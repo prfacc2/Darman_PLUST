@@ -16,6 +16,9 @@ struct CashTicket {
     long long epochMin;
     std::wstring servicesJson;
     std::wstring paidUser;
+    std::wstring mobile, fileNo, archiveNo, insBase, insSupp, receiptNo;
+    std::wstring apptDate, turn, shift, status;
+    std::wstring cancelReason, cancelUser, cancelAt;
     CashTicket():sectionId(0),subId(0),payable(0),paid(0),epochMin(0){}
 };
 
@@ -72,3 +75,18 @@ std::string OpsBackup_Create(const std::wstring& destPath);
 std::string OpsBackup_Analyze(const std::wstring& srcPath);
 std::string OpsBackup_Restore(const std::wstring& srcPath);
 std::string OpsBackup_ProgressJson();
+
+struct ReceiptQuery {
+    std::wstring q, from, to, first, last, nid, mobile;
+    std::wstring fileNo, archive, barcode, doctor;
+    int sectionId;
+    bool onlyUser, byAppt;
+    ReceiptQuery():sectionId(0),onlyUser(false),byAppt(false){}
+};
+std::string Receipt_SearchJson(const ReceiptQuery& q);
+std::string Receipt_GetJson(const std::wstring& id);
+bool Receipt_Delete(const std::wstring& id, std::wstring& err);
+bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err);
+bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out);
+bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err);
+std::string Receipt_SectionsJson();

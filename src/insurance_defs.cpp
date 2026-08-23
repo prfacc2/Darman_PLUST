@@ -222,3 +222,30 @@ const SuppDef* suppDefByIndex(int idx){
     for(const auto& d:cache) if(d.idx==idx) return &d;
     return nullptr;
 }
+
+void InsDefs_SeedDefaults(){
+    if(GetFileAttributesW(insDefsPath().c_str())==INVALID_FILE_ATTRIBUTES){
+        std::vector<InsDef> v;
+        std::wstring today=JalaliTodayKey();
+        for(int i=0;i<N_INSURANCES;i++){
+            InsDef d; d.idx=i; d.groupName=INSURANCES[i].name;
+            d.flipName=INSURANCES[i].name; d.orgShare=INSURANCES[i].pct;
+            d.active=1; d.insType=i==0?L"\u0622\u0632\u0627\u062f":L"\u062f\u0648\u0644\u062a\u06cc";
+            d.created=today; d.modified=today;
+            v.push_back(d);
+        }
+        saveInsDefs(v);
+    }
+    if(GetFileAttributesW(suppDefsPath().c_str())==INVALID_FILE_ATTRIBUTES){
+        std::vector<SuppDef> v;
+        std::wstring today=JalaliTodayKey();
+        for(int i=0;i<N_SUPP;i++){
+            SuppDef d; d.idx=i; d.name=SUPP_INSURANCES[i].name;
+            d.insSpec=SUPP_INSURANCES[i].name; d.active=1;
+            d.franchiseOrgPct=SUPP_INSURANCES[i].pct;
+            d.created=today; d.modified=today;
+            v.push_back(d);
+        }
+        saveSuppDefs(v);
+    }
+}

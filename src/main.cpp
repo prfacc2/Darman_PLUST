@@ -1277,7 +1277,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
     // guarantees the first print already renders the real services-capable
     // design. printPrintDesign also seeds lazily as a belt-and-braces guard.
     { void Sections_Init(); void Designs_Init();
-      Sections_Init(); Designs_Init(); }
+      Sections_Init(); Designs_Init(); InsDefs_SeedDefaults(); }
 
     // v1.66.0: prepare the embedded Patient-Admission surface EAGERLY at
     // launch — registers the shared page verbs and pre-builds the fully
@@ -1553,7 +1553,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
                 // faulted, the crash handler would have already aborted with a
                 // non-zero code. Reaching here means the open path is healthy.
                 void Sections_Init(); void Designs_Init();
-                Sections_Init(); Designs_Init();
+                Sections_Init(); Designs_Init(); InsDefs_SeedDefaults();
                 logLine(L"SMOKE print_designer: subsystems initialized — OK");
                 gdipShutdown(); BackupLog_Shutdown();
                 return 0;

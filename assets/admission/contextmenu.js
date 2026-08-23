@@ -5,8 +5,8 @@
    Behaviour:
      * Right-click on an <input type=text/…> or <textarea>  -> Copy / Cut / Paste
        (+ "انتخاب همه"). Copy/Cut are disabled when there is no selection.
-     * Right-click anywhere else -> the menu is suppressed (no browser menu),
-       matching a clean native desktop feel.
+     * Right-click anywhere on the admission surface -> same menu plus F2
+       (پاک کردن فیلدهای بیمار). The browser menu is always suppressed.
    Uses document.execCommand which is supported by both engines. On MSHTML,
    clipboardData is also used as a fallback for paste when execCommand('paste')
    is blocked.
@@ -136,17 +136,30 @@
     }
   }
 
+  function resetPatient() {
+    try {
+      if (global.AzAdmission && global.AzAdmission.newPatient) {
+        global.AzAdmission.newPatient();
+      }
+    } catch (e) {}
+  }
+
   function showMenu(x, y, el) {
     buildMenu();
     menu.innerHTML = '';
-    var sel = hasSelection(el);
-    addItem('کپی', 'Ctrl+C', sel, function () { doExec('copy'); });
-    addItem('برش', 'Ctrl+X', sel, function () { doExec('cut'); });
-    addItem('چسباندن', 'Ctrl+V', true, function () { pasteInto(el); });
+    var text = isTextField(el);
+    var sel = text && hasSelection(el);
+    addItem('کپی', 'Ctrl+C', !!sel, function () { doExec('copy'); });
+    addItem('برش', 'Ctrl+X', !!sel, function () { doExec('cut'); });
+    addItem('چسباندن', 'Ctrl+V', text, function () { pasteInto(el); });
+    if (text) {
+      addSep();
+      addItem('انتخاب همه', 'Ctrl+A', true, function () {
+        try { el.focus(); el.select(); } catch (e) {}
+      });
+    }
     addSep();
-    addItem('انتخاب همه', 'Ctrl+A', true, function () {
-      try { el.focus(); el.select(); } catch (e) {}
-    });
+    addItem('پاک کردن فیلدهای بیمار', 'F2', true, resetPatient);
 
     menu.style.display = 'block';
     /* position within viewport */
@@ -163,19 +176,14 @@
   function onContextMenu(e) {
     e = e || window.event;
     var el = e.target || e.srcElement;
-    if (isTextField(el)) {
-      if (e.preventDefault) e.preventDefault();
-      e.returnValue = false;
-      try { el.focus(); } catch (ex) {}
-      var x = (e.clientX != null) ? e.clientX : 0;
-      var y = (e.clientY != null) ? e.clientY : 0;
-      showMenu(x, y, el);
-      return false;
-    }
-    /* non-text: suppress the browser's own context menu for a clean UI */
     if (e.preventDefault) e.preventDefault();
     e.returnValue = false;
-    hideMenu();
+    if (isTextField(el)) {
+      try { el.focus(); } catch (ex) {}
+    }
+    var x = (e.clientX != null) ? e.clientX : 0;
+    var y = (e.clientY != null) ? e.clientY : 0;
+    showMenu(x, y, el);
     return false;
   }
 

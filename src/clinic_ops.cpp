@@ -8,6 +8,7 @@
 #include <mutex>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 
 // ---------------------------------------------------------------------------
 //  small local helpers
@@ -84,7 +85,8 @@ static std::mutex g_opsMx;
 
 bool Ops_IsReception(const Section& s){
     if(s.kind==L"reception") return true;
-    return s.name_fa.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos; // پذیرش
+    if(s.kind.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) return true;
+    return s.name_fa.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos;
 }
 
 static const Section* opsFind(const std::vector<Section>& all, int id){
@@ -182,6 +184,20 @@ static std::vector<CashTicket> cashLoad(){
         t.epochMin=_wtoi64(f[16].c_str());
         if(f.size()>=18) t.servicesJson=f[17];
         if(f.size()>=19) t.paidUser=f[18];
+        if(f.size()>=20) t.mobile=f[19];
+        if(f.size()>=21) t.fileNo=f[20];
+        if(f.size()>=22) t.archiveNo=f[21];
+        if(f.size()>=23) t.insBase=f[22];
+        if(f.size()>=24) t.insSupp=f[23];
+        if(f.size()>=25) t.receiptNo=f[24];
+        if(f.size()>=26) t.apptDate=f[25];
+        if(f.size()>=27) t.turn=f[26];
+        if(f.size()>=28) t.shift=f[27];
+        if(f.size()>=29) t.status=f[28];
+        if(f.size()>=30) t.cancelReason=f[29];
+        if(f.size()>=31) t.cancelUser=f[30];
+        if(f.size()>=32) t.cancelAt=f[31];
+        if(t.status.empty()) t.status = t.paid>0 ? L"paid" : L"unpaid";
         out.push_back(t);
     }
     return out;
@@ -200,7 +216,12 @@ static bool cashSave(const std::vector<CashTicket>& rows){
                sid+L"|"+opsEscPipe(t.sectionName)+L"|"+suid+L"|"+opsEscPipe(t.subName)+L"|"+
                pay+L"|"+paid+L"|"+opsEscPipe(t.paidAt)+L"|"+opsEscPipe(t.user)+L"|"+
                opsEscPipe(t.jdate)+L"|"+opsEscPipe(t.time)+L"|"+ep+L"|"+
-               opsEscPipe(t.servicesJson)+L"|"+opsEscPipe(t.paidUser)+L"\r\n";
+               opsEscPipe(t.servicesJson)+L"|"+opsEscPipe(t.paidUser)+L"|"+
+               opsEscPipe(t.mobile)+L"|"+opsEscPipe(t.fileNo)+L"|"+opsEscPipe(t.archiveNo)+L"|"+
+               opsEscPipe(t.insBase)+L"|"+opsEscPipe(t.insSupp)+L"|"+opsEscPipe(t.receiptNo)+L"|"+
+               opsEscPipe(t.apptDate)+L"|"+opsEscPipe(t.turn)+L"|"+opsEscPipe(t.shift)+L"|"+
+               opsEscPipe(t.status)+L"|"+opsEscPipe(t.cancelReason)+L"|"+
+               opsEscPipe(t.cancelUser)+L"|"+opsEscPipe(t.cancelAt)+L"\r\n";
     }
     return writeFileUtf8(opsTicketsPath(), all, false);
 }
@@ -271,6 +292,14 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
     t.paid=0;
     cashStampNow(t, false);
     t.servicesJson=cashBuildServicesJson(r);
+    t.mobile=r.mobile;
+    t.fileNo=r.nationalId;
+    t.insBase=r.insurance;
+    t.insSupp=r.suppInsurance;
+    t.receiptNo=t.barcode;
+    t.apptDate=r.apptDate.empty()?t.jdate:r.apptDate;
+    t.shift=r.shift;
+    t.status=L"unpaid";
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
     rows.push_back(t);
@@ -410,6 +439,7 @@ bool Cash_Pay(const std::wstring& id, std::wstring& err){
     t->paid = t->payable;
     t->paidAt = jalaliDateShort(st)+L" "+iranTimeStr(st,false);
     t->paidUser = g_session.user.username;
+    t->status = L"paid";
     if(!cashSave(rows)){ err=L"ذخیره پرداخت ناموفق بود."; return false; }
     shiftAddIncome(t->paid);
     return true;
@@ -468,7 +498,18 @@ static std::string ticketRowJson(const CashTicket& t, const std::string& extra="
     o+="\"payable\":"+opsJnum(t.payable)+",";
     o+="\"paid\":"+opsJnum(t.paid)+",";
     o+="\"time\":"+opsJstr(t.time)+",";
-    o+="\"date\":"+opsJstr(t.jdate);
+    o+="\"date\":"+opsJstr(t.jdate)+",";
+    o+="\"mobile\":"+opsJstr(t.mobile)+",";
+    o+="\"fileNo\":"+opsJstr(t.fileNo)+",";
+    o+="\"archiveNo\":"+opsJstr(t.archiveNo)+",";
+    o+="\"insBase\":"+opsJstr(t.insBase)+",";
+    o+="\"insSupp\":"+opsJstr(t.insSupp)+",";
+    o+="\"receiptNo\":"+opsJstr(t.receiptNo)+",";
+    o+="\"apptDate\":"+opsJstr(t.apptDate)+",";
+    o+="\"turn\":"+opsJstr(t.turn)+",";
+    o+="\"shift\":"+opsJstr(t.shift)+",";
+    o+="\"status\":"+opsJstr(t.status)+",";
+    o+="\"user\":"+opsJstr(t.user);
     if(!extra.empty()){ o+=","; o+=extra; }
     o+="}";
     return o;
@@ -545,7 +586,7 @@ std::string Cash_GetJson(const std::wstring& id){
         std::string svc=opsW2u8(t.servicesJson);
         if(svc.empty()) svc="[]";
         std::string extra="\"services\":"+svc+",\"paidAt\":"+opsJstr(t.paidAt)+
-            ",\"user\":"+opsJstr(t.user)+",\"paidUser\":"+opsJstr(t.paidUser);
+            ",\"paidUser\":"+opsJstr(t.paidUser);
         return std::string("{\"ok\":true,\"ticket\":")+ticketRowJson(t, extra)+"}";
     }
     return "{\"ok\":false,\"err\":\"بلیت پیدا نشد.\"}";
@@ -569,6 +610,147 @@ std::string Calendar_ListJson(const std::wstring& fromJalali,
         if(!first) o+=",";
         first=false;
         o+=shiftJson(s, s.status==L"open");
+    }
+    o+="]}";
+    return o;
+}
+
+static bool recHas(const std::wstring& hay, const std::wstring& needle){
+    if(needle.empty()) return true;
+    return opsNormDigits(hay).find(opsNormDigits(needle))!=std::wstring::npos;
+}
+
+std::string Receipt_SearchJson(const ReceiptQuery& q){
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    std::wstring fromN=opsNormDigits(q.from);
+    std::wstring toN=opsNormDigits(q.to);
+    std::wstring user=g_session.user.username;
+    std::string list="[";
+    bool first=true;
+    for(int i=(int)rows.size()-1;i>=0;--i){
+        const CashTicket& t=rows[i];
+        std::wstring day=opsNormDigits(t.jdate);
+        if(!fromN.empty() && day<fromN) continue;
+        if(!toN.empty() && day>toN) continue;
+        if(q.sectionId>0 && t.sectionId!=q.sectionId) continue;
+        if(q.onlyUser && t.user!=user) continue;
+        if(q.byAppt && t.apptDate.empty()) continue;
+        if(!recHas(t.first,q.first)) continue;
+        if(!recHas(t.last,q.last)) continue;
+        if(!recHas(t.nid,q.nid)) continue;
+        if(!recHas(t.mobile,q.mobile)) continue;
+        if(!recHas(t.fileNo,q.fileNo)) continue;
+        if(!recHas(t.archiveNo,q.archive)) continue;
+        if(!recHas(t.barcode,q.barcode) && !recHas(t.receiptNo,q.barcode)) continue;
+        if(!recHas(t.doctor,q.doctor)) continue;
+        if(!q.q.empty()){
+            std::wstring hay=t.first+L" "+t.last+L" "+t.nid+L" "+t.barcode+L" "+
+                             t.doctor+L" "+t.mobile+L" "+t.fileNo+L" "+t.receiptNo;
+            if(!recHas(hay,q.q)) continue;
+        }
+        if(!first) list+=",";
+        first=false;
+        list+=ticketRowJson(t);
+    }
+    list+="]";
+    return std::string("{\"ok\":true,\"rows\":")+list+"}";
+}
+
+std::string Receipt_GetJson(const std::wstring& id){
+    return Cash_GetJson(id);
+}
+
+bool Receipt_Delete(const std::wstring& id, std::wstring& err){
+    if(g_session.user.role<1){ err=L"فقط مدیر می‌تواند قبض را حذف کند."; return false; }
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    size_t before=rows.size();
+    rows.erase(std::remove_if(rows.begin(),rows.end(),
+        [&](const CashTicket& t){ return t.id==id; }), rows.end());
+    if(rows.size()==before){ err=L"قبض پیدا نشد."; return false; }
+    if(!cashSave(rows)){ err=L"حذف قبض ناموفق بود."; return false; }
+    return true;
+}
+
+bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err){
+    if(g_session.user.role<1){ err=L"فقط مدیر می‌تواند قبض را حذف کند."; return false; }
+    if(ids.empty()){ err=L"موردی انتخاب نشده."; return false; }
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    std::vector<CashTicket> keep;
+    for(const auto& t:rows){
+        bool drop=false;
+        for(const auto& id:ids) if(t.id==id){ drop=true; break; }
+        if(!drop) keep.push_back(t);
+    }
+    if(!cashSave(keep)){ err=L"حذف گروهی ناموفق بود."; return false; }
+    return true;
+}
+
+bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err){
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    CashTicket* t=nullptr;
+    for(auto& r:rows) if(r.id==id){ t=&r; break; }
+    if(!t){ err=L"قبض پیدا نشد."; return false; }
+    SYSTEMTIME st=iranNow();
+    t->status=L"cancelled";
+    t->cancelReason=reason;
+    t->cancelUser=g_session.user.username;
+    t->cancelAt=jalaliDateShort(st)+L" "+iranTimeStr(st,false);
+    if(!cashSave(rows)){ err=L"لغو قبض ناموفق بود."; return false; }
+    return true;
+}
+
+bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out){
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    const CashTicket* t=nullptr;
+    for(const auto& r:rows) if(r.id==id){ t=&r; break; }
+    if(!t) return false;
+    out=ReceptionRecord();
+    out.firstName=t->first; out.lastName=t->last; out.nationalId=t->nid;
+    out.mobile=t->mobile; out.treatingDoctor=t->doctor;
+    out.insurance=t->insBase; out.suppInsurance=t->insSupp;
+    out.apptDate=t->apptDate.empty()?t->jdate:t->apptDate;
+    out.shift=t->shift; out.insNo=t->barcode;
+    out.receiptBarcode=t->barcode;
+    out.finalTotal=t->payable; out.paid=t->paid; out.patientShare=t->payable;
+    out.userName=t->user;
+    out.regStamp=t->jdate+L" "+t->time;
+    std::wstring js=t->servicesJson;
+    // parse a tiny [{"code":"..","name":"..","qty":1,"price":0,"patShare":0},...]
+    size_t p=0;
+    while(true){
+        size_t c=js.find(L"\"code\":\"",p); if(c==std::wstring::npos) break;
+        c+=8; size_t ce=js.find(L'"',c); if(ce==std::wstring::npos) break;
+        ServiceLine sl; sl.code=js.substr(c,ce-c);
+        size_t n=js.find(L"\"name\":\"",ce); if(n==std::wstring::npos) break;
+        n+=8; size_t ne=js.find(L'"',n); if(ne==std::wstring::npos) break;
+        sl.name=js.substr(n,ne-n);
+        size_t qpos=js.find(L"\"qty\":",ne);
+        if(qpos!=std::wstring::npos) sl.qty=_wtoi(js.c_str()+qpos+6);
+        size_t pr=js.find(L"\"price\":",ne);
+        if(pr!=std::wstring::npos) sl.price=_wtoi64(js.c_str()+pr+8);
+        size_t ps=js.find(L"\"patShare\":",ne);
+        if(ps!=std::wstring::npos) sl.patShare=_wtoi64(js.c_str()+ps+11);
+        if(sl.qty<1) sl.qty=1;
+        out.services.push_back(sl);
+        p=ne+1;
+    }
+    return true;
+}
+
+std::string Receipt_SectionsJson(){
+    std::vector<Section> secs; Sections_All(secs);
+    std::string o="{\"ok\":true,\"rows\":[";
+    bool first=true;
+    for(const auto& s:secs){
+        if(!s.is_active || s.parent_id!=0) continue;
+        if(!first) o+=",";
+        first=false;
+        o+="{\"id\":"+opsJnum(s.id)+",\"name\":"+opsJstr(s.name_fa)+"}";
     }
     o+="]}";
     return o;
@@ -656,6 +838,17 @@ static void opsEnsureParent(const std::wstring& path){
     CreateDirectoryW(dir.c_str(), NULL);
 }
 
+static const unsigned char OPS_K[16]={
+    0xA3,0x5C,0x19,0xE7,0x42,0xB8,0x6D,0x0F,0x91,0x2A,0xC4,0x77,0x3E,0xD1,0x58,0x8B
+};
+static void opsMix(unsigned char* p, size_t n, unsigned long long off){
+    for(size_t i=0;i<n;i++){
+        unsigned char k=OPS_K[(off+i)&15];
+        p[i]=(unsigned char)(p[i]^k^(unsigned char)((off+i)*13u));
+    }
+}
+static bool g_bkPacked=true;
+
 static bool opsBkOpen(const std::wstring& path, HANDLE& hf, std::wstring& err, long long* pos){
     hf=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,NULL,
                    OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
@@ -670,15 +863,31 @@ static bool opsBkOpen(const std::wstring& path, HANDLE& hf, std::wstring& err, l
         err=L"قالب فایل پشتیبان معتبر نیست.";
         return false;
     }
+    char peek[96]; DWORD pr=0;
+    ReadFile(hf,peek,96,&pr,NULL);
+    bool looks=false;
+    for(DWORD i=0;i<pr;i++){
+        if(peek[i]=='\t'){ looks=true; break; }
+    }
+    g_bkPacked=!looks;
+    SetFilePointer(hf,9,NULL,FILE_BEGIN);
     if(pos) *pos=9;
+    return true;
+}
+static bool opsBkRead(HANDLE hf, void* buf, DWORD n, DWORD* rd, long long* pos){
+    if(!ReadFile(hf,buf,n,rd,NULL)||!*rd) return false;
+    if(g_bkPacked){
+        unsigned long long off=pos? (unsigned long long)(*pos-9) : 0;
+        opsMix((unsigned char*)buf,*rd,off);
+    }
+    if(pos) *pos+=*rd;
     return true;
 }
 static bool opsBkReadLine(HANDLE hf, std::string& line, long long* pos){
     line.clear();
     char c; DWORD r1=0;
     while(true){
-        if(!ReadFile(hf,&c,1,&r1,NULL)||r1==0) return false;
-        if(pos) (*pos)++;
+        if(!opsBkRead(hf,&c,1,&r1,pos)) return false;
         if(c=='\n') return true;
         line+=c;
     }
@@ -694,9 +903,8 @@ static void opsBkSkipBody(HANDLE hf, long long fsz, std::vector<char>& buf, long
     long long left=fsz; DWORD rd=0;
     while(left>0){
         DWORD chunk=(DWORD)((left<(long long)buf.size())?left:buf.size());
-        if(!ReadFile(hf,buf.data(),chunk,&rd,NULL)||rd==0) break;
+        if(!opsBkRead(hf,buf.data(),chunk,&rd,pos)) break;
         left-=rd;
-        if(pos) *pos+=rd;
     }
 }
 
@@ -721,18 +929,26 @@ static unsigned __stdcall opsBkWorker(void* p){
         { const char* hdr="AZTBKP01\n"; WriteFile(out,hdr,9,&wr,NULL); }
         std::vector<char> buf(1<<20);
         long long done=0;
+        unsigned long long packOff=0;
+        auto packWrite=[&](const void* p, DWORD n){
+            if(!n) return;
+            std::vector<unsigned char> tmp((const unsigned char*)p,(const unsigned char*)p+n);
+            opsMix(tmp.data(),n,packOff);
+            packOff+=n;
+            WriteFile(out,tmp.data(),n,&wr,NULL);
+        };
         for(size_t i=0;i<files.size();i++){
             std::wstring rel=files[i].substr(dir.size()+1);
             std::string relU=opsW2u8(rel);
             char line[1600];
             int ln=_snprintf(line,sizeof(line),"%s\t%lld\n",relU.c_str(),sizes[i]);
-            WriteFile(out,line,ln,&wr,NULL);
+            packWrite(line,(DWORD)ln);
             HANDLE in=CreateFileW(files[i].c_str(),GENERIC_READ,FILE_SHARE_READ,NULL,
                                   OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
             if(in!=INVALID_HANDLE_VALUE){
                 DWORD rd=0;
                 while(ReadFile(in,buf.data(),(DWORD)buf.size(),&rd,NULL) && rd>0){
-                    WriteFile(out,buf.data(),rd,&wr,NULL);
+                    packWrite(buf.data(),rd);
                     done+=rd;
                     bkSet((int)(done*100/total), L"در حال نوشتن: "+rel);
                 }
@@ -741,7 +957,7 @@ static unsigned __stdcall opsBkWorker(void* p){
                 bkLogErr(L"خواندن ناموفق: "+rel);
             }
         }
-        { const char* end="END\n"; WriteFile(out,end,4,&wr,NULL); }
+        { const char end[]="END\n"; packWrite(end,4); }
         CloseHandle(out);
         bkSet(100, L"پشتیبان‌گیری با موفقیت کامل شد.");
         bkBusy(false);
@@ -777,9 +993,9 @@ static unsigned __stdcall opsBkWorker(void* p){
         long long left=fsz2;
         while(left>0){
             DWORD chunk=(DWORD)((left<(long long)buf.size())?left:buf.size());
-            if(!ReadFile(hf,buf.data(),chunk,&rd,NULL)||rd==0) break;
+            if(!opsBkRead(hf,buf.data(),chunk,&rd,&pos)) break;
             if(out!=INVALID_HANDLE_VALUE){ DWORD wr=0; WriteFile(out,buf.data(),rd,&wr,NULL); }
-            left-=rd; pos+=rd;
+            left-=rd;
             bkSet((int)(pos*100/total), L"در حال بازیابی: "+rel);
         }
         if(out!=INVALID_HANDLE_VALUE) CloseHandle(out);

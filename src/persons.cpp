@@ -176,8 +176,29 @@ std::wstring resolveSessionTitle(const User& u){
         EmpProfile e=loadEmpProfile(u.username);
         pos=e.position;
     }
-    if(pos.empty())
-        pos = (u.role==2) ? L"مدیر سامانه" : (u.role==1) ? L"مدیریت" : L"پرسنل";
+    if(pos.empty()){
+        if(u.role==2) pos=L"مدیر سامانه";
+        else if(u.role==1) pos=L"مدیریت";
+        else {
+            PersonDef pr;
+            bool rec=false;
+            if(personByUsername(u.username,pr)){
+                std::vector<Section> all; Sections_All(all);
+                int did=_wtoi(pr.deptId.c_str());
+                int sid=_wtoi(pr.subId.c_str());
+                for(const auto& s:all){
+                    if(s.id!=did && s.id!=sid) continue;
+                    if(s.kind==L"reception" ||
+                       s.kind.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos ||
+                       s.name_fa.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos){
+                        rec=true; break;
+                    }
+                }
+            }
+            if(!rec && u.dept.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) rec=true;
+            pos = rec ? L"\u067e\u0630\u06cc\u0631\u0634" : L"پرسنل";
+        }
+    }
     return pos;
 }
 

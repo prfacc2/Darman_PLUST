@@ -166,7 +166,22 @@
       st.depts = d.sects || [];            /* v1.80.0: clinical sections tree */
       st.legacyDepts = d.depts || [];      /* organisational DeptCat (legacy) */
       st.totalUsers = d.totalUsers || st.users.length;
-      render(host, st.users, st.depts);
+      function go() { render(host, st.users, st.depts); }
+      if (!st.depts.length) {
+        Crm.call('crm.sections.list', {}).then(function (s) {
+          var rows = s.rows || [], i;
+          st.depts = [];
+          for (i = 0; i < rows.length; i++) {
+            st.depts.push({
+              id: rows[i].id, name: rows[i].name, code: rows[i].code,
+              parentId: rows[i].parentId || 0, kindLabel: rows[i].kindLabel
+            });
+          }
+          go();
+        }, go);
+        return;
+      }
+      go();
     }, function () {
       host.innerHTML = '';
       Crm.head(host, 'تعریف حساب کاربری', 'ساخت و مدیریت حساب‌های پرسنل');
@@ -174,17 +189,13 @@
     });
   }
 
-  /* the personnel pick-list (driven by dept + search).
-     v1.80.0: NO bulk dump — until a department is chosen or a search of 2+
-     characters is typed, the list stays a hint instead of loading everyone. */
+  /* personnel pick-list: search by name / personnel code / national ID from
+     the first character. People who already have an account stay visible but
+     marked. No 2-character / department gate. */
   function loadPersonPick(host) {
     var box = Crm.$('accPersonList');
-    if (!st.dept && (!st.q || st.q.length < 2)) {
-      if (box) box.innerHTML = '<div class="crm-empty-line">یک بخش انتخاب کنید یا حداقل ۲ حرف جستجو تایپ کنید — لیست پرسنل زنده اینجا می‌آید.</div>';
-      return;
-    }
-    var params = { q: st.q };
-    if (st.dept) params.deptId = st.dept;   /* «__none__» is server-side */
+    var params = { q: st.q || '' };
+    if (st.dept) params.deptId = st.dept;
     Crm.call('crm.persons.list', params).then(function (d) {
       var rows = d.rows || [];
       var box = Crm.$('accPersonList');
@@ -276,9 +287,10 @@
     form.innerHTML =
       /* personnel mode */
       '<div class="crm-field accmode-p"><label class="crm-label">بخش</label>' +
+        '<input class="crm-input" id="accSectQ" placeholder="جستجوی بخش…" />' +
         '<select class="crm-select" id="accDept">' + deptFilterOpts(depts) + '</select></div>' +
       '<div class="crm-field accmode-p"><label class="crm-label">جستجو (کد پرسنلی / نام / کد ملی)</label>' +
-        '<input class="crm-input" id="accQ" placeholder="تایپ کنید — لیست زنده به‌روز می‌شود…" /></div>' +
+        '<input class="crm-input" id="accQ" placeholder="نام، کد پرسنلی یا کد ملی — بدون حساب هم پیدا می‌شود" /></div>' +
       '<div class="crm-field full accmode-p"><div class="crm-picklist" id="accPersonList"></div></div>' +
       '<div class="crm-field full accmode-p"><div class="crm-banner" id="accPickedInfo">هنوز پرسنلی انتخاب نشده است.</div></div>' +
       /* management mode (kept from the old «کاربران» page — nothing is lost) */
@@ -354,15 +366,8 @@
         } },
       { key: 'ops', label: 'عملیات', render: function (r) {
           var b = Crm.el('span');
-          b.innerHTML = '<button class="crm-row-btn" data-act="info">اطلاعات بخش</button>' +
-                        '<button class="crm-row-btn danger" data-act="del">حذف</button>';
+          b.innerHTML = '<button class="crm-row-btn" data-act="info">اطلاعات بخش</button>';
           b.childNodes[0].onclick = function () { Crm.viewDeptInfo(r.id); };
-          b.childNodes[1].onclick = function () {
-            Crm.confirm('حذف بخش «' + r.name + '»؟\nلینک بخش پرسنلش قطع می‌شود و زیربخش‌هایش بدون بخش والد می‌مانند (در «تعریف بخش و زیربخش» دوباره مدیریت می‌شوند).', function () {
-              Crm.call('crm.sections.delete', { id: +r.id }).then(function () { Crm.toast('بخش حذف شد.', 'ok'); load(host); },
-                function () { Crm.toast('حذف ناموفق بود.', 'err'); });
-            }, { danger: true });
-          };
           return b;
         } }
     ], tops));
@@ -388,15 +393,8 @@
         { key: 'manager', label: 'مدیر بخش', render: function (r) { return Crm.esc(r.manager || '—'); } },
         { key: 'ops', label: 'عملیات', render: function (r) {
             var b = Crm.el('span');
-            b.innerHTML = '<button class="crm-row-btn" data-act="info">اطلاعات</button>' +
-                          '<button class="crm-row-btn danger" data-act="del">حذف</button>';
+            b.innerHTML = '<button class="crm-row-btn" data-act="info">اطلاعات</button>';
             b.childNodes[0].onclick = function () { Crm.viewOrgDeptInfo(r.id); };
-            b.childNodes[1].onclick = function () {
-              Crm.confirm('حذف بخش «' + r.name + '»؟', function () {
-                Crm.call('crm.depts.delete', { id: r.id }).then(function () { Crm.toast('بخش حذف شد.', 'ok'); load(host); },
-                  function () { Crm.toast('حذف ناموفق بود.', 'err'); });
-              }, { danger: true });
-            };
             return b;
           } }
       ], legacy));
@@ -405,6 +403,20 @@
 
     /* wire card 1 */
     Crm.$('accDept').onchange = function () { st.dept = this.value; st.picked = null; loadPersonPick(host); renderPickInfoOnly(host); };
+    if (Crm.$('accSectQ')) {
+      Crm.$('accSectQ').oninput = function () {
+        var q = (this.value || '').toLowerCase();
+        var sel = Crm.$('accDept');
+        if (!sel) return;
+        var i, t, show;
+        for (i = 0; i < sel.options.length; i++) {
+          t = ((sel.options[i].text || '') + '').toLowerCase();
+          show = !q || t.indexOf(q) >= 0 || i === 0;
+          sel.options[i].disabled = !show;
+          sel.options[i].hidden = !show;
+        }
+      };
+    }
     var qT = null;
     Crm.$('accQ').oninput = function () {
       var v = this.value;

@@ -25,6 +25,16 @@
 
   <div id="app" class="app">
 
+    <!-- v1.83: tab strip lives OUTSIDE #appBody so Ctrl+scroll zoom never scales it. -->
+    <div class="app-tabs" id="appTabs">
+      <button type="button" class="app-tab active" id="tabAdmMain" data-view="adm">
+        <span class="tab-band" id="tabAdmBand"></span>پذیرش
+      </button>
+      <button type="button" class="app-tab" id="tabToolsMain" data-view="tools" style="display:none">
+        <span class="tab-band" id="tabToolsBand"></span>ابزارها
+      </button>
+    </div>
+
     <!-- v1.59 CLINICAL WORKSPACE — three visibly separated zones.
          Column order (RTL, right → left):
            col-action  (RIGHT)  → patient profile first, submit directly beneath it
@@ -93,16 +103,15 @@
           <span class="i"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg></span>
           صندوق نرفته‌ها و صف پذیرش
         </button>
-        <button class="btn queue-hub-btn cash-hub-rail" id="cashLauncher">
-          <span class="i"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg></span>
-          صندوق <span class="cash-f7">F7</span>
-        </button>
 
         <!-- v1.60.0: چاپ‌ها از نوار نیتیو پایین به داخل صفحه آمدند — خوش‌چین پایین ریل راست -->
         <section class="card print-card">
-          <div class="card-head"><span class="card-title">
+          <div class="card-head">
+            <span class="card-title">
             <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M6 3h12v4H6V3zm0 6h12a3 3 0 013 3v5h-3v4H6v-4H3v-5a3 3 0 013-3zm1 8v3h10v-3H7z"/></svg>
-            چاپ اسناد</span></div>
+            چاپ اسناد</span>
+            <button type="button" class="btn btn-sm btn-tools" id="toolsBtn">ابزارها</button>
+          </div>
           <div class="card-body print-grid">
             <button class="btn btn-print btn-print-primary" id="btnPrtLast">
               <span class="i"><svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M6 3h12v4H6V3zm0 6h12a3 3 0 013 3v5h-3v4H6v-4H3v-5a3 3 0 013-3zm1 8v3h10v-3H7z"/></svg></span>
@@ -347,11 +356,92 @@
              more, so the left column ends cleanly with the payment card. -->
       </aside>
     </div>
+
+    <!-- v1.83: Tools stays a sibling of #appBody so the admission form is never destroyed. -->
+    <div class="tools-panel" id="toolsPanel" aria-hidden="true">
+      <div class="tools-home" id="toolsHome">
+        <div class="tools-home-head">
+          <button type="button" class="btn btn-outline" id="toolsBack">بازگشت به پذیرش</button>
+          <h2 class="tools-title">ابزارها</h2>
+        </div>
+        <div class="tools-grid">
+          <button type="button" class="tools-tile" id="toolsReceipts">
+            <span class="tools-tile-ico">⌕</span>
+            <span class="tools-tile-name">جستجوی قبض</span>
+            <span class="tools-tile-sub">فیلتر، چاپ مجدد، خروجی اکسل</span>
+          </button>
+          <button type="button" class="tools-tile" id="toolsCash">
+            <span class="tools-tile-ico">﷼</span>
+            <span class="tools-tile-name">صندوق <span class="cash-f7">F7</span></span>
+            <span class="tools-tile-sub">شیفت، پرداخت، سند دستی</span>
+          </button>
+        </div>
+      </div>
+      <div class="tools-receipts" id="toolsReceiptsView">
+        <div class="tools-rc-head">
+          <button type="button" class="btn btn-outline" id="rcBack">بازگشت به ابزارها</button>
+          <h2 class="tools-title">جستجوی قبض</h2>
+          <span class="tools-rc-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="rcSearchBtn">جستجو</button>
+            <button type="button" class="btn btn-outline btn-sm" id="rcExcel">خروجی اکسل</button>
+            <button type="button" class="btn btn-outline btn-sm" id="rcPrint">چاپ قبض</button>
+            <button type="button" class="btn btn-danger btn-sm" id="rcDelete" style="display:none">حذف</button>
+          </span>
+        </div>
+        <div class="rc-filters">
+          <label class="fld"><span>بخش</span><select id="rcSect" class="inp"></select></label>
+          <label class="fld"><span>از تاریخ</span><input type="text" id="rcFrom" class="inp" data-date maxlength="10" /></label>
+          <label class="fld"><span>تا تاریخ</span><input type="text" id="rcTo" class="inp" data-date maxlength="10" /></label>
+          <label class="fld"><span>نام</span><input type="text" id="rcFirst" class="inp" /></label>
+          <label class="fld"><span>نام خانوادگی</span><input type="text" id="rcLast" class="inp" /></label>
+          <label class="fld"><span>کد ملی</span><input type="text" id="rcNid" class="inp" inputmode="numeric" /></label>
+          <label class="fld"><span>موبایل</span><input type="text" id="rcMobile" class="inp" inputmode="numeric" /></label>
+          <label class="fld"><span>ش پرونده</span><input type="text" id="rcFile" class="inp" /></label>
+          <label class="fld"><span>بایگانی</span><input type="text" id="rcArch" class="inp" /></label>
+          <label class="fld"><span>بارکد</span><input type="text" id="rcBar" class="inp" /></label>
+          <label class="fld"><span>پزشک</span><input type="text" id="rcDoc" class="inp" /></label>
+          <label class="fld rc-tick"><span>&nbsp;</span>
+            <label class="chk"><input type="checkbox" id="rcOnlyUser" /> کاربر فعال</label>
+          </label>
+          <label class="fld rc-tick"><span>&nbsp;</span>
+            <label class="chk"><input type="checkbox" id="rcByAppt" /> نمایش بر اساس نوبت</label>
+          </label>
+        </div>
+        <div class="tbl-wrap rc-tbl-wrap" id="rcWrap">
+          <table class="tbl rc-tbl" id="rcTable">
+            <thead><tr>
+              <th class="c-chk"><input type="checkbox" id="rcAll" /></th>
+              <th data-col="barcode">بارکد</th>
+              <th data-col="fileNo">ش پرونده</th>
+              <th data-col="nid">کد ملی</th>
+              <th data-col="name">نام بیمار</th>
+              <th data-col="insBase">بیمه پایه</th>
+              <th data-col="insSupp">بیمه تکمیلی</th>
+              <th data-col="receiptNo">ش قبض</th>
+              <th data-col="date">تاریخ پذیرش</th>
+              <th data-col="apptDate">تاریخ نوبت</th>
+              <th data-col="turn">نوبت</th>
+              <th data-col="shift">شیفت</th>
+              <th data-col="cash">صندوق</th>
+            </tr></thead>
+            <tbody id="rcBody"><tr><td colspan="13" class="empty">جستجو کنید</td></tr></tbody>
+          </table>
+        </div>
+        <div class="rc-legend">
+          <span class="lg lg-yellow">زرد پرداخت نکرده</span>
+          <span class="lg lg-orange">نارنجی حذف بیمه‌ای</span>
+          <span class="lg lg-red">قرمز استرداد</span>
+          <span class="lg lg-purple">بنفش بدهکار</span>
+          <span class="lg lg-soap">صابونی بستانکار</span>
+          <span class="lg lg-green">سبز کم‌رنگ نوبت از قبل</span>
+          <span class="lg lg-blue">آبی روشن جوابدهی شده</span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- v1.64.0 (درمان پلاس) — FULL-SCREEN queue overlay. It covers the entire
-       admission viewport (sized to the user's monitor, not a fixed box) so it
-       never collides with the form or leaves half the page visible behind it. -->
+  <!-- v1.83: queue overlay is a centered panel (not full-screen) and is a
+       sibling of #app so admission zoom never scales it. -->
   <div class="queue-backdrop" id="queueBackdrop"></div>
   <section class="queue-overlay" id="queuePanel" aria-hidden="true">
     <div class="queue-overlay-head">
@@ -434,16 +524,18 @@
       <div class="tbl-wrap" id="cashWrap">
         <table class="tbl q-tbl">
           <thead><tr>
-            <th>بارکد</th><th>نام و نام خانوادگی</th><th>قابل پرداخت</th>
-            <th>نام پزشک</th><th>نام بخش</th><th>ساعت</th><th>تاریخ</th><th class="c-act">عملیات</th>
+            <th data-col="barcode">بارکد</th><th data-col="name">نام و نام خانوادگی</th>
+            <th data-col="payable">قابل پرداخت</th>
+            <th data-col="doctor">نام پزشک</th><th data-col="section">نام بخش</th>
+            <th data-col="time">ساعت</th><th data-col="date">تاریخ</th><th class="c-act">عملیات</th>
           </tr></thead>
           <tbody id="cashBody"><tr><td colspan="8" class="empty">موردی در صندوق نیست</td></tr></tbody>
         </table>
       </div>
       <div class="queue-foot cash-foot">
         <span>
-          <button type="button" class="btn btn-outline" id="cashShiftStart">شروع شیفت</button>
-          <button type="button" class="btn btn-outline" id="cashShiftEnd">پایان شیفت</button>
+          <button type="button" class="btn cash-shift-start" id="cashShiftStart">▶ شروع شیفت</button>
+          <button type="button" class="btn cash-shift-end" id="cashShiftEnd">■ پایان شیفت</button>
           <button type="button" class="btn btn-primary" id="cashManualBtn">ثبت سند دستی</button>
         </span>
       </div>
@@ -469,6 +561,27 @@
       </div>
     </div>
   </section>
+
+  <div class="cash-dlg ops-dlg" id="opsDlg" style="display:none">
+    <div class="cash-dlg-card">
+      <div class="cash-dlg-msg" id="opsDlgMsg"></div>
+      <div class="cash-dlg-act">
+        <button type="button" class="btn btn-outline" id="opsDlgNo">انصراف</button>
+        <button type="button" class="btn btn-primary" id="opsDlgYes">تأیید</button>
+      </div>
+    </div>
+  </div>
+  <div class="cash-dlg ops-dlg" id="cancelDlg" style="display:none">
+    <div class="cash-dlg-card">
+      <div class="cash-dlg-msg">لغو پذیرش</div>
+      <label class="fld"><span>حساب</span><input type="text" id="cancelAcct" class="inp" readonly /></label>
+      <label class="fld"><span>علت لغو</span><input type="text" id="cancelReason" class="inp" /></label>
+      <div class="cash-dlg-act">
+        <button type="button" class="btn btn-outline" id="cancelDlgNo">انصراف</button>
+        <button type="button" class="btn btn-danger" id="cancelDlgYes">ادامه</button>
+      </div>
+    </div>
+  </div>
 
   <div id="blockModal" class="modal-overlay" aria-hidden="true">
     <div class="modal-card">

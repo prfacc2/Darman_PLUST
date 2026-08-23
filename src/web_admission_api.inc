@@ -319,14 +319,16 @@ static void adQueueSave(const std::vector<AdQueueRow>& rows,bool admissionQueue)
     }
     writeFileUtf8(adQueuePath(admissionQueue),all,false);
 }
-static std::string adQueueJson(bool admissionQueue){
+static std::string adQueueJson(bool admissionQueue, int hours){
     auto rows=adQueueLoad(admissionQueue);
     long long now=adEpochMinutes();
+    long long win = hours>0 ? now-(long long)hours*60 : 0;
     // newest first
     std::string o="{\"rows\":[";
     for(size_t i=0;i<rows.size();++i){
         // reverse index for newest-first
         const AdQueueRow& r=rows[rows.size()-1-i];
+        if(hours>0 && r.epochMin<win) continue;
         if(i)o+=",";
         long long mins=now-r.epochMin; if(mins<0) mins=0;
         std::wstring full=r.first+L" "+r.last;
@@ -581,7 +583,9 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+="\"cashier_view\":";  o+=(userHasPerm(g_session.user,L"cashier_view")?"true":"false"); o+=",";
         o+="\"cashier_edit\":";  o+=(userHasPerm(g_session.user,L"cashier_edit")?"true":"false"); o+=",";
         o+="\"settings\":";      o+=(userHasPerm(g_session.user,L"settings")?"true":"false");
-        o+="}";
+        o+="},";
+        o+="\"role\":"+jnum(g_session.user.role)+",";
+        o+="\"user\":"+jstr(g_session.user.fullname.empty()?g_session.user.username:g_session.user.fullname);
         o+="}";
         return o;
     }
@@ -694,6 +698,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         for(size_t i=0;i<docs.size();++i){
             const auto& d=docs[i];
             if(onlyPerformers && !d.isPerformer) continue;
+            if(!onlyPerformers && d.docType==1) continue;
             wchar_t cb[16]; swprintf(cb,16,L"%d",(int)i+1);
             std::wstring dcode=cb;
             bool hit;
@@ -758,7 +763,8 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     // ---- queue.list: صندوق نرفته‌ها -----------------------------------------
     if(verb=="queue.list"){
         std::string kind; jsonGetString(body,"kind",kind);
-        return adQueueJson(kind=="admission");
+        double hours=24; jsonGetNumber(body,"hours",hours);
+        return adQueueJson(kind=="admission",(int)hours);
     }
 
     // ---- queue.add: push current admission into صندوق نرفته‌ها --------------
@@ -792,6 +798,145 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::vector<AdQueueRow> keep;
         for(const auto& r:rows) if(r.id!=id) keep.push_back(r);
         adQueueSave(keep,admissionQueue);
+        return "{\"ok\":true}";
+    }
+    if(verb=="queue.transfer"){
+        std::string idU,fromU,toU;
+        jsonGetString(body,"id",idU);
+        jsonGetString(body,"from",fromU);
+        jsonGetString(body,"to",toU);
+        std::wstring id=u82w(idU);
+        bool srcAdm=fromU=="admission";
+        bool dstAdm=toU=="admission";
+        auto src=adQueueLoad(srcAdm);
+        AdQueueRow found; bool have=false;
+        std::vector<AdQueueRow> keep;
+        for(const auto& r:src){
+            if(r.id==id){ found=r; have=true; }
+            else keep.push_back(r);
+        }
+        if(!have) return "{\"ok\":false,\"err\":\"ردیف پیدا نشد.\"}";
+        adQueueSave(keep,srcAdm);
+        auto dst=adQueueLoad(dstAdm);
+        if(dstAdm){
+            wchar_t tb[16]; swprintf(tb,16,L"%d",(int)dst.size()+1);
+            found.barcode=found.barcode;
+        }
+        dst.push_back(found);
+        adQueueSave(dst,dstAdm);
+        return "{\"ok\":true}";
+    }
+    if(verb=="queue.pay"){
+        std::string idU; jsonGetString(body,"id",idU);
+        std::wstring id=u82w(idU);
+        auto rows=adQueueLoad(false);
+        AdQueueRow found; bool have=false;
+        std::vector<AdQueueRow> keep;
+        for(const auto& r:rows){
+            if(r.id==id){ found=r; have=true; }
+            else keep.push_back(r);
+        }
+        if(!have) return "{\"ok\":false,\"err\":\"ردیف پیدا نشد.\"}";
+        std::wstring err;
+        bool paid=false;
+        ReceiptQuery q; q.nid=found.nid; q.barcode=found.barcode;
+        std::string sj=Receipt_SearchJson(q);
+        std::string tidU; jsonGetString(sj,"id",tidU);
+        if(!tidU.empty() && Cash_Pay(u82w(tidU),err)) paid=true;
+        else if(found.amount>0 && Cash_Manual(found.nid,found.first,found.last,L"",found.amount,err))
+            paid=true;
+        adQueueSave(keep,false);
+        if(!paid && !err.empty())
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="queue.cancel"){
+        std::string idU,reasonU,kindU;
+        jsonGetString(body,"id",idU);
+        jsonGetString(body,"reason",reasonU);
+        jsonGetString(body,"kind",kindU);
+        std::wstring id=u82w(idU);
+        bool adm=kindU=="admission";
+        auto rows=adQueueLoad(adm);
+        std::vector<AdQueueRow> keep;
+        AdQueueRow found; bool have=false;
+        for(const auto& r:rows){
+            if(r.id==id){ found=r; have=true; }
+            else keep.push_back(r);
+        }
+        if(!have) return "{\"ok\":false,\"err\":\"ردیف پیدا نشد.\"}";
+        adQueueSave(keep,adm);
+        std::wstring err;
+        Receipt_Cancel(id,u82w(reasonU),err);
+        return "{\"ok\":true}";
+    }
+    if(verb=="receipt.search"){
+        ReceiptQuery q;
+        std::string t;
+        if(jsonGetString(body,"q",t)) q.q=u82w(t);
+        if(jsonGetString(body,"from",t)) q.from=u82w(t);
+        if(jsonGetString(body,"to",t)) q.to=u82w(t);
+        if(jsonGetString(body,"first",t)) q.first=u82w(t);
+        if(jsonGetString(body,"last",t)) q.last=u82w(t);
+        if(jsonGetString(body,"nid",t)) q.nid=u82w(t);
+        if(jsonGetString(body,"mobile",t)) q.mobile=u82w(t);
+        if(jsonGetString(body,"fileNo",t)) q.fileNo=u82w(t);
+        if(jsonGetString(body,"archive",t)) q.archive=u82w(t);
+        if(jsonGetString(body,"barcode",t)) q.barcode=u82w(t);
+        if(jsonGetString(body,"doctor",t)) q.doctor=u82w(t);
+        double sid=0; jsonGetNumber(body,"sectionId",sid); q.sectionId=(int)sid;
+        q.onlyUser=jsonGetBool(body,"onlyUser",false);
+        q.byAppt=jsonGetBool(body,"byAppt",false);
+        return Receipt_SearchJson(q);
+    }
+    if(verb=="receipt.sections") return Receipt_SectionsJson();
+    if(verb=="receipt.get"){
+        std::string idU; jsonGetString(body,"id",idU);
+        return Receipt_GetJson(u82w(idU));
+    }
+    if(verb=="receipt.delete"){
+        std::string idU; jsonGetString(body,"id",idU);
+        std::wstring err;
+        if(!Receipt_Delete(u82w(idU),err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="receipt.deleteMany"){
+        std::string idsU; jsonGetString(body,"ids",idsU);
+        std::vector<std::wstring> ids;
+        std::wstring cur;
+        std::wstring all=u82w(idsU);
+        for(wchar_t c:all){
+            if(c==L','||c==L'|'){ if(!cur.empty()) ids.push_back(cur); cur.clear(); }
+            else cur+=c;
+        }
+        if(!cur.empty()) ids.push_back(cur);
+        std::wstring err;
+        if(!Receipt_DeleteMany(ids,err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="receipt.print"){
+        std::string idU; jsonGetString(body,"id",idU);
+        ReceptionRecord rec;
+        if(!Receipt_BuildRecord(u82w(idU),rec))
+            return "{\"ok\":false,\"err\":\"قبض پیدا نشد.\"}";
+        HWND owner=g_hFrame;
+        RunOnUiThreadSync([&](){
+            int sid=adResolveSectionId(); bool done=false;
+            done=printPrintDesign(rec,sid,owner);
+            if(!done) done=printDesignedReceipt(rec,0,owner);
+            if(!done) printReceipt(rec,2,owner);
+        });
+        return "{\"ok\":true}";
+    }
+    if(verb=="receipt.printIns"){
+        std::string idU; jsonGetString(body,"id",idU);
+        ReceptionRecord rec;
+        if(!Receipt_BuildRecord(u82w(idU),rec))
+            return "{\"ok\":false,\"err\":\"قبض پیدا نشد.\"}";
+        HWND owner=g_hFrame;
+        RunOnUiThreadSync([&](){ printReceipt(rec,0,owner); });
         return "{\"ok\":true}";
     }
 
