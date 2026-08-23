@@ -59,6 +59,7 @@ bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
 // tabSectionId==0 → «صندوق نرفته‌ها» (unpaid). Otherwise a top-level section id.
 std::string Cash_PageJson(const std::wstring& q, int tabSectionId);
 std::string Cash_GetJson(const std::wstring& id);
+std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode, bool unpaidOnly);
 
 bool Shift_Start(std::wstring& err);
 bool Shift_End(std::wstring& err);
@@ -84,8 +85,6 @@ struct ReceiptQuery {
     ReceiptQuery():sectionId(0),onlyUser(false),byAppt(false){}
 };
 std::string Receipt_SearchJson(const ReceiptQuery& q);
-std::string Receipt_GetJson(const std::wstring& id);
-bool Receipt_Delete(const std::wstring& id, std::wstring& err);
 bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err);
 bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out);
 bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err);

@@ -183,6 +183,19 @@ int Sections_Find(const std::wstring& query, std::vector<Section>& out){
     return (int)out.size();
 }
 
+static std::wstring sec_nextCode(const std::vector<Section>& v, const std::wstring& kind){
+    const wchar_t* pre=Sections_CategoryCode(kind);
+    int mx=0; std::wstring p=pre;
+    for(const auto& y:v){
+        if(y.code.compare(0,p.size(),p)==0){
+            int n=_wtoi(y.code.c_str()+p.size());
+            if(n>mx) mx=n;
+        }
+    }
+    wchar_t b[24]; swprintf(b,24,L"%s%02d",pre,mx+1);
+    return b;
+}
+
 int Sections_Upsert(const Section& s){
     std::vector<Section> v = sec_readAll();
     std::wstring now = sec_now();
@@ -193,18 +206,7 @@ int Sections_Upsert(const Section& s){
                 std::wstring keepCode = x.code;
                 x = s; x.created_at = created; x.updated_at = now;
                 if(x.code.empty()) x.code = keepCode;
-                if(x.code.empty()){
-                    const wchar_t* pre=Sections_CategoryCode(x.kind);
-                    int mx=0; std::wstring p=pre;
-                    for(const auto& y:v){
-                        if(y.code.compare(0,p.size(),p)==0){
-                            int n=_wtoi(y.code.c_str()+p.size());
-                            if(n>mx) mx=n;
-                        }
-                    }
-                    wchar_t b[24]; swprintf(b,24,L"%s%02d",pre,mx+1);
-                    x.code=b;
-                }
+                if(x.code.empty()) x.code = sec_nextCode(v, x.kind);
                 sec_writeAll(v); return x.id;
             }
         }
@@ -212,18 +214,7 @@ int Sections_Upsert(const Section& s){
     // insert
     int maxId=0; for(const auto& x : v) maxId = (x.id>maxId)?x.id:maxId;
     Section x = s; if(x.id<=0) x.id = maxId+1;
-    if(x.code.empty()){
-        const wchar_t* pre=Sections_CategoryCode(x.kind);
-        int mx=0; std::wstring p=pre;
-        for(const auto& y:v){
-            if(y.code.compare(0,p.size(),p)==0){
-                int n=_wtoi(y.code.c_str()+p.size());
-                if(n>mx) mx=n;
-            }
-        }
-        wchar_t b[24]; swprintf(b,24,L"%s%02d",pre,mx+1);
-        x.code=b;
-    }
+    if(x.code.empty()) x.code = sec_nextCode(v, x.kind);
     if(x.created_at.empty()) x.created_at = now;
     x.updated_at = now;
     v.push_back(x);

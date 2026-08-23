@@ -404,16 +404,37 @@
     /* wire card 1 */
     Crm.$('accDept').onchange = function () { st.dept = this.value; st.picked = null; loadPersonPick(host); renderPickInfoOnly(host); };
     if (Crm.$('accSectQ')) {
+      var accDeptAll = [];
+      (function () {
+        var sel0 = Crm.$('accDept');
+        var oi;
+        if (sel0) {
+          for (oi = 0; oi < sel0.options.length; oi++)
+            accDeptAll.push({ value: sel0.options[oi].value, text: sel0.options[oi].text });
+        }
+      })();
       Crm.$('accSectQ').oninput = function () {
         var q = (this.value || '').toLowerCase();
         var sel = Crm.$('accDept');
         if (!sel) return;
-        var i, t, show;
-        for (i = 0; i < sel.options.length; i++) {
-          t = ((sel.options[i].text || '') + '').toLowerCase();
-          show = !q || t.indexOf(q) >= 0 || i === 0;
-          sel.options[i].disabled = !show;
-          sel.options[i].hidden = !show;
+        var keep = sel.value;
+        var html = '', i, o, show, found = false;
+        for (i = 0; i < accDeptAll.length; i++) {
+          o = accDeptAll[i];
+          show = !q || i === 0 || ((o.text || '').toLowerCase().indexOf(q) >= 0);
+          if (!show) continue;
+          html += '<option value="' + Crm.esc(o.value) + '"' +
+            (o.value === keep ? ' selected="selected"' : '') + '>' +
+            Crm.esc(o.text) + '</option>';
+          if (o.value === keep) found = true;
+        }
+        sel.innerHTML = html;
+        if (!found) {
+          sel.selectedIndex = 0;
+          st.dept = sel.value;
+          st.picked = null;
+          loadPersonPick(host);
+          renderPickInfoOnly(host);
         }
       };
     }

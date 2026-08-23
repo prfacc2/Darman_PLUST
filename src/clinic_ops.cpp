@@ -293,11 +293,21 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
     cashStampNow(t, false);
     t.servicesJson=cashBuildServicesJson(r);
     t.mobile=r.mobile;
-    t.fileNo=r.nationalId;
+    if(!r.insNo.empty()) t.fileNo=r.insNo;
+    else if(!r.receiptBarcode.empty()) t.fileNo=r.receiptBarcode;
+    else t.fileNo=r.nationalId;
+    if(!r.receiptCode.empty()) t.archiveNo=r.receiptCode;
+    else t.archiveNo=r.receiptBarcode;
     t.insBase=r.insurance;
     t.insSupp=r.suppInsurance;
     t.receiptNo=t.barcode;
     t.apptDate=r.apptDate.empty()?t.jdate:r.apptDate;
+    if(!r.apptTime.empty()) t.time=r.apptTime;
+    if(r.queueNo>0){
+        wchar_t tb[16]; swprintf(tb,16,L"%d",r.queueNo);
+        t.turn=tb;
+        if(t.receiptNo.empty()) t.receiptNo=tb;
+    }
     t.shift=r.shift;
     t.status=L"unpaid";
     std::lock_guard<std::mutex> lk(g_opsMx);
@@ -427,12 +437,16 @@ static void shiftAddIncome(long long amount){
     shiftSave(srows);
 }
 
+static CashTicket* cashFind(std::vector<CashTicket>& rows, const std::wstring& id){
+    for(auto& r:rows) if(r.id==id) return &r;
+    return nullptr;
+}
+
 bool Cash_Pay(const std::wstring& id, std::wstring& err){
     if(!opsNeedCashEdit(err)) return false;
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
-    CashTicket* t=nullptr;
-    for(auto& r:rows) if(r.id==id){ t=&r; break; }
+    CashTicket* t=cashFind(rows,id);
     if(!t){ err=L"بلیت پیدا نشد."; return false; }
     if(t->paid>0){ err=L"این بلیت قبلاً صندوق شده است."; return false; }
     SYSTEMTIME st=iranNow();
@@ -509,6 +523,9 @@ static std::string ticketRowJson(const CashTicket& t, const std::string& extra="
     o+="\"turn\":"+opsJstr(t.turn)+",";
     o+="\"shift\":"+opsJstr(t.shift)+",";
     o+="\"status\":"+opsJstr(t.status)+",";
+    o+="\"cancelReason\":"+opsJstr(t.cancelReason)+",";
+    o+="\"cancelUser\":"+opsJstr(t.cancelUser)+",";
+    o+="\"cancelAt\":"+opsJstr(t.cancelAt)+",";
     o+="\"user\":"+opsJstr(t.user);
     if(!extra.empty()){ o+=","; o+=extra; }
     o+="}";
@@ -581,15 +598,33 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
 std::string Cash_GetJson(const std::wstring& id){
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
-    for(const auto& t:rows){
-        if(t.id!=id) continue;
-        std::string svc=opsW2u8(t.servicesJson);
-        if(svc.empty()) svc="[]";
-        std::string extra="\"services\":"+svc+",\"paidAt\":"+opsJstr(t.paidAt)+
-            ",\"paidUser\":"+opsJstr(t.paidUser);
-        return std::string("{\"ok\":true,\"ticket\":")+ticketRowJson(t, extra)+"}";
+    CashTicket* t=cashFind(rows,id);
+    if(!t) return "{\"ok\":false,\"err\":\"بلیت پیدا نشد.\"}";
+    std::string svc=opsW2u8(t->servicesJson);
+    if(svc.empty()) svc="[]";
+    std::string extra="\"services\":"+svc+",\"paidAt\":"+opsJstr(t->paidAt)+
+        ",\"paidUser\":"+opsJstr(t->paidUser);
+    return std::string("{\"ok\":true,\"ticket\":")+ticketRowJson(*t, extra)+"}";
+}
+
+std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode, bool unpaidOnly){
+    if(nid.empty() && barcode.empty()) return L"";
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    const CashTicket* unpaid=nullptr;
+    const CashTicket* any=nullptr;
+    for(const auto& r:rows){
+        if(!nid.empty() && r.nid!=nid) continue;
+        if(!barcode.empty() && r.barcode!=barcode && r.receiptNo!=barcode && r.fileNo!=barcode)
+            continue;
+        if(!any || r.epochMin>=any->epochMin) any=&r;
+        if(r.status!=L"cancelled" && r.paid==0){
+            if(!unpaid || r.epochMin>=unpaid->epochMin) unpaid=&r;
+        }
     }
-    return "{\"ok\":false,\"err\":\"بلیت پیدا نشد.\"}";
+    if(unpaid) return unpaid->id;
+    if(unpaidOnly) return L"";
+    return any ? any->id : L"";
 }
 
 std::string Calendar_ListJson(const std::wstring& fromJalali,
@@ -657,22 +692,6 @@ std::string Receipt_SearchJson(const ReceiptQuery& q){
     return std::string("{\"ok\":true,\"rows\":")+list+"}";
 }
 
-std::string Receipt_GetJson(const std::wstring& id){
-    return Cash_GetJson(id);
-}
-
-bool Receipt_Delete(const std::wstring& id, std::wstring& err){
-    if(g_session.user.role<1){ err=L"فقط مدیر می‌تواند قبض را حذف کند."; return false; }
-    std::lock_guard<std::mutex> lk(g_opsMx);
-    auto rows=cashLoad();
-    size_t before=rows.size();
-    rows.erase(std::remove_if(rows.begin(),rows.end(),
-        [&](const CashTicket& t){ return t.id==id; }), rows.end());
-    if(rows.size()==before){ err=L"قبض پیدا نشد."; return false; }
-    if(!cashSave(rows)){ err=L"حذف قبض ناموفق بود."; return false; }
-    return true;
-}
-
 bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err){
     if(g_session.user.role<1){ err=L"فقط مدیر می‌تواند قبض را حذف کند."; return false; }
     if(ids.empty()){ err=L"موردی انتخاب نشده."; return false; }
@@ -684,6 +703,7 @@ bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err)
         for(const auto& id:ids) if(t.id==id){ drop=true; break; }
         if(!drop) keep.push_back(t);
     }
+    if(keep.size()==rows.size()){ err=L"قبض پیدا نشد."; return false; }
     if(!cashSave(keep)){ err=L"حذف گروهی ناموفق بود."; return false; }
     return true;
 }
@@ -691,8 +711,7 @@ bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err)
 bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err){
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
-    CashTicket* t=nullptr;
-    for(auto& r:rows) if(r.id==id){ t=&r; break; }
+    CashTicket* t=cashFind(rows,id);
     if(!t){ err=L"قبض پیدا نشد."; return false; }
     SYSTEMTIME st=iranNow();
     t->status=L"cancelled";
@@ -706,16 +725,21 @@ bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wst
 bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out){
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
-    const CashTicket* t=nullptr;
-    for(const auto& r:rows) if(r.id==id){ t=&r; break; }
+    CashTicket* t=cashFind(rows,id);
     if(!t) return false;
     out=ReceptionRecord();
     out.firstName=t->first; out.lastName=t->last; out.nationalId=t->nid;
     out.mobile=t->mobile; out.treatingDoctor=t->doctor;
     out.insurance=t->insBase; out.suppInsurance=t->insSupp;
     out.apptDate=t->apptDate.empty()?t->jdate:t->apptDate;
+    out.apptTime=t->time;
+    out.queueNo=_wtoi(t->turn.c_str());
+    if(out.queueNo<=0 && !t->receiptNo.empty()) out.queueNo=_wtoi(t->receiptNo.c_str());
+    out.receiptNo=_wtoi64(t->receiptNo.c_str());
+    if(out.receiptNo<=0) out.receiptNo=out.queueNo;
     out.shift=t->shift; out.insNo=t->barcode;
     out.receiptBarcode=t->barcode;
+    out.receiptCode=t->archiveNo;
     out.finalTotal=t->payable; out.paid=t->paid; out.patientShare=t->payable;
     out.userName=t->user;
     out.regStamp=t->jdate+L" "+t->time;
@@ -863,13 +887,35 @@ static bool opsBkOpen(const std::wstring& path, HANDLE& hf, std::wstring& err, l
         err=L"قالب فایل پشتیبان معتبر نیست.";
         return false;
     }
-    char peek[96]; DWORD pr=0;
-    ReadFile(hf,peek,96,&pr,NULL);
-    bool looks=false;
-    for(DWORD i=0;i<pr;i++){
-        if(peek[i]=='\t'){ looks=true; break; }
+    auto firstOk=[&](bool mix)->bool{
+        SetFilePointer(hf,9,NULL,FILE_BEGIN);
+        std::string line;
+        char c; DWORD r1=0;
+        unsigned long long off=0;
+        while(true){
+            if(!ReadFile(hf,&c,1,&r1,NULL)||!r1) return false;
+            if(mix){
+                unsigned char k=OPS_K[off&15];
+                c=(char)((unsigned char)c^k^(unsigned char)(off*13u));
+            }
+            off++;
+            if(c=='\n') break;
+            if(c!='\r') line+=c;
+            if(line.size()>512) return false;
+        }
+        if(line.empty()||line=="END") return false;
+        size_t tab=line.find('\t');
+        if(tab==std::string::npos||tab==0) return false;
+        return _atoi64(line.c_str()+tab+1)>=0;
+    };
+    bool mixOk=firstOk(true);
+    bool rawOk=mixOk?false:firstOk(false);
+    if(!mixOk && !rawOk){
+        CloseHandle(hf); hf=INVALID_HANDLE_VALUE;
+        err=L"قالب فایل پشتیبان معتبر نیست.";
+        return false;
     }
-    g_bkPacked=!looks;
+    g_bkPacked=mixOk;
     SetFilePointer(hf,9,NULL,FILE_BEGIN);
     if(pos) *pos=9;
     return true;

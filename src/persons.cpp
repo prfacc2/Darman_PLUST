@@ -14,6 +14,7 @@
 // ============================================================================
 #include "app.h"
 #include "sections.h"
+#include "clinic_ops.h"
 #include <stdio.h>
 #include <algorithm>
 
@@ -170,7 +171,8 @@ bool personByUsername(const std::wstring& username, PersonDef& out){
 std::wstring resolveSessionTitle(const User& u){
     std::wstring pos;
     PersonDef p;
-    if(personByUsername(u.username,p))
+    bool haveP=personByUsername(u.username,p);
+    if(haveP)
         pos = p.position.empty() ? personRoleLabel(p) : p.position;
     if(pos.empty()){
         EmpProfile e=loadEmpProfile(u.username);
@@ -180,19 +182,14 @@ std::wstring resolveSessionTitle(const User& u){
         if(u.role==2) pos=L"مدیر سامانه";
         else if(u.role==1) pos=L"مدیریت";
         else {
-            PersonDef pr;
             bool rec=false;
-            if(personByUsername(u.username,pr)){
+            if(haveP){
                 std::vector<Section> all; Sections_All(all);
-                int did=_wtoi(pr.deptId.c_str());
-                int sid=_wtoi(pr.subId.c_str());
+                int did=_wtoi(p.deptId.c_str());
+                int sid=_wtoi(p.subId.c_str());
                 for(const auto& s:all){
                     if(s.id!=did && s.id!=sid) continue;
-                    if(s.kind==L"reception" ||
-                       s.kind.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos ||
-                       s.name_fa.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos){
-                        rec=true; break;
-                    }
+                    if(Ops_IsReception(s)){ rec=true; break; }
                 }
             }
             if(!rec && u.dept.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) rec=true;
