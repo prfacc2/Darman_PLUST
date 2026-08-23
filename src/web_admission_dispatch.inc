@@ -45,6 +45,14 @@ HWND WebAdmission_CreateView(HWND parent){
     return nullptr;   // caller keeps the native GDI form
 }
 
+HWND WebAdmission_CreateViewEx(HWND parent, const char* surface,
+                               const std::string& ticketJson){
+    adSetPendingView(surface, ticketJson);
+    HWND h=WebAdmission_CreateView(parent);
+    adClearPendingView();
+    return h;
+}
+
 void WebAdmission_Resize(HWND view, int w, int h){
     if(!view) return;
     if(WV2_Owns(view)){ WV2_Resize(view,w,h); return; }

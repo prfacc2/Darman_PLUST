@@ -270,7 +270,7 @@ struct CtrlHandler : public ICoreWebView2CreateCoreWebView2ControllerCompletedHa
         if(SUCCEEDED(hr)) hr=ctrl->put_IsVisible(TRUE);
         if(FAILED(hr)){ state->Complete(hr); return S_OK; }
 
-        const std::string& page=AdmissionInlinePage(true);
+        std::string page=AdmissionPageForHost(true,state->host);
         if(page.empty()){ state->Complete(E_FAIL); return S_OK; }
         hr=v->web->NavigateToString(u82w(page).c_str());
         if(FAILED(hr)) state->Complete(hr);
@@ -363,6 +363,7 @@ static HWND WV2_CreateView(HWND parent){
     HWND host=CreateWindowExW(0,CLS,L"",WS_CHILD|WS_CLIPCHILDREN,
         0,0,rc.right,rc.bottom,parent,NULL,g_hInst,NULL);
     if(!host) return nullptr;
+    adBindPendingView(host);
 
     AdView* v=new AdView(); v->host=host;
     { std::lock_guard<std::mutex> lk(g_adViewsMx); g_adViews[host]=v; }
@@ -439,6 +440,7 @@ static bool WV2_PushEventTo(HWND view, const char* eventName, const std::string&
 }
 
 static bool WV2_DestroyView(HWND view){
+    adForgetHost(view);
     AdView* v=nullptr;
     { std::lock_guard<std::mutex> lk(g_adViewsMx);
       auto it=g_adViews.find(view); if(it!=g_adViews.end()){ v=it->second; g_adViews.erase(it); } }

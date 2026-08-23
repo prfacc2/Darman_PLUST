@@ -1055,13 +1055,11 @@ static LRESULT CALLBACK SettingsProc(HWND h,UINT m,WPARAM w,LPARAM l){
             std::wstring suffix=sw->user.username.empty()?L"":L"."+sw->user.username;
             bool full=SendMessageW(GetDlgItem(h,IDC_PANEL_BASE+81),BM_GETCHECK,0,0)==BST_CHECKED;
             setSetting(L"reception.mode"+suffix,full?L"full":L"simple");
-            /* v1.73.0: the zoom dropdown is gone from this panel; re-send the
-               currently persisted zoom (chosen via Ctrl+scroll) so applying the
-               display settings does NOT reset the user's zoom level. Default is
-               now 90% (was 80%). */
+            /* v1.84.0: keep the persisted Ctrl+scroll zoom (50–200, default 80)
+               so applying display mode does not rewrite a wrap-safe zoom. */
             int zoom=_wtoi(getSetting(L"reception.zoom"+suffix,
-                               getSetting(L"reception.zoom",L"90")).c_str());
-            if(zoom<80||zoom>200) zoom=90;
+                               getSetting(L"reception.zoom",L"80")).c_str());
+            if(zoom<50||zoom>200) zoom=80;
             std::string payload=std::string("{\"mode\":\"")+(full?"full":"simple")+
                 "\",\"zoom\":"+std::to_string(zoom)+"}";
             WebAdmission_PushEvent("reception.settings",payload);

@@ -119,13 +119,15 @@ struct SvcRow {
 enum TabKind {
     TK_RECEPTION   = 0,   // the patient reception + billing form
     TK_PORTAL      = 1,   // پیام پرتابل — portal/admin message page (post-login)
-    TK_EMPTY       = 2    // a fresh blank tab (new-tab button)
-    // v1.60.0: TK_APPOINTMENT (3) removed — نوبت‌دهی no longer exists.
+    TK_EMPTY       = 2,   // a fresh blank tab (new-tab button)
+    TK_TOOLS       = 3,   // v1.84: native «ابزارها» web surface
+    TK_CASHIER     = 4    // v1.84: native «صندوق» web surface
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
     int  kind;                // TabKind
     std::wstring title;
+    std::string extraJson;    // v1.84: ticket JSON for a receipt-backed پذیرش tab
     // form controls
     HWND eFirst,eLast,eNid,eFather,eBirth,cGender,eMobile,ePhone,eAddr;
     HWND cPType,cIns,cSupp,cNType;
@@ -545,9 +547,11 @@ static int tabGap()  { return S(8);  }
 // v1.75.0: each tab kind carries a distinct vector glyph so the strip reads as
 // a set of labelled, iconified tabs rather than a row of plain text buttons.
 static int tabIconFor(int kind){
-    if(kind==TK_PORTAL) return ICO_LETTER;   // کارتابل — پاکت نامه (management inbox)
-    if(kind==TK_EMPTY)  return ICO_TAB;     // تب جدید — fresh blank tab
-    return ICO_USER;                        // پذیرش بیمار — patient admission
+    if(kind==TK_PORTAL)  return ICO_LETTER;  // کارتابل — پاکت نامه (management inbox)
+    if(kind==TK_EMPTY)   return ICO_TAB;     // تب جدید — fresh blank tab
+    if(kind==TK_TOOLS)   return ICO_GEAR;
+    if(kind==TK_CASHIER) return ICO_WALLET;
+    return ICO_USER;                         // پذیرش بیمار — patient admission
 }
 
 // ---------------------------------------------------------------- billing --
@@ -2612,7 +2616,8 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // controls — they own no edit boxes, combos or buttons.
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
-        if(t->kind!=TK_RECEPTION) return 0;
+        if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER)
+            return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
         //  host: the modern HTML/CSS/JS admission UI, fully two-way synced with
@@ -2622,11 +2627,18 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  through to the proven native GDI reception form below, so the app
         //  keeps working on every Windows (7→11+) offline. The page never opens
         //  in an external browser.
+        //  v1.84.0: tools / cashier / a receipt-backed پذیرش reuse the same
+        //  inline page with a per-host surface inject. No GDI fallback for
+        //  tools or cashier.
         t->web = NULL;
         if(WebAdmission_Available()){
-            HWND wv = WebAdmission_CreateView(h);
+            const char* surf="admission";
+            if(t->kind==TK_TOOLS) surf="tools";
+            else if(t->kind==TK_CASHIER) surf="cashier";
+            HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
+        if(t->kind!=TK_RECEPTION) return 0;
         // v1.25.0: ES_RIGHT so every textbox is right-aligned (راست‌چین) by
         // default — Persian RTL data entry. Fields with enableAutoDir still flip
         // alignment live based on typed content (Latin vs Persian).
@@ -4606,7 +4618,7 @@ static void recLayoutTabs(HWND h){
         } else ShowWindow(t->page,SW_HIDE);
     }
 }
-static void addTabKind(HWND h, int kind){
+static void addTabKind(HWND h, int kind, const std::string& extra=""){
     if(!s_rd) return;
     static bool reg=false;
     if(!reg){
@@ -4618,13 +4630,17 @@ static void addTabKind(HWND h, int kind){
     }
     TabPage* t=new TabPage();
     t->kind=kind;
+    t->extraJson=extra;   // WM_CREATE reads TabPage* via lpCreateParams
     std::wstring dept=g_session.user.dept;
     if(kind==TK_PORTAL)         t->title=L"کارتابل";
     else if(kind==TK_EMPTY)     t->title=L"تب جدید";
+    else if(kind==TK_TOOLS)     t->title=L"ابزارها";
+    else if(kind==TK_CASHIER)   t->title=L"صندوق";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
-    // painted portal / appointment / empty pages don't need a scrollbar.
+    // painted portal / empty pages and the tools/cashier surfaces don't need
+    // a native scrollbar.
     DWORD pgStyle = WS_CHILD|WS_CLIPCHILDREN;
     if(kind==TK_RECEPTION) pgStyle |= WS_VSCROLL;
     HWND pg=CreateWindowExW(0,TABPG_CLASS,L"",
@@ -5120,6 +5136,48 @@ void receptionPrintAction(RecPrintAction a){
     ReceptionRecord r;
     collect(t,r);
     printReceipt(r,a==RPA_INSURANCE?0:1,g_hFrame);
+}
+
+static void activateKind(HWND h, int kind){
+    if(!s_rd || !h) return;
+    for(size_t i=0;i<s_rd->tabs.size();i++){
+        TabPage* t=s_rd->tabs[i];
+        if(!t || t->detached || t->kind!=kind) continue;
+        s_rd->active=(int)i;
+        recLayoutTabs(h);
+        InvalidateRect(h,NULL,TRUE);
+        return;
+    }
+    addTabKind(h, kind);
+}
+
+void Reception_OpenTools(){
+    HWND h=recWnd(); if(!h) return;
+    activateKind(h, TK_TOOLS);
+}
+void Reception_OpenCashier(){
+    if(!userHasPerm(g_session.user, L"cashier_view")) return;
+    HWND h=recWnd(); if(!h) return;
+    activateKind(h, TK_CASHIER);
+}
+void Reception_OpenAdmissionTicket(const std::string& ticketJson){
+    HWND h=recWnd(); if(!h) return;
+    addTabKind(h, TK_RECEPTION, ticketJson);
+}
+static void closeActiveKind(int kind){
+    if(!s_rd) return;
+    if(s_rd->active<0 || s_rd->active>=(int)s_rd->tabs.size()) return;
+    TabPage* t=s_rd->tabs[s_rd->active];
+    if(t && t->kind==kind) closeTab(t);
+}
+void Reception_CloseTools(){ closeActiveKind(TK_TOOLS); }
+void Reception_CloseCashier(){ closeActiveKind(TK_CASHIER); }
+void Reception_ResetZoom(){
+    std::wstring user=g_session.user.username;
+    std::wstring suffix=user.empty()?L"":L"."+user;
+    setSetting(L"reception.zoom", L"80");
+    setSetting(L"reception.zoom"+suffix, L"80");
+    WebAdmission_PushEvent("reception.settings", "{\"zoom\":80}");
 }
 
 HWND createReceptionScreen(HWND frame){

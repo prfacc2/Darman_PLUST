@@ -152,6 +152,59 @@ static const std::string& AdmissionInlinePage(bool withFontFace){
     return g_adPageCache[i];
 }
 
+// v1.84.0: WebView2 NavigateToString is async — bind surface/ticket to the
+// host HWND so the later navigation still sees them. A process-wide pending
+// slot is only used between CreateViewEx and CreateWindow.
+static std::mutex g_adPendingMx;
+static std::string g_adPendingSurf="admission";
+static std::string g_adPendingTicket;
+static std::map<HWND,std::pair<std::string,std::string> > g_adInject;
+
+static void adSetPendingView(const char* surface, const std::string& ticket){
+    std::lock_guard<std::mutex> lk(g_adPendingMx);
+    g_adPendingSurf=(surface && *surface)?surface:"admission";
+    g_adPendingTicket=ticket;
+}
+static void adBindPendingView(HWND host){
+    if(!host) return;
+    std::lock_guard<std::mutex> lk(g_adPendingMx);
+    g_adInject[host]=std::make_pair(g_adPendingSurf,g_adPendingTicket);
+}
+static void adClearPendingView(){
+    std::lock_guard<std::mutex> lk(g_adPendingMx);
+    g_adPendingSurf="admission";
+    g_adPendingTicket.clear();
+}
+static void adForgetHost(HWND host){
+    if(!host) return;
+    std::lock_guard<std::mutex> lk(g_adPendingMx);
+    g_adInject.erase(host);
+}
+static std::string AdmissionPageForHost(bool withFont, HWND host){
+    std::string html=AdmissionInlinePage(withFont);
+    if(html.empty()) return html;
+    std::string surf="admission";
+    std::string ticket;
+    {
+        std::lock_guard<std::mutex> lk(g_adPendingMx);
+        auto it=g_adInject.find(host);
+        if(it!=g_adInject.end()){ surf=it->second.first; ticket=it->second.second; }
+    }
+    if(surf!="tools" && surf!="cashier") surf="admission";
+    if(ticket.find("</")!=std::string::npos) ticket.clear();
+    std::string inj="<script>window.__azSurface=\"";
+    inj+=surf;
+    inj+="\";window.__azTicket=";
+    inj+=ticket.empty()?"null":ticket;
+    inj+=";</script>";
+    size_t b=html.find("<body");
+    if(b==std::string::npos) return html;
+    size_t e=html.find('>',b);
+    if(e==std::string::npos) return html;
+    html.insert(e+1,inj);
+    return html;
+}
+
 // ---- serverless verb dispatch (both engines route here) ---------------------
 //  Order matches the old HTTP handler: generic multi-page registry first
 //  (ping / client.log / client.metrics), then the legacy admission handler, so

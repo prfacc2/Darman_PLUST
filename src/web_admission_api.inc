@@ -759,8 +759,11 @@ static std::string admissionApi(const std::string& verb, const std::string& body
 
     // ---- reception.zoom.save: persist user's Ctrl+scroll zoom choice --------
     if(verb=="reception.zoom.save"){
-        std::string zU; jsonGetString(body,"zoom",zU);
-        int z=atoi(zU.c_str());
+        double zN=0;
+        std::string zU;
+        int z=0;
+        if(jsonGetNumber(body,"zoom",zN)) z=(int)llround(zN);
+        else if(jsonGetString(body,"zoom",zU)) z=atoi(zU.c_str());
         if(z<50) z=50; if(z>200) z=200;
         std::wstring user=g_session.user.username;
         std::wstring suffix=user.empty()?L"":L"."+user;
@@ -1043,6 +1046,33 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     if(verb=="admission.clear"||verb=="admission.new"||
        verb=="ui.toggleServices"||verb=="ui.toggleQueue"||
        verb=="ui.settings"){
+        return "{\"ok\":true}";
+    }
+    if(verb=="ui.openTab"){
+        std::string kind; jsonGetString(body,"kind",kind);
+        if(kind=="tools") Reception_OpenTools();
+        else if(kind=="cashier"){
+            if(!userHasPerm(g_session.user, L"cashier_view"))
+                return "{\"ok\":false,\"err\":\"perm\"}";
+            Reception_OpenCashier();
+        }
+        else return "{\"ok\":false,\"err\":\"kind\"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="ui.openAdmission"){
+        std::string idU; jsonGetString(body,"id",idU);
+        if(idU.empty()) return "{\"ok\":false}";
+        std::string raw=Cash_GetJson(u82w(idU));
+        std::string ticket;
+        if(!jsonGetRaw(raw,"ticket",ticket) || ticket.empty()) return raw;
+        Reception_OpenAdmissionTicket(ticket);
+        return "{\"ok\":true}";
+    }
+    if(verb=="ui.closeTab"){
+        std::string kind; jsonGetString(body,"kind",kind);
+        if(kind=="cashier") Reception_CloseCashier();
+        else if(kind=="tools") Reception_CloseTools();
+        else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
 

@@ -32,6 +32,8 @@ void WebAdmission_Prepare();
 // NULL if the WebView could not be created (caller falls back to native form).
 // The view is fully wired to the C++ bridge before this returns control.
 HWND WebAdmission_CreateView(HWND parent);
+HWND WebAdmission_CreateViewEx(HWND parent, const char* surface,
+                               const std::string& ticketJson);
 
 // Resize the embedded view to the parent's client rect (call on WM_SIZE).
 void WebAdmission_Resize(HWND view, int w, int h);

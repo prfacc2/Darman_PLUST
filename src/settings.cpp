@@ -39,7 +39,8 @@ enum {
     ROW_SAVEDMSGS,    // v1.8.0: enable «پیام‌های ذخیره‌شده» (off by default)
     ROW_SERVER,
     ROW_ABOUT,
-    ROW_LOGOUT
+    ROW_LOGOUT,
+    ROW_ZOOMRESET     // v1.84: «ریست کردن بزرگنمایی»
 };
 
 struct RowDef { int id; const wchar_t* label; int icon; const wchar_t* hint; bool toggle; bool disabled; };
@@ -589,6 +590,7 @@ static LRESULT CALLBACK setProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // routed to the printer-settings dialog).
             case ROW_PRINTDESIGN: closeSettingsPanel(); PrintDesigner_Open(g_hFrame); break;
             case ROW_PROFILE:     doProfile(h); break;
+            case ROW_ZOOMRESET:   Reception_ResetZoom(); closeSettingsPanel(); break;
             case ROW_DENSITY:     doDensityToggle(h); break;
             case ROW_AUTOPRINT:   doAutoPrintToggle(h); break;
             case ROW_SERVER:      if(s_st&&s_st->eServer) SetFocus(s_st->eServer); break;
@@ -641,6 +643,8 @@ static void buildRows(SetState* st){
     // reception-user "settings/profile" entry point requested for this release.
     st->rows.push_back({ROW_PROFILE, L"پروفایل من",        ICO_USER,
                         L"تغییر نام و عکس — ارسال درخواست برای تأیید مدیریت",false,false});
+    st->rows.push_back({ROW_ZOOMRESET, L"ریست کردن بزرگنمایی", ICO_REFRESH,
+                        L"بازگشت بزرگنمایی پذیرش به اندازهٔ پیش‌فرض",false,false});
     // v1.60.0: professional icon — the about row used ICO_BELL (notification
     // bell) which made no semantic sense; ICO_INFO (circle + i) is correct.
     st->rows.push_back({ROW_ABOUT,  L"درباره برنامه",     ICO_INFO,

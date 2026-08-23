@@ -386,7 +386,7 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         o+="\"username\":"+jstr(g_session.user.username)+",";
         o+="\"role\":"+jnum(g_session.user.role)+",";
         o+="\"theme\":"+jstr(getSetting(L"theme",L"light"))+",";
-        o+="\"version\":\"1.83.0\",";
+        o+="\"version\":\"1.84.0\",";
         std::vector<Section> secs; Sections_All(secs);
         o+="\"sections\":"+jnum((long long)secs.size())+",";
         o+="\"patients\":"+jnum((long long)loadAllPatients().size())+",";

@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.83.0"
+#define APP_VERSION_W   L"1.84.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -552,6 +552,12 @@ enum RecPrintAction { RPA_INSURANCE=0, RPA_RX=1, RPA_LAST=2 };
 HWND receptionWindow();                  // the live reception HWND (or NULL)
 void receptionAction(RecAction a);       // route a header action to reception
 void receptionPrintAction(RecPrintAction a); // native bottom-bar print action
+void Reception_OpenTools();
+void Reception_OpenCashier();
+void Reception_OpenAdmissionTicket(const std::string& ticketJson);
+void Reception_CloseTools();
+void Reception_CloseCashier();
+void Reception_ResetZoom();
 
 // ---------------------------------------------------------------- dialogs --
 // role: 0 پذیرش / 1 مدیریت / 2 admin (hidden, prf)
