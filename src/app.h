@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.82.0"
+#define APP_VERSION_W   L"1.83.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -401,6 +401,7 @@ struct SuppDef {
               franchiseOrgPct(0),defaultOff(0),difference(0),booklet(0),active(1){}
 };
 std::vector<InsDef>  loadInsDefs();
+void  InsDefs_SeedDefaults();
 bool  upsertInsDef(const InsDef& d);
 bool  deleteInsDef(int idx);
 const InsDef*  insDefByIndex(int idx);

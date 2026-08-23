@@ -28,6 +28,8 @@ static std::wstring sec_now(){
     return b;
 }
 
+static bool sec_writeAll(const std::vector<Section>& v);
+
 static std::vector<Section> sec_readAll(){
     std::vector<Section> v;
     std::wstring all = readFileUtf8(sec_path());
@@ -40,15 +42,15 @@ static std::vector<Section> sec_readAll(){
         while(!line.empty() && (line.back()==L'\r'||line.back()==L'\n')) line.pop_back();
         if(line.empty()) continue;
         auto f = sec_split(line, L'|');
-        if(f.size() < 7) continue;
+        if(f.size() < 3) continue;
         Section s;
-        s.id        = _wtoi(f[0].c_str());
-        s.code      = f[1];
-        s.name_fa   = f[2];
-        s.kind      = f[3];
-        s.is_active = _wtoi(f[4].c_str());
-        s.created_at= f[5];
-        s.updated_at= f[6];
+        s.id        = f.size()>0 ? _wtoi(f[0].c_str()) : 0;
+        s.code      = f.size()>1 ? f[1] : L"";
+        s.name_fa   = f.size()>2 ? f[2] : L"";
+        s.kind      = f.size()>3 ? f[3] : L"";
+        s.is_active = f.size()>4 ? _wtoi(f[4].c_str()) : 1;
+        s.created_at= f.size()>5 ? f[5] : L"";
+        s.updated_at= f.size()>6 ? f[6] : L"";
         // §7 (1.14.0): optional 8th field = net_meta. Older files have only 7
         // fields and load unchanged (net_meta stays empty).
         if(f.size() >= 8) s.net_meta = f[7];
@@ -57,6 +59,25 @@ static std::vector<Section> sec_readAll(){
         if(f.size() >= 9) s.parent_id = _wtoi(f[8].c_str());
         v.push_back(s);
     }
+    int maxId=0;
+    for(const auto& x:v) if(x.id>maxId) maxId=x.id;
+    bool dirty=false;
+    for(auto& s:v){
+        if(s.id<=0){ s.id=++maxId; dirty=true; }
+        if(s.code.empty()){
+            const wchar_t* pre=Sections_CategoryCode(s.kind);
+            int mx=0; std::wstring p=pre;
+            for(const auto& y:v){
+                if(y.code.compare(0,p.size(),p)==0){
+                    int n=_wtoi(y.code.c_str()+p.size());
+                    if(n>mx) mx=n;
+                }
+            }
+            wchar_t b[24]; swprintf(b,24,L"%s%02d",pre,mx+1);
+            s.code=b; dirty=true;
+        }
+    }
+    if(dirty) sec_writeAll(v);
     return v;
 }
 
@@ -162,6 +183,19 @@ int Sections_Find(const std::wstring& query, std::vector<Section>& out){
     return (int)out.size();
 }
 
+static std::wstring sec_nextCode(const std::vector<Section>& v, const std::wstring& kind){
+    const wchar_t* pre=Sections_CategoryCode(kind);
+    int mx=0; std::wstring p=pre;
+    for(const auto& y:v){
+        if(y.code.compare(0,p.size(),p)==0){
+            int n=_wtoi(y.code.c_str()+p.size());
+            if(n>mx) mx=n;
+        }
+    }
+    wchar_t b[24]; swprintf(b,24,L"%s%02d",pre,mx+1);
+    return b;
+}
+
 int Sections_Upsert(const Section& s){
     std::vector<Section> v = sec_readAll();
     std::wstring now = sec_now();
@@ -169,14 +203,18 @@ int Sections_Upsert(const Section& s){
         for(auto& x : v){
             if(x.id==s.id){
                 std::wstring created = x.created_at;
+                std::wstring keepCode = x.code;
                 x = s; x.created_at = created; x.updated_at = now;
+                if(x.code.empty()) x.code = keepCode;
+                if(x.code.empty()) x.code = sec_nextCode(v, x.kind);
                 sec_writeAll(v); return x.id;
             }
         }
     }
     // insert
     int maxId=0; for(const auto& x : v) maxId = (x.id>maxId)?x.id:maxId;
-    Section x = s; x.id = maxId+1;
+    Section x = s; if(x.id<=0) x.id = maxId+1;
+    if(x.code.empty()) x.code = sec_nextCode(v, x.kind);
     if(x.created_at.empty()) x.created_at = now;
     x.updated_at = now;
     v.push_back(x);
@@ -203,7 +241,10 @@ const wchar_t* Sections_KindLabel(const std::wstring& kind){
     if(kind==L"billing")     return L"\u0635\u0646\u062f\u0648\u0642";
     if(kind==L"radiology")   return L"\u0631\u0627\u062f\u06cc\u0648\u0644\u0648\u0698\u06cc";
     if(kind==L"physio")      return L"\u0641\u06cc\u0632\u06cc\u0648\u062a\u0631\u0627\u067e\u06cc";
-    return L"\u0633\u0627\u06cc\u0631";
+    if(kind.empty() || kind==L"other") return L"\u0633\u0627\u06cc\u0631";
+    static thread_local std::wstring buf;
+    buf=kind;
+    return buf.c_str();
 }
 
 // §7 (1.14.0): stable, durable category code for a section `kind`. These short
@@ -211,14 +252,14 @@ const wchar_t* Sections_KindLabel(const std::wstring& kind){
 // names. Unknown kinds collapse to a stable "GEN" (general) so a code is always
 // produced.
 const wchar_t* Sections_CategoryCode(const std::wstring& kind){
-    if(kind==L"reception")   return L"REC";
-    if(kind==L"appointment") return L"APR";
-    if(kind==L"lab")         return L"LAB";
-    if(kind==L"injection")   return L"INJ";
-    if(kind==L"pharmacy")    return L"PHR";
-    if(kind==L"billing")     return L"BIL";
-    if(kind==L"radiology")   return L"RAD";
-    if(kind==L"physio")      return L"PHY";
+    if(kind==L"reception" || kind.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) return L"REC";
+    if(kind==L"appointment" || kind.find(L"\u0646\u0648\u0628\u062a")!=std::wstring::npos) return L"APR";
+    if(kind==L"lab" || kind.find(L"\u0622\u0632\u0645\u0627\u06cc\u0634")!=std::wstring::npos) return L"LAB";
+    if(kind==L"injection" || kind.find(L"\u062a\u0632\u0631\u06cc\u0642")!=std::wstring::npos) return L"INJ";
+    if(kind==L"pharmacy" || kind.find(L"\u062f\u0627\u0631\u0648\u062e\u0627\u0646\u0647")!=std::wstring::npos) return L"PHR";
+    if(kind==L"billing" || kind.find(L"\u0635\u0646\u062f\u0648\u0642")!=std::wstring::npos) return L"BIL";
+    if(kind==L"radiology" || kind.find(L"\u0631\u0627\u062f\u06cc\u0648")!=std::wstring::npos) return L"RAD";
+    if(kind==L"physio" || kind.find(L"\u0641\u06cc\u0632\u06cc\u0648")!=std::wstring::npos) return L"PHY";
     return L"GEN";
 }
 
