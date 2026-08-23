@@ -43,7 +43,12 @@
     mode: 'simple',
     zoom: 80,
     overrideBlock: false,
-    ready: false
+    ready: false,
+    formLocked: false,
+    canCashView: true,
+    canCashEdit: true,
+    cashTab: 0,
+    cashQ: ''
   };
 
   /* ---- Persian digit helpers ---- */
@@ -262,7 +267,7 @@
     setText($('tcVal'), money(b.pat));
   }
   function scheduleBillSync() {
-    if (!state.ready) return;
+    if (!state.ready || state.formLocked) return;
     // v1.70.0: sync immediately (was 100ms delay which caused a brief flash of
     // wrong values). The authoritative C++ recompute is fast enough to run
     // synchronously without freezing the UI.
@@ -270,6 +275,7 @@
   }
 
   function recompute() {
+    if (state.formLocked) return { gross: 0, disc: 0, org: 0, supp: 0, pat: 0, paid: 0 };
     var i, s;
     var sumGross = 0, sumDisc = 0, sumOrg = 0, sumSupp = 0, sumPat = 0;
     for (i = 0; i < state.services.length; i++) {
@@ -1363,6 +1369,63 @@
     });
     on($('queueLauncher'), 'click', function () { openQueuePanel('unpaid'); });
     on($('queueClose'),    'click', function () { closeQueuePanel(); });
+    on($('cashLauncher'), 'click', function () { openCashPanel(); });
+    on($('cashClose'),    'click', function () { closeCashPanel(); });
+    on($('cashBackdrop'), 'click', function () { closeCashPanel(); });
+    on($('cashSearch'), 'keyup', function () { state.cashQ = this.value; refreshCash(); });
+    on($('cashShiftStart'), 'click', function () {
+      cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود');
+    });
+    on($('cashShiftEnd'), 'click', function () {
+      cashCall('پایان شیفت ثبت شود؟', 'cashier.shift.end', {}, 'شیفت بسته شد', 'پایان شیفت ناموفق بود');
+    });
+    on($('cashManualBtn'), 'click', function () {
+      if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
+      var box = $('cashManualBox');
+      if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+    on($('cmCancel'), 'click', function () {
+      var box = $('cashManualBox'); if (box) box.style.display = 'none';
+    });
+    on($('cmSave'), 'click', function () {
+      if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
+      var amt = Number(toEn($('cmAmt') ? $('cmAmt').value : '').replace(/,/g, '')) || 0;
+      cashCall('سند دستی به مبلغ ' + money(amt) + ' ریال ثبت شود؟', 'cashier.manual', {
+        nid: toEn($('cmNid') ? $('cmNid').value : ''),
+        first: $('cmFirst') ? $('cmFirst').value : '',
+        last: $('cmLast') ? $('cmLast').value : '',
+        doctor: $('cmDoc') ? $('cmDoc').value : '',
+        amount: amt
+      }, 'سند دستی ثبت شد', 'ثبت سند ناموفق بود', function () {
+        var box = $('cashManualBox'); if (box) box.style.display = 'none';
+      });
+    });
+    on($('cashTabs'), 'click', function (e) {
+      e = e || window.event;
+      var tgt = e.target || e.srcElement;
+      var btn = findUp(tgt, 'data-tab', $('cashTabs'));
+      if (!btn) return;
+      state.cashTab = +btn.getAttribute('data-tab') || 0;
+      refreshCash();
+    });
+    on($('cashBody'), 'dblclick', function (e) {
+      e = e || window.event;
+      var tgt = e.target || e.srcElement;
+      var tr = findUp(tgt, 'data-cid', $('cashBody'));
+      if (!tr) return;
+      var paid = tr.getAttribute('data-paid') === '1';
+      if (paid) { toast('این ردیف قبلاً صندوق شده است', 'info'); return; }
+      loadCashTicket(tr.getAttribute('data-cid'));
+    });
+    on($('cashBody'), 'click', function (e) {
+      e = e || window.event;
+      var tgt = e.target || e.srcElement;
+      var pay = findUp(tgt, 'data-pay', $('cashBody'));
+      if (!pay) return;
+      if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
+      var id = pay.getAttribute('data-pay');
+      cashCall('این بلیت صندوق شود؟', 'cashier.pay', { id: id }, 'صندوق شد', 'پرداخت ناموفق بود');
+    });
     /* v1.79.0: the «صندوق نرفته‌ها» / «صف پذیرش» nav buttons were removed from
        the action card (they duplicated the launcher). The handlers stay out —
        the consolidated «queueLauncher» (now centred on the right rail) opens
@@ -1411,10 +1474,16 @@
     on($('hdrSettings'), 'click', function () { Bridge.call('ui.settings', {}); });
     on($('btnErx'), 'click', function () { Bridge.call('rx.electronic', collectRecord()); });
 
-    /* F8 = print last; Ctrl+Enter = submit and issue the current receipt. */
+    /* F8 = print last; F7 = cashier; F4 = unlock locked form; Ctrl+Enter = save. */
     on(document, 'keydown', function (e) {
       e = e || window.event; var key = e.keyCode || e.which;
-      if (key === 119) { Bridge.call('print.last', {}); }        /* F8 */
+      if (key === 118) { /* F7 */
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        openCashPanel();
+      } else if (key === 115) { /* F4 */
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        unlockCashForm();
+      } else if (key === 119) { Bridge.call('print.last', {}); }        /* F8 */
       else if (key === 13 && e.ctrlKey) {
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
         saveAdmission();
@@ -1530,22 +1599,206 @@
      one pair of helpers so the overlay + its dim backdrop can never fall out of
      sync. `tab` optionally selects the صندوق/صف tab before showing. */
   function openQueuePanel(tab) {
-    var p = $('queuePanel'), b = $('queueBackdrop');
-    if (!p) return;
+    if (!$('queuePanel')) return;
     if (tab === 'admission') {
       state.queueKind = 'admission'; setActiveTab('tabAdmQ');
     } else if (tab === 'unpaid') {
       state.queueKind = 'unpaid'; setActiveTab('tabQueue');
     }
-    if (b) b.className = 'queue-backdrop open';
-    p.className = (p.className || '').replace(/\s*open/g, '') + ' open';
-    p.setAttribute('aria-hidden', 'false');
+    setOverlay('queuePanel', 'queueBackdrop', true);
     refreshQueue();
   }
   function closeQueuePanel() {
-    var p = $('queuePanel'), b = $('queueBackdrop');
-    if (p) { p.className = (p.className || '').replace(/\s*open/g, ''); p.setAttribute('aria-hidden', 'true'); }
-    if (b) b.className = 'queue-backdrop';
+    setOverlay('queuePanel', 'queueBackdrop', false);
+  }
+
+  function cashAsk(msg, onYes) {
+    var dlg = $('cashDlg');
+    if (!dlg) { if (onYes) onYes(); return; }
+    setText($('cashDlgMsg'), msg || '');
+    dlg.style.display = 'block';
+    $('cashDlgYes').onclick = function () { dlg.style.display = 'none'; if (onYes) onYes(); };
+    $('cashDlgNo').onclick = function () { dlg.style.display = 'none'; };
+  }
+
+  function cashCall(msg, verb, payload, okMsg, failMsg, afterOk) {
+    cashAsk(msg, function () {
+      Bridge.call(verb, payload || {}).then(function (r) {
+        if (r && r.ok === false) { toast(r.err || failMsg, 'err'); return; }
+        toast(okMsg, 'ok');
+        if (afterOk) afterOk(r);
+        refreshCash();
+      }, function () { toast(failMsg, 'err'); });
+    });
+  }
+
+  function setFieldsLocked(on) {
+    var ids = ['nid', 'first', 'last', 'father', 'birth', 'mobile', 'phone', 'addr',
+      'doc2code', 'doc2name', 'perfcode', 'perfname', 'insBooklet', 'insValid',
+      'rxDate', 'apptDate', 'svcSearch', 'gender', 'insMain', 'insSupp', 'insSuppPct',
+      'ptype', 'insType', 'apptShift', 'hasIns', 'noPay'];
+    var i, el;
+    for (i = 0; i < ids.length; i++) {
+      el = $(ids[i]);
+      if (!el) continue;
+      if (on) {
+        el.setAttribute('disabled', 'disabled');
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
+          el.setAttribute('readonly', 'readonly');
+      } else {
+        el.removeAttribute('disabled');
+        el.removeAttribute('readonly');
+      }
+    }
+    if (on && document.activeElement && document.activeElement.blur) {
+      try { document.activeElement.blur(); } catch (e) {}
+    }
+  }
+
+  function setFormLocked(on) {
+    state.formLocked = !!on;
+    var root = document.body;
+    var cls = String(root.className || '').replace(/\s*form-locked\b/g, '');
+    if (on) cls += ' form-locked';
+    root.className = cls;
+    setFieldsLocked(on);
+  }
+
+  function unlockCashForm() {
+    if (!state.formLocked) return;
+    if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
+    setFormLocked(false);
+    recompute();
+    toast('ویرایش باز شد', 'ok');
+  }
+
+  function setOverlay(panelId, backId, open) {
+    var p = $(panelId), b = $(backId);
+    if (p) {
+      p.className = (p.className || '').replace(/\s*open/g, '') + (open ? ' open' : '');
+      p.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+    if (b) b.className = open ? 'queue-backdrop open' : 'queue-backdrop';
+  }
+
+  function openCashPanel() {
+    if (!state.canCashView) return;
+    closeQueuePanel();
+    if (!$('cashPanel')) return;
+    setOverlay('cashPanel', 'cashBackdrop', true);
+    refreshCash();
+    var s = $('cashSearch'); if (s) try { s.focus(); } catch (e) {}
+  }
+  function closeCashPanel() {
+    setOverlay('cashPanel', 'cashBackdrop', false);
+    var dlg = $('cashDlg'); if (dlg) dlg.style.display = 'none';
+  }
+
+  function refreshCash() {
+    if (!state.canCashView) return;
+    Bridge.call('cashier.page', { q: state.cashQ || '', tab: state.cashTab || 0 }).then(function (d) {
+      renderCash(d || {});
+    }, function () { toast('بارگذاری صندوق ناموفق بود', 'err'); });
+  }
+
+  function renderCash(d) {
+    var tabs = d.tabs || [];
+    var host = $('cashTabs');
+    if (host) {
+      var h = '', i, t, on;
+      for (i = 0; i < tabs.length; i++) {
+        t = tabs[i];
+        on = (+t.id === +state.cashTab) ? ' active' : '';
+        h += '<button type="button" class="cash-tab' + on + '" data-tab="' + esc(t.id) + '">' +
+             esc(t.name || '') + '</button>';
+      }
+      host.innerHTML = h;
+    }
+    var inc = (d.shift && d.shift.income != null) ? d.shift.income : (d.income || 0);
+    var incEl = $('cashIncome');
+    if (incEl) incEl.innerHTML = 'درآمد شیفت: <b>' + money(inc) + '</b> ریال';
+    var st = d.stats || {};
+    setText($('cashStatP'), toFa(st.patients || 0));
+    setText($('cashStatPaid'), toFa(st.paid || 0));
+    setText($('cashStatUnpaid'), toFa(st.unpaid || 0));
+    setText($('cashStatQ'), toFa(st.queue || 0));
+    var sh = d.shift || {};
+    var meta = 'شیفت شروع نشده';
+    if (sh.open) {
+      meta = 'شیفت باز از ' + toFa(sh.startTime || '') +
+             (sh.startJalali ? ' — ' + toFa(sh.startJalali) : '');
+    } else if (sh.startTime) {
+      meta = 'شروع ' + toFa(sh.startTime || '') + ' / پایان ' + toFa(sh.endTime || '');
+    }
+    setText($('cashShiftMeta'), meta);
+
+    var rows = d.rows || [];
+    var body = $('cashBody');
+    if (!body) return;
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="8" class="empty">موردی در این زبانه نیست</td></tr>';
+      return;
+    }
+    var html = '', r, paid;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      paid = (+r.paid || 0) > 0;
+      html += '<tr class="' + (paid ? '' : 'cash-unpaid') + '" data-cid="' + esc(r.id) +
+              '" data-paid="' + (paid ? '1' : '0') + '">' +
+        '<td class="c-mono">' + toFa(r.barcode || '—') + '</td>' +
+        '<td>' + esc(r.name || ((r.first || '') + ' ' + (r.last || ''))) + '</td>' +
+        '<td>' + money(r.payable) + '</td>' +
+        '<td>' + esc(r.doctor || '—') + '</td>' +
+        '<td>' + esc(r.section || '—') + '</td>' +
+        '<td>' + toFa(r.time || '') + '</td>' +
+        '<td>' + toFa(r.date || '') + '</td>' +
+        '<td>' + (paid || !state.canCashEdit ? (paid ? 'صندوق‌شده' : '—') :
+          '<button type="button" class="q-act-btn" data-pay="' + esc(r.id) + '">صندوق شد</button>') +
+        '</td></tr>';
+    }
+    body.innerHTML = html;
+  }
+
+  function applyTicketBill(t) {
+    var sv = (t && t.services) || [];
+    var i, gross = 0, pat = 0, q, p;
+    for (i = 0; i < sv.length; i++) {
+      q = Number(sv[i].qty) || 1;
+      p = Number(sv[i].price) || 0;
+      if (q < 1) q = 1;
+      gross += p * q;
+      if (sv[i].patShare != null) pat += Number(sv[i].patShare) || 0;
+    }
+    if (t && t.payable != null) pat = Number(t.payable) || 0;
+    applyAuthoritativeBill({
+      gross: gross,
+      disc: 0,
+      org: Math.max(0, gross - pat),
+      supp: 0,
+      pat: pat,
+      paid: 0
+    });
+  }
+
+  function loadCashTicket(id) {
+    if (!id) return;
+    Bridge.call('cashier.get', { id: id }).then(function (r) {
+      if (!r || !r.ok || !r.ticket) { toast((r && r.err) || 'بلیت پیدا نشد', 'err'); return; }
+      var t = r.ticket;
+      closeCashPanel();
+      setFormLocked(false);
+      clearForm({ keepLock: true, skipFocus: true });
+      fillPatient({ nid: t.nid, first: t.first, last: t.last });
+      if (t.doctor && $('doc2name')) $('doc2name').value = t.doctor;
+      state.services = [];
+      var sv = t.services || [];
+      var i;
+      for (i = 0; i < sv.length; i++) addServiceRow(sv[i]);
+      renderServices();
+      applyTicketBill(t);
+      setFormLocked(true);
+      toast('فقط مشاهده — F4 برای ویرایش', 'ok');
+    }, function () { toast('بازخوانی بلیت ناموفق بود', 'err'); });
   }
 
   function showBlock(block) {
@@ -1624,6 +1877,7 @@
 
   /* --- save admission + print per Management design --- */
   function saveAdmission() {
+    if (state.formLocked) { toast('فرم قفل است — F4 برای ویرایش', 'err'); return; }
     var rec = collectRecord();
     /* v1.69.0: SMART SUBMIT — if the patient fields are empty (no national ID
        AND no name), the operator is re-printing the PREVIOUS receipt (F8
@@ -1650,6 +1904,11 @@
           }, 700);
         }
         if (r.ps) updatePS(r.ps);
+        if (r.cashWarn) {
+          setTimeout(function () {
+            toast('پذیرش ثبت شد ولی صندوق: ' + r.cashWarn, 'err');
+          }, 600);
+        }
         refreshQueue();
       } else {
         toast('ثبت ناموفق: ' + ((r && r.err) || 'نامشخص'), 'err');
@@ -1690,7 +1949,8 @@
     };
   }
 
-  function clearForm() {
+  function clearForm(opts) {
+    opts = opts || {};
     /* v1.72.0: #docSearch / #docCode are retired (the #doc2code field is now the
        single doctor search field), so they are no longer cleared here. */
     var ids = ['nid', 'first', 'last', 'father', 'birth', 'mobile', 'phone', 'addr',
@@ -1704,9 +1964,15 @@
     fillPerformers();
     if ($('insSuppPct')) $('insSuppPct').value = '0';
     if ($('insMain')) $('insMain').selectedIndex = 0;
+    if ($('insSupp')) $('insSupp').selectedIndex = 0;
+    if ($('ptype')) $('ptype').selectedIndex = 0;
+    if ($('insType')) $('insType').selectedIndex = 0;
+    if ($('apptShift')) $('apptShift').selectedIndex = 0;
+    if ($('gender')) $('gender').selectedIndex = 0;
     if ($('hasIns')) $('hasIns').checked = false;
     if ($('noPay')) $('noPay').checked = false;
     state.services = []; state.patient = null; state.catalog = []; state.overrideBlock = false;
+    if (!opts.keepLock) setFormLocked(false);
     setText($('pfName'), 'بیمار جدید');
     setText($('pfFile'), '----');
     setText($('profileStateText'), 'برای شروع، مشخصات بیمار را وارد کنید');
@@ -1716,7 +1982,7 @@
     renderServices(); recompute();
     /* v1.75.0: after clearing, no field is selected → auto-focus کد ملی (nid)
        so the next patient can be looked up immediately. */
-    autoFocusNid();
+    if (!opts.skipFocus) autoFocusNid();
   }
 
   function updatePS(ps) {
@@ -1747,6 +2013,11 @@
         for (var ui = 0; ui < d.rows.length; ui++) addServiceRow(d.rows[ui]);
         renderServices(); recompute();
       }
+    });
+    Bridge.on('hotkey', function (d) {
+      var k = (d && d.key) ? ('' + d.key) : '';
+      if (k === 'F7') openCashPanel();
+      else if (k === 'F4') unlockCashForm();
     });
     Bridge.on('queue.update', function (d) { renderQueue(d.rows || []); updateTurnPreview(); });
     Bridge.on('ps.update', function (d) { updatePS(d); });
@@ -1870,10 +2141,22 @@
       renderServices(); recompute();
       /* v1.78.0: load the «انجام دهنده» combo (performer-flagged doctors). */
       fillPerformers();
-      /* v1.79.0: access ticks — hide the queue/cashier launcher entirely when
-         the account lacks «گزارش و صندوق» (مدیریت ← تعریف حساب کاربری). */
+      /* v1.79.0 / v1.82.0: hide launchers when the matching tick is OFF
+         (the button must not exist — not merely disabled). */
       if (r.perms && r.perms.cashier === false) {
         var ql = $('queueLauncher'); if (ql) ql.style.display = 'none';
+      }
+      state.canCashView = !r.perms || r.perms.cashier_view !== false;
+      state.canCashEdit = !r.perms || r.perms.cashier_edit !== false;
+      if (!state.canCashView) {
+        var cl = $('cashLauncher'); if (cl) cl.style.display = 'none';
+      }
+      if (!state.canCashEdit) {
+        var hideIds = ['cashManualBtn', 'cashShiftStart', 'cashShiftEnd', 'cashManualBox'];
+        var hi;
+        for (hi = 0; hi < hideIds.length; hi++) {
+          if ($(hideIds[hi])) $(hideIds[hi]).style.display = 'none';
+        }
       }
       refreshQueue();
       setSync('ok', 'همگام با برنامه');

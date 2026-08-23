@@ -19,15 +19,19 @@
 
   /* the access ticks available today (keys must match userHasPerm in C++) */
   var PERMS = [
-    { key: 'admission', label: 'پذیرش بیمار',  hint: 'ثبت و صدور قبض پذیرش' },
-    { key: 'worklist',  label: 'کارتابل',       hint: 'مشاهده پیام‌های مدیریت' },
-    { key: 'cashier',   label: 'گزارش و صندوق', hint: 'صندوق نرفته‌ها و صف پذیرش' },
-    { key: 'settings',  label: 'تنظیمات',       hint: 'تنظیمات پذیرش' }
+    { key: 'admission',    label: 'پذیرش بیمار',     hint: 'ثبت و صدور قبض پذیرش' },
+    { key: 'worklist',     label: 'کارتابل',          hint: 'مشاهده پیام‌های مدیریت' },
+    { key: 'cashier_view', label: 'دیدن صندوق',       hint: 'مشاهده صندوق و زبانه بخش‌ها' },
+    { key: 'cashier_edit', label: 'تغییر در صندوق',   hint: 'پرداخت، سند دستی و ویرایش پس از F4' },
+    { key: 'settings',     label: 'تنظیمات',          hint: 'تنظیمات پذیرش' }
   ];
   function permsLabel(p) {
     if (!p) return 'دسترسی کامل';
     if (p === '-') return 'بدون دسترسی';
-    var map = { admission: 'پذیرش', worklist: 'کارتابل', cashier: 'صندوق', settings: 'تنظیمات' };
+    var map = {
+      admission: 'پذیرش', worklist: 'کارتابل', cashier: 'صندوق',
+      cashier_view: 'دیدن صندوق', cashier_edit: 'تغییر صندوق', settings: 'تنظیمات'
+    };
     var parts = ('' + p).split(','), out = [], i;
     for (i = 0; i < parts.length; i++) if (map[parts[i]]) out.push(map[parts[i]]);
     return out.length ? out.join('، ') : 'دسترسی کامل';
@@ -63,6 +67,16 @@
       for (i = 0; i < subs.length; i++) h += '<span class="crm-codechip">' + Crm.esc(subs[i].name) + '</span> ';
       h += '</div>';
     }
+    var chips = d.receptionChips || [];
+    h += '<div class="crm-sheet-sub">پذیرش‌های این بخش (' + Crm.faDigits('' + (d.receptionCount || chips.length || 0)) + ')</div><div class="crm-chips">';
+    if (chips.length) {
+      for (i = 0; i < chips.length; i++)
+        h += '<span class="crm-rec-chip" style="background:' + Crm.esc(chips[i].color || '#2563eb') + '">' +
+             Crm.esc(chips[i].name) + '</span> ';
+    } else {
+      h += '<span class="crm-muted">پذیرش ثبت‌شده‌ای زیر این بخش نیست.</span>';
+    }
+    h += '</div>';
     h += '<div class="crm-sheet-sub">پرسنل این بخش (' + Crm.faDigits('' + ps.length) + ' نفر)</div>' +
       '<table class="crm-sheet-tbl"><tr><td>کد پرسنلی</td><td>نام</td><td>نقش</td><td>مقام/سمت</td><td>زیربخش</td><td>حساب</td></tr>';
     for (i = 0; i < ps.length; i++) {
@@ -293,7 +307,8 @@
       '<option value="">همه دسترسی‌ها</option>' +
       '<option value="full">دسترسی کامل</option>' +
       '<option value="admission">پذیرش بیمار</option><option value="worklist">کارتابل</option>' +
-      '<option value="cashier">گزارش و صندوق</option><option value="settings">تنظیمات</option>' +
+      '<option value="cashier_view">دیدن صندوق</option><option value="cashier_edit">تغییر در صندوق</option>' +
+      '<option value="settings">تنظیمات</option>' +
       '<option value="none">بدون دسترسی</option></select>';
     var fQ = Crm.el('div', 'crm-search');
     fQ.innerHTML = '<input class="crm-input" id="afQ" placeholder="جستجوی نام کاربری / نام…" />' +
@@ -471,7 +486,11 @@
     var all = (perms == null || perms === '');
     var h = '', i;
     for (i = 0; i < PERMS.length; i++) {
-      var on = all || (perms !== '-' && (',' + (perms || '') + ',').indexOf(',' + PERMS[i].key + ',') >= 0);
+      var key = PERMS[i].key;
+      var csv = ',' + (perms || '') + ',';
+      var on = all || (perms !== '-' && csv.indexOf(',' + key + ',') >= 0);
+      if (!on && (key === 'cashier_view' || key === 'cashier_edit') && csv.indexOf(',cashier,') >= 0)
+        on = true;
       h += '<label class="crm-check crm-perm"><input type="checkbox" data-perm="' + PERMS[i].key + '"' + (on ? ' checked' : '') + ' />' +
            '<b>' + PERMS[i].label + '</b><small>' + PERMS[i].hint + '</small></label>';
     }

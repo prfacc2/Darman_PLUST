@@ -62,6 +62,13 @@
       body.appendChild(head);
       for (var i = 0; i < cat.tiles.length; i++) body.appendChild(menuItem(cat.tiles[i]));
     }
+    /* v1.82.0: backup is always the last hamburger item (not a header button). */
+    body.appendChild(menuItem({
+      page: 'backup',
+      label: 'پشتیبان‌گیری',
+      color: 'slate',
+      ic: 'M19 12v7H5v-7H3v7a2 2 0 002 2h14a2 2 0 002-2v-7h-2zm-6 .67l2.59-2.58L17 11.5 12 16.5 7 11.5l1.41-1.41L11 12.67V3h2v9.67z'
+    }));
   }
   Crm.openMenu = function () {
     buildMenu();

@@ -297,11 +297,7 @@
     }
     var home = $('navHome');
     if (home) home.onclick = function () { Crm.home(); };
-    var backup = $('navBackup');
-    if (backup) backup.onclick = function () {
-      Crm.toast('در حال باز کردن پشتیبان‌گیری…', 'info');
-      Crm.call('crm.backup', {}).then(function () {}, function () { Crm.toast('پشتیبان‌گیری ناموفق بود.', 'err'); });
-    };
+    /* v1.82.0: backup lives on its own HTML page (last hamburger item). */
     /* hamburger drawer: the top-bar button toggles it; the in-drawer close
        button, the backdrop and the Esc key all dismiss it. The drawer body
        itself is populated from Crm.categories when it first opens. */

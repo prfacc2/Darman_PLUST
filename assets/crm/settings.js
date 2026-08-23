@@ -1,9 +1,9 @@
 /* ============================================================================
    settings.js — Settings + backup (تنظیمات و پشتیبان). ES5-only.
-   Read / write application settings via crm.settings.* verbs, and trigger a
-   backup (crm.backup → openBackupManager) or the print-settings modal
-   (crm.printConfig → PrintCfg_Open). The on-disk settings store (data\settings)
-   is owned by C++ (getSetting / setSetting).
+   Read / write application settings via crm.settings.* verbs. Backup opens
+   the HTML page (Crm.nav('backup')), not the native C++ manager. Print
+   settings still go through crm.printConfig → PrintCfg_Open. The on-disk
+   settings store (data\settings) is owned by C++ (getSetting / setSetting).
    ============================================================================ */
 (function (global) {
   'use strict';
@@ -73,10 +73,7 @@
       Crm.toast('در حال باز کردن تنظیمات چاپ…', 'info');
       Crm.call('crm.printConfig', {}).then(function () {}, function () { Crm.toast('عملیات ناموفق بود.', 'err'); });
     };
-    bBackup.onclick = function () {
-      Crm.toast('در حال باز کردن پشتیبان‌گیری…', 'info');
-      Crm.call('crm.backup', {}).then(function () {}, function () { Crm.toast('پشتیبان‌گیری ناموفق بود.', 'err'); });
-    };
+    bBackup.onclick = function () { Crm.nav('backup'); };
   }
 
   Crm.pages.settings = {

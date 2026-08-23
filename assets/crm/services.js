@@ -109,8 +109,12 @@
     host.innerHTML = '';
     Crm.head(host, 'خدمات', 'مدیریت فهرست خدمات و تعرفه‌ها');
 
-    /* ---------------- professional settings panel ----------------------- */
+    /* ---------------- professional settings panel (collapsed advanced) -- */
+    var adv = Crm.el('div', 'crm-card');
+    var tog = Crm.el('button', 'crm-btn outline', 'تنظیمات پیشرفته قیمت‌گذاری ▾');
+    tog.setAttribute('type', 'button');
     var panel = Crm.el('div', 'crm-panel');
+    panel.style.display = 'none';
     panel.innerHTML =
       '<div class="crm-panel-title">تنظیمات حرفه‌ای قیمت‌گذاری</div>' +
       '<div class="crm-form">' +
@@ -139,7 +143,14 @@
       '<div class="crm-modal-foot" style="border-top:0;padding-top:0;margin-top:0">' +
         '<button class="crm-btn primary" id="svApply">اعمال روی خدمات</button>' +
       '</div>';
-    host.appendChild(panel);
+    tog.onclick = function () {
+      var on = panel.style.display !== 'none';
+      panel.style.display = on ? 'none' : 'block';
+      tog.innerHTML = on ? 'تنظیمات پیشرفته قیمت‌گذاری ▾' : 'تنظیمات پیشرفته قیمت‌گذاری ▴';
+    };
+    adv.appendChild(tog);
+    adv.appendChild(panel);
+    host.appendChild(adv);
     wireSeg('svMode', updatePreview);
     wireSeg('svDir', updatePreview);
     wireSeg('svTarget', updatePreview);

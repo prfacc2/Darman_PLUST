@@ -1105,3 +1105,12 @@ html, body{
 .crm-chips{margin-bottom:4px;}
 .crm-chips .crm-codechip{margin-left:6px;margin-bottom:4px;}
 .crm-sub-arrow{color:#8a97a8;font-weight:400;margin:0 2px;}
+.crm-rec-chip{
+  display:inline-block;color:#fff;border-radius:999px;padding:2px 10px;
+  font-size:11px;font-weight:800;margin-left:6px;margin-bottom:4px;
+}
+.crm-muted{color:#7a8796;font-size:12px;}
+.bk-track{height:10px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin:8px 0;}
+.bk-bar{height:10px;width:0;background:#0f766e;}
+.theme-dark .crm-muted{color:#93a4b8;}
+.theme-dark .bk-track{background:#1d2f44;}

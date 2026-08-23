@@ -82,11 +82,33 @@
           ('' + r.code).toLowerCase().indexOf(fq) >= 0) view.push(r);
     }
 
+    function isRec(s) {
+      var k = ('' + (s.kind || '')).toLowerCase();
+      var n = s.name || '';
+      return k === 'reception' || n.indexOf('پذیرش') >= 0;
+    }
+    function recInfo(id) {
+      var PAL = ['#2563eb','#0f766e','#7c3aed','#be123c','#c2410c','#0369a1','#4d7c0f','#6d28d9'];
+      var n = 0, h = '', j, s, col;
+      for (j = 0; j < rows.length; j++) {
+        s = rows[j];
+        if (s.parentId !== id || !s.active || !isRec(s)) continue;
+        n++;
+        col = PAL[(((+s.id || 0) * 2654435761) >>> 0) % 8];
+        h += '<span class="crm-rec-chip" style="background:' + col + '">' + Crm.esc(s.name) + '</span> ';
+      }
+      return { n: n, chips: h || '<span class="crm-muted">—</span>' };
+    }
+
     host.appendChild(Crm.table([
       { key: 'i', label: 'ردیف', cls: 'c-row', render: function (r, i) { return Crm.faDigits('' + (i + 1)); } },
       { key: 'code', label: 'کد', cls: 'c-mono', render: function (r) { return Crm.esc(r.code || '—'); } },
       { key: 'name', label: 'نام بخش', render: function (r) { return '<b>' + Crm.esc(r.name) + '</b>'; } },
       { key: 'kind', label: 'نوع', render: function (r) { return Crm.esc(r.kindLabel || r.kind || '—'); } },
+      { key: 'rec', label: 'پذیرش‌ها', render: function (r) {
+          var info = recInfo(r.id);
+          return Crm.faDigits('' + info.n) + '<div class="crm-chips">' + info.chips + '</div>';
+        } },
       { key: 'active', label: 'وضعیت', render: function (r) { return Crm.pill(r.active ? 'فعال' : 'غیرفعال', r.active ? 'on' : 'off'); } },
       { key: 'ops', label: 'عملیات', render: function (r) {
           var b = Crm.el('span');

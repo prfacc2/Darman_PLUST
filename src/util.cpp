@@ -127,6 +127,13 @@ void logLine(const std::wstring& s){
     (void)s;   // release: do not write any user-behavior telemetry
 #endif
 }
+void logError(const std::wstring& s){
+    SYSTEMTIME st = iranNow();
+    wchar_t pre[64];
+    swprintf(pre,64,L"[%04d-%02d-%02d %02d:%02d:%02d] ",
+        st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond);
+    writeFileUtf8(logsDir()+L"\\errors.log", std::wstring(pre)+s+L"\r\n", true);
+}
 
 // --------------------------------------------------------------- settings --
 //  simple key=value store: data\settings.ini
