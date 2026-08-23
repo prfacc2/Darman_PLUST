@@ -748,7 +748,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         }
         if(w==VK_F8){ printLastReceipt(h); return 0; }
         if(w==VK_F7){
-            WebAdmission_PushEvent("hotkey","{\"key\":\"F7\"}");
+            Reception_OpenCashier();
             return 0;
         }
         if(w==VK_F4){

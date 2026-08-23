@@ -303,8 +303,7 @@ static LRESULT CALLBACK mshtmlHostProc(HWND h, UINT m, WPARAM w, LPARAM l){
 // ---------------------------------------------------------------------------
 static HWND MshtmlAdmission_CreateView(HWND parent){
     if(!parent) return nullptr;
-    const std::string& page=AdmissionInlinePage(false);
-    if(page.empty()) return nullptr;
+    if(AdmissionInlinePage(false).empty()) return nullptr;
     mshtmlSetBrowserEmulation();
     OleInitialize(NULL); // S_FALSE is normal when this UI thread is initialized.
 
@@ -324,11 +323,13 @@ static HWND MshtmlAdmission_CreateView(HWND parent){
     HWND host=CreateWindowExW(0,CLS,L"",WS_CHILD|WS_CLIPCHILDREN,
         0,0,rc.right,rc.bottom,parent,NULL,g_hInst,NULL);
     if(!host) return nullptr;
+    adBindPendingView(host);
 
     MshtmlView* v=new MshtmlView(); v->host=host;
     MshtmlHost* site=new MshtmlHost(host); v->site=site;
     bool registered=false;
     auto fail=[&]()->HWND{
+        adForgetHost(host);
         if(registered){
             std::lock_guard<std::mutex> lk(g_mshtmlMx);
             g_mshtmlViews.erase(host);
@@ -424,6 +425,8 @@ static HWND MshtmlAdmission_CreateView(HWND parent){
     dd->Release();
     if(FAILED(hr)||!doc) return fail();
 
+    std::string page=AdmissionPageForHost(false,host);
+    if(page.empty()){ doc->Release(); return fail(); }
     std::wstring wpage=u82w(page);
     BSTR bpage=SysAllocStringLen(wpage.c_str(),(UINT)wpage.size());
     SAFEARRAY* sa=SafeArrayCreateVector(VT_VARIANT,0,1);
@@ -507,6 +510,7 @@ static bool MshtmlAdmission_PushEvent(HWND host, const char* eventName,
 }
 
 static void MshtmlAdmission_Destroy(HWND host){
+    adForgetHost(host);
     MshtmlView* v=nullptr;
     { std::lock_guard<std::mutex> lk(g_mshtmlMx);
       auto it=g_mshtmlViews.find(host); if(it!=g_mshtmlViews.end()){ v=it->second; g_mshtmlViews.erase(it); } }
