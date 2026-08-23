@@ -965,7 +965,12 @@ body.theme-dark{background:#111827;color:#e5edf7;}
 .profile-card{-ms-flex-order:1;order:1;}
 .datetime-card{-ms-flex-order:2;order:2;}
 .action-card{-ms-flex-order:3;order:3;}
-.status-card{-ms-flex-order:5;order:5;}
+/* v1.81.0: the queue launcher is a plain <button> (default order 0 — it used
+   to sort ABOVE the profile card). It belongs between عملیات پذیرش (3) and
+   چاپ اسناد (4): profile → date/shift → operations → launcher → printing. */
+.queue-hub-rail{-ms-flex-order:4;order:4;}
+.print-card{-ms-flex-order:5;order:5 !important;}
+.status-card{-ms-flex-order:6;order:6;}
 .action-kicker{
   color:#153c73;font-size:13px;font-weight:900;padding:0 2px 9px;margin-bottom:10px;
   border-bottom:1px solid #ccdae9;
@@ -1377,7 +1382,7 @@ select.inp{background:#fbfdff;}
 /* Bottom-RIGHT of the page: the print card is the LAST card of the right rail
    and is pushed down with an auto top margin, so «چاپ آخرین قبض / چاپ نسخه /
    رسید بیمه» sit at the bottom-right exactly where the native bar used to be. */
-.print-card{-ms-flex-order:4;order:4;margin-top:auto;margin-bottom:0;border-color:#c4d5ee;}
+.print-card{-ms-flex-order:5;order:5;margin-top:auto;margin-bottom:0;border-color:#c4d5ee;}
 .status-card{-ms-flex-order:5;order:5;margin-top:12px;}
 .print-grid .btn-print{
   height:43px;border-radius:11px;border:1.5px solid #c2d1e4;
@@ -1842,7 +1847,7 @@ body{
 .action-card .btn-danger.btn-block{height:40px;margin-bottom:0;font-size:13px;background:#fff9fa;}
 
 /* print actions stay at the bottom-right, with a dominant print-last action */
-.print-card{-ms-flex-order:4;order:4;margin-top:auto;margin-bottom:0;border-color:#bdd0e7;}
+.print-card{-ms-flex-order:5;order:5;margin-top:auto;margin-bottom:0;border-color:#bdd0e7;}
 .print-card .card-body{padding:10px;}
 .print-grid{
   display:-ms-flexbox;display:flex;-ms-flex-direction:row;flex-direction:row;
@@ -3215,9 +3220,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .card-head{
    title. The body tints stay whisper-light (see section 3). */
 /* PATIENT (مشخصات بیمار) → soft blue */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .card-head{
-  background:#e9f1fc;background:-webkit-linear-gradient(top,#f0f6fd 0%,#e0ebf9 100%);
-  background:linear-gradient(180deg,#f0f6fd 0%,#e0ebf9 100%);
-  border-bottom:1px solid #cbdcf2;
+  background:#e2eefa;background:-webkit-linear-gradient(top,#eaf2fc 0%,#d2e3f7 100%);
+  background:linear-gradient(180deg,#eaf2fc 0%,#d2e3f7 100%);
+  border-bottom:1px solid #c3d7f0;
   -webkit-box-shadow:inset -3px 0 0 #2563eb;box-shadow:inset -3px 0 0 #2563eb;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .card-title{color:#1e40af;}
@@ -3225,9 +3230,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .ct-ico{co
 
 /* INSURANCE (اطلاعات بیمه و نوع پذیرش) → soft mint */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(1) .card-head{
-  background:#e9f5f0;background:-webkit-linear-gradient(top,#eff9f4 0%,#dff0e8 100%);
-  background:linear-gradient(180deg,#eff9f4 0%,#dff0e8 100%);
-  border-bottom:1px solid #c2e4d6;
+  background:#def2ea;background:-webkit-linear-gradient(top,#e8f6ef 0%,#cdeadd 100%);
+  background:linear-gradient(180deg,#e8f6ef 0%,#cdeadd 100%);
+  border-bottom:1px solid #b5dfce;
   -webkit-box-shadow:inset -3px 0 0 #0d9488;box-shadow:inset -3px 0 0 #0d9488;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(1) .card-title{color:#0f766e;}
@@ -3235,9 +3240,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child
 
 /* DOCTOR (پزشک معالج) → muted indigo (periwinkle — calm, never loud violet) */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(2) .card-head{
-  background:#eceef9;background:-webkit-linear-gradient(top,#f2f3fc 0%,#e2e5f6 100%);
-  background:linear-gradient(180deg,#f2f3fc 0%,#e2e5f6 100%);
-  border-bottom:1px solid #ccd0ec;
+  background:#e3e6f7;background:-webkit-linear-gradient(top,#ebedfb 0%,#d3d8f1 100%);
+  background:linear-gradient(180deg,#ebedfb 0%,#d3d8f1 100%);
+  border-bottom:1px solid #c1c6e8;
   -webkit-box-shadow:inset -3px 0 0 #5b62d6;box-shadow:inset -3px 0 0 #5b62d6;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(2) .card-title{color:#4a4fb8;}
@@ -3245,9 +3250,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child
 
 /* PERFORMER (انجام دهنده) → calm cyan (cool & clinical — never red/warm) */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(3) .card-head{
-  background:#e7f4fa;background:-webkit-linear-gradient(top,#eef8fc 0%,#dceef6 100%);
-  background:linear-gradient(180deg,#eef8fc 0%,#dceef6 100%);
-  border-bottom:1px solid #bdddec;
+  background:#def0f7;background:-webkit-linear-gradient(top,#e7f4fa 0%,#c9e5f1 100%);
+  background:linear-gradient(180deg,#e7f4fa 0%,#c9e5f1 100%);
+  border-bottom:1px solid #aed7e9;
   -webkit-box-shadow:inset -3px 0 0 #0891b2;box-shadow:inset -3px 0 0 #0891b2;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(3) .card-title{color:#0e7490;}
@@ -3255,9 +3260,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child
 
 /* SERVICES (خدمات) → slate (the working surface) */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .svc-card > .card-head{
-  background:#edf1f7;background:-webkit-linear-gradient(top,#f4f7fb 0%,#e5eaf3 100%);
-  background:linear-gradient(180deg,#f4f7fb 0%,#e5eaf3 100%);
-  border-bottom:1px solid #d2dbe8;
+  background:#e5ebf4;background:-webkit-linear-gradient(top,#edf2f8 0%,#d8e0eb 100%);
+  background:linear-gradient(180deg,#edf2f8 0%,#d8e0eb 100%);
+  border-bottom:1px solid #c5d2e2;
   -webkit-box-shadow:inset -3px 0 0 #475569;box-shadow:inset -3px 0 0 #475569;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .svc-card .card-title{color:#33465f;}
@@ -3265,9 +3270,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .svc-card > .card-head .
 
 /* PAYMENT (وضعیت پرداخت) → soft emerald */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payment-card .card-head{
-  background:#eaf6ef;background:-webkit-linear-gradient(top,#f0faf4 0%,#dff0e6 100%);
-  background:linear-gradient(180deg,#f0faf4 0%,#dff0e6 100%);
-  border-bottom:1px solid #c3e5d0;
+  background:#def2e6;background:-webkit-linear-gradient(top,#e8f7ee 0%,#ccead8 100%);
+  background:linear-gradient(180deg,#e8f7ee 0%,#ccead8 100%);
+  border-bottom:1px solid #b7e0c8;
   -webkit-box-shadow:inset -3px 0 0 #059669;box-shadow:inset -3px 0 0 #059669;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payment-card .card-title{color:#047857;}
@@ -3276,9 +3281,9 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payment-card .ct-ico{co
 /* INVOICE (صورت حساب) → AMBER, restored (the classic warm gold the clinic
    loved) — golden head + gold card edge + white chip */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-head{
-  background:#fdf2dc;background:-webkit-linear-gradient(top,#fef6e4 0%,#fbe9bf 100%);
-  background:linear-gradient(180deg,#fef6e4 0%,#fbe9bf 100%);
-  border-bottom:1px solid #edd7a4;
+  background:#fbeccb;background:-webkit-linear-gradient(top,#fdf2d4 0%,#f7dd9f 100%);
+  background:linear-gradient(180deg,#fdf2d4 0%,#f7dd9f 100%);
+  border-bottom:1px solid #e7cc8f;
   -webkit-box-shadow:inset -3px 0 0 #d97706;box-shadow:inset -3px 0 0 #d97706;
 }
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-title{color:#b45309;}
@@ -3765,3 +3770,131 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .queue-hub-btn:not(.queu
 .theme-dark .col .queue-hub-rail{background:#1d2c40;border-color:#3d5b80;color:#a8ccf5;
   -webkit-box-shadow:none;box-shadow:none;}
 .theme-dark .col .queue-hub-rail:hover{background:#25364e;border-color:#5b83b8;color:#cfe4fb;}
+
+/* ============================================================================
+   v1.81.0 — «CLINIC MORNING» SURFACE POLISH (light theme)
+   ----------------------------------------------------------------------------
+   The admission page read as «too white, too plain». This pass adds REAL depth
+   without any clutter: a calmer room-tone page wash, moulded cards (deeper
+   layered shadows + inset top light), soft tinted input wells with per-section
+   focus rings, a richer identity card, and hairline group separators. All hues
+   stay inside the section palettes of v1.80.0 — nothing loud, nothing busy.
+   Trident-safe: paired -webkit- gradients, no custom properties, no gap.
+   ============================================================================ */
+
+/* ---- page canvas: a calm cool room-tone (never a bare white sheet) -------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm){
+  background:#cfdcec;
+  background:-webkit-linear-gradient(320deg,#e4ecf6 0%,#d5e1f0 48%,#cbd9ea 100%);
+  background:linear-gradient(140deg,#e4ecf6 0%,#d5e1f0 48%,#cbd9ea 100%);
+}
+
+/* ---- cards: moulded panels (deeper lift + inset top light) ----------------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .card{
+  border:1px solid #bfcbde;border-radius:15px;
+  -webkit-box-shadow:0 1px 2px rgba(18,40,70,.07),0 14px 30px rgba(18,40,70,.10),
+    inset 0 1px 0 rgba(255,255,255,.75);
+  box-shadow:0 1px 2px rgba(18,40,70,.07),0 14px 30px rgba(18,40,70,.10),
+    inset 0 1px 0 rgba(255,255,255,.75);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .card-head{
+  padding:11px 15px;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+/* the white icon chip gains a soft section-tinted ring shadow */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .ct-ico{
+  -webkit-box-shadow:0 2px 5px rgba(15,35,70,.14),inset 0 1px 0 #ffffff;
+  box-shadow:0 2px 5px rgba(15,35,70,.14),inset 0 1px 0 #ffffff;
+}
+
+/* ---- inputs: soft tinted wells + per-section focus ring -------------------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inp{
+  border:1px solid #bfcfe2;border-radius:10px;
+  background:#f4f8fd;
+  background:-webkit-linear-gradient(top,#f9fbfe 0%,#eef4fb 100%);
+  background:linear-gradient(180deg,#f9fbfe 0%,#eef4fb 100%);
+  -webkit-box-shadow:inset 0 1px 3px rgba(18,40,70,.07);
+  box-shadow:inset 0 1px 3px rgba(18,40,70,.07);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inp:hover{border-color:#9db4cf;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inp:focus{
+  background:#ffffff;border-color:#2563eb;
+  -webkit-box-shadow:0 0 0 3px rgba(37,99,235,.15),inset 0 1px 2px rgba(18,40,70,.04);
+  box-shadow:0 0 0 3px rgba(37,99,235,.15),inset 0 1px 2px rgba(18,40,70,.04);
+}
+/* the focus ring borrows the SECTION's accent — a quiet premium cue */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .inp:not([readonly]):focus{border-color:#2563eb;-webkit-box-shadow:0 0 0 3px rgba(37,99,235,.16);box-shadow:0 0 0 3px rgba(37,99,235,.16);}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(1) .inp:not([readonly]):focus{border-color:#0d9488;-webkit-box-shadow:0 0 0 3px rgba(13,148,136,.16);box-shadow:0 0 0 3px rgba(13,148,136,.16);}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(2) .inp:not([readonly]):focus{border-color:#5b62d6;-webkit-box-shadow:0 0 0 3px rgba(91,98,214,.16);box-shadow:0 0 0 3px rgba(91,98,214,.16);}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .row-3 > .card:nth-child(3) .inp:not([readonly]):focus{border-color:#0891b2;-webkit-box-shadow:0 0 0 3px rgba(8,145,178,.16);box-shadow:0 0 0 3px rgba(8,145,178,.16);}
+
+/* ---- field labels: slate ink, slightly tighter ------------------------------ */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .fld > span{color:#3c5069;font-weight:800;}
+
+/* ---- identity card (right rail): richer slate-blue, ringed avatar ----------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .profile-card{
+  border:1px solid #b9cde4;
+  background-color:#e6eef8;
+  background-image:-webkit-linear-gradient(160deg,#eef4fb 0%,#d8e5f4 60%,#d0e0f1 100%);
+  background-image:linear-gradient(160deg,#eef4fb 0%,#d8e5f4 60%,#d0e0f1 100%);
+  -webkit-box-shadow:0 3px 8px rgba(37,99,235,.10),0 14px 30px -14px rgba(37,99,235,.24),inset 0 1px 0 rgba(255,255,255,.8);
+  box-shadow:0 3px 8px rgba(37,99,235,.10),0 14px 30px -14px rgba(37,99,235,.24),inset 0 1px 0 rgba(255,255,255,.8);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .profile-card .avatar{
+  border:3px solid #ffffff;
+  -webkit-box-shadow:0 0 0 2px #c4d8ef,0 4px 10px rgba(37,99,235,.18);
+  box-shadow:0 0 0 2px #c4d8ef,0 4px 10px rgba(37,99,235,.18);
+}
+
+/* ---- datetime + print + status cards (right rail): soft slate, not white --- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .datetime-card,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .print-card,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .status-card{
+  background-color:#f2f6fb;
+  background-image:-webkit-linear-gradient(top,#f7fafd 0%,#edf2f9 100%);
+  background-image:linear-gradient(180deg,#f7fafd 0%,#edf2f9 100%);
+  border:1px solid #c6d4e5;
+}
+
+/* ---- counter strip: a touch of glass ---------------------------------------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .counter-strip{
+  background:#eef3fa;
+  background:-webkit-linear-gradient(top,#f4f8fc 0%,#e8eff7 100%);
+  background:linear-gradient(180deg,#f4f8fc 0%,#e8eff7 100%);
+  border:1px solid #c3d1e4;
+  -webkit-box-shadow:0 1px 2px rgba(18,40,70,.06),inset 0 1px 0 rgba(255,255,255,.7);
+  box-shadow:0 1px 2px rgba(18,40,70,.06),inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+/* ---- services table: deeper head + calmer striping --------------------------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .tbl thead th{
+  background:#e2eaf5;
+  background:-webkit-linear-gradient(top,#eef3fa 0%,#dde7f3 100%);
+  background:linear-gradient(180deg,#eef3fa 0%,#dde7f3 100%);
+  color:#33465f;border-bottom:2px solid #c3d1e4;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .tbl tbody tr:nth-child(even){background:#f2f7fc;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .tbl tbody tr:hover{background:#e7f1fb;}
+
+/* ---- invoice groups: the warm receipt panels get their gold depth back ------ */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group{
+  border:1px solid #e8d29e;border-radius:12px;
+  background:#fffaf0;
+  background:-webkit-linear-gradient(top,#fffdf6 0%,#faf1dc 100%);
+  background:linear-gradient(180deg,#fffdf6 0%,#faf1dc 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group:last-child{
+  border-color:#e0c37f;
+  background:#fdf4de;
+  background:-webkit-linear-gradient(top,#fef8e9 0%,#f9edd2 100%);
+  background:linear-gradient(180deg,#fef8e9 0%,#f9edd2 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain{
+  border-color:#e6c887;
+  background:#fdf2d8;
+  background:-webkit-linear-gradient(top,#fef6e2 0%,#fbebc8 100%);
+  background:linear-gradient(180deg,#fef6e2 0%,#fbebc8 100%);
+}
+
+/* (no per-row hairlines inside the patient form — the clinic asked for calm,
+   not stripes.) */

@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.80.0"
+#define APP_VERSION_W   L"1.81.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
