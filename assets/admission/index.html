@@ -93,6 +93,10 @@
           <span class="i"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg></span>
           صندوق نرفته‌ها و صف پذیرش
         </button>
+        <button class="btn queue-hub-btn cash-hub-rail" id="cashLauncher">
+          <span class="i"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg></span>
+          صندوق <span class="cash-f7">F7</span>
+        </button>
 
         <!-- v1.60.0: چاپ‌ها از نوار نیتیو پایین به داخل صفحه آمدند — خوش‌چین پایین ریل راست -->
         <section class="card print-card">
@@ -394,6 +398,74 @@
         <button class="link-btn" id="addToQueue">
           <span class="i"><svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M11 5v6H5v2h6v6h2v-6h6v-2h-6V5z"/></svg></span>
           افزودن به صندوق نرفته‌ها</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- v1.82.0: full-screen cashier overlay (section tabs + shift + 24h tickets) -->
+  <div class="queue-backdrop" id="cashBackdrop"></div>
+  <section class="queue-overlay cash-overlay" id="cashPanel" aria-hidden="true">
+    <div class="queue-overlay-head cash-overlay-head">
+      <div class="qov-title">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
+        <span class="qov-title-stack">
+          <span class="qov-title-main">صندوق</span>
+          <span class="qov-subtitle" id="cashSubtitle">۲۴ ساعت اخیر — جستجو فقط در زبانه فعال</span>
+        </span>
+      </div>
+      <div class="cash-income" id="cashIncome">درآمد شیفت: <b>۰</b> ریال</div>
+      <div class="tabs cash-tabs" id="cashTabs"></div>
+      <div class="head-tools">
+        <div class="with-ico q-search-wrap">
+          <input type="text" id="cashSearch" class="inp inp-sm" placeholder="جستجوی بارکد، نام، پزشک، بخش…" />
+          <span class="in-ico"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 2a8 8 0 105 14.3l5.3 5.4 1.4-1.4-5.4-5.3A8 8 0 0010 2z"/></svg></span>
+        </div>
+        <button type="button" id="cashClose" class="btn btn-icon qov-close">×</button>
+      </div>
+    </div>
+    <div class="queue-overlay-body">
+      <div class="qov-summary cash-summary" id="cashSummary">
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatP">۰</span><span class="qov-sum-lbl">بیمار</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatPaid">۰</span><span class="qov-sum-lbl">صندوق‌شده</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatUnpaid">۰</span><span class="qov-sum-lbl">پرداخت‌نشده</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatQ">۰</span><span class="qov-sum-lbl">صف پذیرش</span></div>
+        <div class="qov-sum-hint" id="cashShiftMeta">شیفت شروع نشده</div>
+      </div>
+      <div class="tbl-wrap" id="cashWrap">
+        <table class="tbl q-tbl">
+          <thead><tr>
+            <th>بارکد</th><th>نام و نام خانوادگی</th><th>قابل پرداخت</th>
+            <th>نام پزشک</th><th>نام بخش</th><th>ساعت</th><th>تاریخ</th><th class="c-act">عملیات</th>
+          </tr></thead>
+          <tbody id="cashBody"><tr><td colspan="8" class="empty">موردی در صندوق نیست</td></tr></tbody>
+        </table>
+      </div>
+      <div class="queue-foot cash-foot">
+        <span>
+          <button type="button" class="btn btn-outline" id="cashShiftStart">شروع شیفت</button>
+          <button type="button" class="btn btn-outline" id="cashShiftEnd">پایان شیفت</button>
+          <button type="button" class="btn btn-primary" id="cashManualBtn">ثبت سند دستی</button>
+        </span>
+      </div>
+      <div class="cash-manual" id="cashManualBox" style="display:none">
+        <div class="cash-manual-grid">
+          <input class="inp" id="cmNid" placeholder="کد ملی" />
+          <input class="inp" id="cmFirst" placeholder="نام" />
+          <input class="inp" id="cmLast" placeholder="نام خانوادگی" />
+          <input class="inp" id="cmDoc" placeholder="پزشک" />
+          <input class="inp" id="cmAmt" placeholder="مبلغ (ریال)" />
+          <button type="button" class="btn btn-primary" id="cmSave">ثبت</button>
+          <button type="button" class="btn btn-outline" id="cmCancel">انصراف</button>
+        </div>
+      </div>
+    </div>
+    <div class="cash-dlg" id="cashDlg" style="display:none">
+      <div class="cash-dlg-card">
+        <div class="cash-dlg-msg" id="cashDlgMsg"></div>
+        <div class="cash-dlg-act">
+          <button type="button" class="btn btn-outline" id="cashDlgNo">انصراف</button>
+          <button type="button" class="btn btn-primary" id="cashDlgYes">تأیید</button>
+        </div>
       </div>
     </div>
   </section>

@@ -21,6 +21,7 @@
 #include "web_crm.h"
 #include "web_thread_pool.h"    // RunOnUiThreadSync (UI-thread marshalling)
 #include "print_designer.h"     // PrintCfg_Open (print-settings modal)
+#include "clinic_ops.h"
 #include <shlobj.h>
 #include <string>
 #include <vector>

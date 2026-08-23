@@ -575,10 +575,12 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         // page hides the elements the account has no access to (e.g. the
         // صندوق/صف launcher without «گزارش و صندوق»). Management passes all.
         o+="\"perms\":{";
-        o+="\"admission\":";  o+=(userHasPerm(g_session.user,L"admission")?"true":"false"); o+=",";
-        o+="\"worklist\":";   o+=(userHasPerm(g_session.user,L"worklist")?"true":"false");  o+=",";
-        o+="\"cashier\":";    o+=(userHasPerm(g_session.user,L"cashier")?"true":"false");   o+=",";
-        o+="\"settings\":";   o+=(userHasPerm(g_session.user,L"settings")?"true":"false");
+        o+="\"admission\":";     o+=(userHasPerm(g_session.user,L"admission")?"true":"false"); o+=",";
+        o+="\"worklist\":";      o+=(userHasPerm(g_session.user,L"worklist")?"true":"false");  o+=",";
+        o+="\"cashier\":";       o+=(userHasPerm(g_session.user,L"cashier")?"true":"false");   o+=",";
+        o+="\"cashier_view\":";  o+=(userHasPerm(g_session.user,L"cashier_view")?"true":"false"); o+=",";
+        o+="\"cashier_edit\":";  o+=(userHasPerm(g_session.user,L"cashier_edit")?"true":"false"); o+=",";
+        o+="\"settings\":";      o+=(userHasPerm(g_session.user,L"settings")?"true":"false");
         o+="}";
         o+="}";
         return o;
@@ -824,6 +826,14 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             return "{\"ok\":false,\"err\":\"حداقل یک خدمت با مبلغ لازم است\"}";
 
         int q=saveReception(r);   // assigns queue no + persists CSV
+        std::wstring cashWarn;
+        {
+            std::wstring cerr;
+            if(!Cash_CreateFromReception(r,cerr)){
+                logError(L"admission.save cashier ticket: "+cerr);
+                cashWarn=cerr.empty()?L"ثبت بلیت صندوق ناموفق بود.":cerr;
+            }
+        }
 
         // remember this operator-confirmed identity (never fabricated).
         // v1.40.0: also persist landline «تلفن ثابت», address «آدرس» and the
@@ -877,7 +887,9 @@ static std::string admissionApi(const std::string& verb, const std::string& body
 
         std::string o="{\"ok\":true,\"queueNo\":"+jnum(q)+
             ",\"printMode\":"+jstr(printMode)+
-            ",\"ps\":"+adDoctorStatsJson(r.treatingDoctor)+"}";
+            ",\"ps\":"+adDoctorStatsJson(r.treatingDoctor);
+        if(!cashWarn.empty()) o+=",\"cashWarn\":"+jstr(cashWarn);
+        o+="}";
         return o;
     }
 
@@ -921,6 +933,48 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     if(verb=="rx.electronic"){
         logLine(L"electronic prescription request (web)");
         return "{\"ok\":true}";
+    }
+
+    // ---- v1.82.0 cashier page ----------------------------------------------
+    if(verb=="cashier.page"){
+        std::string qU; jsonGetString(body,"q",qU);
+        double tab=0; jsonGetNumber(body,"tab",tab);
+        return Cash_PageJson(u82w(qU),(int)tab);
+    }
+    if(verb=="cashier.get"){
+        std::string idU; jsonGetString(body,"id",idU);
+        return Cash_GetJson(u82w(idU));
+    }
+    if(verb=="cashier.pay"){
+        std::string idU; jsonGetString(body,"id",idU);
+        std::wstring err;
+        if(!Cash_Pay(u82w(idU),err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="cashier.manual"){
+        std::string nidU,fU,lU,dU; double amt=0;
+        jsonGetString(body,"nid",nidU);
+        jsonGetString(body,"first",fU);
+        jsonGetString(body,"last",lU);
+        jsonGetString(body,"doctor",dU);
+        jsonGetNumber(body,"amount",amt);
+        std::wstring err;
+        if(!Cash_Manual(u82w(nidU),u82w(fU),u82w(lU),u82w(dU),(long long)amt,err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return "{\"ok\":true}";
+    }
+    if(verb=="cashier.shift.start"){
+        std::wstring err;
+        if(!Shift_Start(err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return Shift_StatusJson();
+    }
+    if(verb=="cashier.shift.end"){
+        std::wstring err;
+        if(!Shift_End(err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        return Shift_StatusJson();
     }
 
     return "{\"ok\":false,\"err\":\"verb ناشناخته\"}";

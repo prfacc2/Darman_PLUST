@@ -77,8 +77,18 @@ bool userHasPerm(const User& u, const wchar_t* key){
     if(u.role>=1) return true;
     std::wstring p=trim(u.perms);
     if(p.empty()) return true;
+    std::wstring want=key?key:L"";
     auto parts=split(p, L',');
-    for(auto& k:parts) if(trim(k)==key) return true;
+    for(auto& part:parts){
+        std::wstring k=trim(part);
+        if(k==want) return true;
+        // legacy "cashier" = both view and edit
+        if(k==L"cashier" && (want==L"cashier_view" || want==L"cashier_edit"))
+            return true;
+        // asking for "cashier" matches either of the split ticks
+        if(want==L"cashier" && (k==L"cashier_view" || k==L"cashier_edit"))
+            return true;
+    }
     return false;
 }
 

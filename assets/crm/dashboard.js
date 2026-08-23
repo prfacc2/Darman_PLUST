@@ -23,7 +23,9 @@
       { page: 'doctors', label: 'پزشکان و پرستاران', sub: 'نیروی درمانی و قراردادها', color: 'green',
         ic: 'M19 3h-4.5v3H12V3H7a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2zm-6 14h-2v-2h2v2zm0-4h-2V8h2v5z' },
       { page: 'services', label: 'خدمات و تعرفه‌ها', sub: 'تعریف خدمات و قیمت‌ها', color: 'amber',
-        ic: 'M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm2 5v2h10V8H7zm0 4v2h10v-2H7zm0 4v2h6v-2H7z' }
+        ic: 'M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm2 5v2h10V8H7zm0 4v2h10v-2H7zm0 4v2h6v-2H7z' },
+      { page: 'calendar', label: 'تقویم کاری', sub: 'شروع و پایان شیفت صندوق هر بخش', color: 'amber',
+        ic: 'M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 16H5V10h14v10zM7 12h2v2H7v-2zm4 0h2v2h-2v-2z' }
     ] },
     { title: 'سیستم', dot: '#475569', tiles: [
       /* v1.79.0: the personnel registry + the rebuilt account workshop */

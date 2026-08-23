@@ -19,6 +19,7 @@
 #include "web_pages.h"          // v1.40.0: multi-page registry (generic dispatch)
 #include "web_thread_pool.h"    // RunOnUiThreadSync (UI-thread marshalling)
 #include "sections.h"
+#include "clinic_ops.h"
 #include <shlobj.h>
 #include <string>
 #include <vector>

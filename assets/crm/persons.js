@@ -91,11 +91,13 @@
       { key: 'ops', label: 'عملیات', render: function (r) {
           var b = Crm.el('span');
           b.innerHTML = '<button class="crm-row-btn" data-act="view">مشاهده</button>' +
+                        '<button class="crm-row-btn" data-act="assign">تعریف بخش برای پرسنل</button>' +
                         '<button class="crm-row-btn" data-act="edit">ویرایش</button>' +
                         '<button class="crm-row-btn danger" data-act="del">حذف</button>';
           b.childNodes[0].onclick = function () { viewPerson(r.code); };
-          b.childNodes[1].onclick = function () { openModal(host, r, depts); };
-          b.childNodes[2].onclick = function () { del(host, r); };
+          b.childNodes[1].onclick = function () { openAssign(host, r, depts); };
+          b.childNodes[2].onclick = function () { openModal(host, r, depts); };
+          b.childNodes[3].onclick = function () { del(host, r); };
           return b;
         } }
     ], persons));
@@ -294,6 +296,35 @@
         Crm.toast(adding ? ('پرسنل با کد ' + (d.code || '') + ' ثبت شد.') : 'پرسنل ویرایش شد.', 'ok');
         m.close(); load(host);
       }, function (e) { Crm.toast('ذخیره ناموفق بود.', 'err'); });
+    };
+  }
+
+  function openAssign(host, p, depts) {
+    var m = Crm.modal('تعریف بخش برای پرسنل — ' + fullName(p), null);
+    m.body.innerHTML =
+      '<div class="crm-form">' +
+      '<div class="crm-field"><label class="crm-label">بخش</label><select class="crm-select" id="asDept">' +
+        sectOptions(depts, p.deptId) + '</select></div>' +
+      '<div class="crm-field"><label class="crm-label">زیربخش</label><select class="crm-select" id="asSub">' +
+        subOptions(depts, p.deptId, p.subId) + '</select></div>' +
+      '</div>';
+    Crm.$('asDept').onchange = function () {
+      Crm.$('asSub').innerHTML = subOptions(depts, Crm.$('asDept').value, '');
+    };
+    var foot = Crm.el('div', 'crm-modal-foot');
+    foot.innerHTML = '<button class="crm-btn ghost" id="asCancel">انصراف</button>' +
+                     '<button class="crm-btn primary" id="asSave">ثبت بخش</button>';
+    m.card.appendChild(foot);
+    Crm.$('asCancel').onclick = m.close;
+    Crm.$('asSave').onclick = function () {
+      Crm.call('crm.persons.assign', {
+        code: p.code,
+        deptId: Crm.$('asDept').value,
+        subId: Crm.$('asSub').value
+      }).then(function () {
+        Crm.toast('بخش پرسنل ثبت شد.', 'ok');
+        m.close(); load(host);
+      }, function () { Crm.toast('ثبت بخش ناموفق بود.', 'err'); });
     };
   }
 

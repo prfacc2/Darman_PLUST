@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.81.0"
+#define APP_VERSION_W   L"1.82.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -266,6 +266,8 @@ std::wstring dataDir();      // <exe>\data   (auto-created)
 std::wstring logsDir();      // <exe>\logs   (auto-created)
 void         writeSchemaVersion();   // §I: stamp data\.schema_version (informational only)
 void         logLine(const std::wstring& s);
+// v1.82.0: real failures only (not gated by AZ_DEBUG_LOGS). Writes logs\errors.log.
+void         logError(const std::wstring& s);
 // §J: record a flow breadcrumb (last 32 are dumped into the crash report).
 void         Breadcrumb(const wchar_t* what);
 std::wstring formatMoney(long long v);                   // 1,234,567
@@ -304,8 +306,10 @@ struct User {
     int id;                   // stable per-user id (index into users store)
     // v1.79.0: comma-separated permission keys (column 6 of users.dat).
     // EMPTY = full access (back-compat: accounts created before v1.79 keep
-    // everything). Known keys today: "admission" (پذیرش بیمار),
-    // "worklist" (کارتابل), "cashier" (گزارش و صندوق), "settings" (تنظیمات).
+    // everything). Known keys: "admission" (پذیرش بیمار),
+    // "worklist" (کارتابل), "cashier_view" (دیدن صندوق),
+    // "cashier_edit" (تغییر در صندوق), "settings" (تنظیمات).
+    // Legacy "cashier" still means both view and edit.
     std::wstring perms;
     // §H forward-compat: any extra pipe-delimited columns written by a FUTURE
     // version (fields 7,8,…) are captured verbatim here and written back

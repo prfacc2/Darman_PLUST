@@ -386,7 +386,7 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         o+="\"username\":"+jstr(g_session.user.username)+",";
         o+="\"role\":"+jnum(g_session.user.role)+",";
         o+="\"theme\":"+jstr(getSetting(L"theme",L"light"))+",";
-        o+="\"version\":\"1.70.0\",";
+        o+="\"version\":\"1.82.0\",";
         std::vector<Section> secs; Sections_All(secs);
         o+="\"sections\":"+jnum((long long)secs.size())+",";
         o+="\"patients\":"+jnum((long long)loadAllPatients().size())+",";
@@ -1115,7 +1115,28 @@ static std::string crmApi(const std::string& verb, const std::string& body){
             o+="{\"username\":"+jstr(u.username)+",\"fullname\":"+jstr(u.fullname)+
                ",\"online\":"; o+=(isUserOnline(u.username)?"true":"false"); o+="}";
         }
-        o+="]}";
+        o+="]";
+        // v1.82.0: reception-subsection counts + colour chips (hashed by id)
+        {
+            static const wchar_t* PAL[]={
+                L"#2563eb",L"#0f766e",L"#7c3aed",L"#be123c",
+                L"#c2410c",L"#0369a1",L"#4d7c0f",L"#6d28d9"
+            };
+            int recN=0;
+            std::string chips="[";
+            bool cf=true;
+            for(auto& s2:ss) if(s2.parent_id==id && s2.is_active && Ops_IsReception(s2)){
+                recN++;
+                unsigned h=(unsigned)s2.id*2654435761u;
+                const wchar_t* col=PAL[h%8];
+                if(!cf) chips+=","; cf=false;
+                chips+="{\"id\":"+jnum(s2.id)+",\"name\":"+jstr(s2.name_fa)+
+                       ",\"color\":"+jstr(col)+"}";
+            }
+            chips+="]";
+            o+=",\"receptionCount\":"+jnum(recN)+",\"receptionChips\":"+chips;
+        }
+        o+="}";
         return o;
     }
     //  dept info sheet: the dept + its personnel + its accounts (for the view
@@ -1238,9 +1259,47 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         return "{\"ok\":true}";
     }
     if(verb=="crm.backup"){
-        // open the management backup/restore manager (modal) on the UI thread.
-        HWND owner=g_hFrame;
-        RunOnUiThreadSync([&](){ openBackupManager(owner); });
+        // v1.82.0: the HTML backup page owns this flow. Keep the verb so an
+        // old cached shell that still calls crm.backup does not crash — the
+        // page itself navigates to Crm.pages.backup.
+        return "{\"ok\":true,\"html\":true}";
+    }
+    if(verb=="crm.backup.pickSave")  return OpsBackup_PickSave();
+    if(verb=="crm.backup.pickOpen")  return OpsBackup_PickOpen();
+    if(verb=="crm.backup.create"){
+        std::string p; jsonGetString(body,"path",p);
+        return OpsBackup_Create(u82w(p));
+    }
+    if(verb=="crm.backup.analyze"){
+        std::string p; jsonGetString(body,"path",p);
+        return OpsBackup_Analyze(u82w(p));
+    }
+    if(verb=="crm.backup.restore"){
+        std::string p; jsonGetString(body,"path",p);
+        return OpsBackup_Restore(u82w(p));
+    }
+    if(verb=="crm.backup.progress")  return OpsBackup_ProgressJson();
+    if(verb=="crm.calendar.list"){
+        std::string fromU,toU,userU;
+        jsonGetString(body,"from",fromU);
+        jsonGetString(body,"to",toU);
+        jsonGetString(body,"user",userU);
+        return Calendar_ListJson(u82w(fromU),u82w(toU),u82w(userU));
+    }
+    if(verb=="crm.persons.assign"){
+        std::string cU,dU,sU;
+        jsonGetString(body,"code",cU);
+        jsonGetString(body,"deptId",dU);
+        jsonGetString(body,"subId",sU);
+        std::wstring code=trim(u82w(cU));
+        if(code.empty()) return "{\"ok\":false,\"err\":\"کد پرسنلی خالی است.\"}";
+        PersonDef p;
+        if(!personByCode(code,p)) return "{\"ok\":false,\"err\":\"پرسنل پیدا نشد.\"}";
+        p.deptId=u82w(dU);
+        p.subId=u82w(sU);
+        std::wstring err;
+        if(!updatePerson(p,err))
+            return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
         return "{\"ok\":true}";
     }
     if(verb=="crm.printConfig"){

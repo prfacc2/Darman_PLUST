@@ -747,6 +747,14 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             return 0;
         }
         if(w==VK_F8){ printLastReceipt(h); return 0; }
+        if(w==VK_F7){
+            WebAdmission_PushEvent("hotkey","{\"key\":\"F7\"}");
+            return 0;
+        }
+        if(w==VK_F4){
+            WebAdmission_PushEvent("hotkey","{\"key\":\"F4\"}");
+            return 0;
+        }
         return 0; }
     case WM_CTLCOLORSTATIC: {
         HDC dc=(HDC)w; SetBkColor(dc,g_theme.surface2);
@@ -1561,6 +1569,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
             HWND root=GetAncestor(msg.hwnd,GA_ROOT);
             if(root==g_hFrame){
                 if(msg.wParam==VK_F8){
+                    SendMessageW(g_hFrame, WM_KEYDOWN, msg.wParam, msg.lParam);
+                    continue;
+                }
+                if(msg.wParam==VK_F7 || msg.wParam==VK_F4){
                     SendMessageW(g_hFrame, WM_KEYDOWN, msg.wParam, msg.lParam);
                     continue;
                 }

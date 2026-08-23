@@ -184,6 +184,19 @@ static std::string CrmBuildInlinePage(bool withFontFace){
                           "<script>\n"+perJs+"\n</script>"))
         return "";
     }
+    // v1.82.0: calendar.js (815) + backup.js (816)
+    {
+      std::string calJs; if(!crmLoadRes(815,calJs) || calJs.empty()) return "";
+      if(!crmReplaceRequired(html,"<script src=\"calendar.js\"></script>",
+                          "<script>\n"+calJs+"\n</script>"))
+        return "";
+    }
+    {
+      std::string bkJs; if(!crmLoadRes(816,bkJs) || bkJs.empty()) return "";
+      if(!crmReplaceRequired(html,"<script src=\"backup.js\"></script>",
+                          "<script>\n"+bkJs+"\n</script>"))
+        return "";
+    }
     return html;
 }
 

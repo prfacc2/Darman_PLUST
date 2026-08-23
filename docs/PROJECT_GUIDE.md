@@ -2,7 +2,7 @@
 
 این سند «نقشه ذهنی» کامل برنامه است. **قبل از هر تغییری این فایل را کامل بخوانید.**
 
-> **نسخهٔ فعلی: ۱.۶۷.۰** — اجرای مستقل، رابط حرفه‌ای و چاپ خدمات پویا:
+> **نسخهٔ فعلی: ۱.۸۲.۰** — صندوق بخشی، شیفت مستقل، تقویم کاری و پشتیبان HTML:
 > - **پذیرش سه‌ناحیه‌ای تعبیه‌شده** با پروفایل/عملیات در راست، فرم و خدمات در مرکز، صورتحساب/پرداخت در چپ؛ HTML/CSS/JS مستقیم از RCDATA بارگذاری می‌شود و به localhost وابسته نیست (`assets/admission/*`, `web_admission*`).
 > - **چهار ظاهر هماهنگ**: سفید پزشکی، تیره حرفه‌ای، آرام فیروزه‌ای و گرم صدفی؛ رنگ متن، آیکون‌ها و سطوح گرد در هر تم کنتراست قطعی دارند (`theme.cpp`, `gdiplus.cpp`, `admission.js`).
 > - **محاسبات authoritative**: درصدها و تخفیف‌ها کران‌دارند و خدمات تکراری پیش از صورتحساب/چاپ بر اساس کد یا نام ادغام می‌شوند (`web_admission_api.inc`).
@@ -33,9 +33,10 @@
     **v1.80.0:** `deptId` حالا شناسه بخش بالینی (درخت `sections.dat`) است و `subId` = زیربخش؛
     پیشوند کد از نام زیربخش (وگرنه بخش) ساخته می‌شود؛ `crm.sections.info` برگه بخش می‌دهد.
   - `users.dat` — ستون ششم (**v1.79.0**) = `perms` (کلیدهای دسترسی با کاما: `admission`/
-    `worklist`/`cashier`/`settings`؛ خالی = دسترسی کامل؛ `-` = هیچ). `userHasPerm` در
-    `users.cpp`؛ اجرای UI در `main.cpp`/`reception.cpp`/`admission.js`.
-- **لاگ:** `logs/app.log` + `logs/crash_*.log`
+    `worklist`/`cashier_view`/`cashier_edit`/`settings`؛ تیک قدیمی `cashier` = هر دو
+    صندوق؛ خالی = دسترسی کامل؛ `-` = هیچ). `userHasPerm` در `users.cpp`.
+- **لاگ:** `logs/errors.log` فقط خطا/کرش/خرابی بحرانی (`logError`)؛ `logs/backup_errors.log`
+  برای پشتیبان HTML. لاگ معمولی استفاده در بیلد محصول خاموش است.
 
 ## 2. فایل‌های سورس و مسئولیت هرکدام
 
@@ -47,6 +48,7 @@
 | `src/handlers.cpp` | **Crash handler** (`SetUnhandledExceptionFilter` → crash log + پیام فارسی)، **Speed handler** (`detectSpec` → `g_lowSpec` وقتی ≤2 هسته یا ≤2.2GB رم)، **نصب فونت وزیر** (لود از RCDATA با `AddFontMemResourceEx` + کپی به `%LOCALAPPDATA%\Microsoft\Windows\Fonts` + ثبت HKCU اگر نصب نبود) |
 | `src/theme.cpp` | پالت تم روشن/تیره (`applyTheme`)، براش‌های سراسری، **دکمه Flat سفارشی** (کلاس `AzFlatBtn` با ۵ استایل: GHOST/PRIMARY/DANGER/OUTLINE/CARD)، **آیکون‌های وکتوری** (`drawIcon` — بدون فایل تصویری)، `fillRoundRect` |
 | `src/users.cpp` | ذخیره/خواندن کاربران، هش رمز (FNV-1a دوپاس + salt)، `verifyLogin` با کنترل نقش (پذیرش≠مدیریت)، ادمین مخفی `prf/prf123` هاردکد با role=2 |
+| `src/clinic_ops.cpp` | **v1.82.0:** بلیت صندوق، شیفت مستقل از لاگین، تقویم کاری، پشتیبان AZTBKP01 با `.bak` (بدون کارگران مودال نیتیو) |
 | `src/billing.cpp` | جدول **بیمه‌های ایران** (`INSURANCES` پایه + `SUPP_INSURANCES` مکمل با درصد سهم)، **تعرفهٔ خودکار ویزیت** (`VISIT_TARIFF[3]`=عادی/سرپایی/بستری، `applyApptTariff` برای VIP×۱۵۰٪ و تخفیف‌دار×۵۰٪، `defaultServicePrice`)، ذخیره پذیرش در CSV روزانه + شماره نوبت، `last_receipt`، **چاپ واقعی GDI** (`printReceipt` با `PrintDlgW`/پرینتر پیش‌فرض — ۳ نوع: رسید بیمه=0، نسخه=1، قبض=2) |
 | `src/calculator.cpp` | ماشین حساب مستقل Always-on-Top (کلاس `AzCalc`)، گرید ۵×۴ owner-draw، پشتیبانی کیبورد/Numpad/ماوس، عملیات: + − × ÷ % √ x² 1/x ± ⌫ |
 | `src/dialogs.cpp` | **دیالوگ لاگین** سبک ویندوز ۱۱ (کارت گرد وسط + لایه dim + انیمیشن shake خطا) با حلقه پیام modal خودی (`runModal`)، **دیالوگ شیفت** (تشخیص خودکار، تیک خودکار با حافظه در settings، انتخاب دستی) |
