@@ -871,7 +871,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         AdQueueRow found;
         if(!adQueueTake(rows,id,found))
             return "{\"ok\":false,\"err\":\"ردیف پیدا نشد.\"}";
-        std::wstring tid=Cash_LookupId(found.nid,found.barcode,false);
+        std::wstring tid=Cash_LookupId(found.nid,found.barcode,true);
         std::wstring err;
         if(tid.empty() || !Receipt_Cancel(tid,u82w(reasonU),err)){
             if(err.empty()) err=L"قبض پیدا نشد.";

@@ -293,9 +293,7 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
     cashStampNow(t, false);
     t.servicesJson=cashBuildServicesJson(r);
     t.mobile=r.mobile;
-    if(!r.insNo.empty()) t.fileNo=r.insNo;
-    else if(!r.receiptBarcode.empty()) t.fileNo=r.receiptBarcode;
-    else t.fileNo=r.nationalId;
+    t.fileNo=r.nationalId;
     if(!r.receiptCode.empty()) t.archiveNo=r.receiptCode;
     else t.archiveNo=r.receiptBarcode;
     t.insBase=r.insurance;
@@ -613,9 +611,10 @@ std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode,
     auto rows=cashLoad();
     const CashTicket* unpaid=nullptr;
     const CashTicket* any=nullptr;
+    const bool nidOnly=barcode.empty() || (!nid.empty() && barcode==nid);
     for(const auto& r:rows){
         if(!nid.empty() && r.nid!=nid) continue;
-        if(!barcode.empty() && r.barcode!=barcode && r.receiptNo!=barcode && r.fileNo!=barcode)
+        if(!nidOnly && r.barcode!=barcode && r.receiptNo!=barcode && r.fileNo!=barcode)
             continue;
         if(!any || r.epochMin>=any->epochMin) any=&r;
         if(r.status!=L"cancelled" && r.paid==0){
