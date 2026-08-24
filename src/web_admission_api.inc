@@ -1062,6 +1062,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(kind=="tools")           RunOnUiThread([](){ Reception_OpenTools(); });
         else if(kind=="cashier")    RunOnUiThread([](){ Reception_OpenCashier(); });
         else if(kind=="queue")      RunOnUiThread([](){ Reception_OpenQueue(); });
+        else if(kind=="receipts")   RunOnUiThread([](){ Reception_OpenReceipts(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
@@ -1117,6 +1118,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(kind=="cashier")      RunOnUiThread([](){ Reception_CloseCashier(); });
         else if(kind=="tools")   RunOnUiThread([](){ Reception_CloseTools(); });
         else if(kind=="queue")   RunOnUiThread([](){ Reception_CloseQueue(); });
+        else if(kind=="receipts") RunOnUiThread([](){ Reception_CloseReceipts(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }

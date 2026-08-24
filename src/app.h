@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.87.0"
+#define APP_VERSION_W   L"1.88.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -561,10 +561,12 @@ void receptionPrintAction(RecPrintAction a); // native bottom-bar print action
 void Reception_OpenTools();
 void Reception_OpenCashier();
 void Reception_OpenQueue();
+void Reception_OpenReceipts();
 void Reception_OpenAdmissionTicket(const std::string& ticketJson);
 void Reception_CloseTools();
 void Reception_CloseCashier();
 void Reception_CloseQueue();
+void Reception_CloseReceipts();
 void Reception_ResetZoom();
 
 // ---------------------------------------------------------------- dialogs --

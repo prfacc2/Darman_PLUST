@@ -3897,10 +3897,6 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain{
 
 /* v1.82.0 cashier overlay + locked admission form */
 .cash-hub-rail{-ms-flex-order:4;order:4;}
-.cash-f7{
-  display:inline-block;margin-right:6px;padding:1px 6px;border-radius:6px;
-  background:#e8f0ff;color:#1d4ed8;font-size:10px;font-weight:800;
-}
 .cash-overlay{z-index:1670;}
 #cashBackdrop{z-index:1660;}
 .cash-overlay-head{background:#0f766e;}
@@ -5062,4 +5058,403 @@ body.theme-dark.surface-tools .tools-search-wrap .inp{
   background:-webkit-linear-gradient(top,#1f2a3c 0%,#182130 100%);
   background:linear-gradient(180deg,#1f2a3c 0%,#182130 100%);
   border-color:#344357;
+}
+
+/* ==========================================================================
+   v1.88.0 — «APP-ICON» polish round
+   Per user feedback on v1.87:
+     * tools tiles lose their card background entirely — icon + name + sub +
+       «باز کردن» pill, like installed phone apps; the F7 hint chip is gone;
+     * the receipt colour guide moves OUT of the filter rail into a spectrum
+       circle in the page header (hover → glass popover);
+     * «جستجوی قبض» is its own native C++ tab now (body.surface-rc);
+     * cashbox stat cards get distinct pastel identities, the shift hint is a
+       compact centred pill, shift buttons are narrower;
+     * the invoice card drops the heavy amber for a refined royal-blue scheme
+       (harmonised with the new C++ accent #3550D8);
+     * tools drawer + tools topbar get real glass/gradient treatment.
+   Trident-safe: no var(), no gap, no backdrop-filter, no logical props.
+   ========================================================================== */
+
+/* ---- 0. hue coherence with the new C++ royal-blue accent ------------------ */
+body.surface-adm .btn-primary,body.surface-tools .btn-primary,
+body.surface-cash .btn-primary,body.surface-queue .btn-primary,
+body.surface-rc .btn-primary{
+  border:1px solid #2a3ea8;color:#fff;
+  background:#3550d8;
+  background:-webkit-linear-gradient(top,#2c46c0 0%,#4e68e6 100%);
+  background:linear-gradient(180deg,#2c46c0 0%,#4e68e6 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(12,18,64,.32), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(53,80,216,.30);
+  box-shadow:inset 0 2px 4px rgba(12,18,64,.32), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(53,80,216,.30);
+}
+body.surface-adm .btn-primary:hover,body.surface-tools .btn-primary:hover,
+body.surface-cash .btn-primary:hover,body.surface-queue .btn-primary:hover,
+body.surface-rc .btn-primary:hover{
+  background:#3f5ae0;
+  background:-webkit-linear-gradient(top,#3550d8 0%,#5a74ee 100%);
+  background:linear-gradient(180deg,#3550d8 0%,#5a74ee 100%);
+}
+body.surface-adm .btn-submit,body.surface-tools .btn-submit{
+  border:1px solid #26379a;
+  background:#3550d8;
+  background:-webkit-linear-gradient(top,#2a42ba 0%,#4c66e4 60%,#5a74ee 100%);
+  background:linear-gradient(180deg,#2a42ba 0%,#4c66e4 60%,#5a74ee 100%);
+}
+body.surface-tools .tools-tile:hover .tools-tile-go{
+  background:#3550d8;border-color:#2a3ea8;
+  background:-webkit-linear-gradient(top,#2c46c0 0%,#4e68e6 100%);
+  background:linear-gradient(180deg,#2c46c0 0%,#4e68e6 100%);
+}
+.tools-burger:hover{color:#2f47c4;border-color:#8fa4ef;}
+.rc-help{color:#3550d8;}
+
+/* ---- 1. receipts as its own full-page native tab (surface-rc) ------------- */
+body.surface-rc #appBody{display:none !important;}
+body.surface-rc .tools-panel{
+  display:-ms-flexbox;display:flex;
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;
+  background:transparent;padding:0;overflow:hidden;
+}
+body.surface-rc .tools-home{display:none !important;}
+body.surface-rc .tools-drawer,body.surface-rc .tools-drawer-bk{display:none;}
+body.surface-rc .tools-receipts,
+body.surface-rc .tools-receipts.show{
+  display:-ms-flexbox !important;display:flex !important;
+  -ms-flex-direction:column;flex-direction:column;
+  height:100%;padding:12px 14px;
+}
+
+/* ---- 2. receipt search: richer glass, header colour-guide, button fix ------ */
+body.surface-tools .tools-receipts.show{padding:12px 14px;}
+body.surface-tools,body.surface-rc{
+  /* deeper, two-hue canvas with a whisper of diagonal texture */
+  background:#d6dfee;
+  background:-webkit-linear-gradient(135deg,#e2e9f6 0%,#d0daee 45%,#c5d1e8 75%,#dbe3f3 100%);
+  background:linear-gradient(135deg,#e2e9f6 0%,#d0daee 45%,#c5d1e8 75%,#dbe3f3 100%);
+}
+.rc-header{
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(233,240,251,.93) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(233,240,251,.93) 100%);
+  border:1px solid #b2c3e2;
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.06), 0 14px 30px rgba(38,60,140,.12), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(70,95,190,.08);
+  box-shadow:0 2px 5px rgba(20,40,72,.06), 0 14px 30px rgba(38,60,140,.12), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(70,95,190,.08);
+}
+.rc-head-titles .tools-title{color:#1c2c50;}
+/* spectrum circle in the header — hover opens the glass legend popover */
+.rc-help-hdr{
+  width:36px;height:36px;line-height:normal;margin-right:14px;
+  background:transparent;border:none;-webkit-box-shadow:none;box-shadow:none;
+}
+.rc-help-wheel{
+  display:block;width:34px;height:34px;border-radius:50%;
+  background:#8fbbff;
+  background:-webkit-linear-gradient(135deg,#f5d90a 0%,#ff9f43 22%,#ff6b6b 42%,#c586ff 62%,#7fd8d8 82%,#8fbbff 100%);
+  background:linear-gradient(135deg,#f5d90a 0%,#ff9f43 22%,#ff6b6b 42%,#c586ff 62%,#7fd8d8 82%,#8fbbff 100%);
+  border:2px solid #ffffff;
+  -webkit-box-shadow:0 3px 9px rgba(20,40,72,.28), inset 0 2px 3px rgba(255,255,255,.55), inset 0 -2px 3px rgba(20,40,72,.18);
+  box-shadow:0 3px 9px rgba(20,40,72,.28), inset 0 2px 3px rgba(255,255,255,.55), inset 0 -2px 3px rgba(20,40,72,.18);
+}
+.rc-help-hdr:hover .rc-help-wheel{
+  -webkit-transform:scale(1.08);-ms-transform:scale(1.08);transform:scale(1.08);
+}
+.rc-help-hdr .rc-help-pop{
+  top:124%;bottom:auto;right:0;left:auto;
+}
+.rc-help-hdr:hover .rc-help-pop,.rc-help-hdr:focus .rc-help-pop{display:block;}
+/* filter rail: a whisper of indigo in the glass */
+.rc-side{
+  background:-webkit-linear-gradient(180deg,rgba(244,247,254,.95) 0%,rgba(226,233,248,.93) 100%);
+  background:linear-gradient(180deg,rgba(244,247,254,.95) 0%,rgba(226,233,248,.93) 100%);
+  border:1px solid #b2c3e2;
+}
+/* search button: fixed, proper height, right under the filter fields */
+.rc-search-btn{
+  width:100%;height:44px;margin:4px 0 0;font-size:14px;border-radius:13px;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+}
+.rc-side-title{color:#22325a;}
+
+/* ---- 3. tools home — bare app-icon tiles, richer canvas -------------------- */
+body.surface-tools .tools-tile{
+  width:198px;margin:0 0 18px 18px;padding:18px 10px 12px;text-align:center;
+  background:transparent;border:none;border-radius:22px;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+/* bare tiles: kill the UA dotted focus outline in Trident (the hover wash
+   already carries the affordance) */
+body.surface-tools .tools-tile:focus{outline:none;}
+body.surface-tools .tools-tile:hover{
+  -webkit-transform:translateY(-3px);-ms-transform:translateY(-3px);transform:translateY(-3px);
+  background:rgba(255,255,255,.55);border:none;
+  -webkit-box-shadow:0 14px 30px rgba(20,40,72,.12), inset 0 1px 0 rgba(255,255,255,.85);
+  box-shadow:0 14px 30px rgba(20,40,72,.12), inset 0 1px 0 rgba(255,255,255,.85);
+}
+body.surface-tools .tools-appico{
+  position:relative;width:74px;height:74px;line-height:74px;
+  border-radius:23px;margin:0 auto 12px;
+}
+/* glossy top-light on every tool badge — the app-store sheen */
+body.surface-tools .tools-appico:after{
+  content:"";position:absolute;top:3px;left:8%;right:8%;height:42%;
+  border-radius:14px 14px 18px 18px;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+}
+body.surface-tools .tools-tile-name{font-size:15.5px;}
+.tools-tile-go{margin-top:11px;}
+/* tools canvas: deeper two-hue gradient + faint diagonal weave */
+body.surface-tools .tools-panel{
+  background:transparent;
+  background-image:repeating-linear-gradient(135deg, rgba(53,80,216,.028) 0px, rgba(53,80,216,.028) 2px, transparent 2px, transparent 12px);
+}
+/* topbar as a real glass bar */
+.tools-topbar{
+  margin:8px 8px 0;padding:10px 12px;border-radius:16px;
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(234,240,251,.88) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(234,240,251,.88) 100%);
+  border:1px solid #b6c6e4;
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.05), 0 10px 24px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+  box-shadow:0 2px 5px rgba(20,40,72,.05), 0 10px 24px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+}
+
+/* ---- 4. tools drawer — tinted glass, accent-edged items -------------------- */
+.tools-drawer{
+  background:-webkit-linear-gradient(180deg,#eef2fb 0%,#dfe8f7 100%);
+  background:linear-gradient(180deg,#eef2fb 0%,#dfe8f7 100%);
+  border-left:1px solid #b2c3e2;
+}
+.tools-drawer-head{
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(232,239,251,.70) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(232,239,251,.70) 100%);
+  border-bottom:1px solid #c6d3ea;
+}
+.tools-drawer-item{
+  background:rgba(255,255,255,.72);
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(238,243,252,.70) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(238,243,252,.70) 100%);
+  border:1px solid #c6d4ec;border-right:3px solid #c6d4ec;
+}
+.tools-drawer-item:hover{
+  background:-webkit-linear-gradient(180deg,#ffffff 0%,#e7eefd 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e7eefd 100%);
+  border-color:#9db2ea;border-right-color:#3550d8;
+  -webkit-box-shadow:0 6px 14px rgba(53,80,216,.16), inset 0 1px 0 #fff;
+  box-shadow:0 6px 14px rgba(53,80,216,.16), inset 0 1px 0 #fff;
+}
+.tools-cat{color:#4a5a80;}
+
+/* ---- 5. cashbox — pastel stat identities, compact shift pill --------------- */
+body.surface-cash .cash-summary .qov-sum-card:nth-child(1){
+  background:-webkit-linear-gradient(145deg,#eaf1fe 0%,#d7e3fb 100%);
+  background:linear-gradient(145deg,#eaf1fe 0%,#d7e3fb 100%);
+  border:1px solid #b9c9f2;
+}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(2){
+  background:-webkit-linear-gradient(145deg,#e6f7f1 0%,#cdefe2 100%);
+  background:linear-gradient(145deg,#e6f7f1 0%,#cdefe2 100%);
+  border:1px solid #a9dcc9;
+}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(3){
+  background:-webkit-linear-gradient(145deg,#fdf2e2 0%,#fbe4c4 100%);
+  background:linear-gradient(145deg,#fdf2e2 0%,#fbe4c4 100%);
+  border:1px solid #f0cf9a;
+}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(4){
+  background:-webkit-linear-gradient(145deg,#f2ecfe 0%,#e4d9fc 100%);
+  background:linear-gradient(145deg,#f2ecfe 0%,#e4d9fc 100%);
+  border:1px solid #cbb8f2;
+}
+body.surface-cash .cash-summary .qov-sum-card{
+  -webkit-box-shadow:0 3px 6px rgba(20,40,72,.07), 0 12px 24px rgba(20,40,72,.10), inset 0 1px 0 rgba(255,255,255,.85);
+  box-shadow:0 3px 6px rgba(20,40,72,.07), 0 12px 24px rgba(20,40,72,.10), inset 0 1px 0 rgba(255,255,255,.85);
+}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(1) .qov-sum-num{color:#2b3fae;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(2) .qov-sum-num{color:#0b6b52;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(3) .qov-sum-num{color:#9a5a10;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(4) .qov-sum-num{color:#5b34c8;}
+/* shift meta: a compact CENTRED pill, not a full-width bar */
+body.surface-cash .cash-summary .qov-sum-hint{
+  -ms-flex:0 1 auto;flex:0 1 auto;margin:0 auto;padding:7px 20px;
+  border-radius:999px;font-size:11.5px;
+}
+/* shift buttons: narrower, pill-shaped */
+body.surface-cash .cash-actions .cash-act{
+  min-width:132px;height:42px;padding:0 18px;border-radius:999px;
+  font-size:13px;
+}
+/* cash tabs: clearer active state */
+body.surface-cash .cash-tab{border-radius:10px;}
+body.surface-cash .cash-tab:hover{background:rgba(255,255,255,.14);}
+/* table vessel keeps the framed v1.87 look; the empty-state reads softer */
+body.surface-cash .cash-tbl td.empty{color:#5f7285;}
+
+/* ---- 6. admission form — profile, card heads, invoice, launchers ----------- */
+/* profile identity card: deeper blue glass + brand avatar ring */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .profile-card{
+  border:1px solid #aac2e6;
+  background-color:#e2ebf9;
+  background-image:-webkit-linear-gradient(160deg,#eef4fd 0%,#d5e3f6 55%,#c8d9f2 100%);
+  background-image:linear-gradient(160deg,#eef4fd 0%,#d5e3f6 55%,#c8d9f2 100%);
+  -webkit-box-shadow:0 3px 8px rgba(53,80,216,.10),0 16px 34px -14px rgba(53,80,216,.28),inset 0 1px 0 rgba(255,255,255,.85);
+  box-shadow:0 3px 8px rgba(53,80,216,.10),0 16px 34px -14px rgba(53,80,216,.28),inset 0 1px 0 rgba(255,255,255,.85);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .profile-card .avatar{
+  border:3px solid #ffffff;
+  -webkit-box-shadow:0 0 0 2px #9db8ea,0 5px 12px rgba(53,80,216,.22);
+  box-shadow:0 0 0 2px #9db8ea,0 5px 12px rgba(53,80,216,.22);
+}
+/* card heads: a touch deeper gradients, crisper separators, glass icon chips */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .card .card-head{
+  border-bottom:1px solid rgba(120,145,190,.45);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .card .ct-ico{
+  background:rgba(255,255,255,.85);
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+  box-shadow:0 2px 5px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+}
+/* invoice: the heavy amber is gone — refined royal-blue financial scheme */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card{border:1px solid #b3c2ec;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-head{
+  background:#e4eafb;background:-webkit-linear-gradient(top,#eaf0fd 0%,#d0dbf5 100%);
+  background:linear-gradient(180deg,#eaf0fd 0%,#d0dbf5 100%);
+  border-bottom:1px solid #b6c6ee;
+  -webkit-box-shadow:inset -3px 0 0 #3550d8;box-shadow:inset -3px 0 0 #3550d8;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-title{color:#2b3fae;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .ct-ico{color:#3550d8;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .btn-icon,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) #invoiceToggle{
+  color:#2b3fae;border-color:#b6c6ee;background:#f2f5fe;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-gtitle{
+  color:#2b3fae;border-bottom:2px solid #d4ddf6;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-line span{color:#5a6a8a;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-line b{color:#1b2a44;}
+/* «مانده» stays an attention pill, but in a refined rose instead of amber */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain{
+  margin-top:8px;padding:9px 11px;border:1px solid #f0c4cd;border-radius:10px;
+  background:#fdf0f3;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain span{color:#8a4353;font-weight:800;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain b{color:#c2283d;font-weight:900;font-size:14px;}
+/* tools launcher in the rail: clearly NOT white — deep teal concave */
+body.surface-adm .tools-launch{
+  border:1px solid #0a5f52;color:#ffffff;
+  background:#0d8a76;
+  background:-webkit-linear-gradient(top,#0a6b5c 0%,#0f9480 60%,#17ad97 100%);
+  background:linear-gradient(180deg,#0a6b5c 0%,#0f9480 60%,#17ad97 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(4,50,44,.34), inset 0 -2px 3px rgba(255,255,255,.26), 0 10px 20px rgba(13,138,118,.32);
+  box-shadow:inset 0 2px 4px rgba(4,50,44,.34), inset 0 -2px 3px rgba(255,255,255,.26), 0 10px 20px rgba(13,138,118,.32);
+}
+body.surface-adm .tools-launch:hover{
+  background:-webkit-linear-gradient(top,#0c7a68 0%,#12a88f 60%,#22c2a8 100%);
+  background:linear-gradient(180deg,#0c7a68 0%,#12a88f 60%,#22c2a8 100%);
+}
+
+/* ---- 7. dark parity for the new bits --------------------------------------- */
+body.theme-dark.surface-rc{
+  background:#101724;
+  background:-webkit-linear-gradient(135deg,#141e2e 0%,#101724 60%,#0c1220 100%);
+  background:linear-gradient(135deg,#141e2e 0%,#101724 60%,#0c1220 100%);
+}
+.theme-dark .rc-help-hdr{background:transparent;border:none;-webkit-box-shadow:none;box-shadow:none;}
+.theme-dark .tools-topbar{background:#1d2735;border-color:#344357;}
+.theme-dark .tools-drawer-item{border-right-color:#3b4c68;}
+.theme-dark .tools-drawer-item:hover{border-right-color:#6a83f7;}
+.theme-dark .tools-tile:hover{background:rgba(35,47,66,.6);}
+
+/* ---- 8. hue coherence: legacy indigo hexes → the v1.88 royal blue ---------- */
+body.surface-adm .ct-ico,body.surface-tools .ct-ico{color:#3550d8;}
+body.surface-adm .card-head{border-top-color:#546eee;}
+body.surface-queue .queue-overlay-head{
+  background:#2f4ecf;
+  background:-webkit-linear-gradient(top,#3a58dd 0%,#2740b6 100%);
+  background:linear-gradient(180deg,#3a58dd 0%,#2740b6 100%);
+}
+body.surface-queue .tab.active{color:#2b3fae;}
+body.surface-adm .queue-hub-rail{color:#2b47c6;}
+body.surface-adm .queue-hub-rail:hover{
+  background:-webkit-linear-gradient(top,#2740b6 0%,#3f5ae0 100%);
+  background:linear-gradient(180deg,#2740b6 0%,#3f5ae0 100%);
+}
+
+/* ---- 9. specificity fix: the v1.78 «:not(theme)» button block (0,4,1) was
+   shadowing the v1.87/v1.88 concave buttons (0,2,1) on every light page.
+   Re-assert the concave royal-blue design with higher specificity (0,5,1). -- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-primary,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-primary,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-cash .btn-primary,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-queue .btn-primary,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-rc .btn-primary{
+  border:1px solid #2a3ea8;color:#fff;
+  background:#3550d8;
+  background:-webkit-linear-gradient(top,#2c46c0 0%,#4e68e6 100%);
+  background:linear-gradient(180deg,#2c46c0 0%,#4e68e6 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(12,18,64,.32), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(53,80,216,.30);
+  box-shadow:inset 0 2px 4px rgba(12,18,64,.32), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(53,80,216,.30);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-primary:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-primary:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-cash .btn-primary:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-queue .btn-primary:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-rc .btn-primary:hover{
+  background:#3f5ae0;
+  background:-webkit-linear-gradient(top,#3550d8 0%,#5a74ee 100%);
+  background:linear-gradient(180deg,#3550d8 0%,#5a74ee 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(12,18,64,.28), inset 0 -2px 3px rgba(255,255,255,.26), 0 8px 18px rgba(53,80,216,.38);
+  box-shadow:inset 0 2px 4px rgba(12,18,64,.28), inset 0 -2px 3px rgba(255,255,255,.26), 0 8px 18px rgba(53,80,216,.38);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-submit,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-submit{
+  border:1px solid #26379a;color:#fff;border-radius:12px;
+  background:#3550d8;
+  background:-webkit-linear-gradient(top,#2a42ba 0%,#4c66e4 60%,#5a74ee 100%);
+  background:linear-gradient(180deg,#2a42ba 0%,#4c66e4 60%,#5a74ee 100%);
+  -webkit-box-shadow:inset 0 2px 5px rgba(12,18,64,.34), inset 0 -2px 3px rgba(255,255,255,.26), 0 8px 20px rgba(53,80,216,.36);
+  box-shadow:inset 0 2px 5px rgba(12,18,64,.34), inset 0 -2px 3px rgba(255,255,255,.26), 0 8px 20px rgba(53,80,216,.36);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-submit:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-submit:hover{
+  background:-webkit-linear-gradient(top,#3550d8 0%,#5470ea 65%,#6680f2 100%);
+  background:linear-gradient(180deg,#3550d8 0%,#5470ea 65%,#6680f2 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-outline,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-outline,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-cash .btn-outline,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-queue .btn-outline,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-rc .btn-outline{
+  background:#f7fafd;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#eef3fb 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#eef3fb 100%);
+  border:1px solid #c3d1e5;color:#2b3a55;
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 rgba(255,255,255,1), 0 2px 6px rgba(20,40,72,.07);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 rgba(255,255,255,1), 0 2px 6px rgba(20,40,72,.07);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .btn-outline:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-tools .btn-outline:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-cash .btn-outline:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-queue .btn-outline:hover,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-rc .btn-outline:hover{
+  border-color:#8fa4ef;color:#2f47c4;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#e8eefe 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e8eefe 100%);
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 5px 12px rgba(53,80,216,.18);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 5px 12px rgba(53,80,216,.18);
+}
+
+/* ---- 10. invoice groups: the cream/amber panels → cool financial glass ----- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group{
+  border:1px solid #ccd8f0;border-radius:12px;
+  background:#f6f9fe;
+  background:-webkit-linear-gradient(top,#fbfdff 0%,#eef3fb 100%);
+  background:linear-gradient(180deg,#fbfdff 0%,#eef3fb 100%);
+  -webkit-box-shadow:inset 0 1px 0 #fff, 0 1px 3px rgba(20,40,72,.04);
+  box-shadow:inset 0 1px 0 #fff, 0 1px 3px rgba(20,40,72,.04);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group:last-child{
+  border-color:#b3c2ec;
+  background:#eef2fc;
+  background:-webkit-linear-gradient(top,#f4f7fd 0%,#e5ebf9 100%);
+  background:linear-gradient(180deg,#f4f7fd 0%,#e5ebf9 100%);
 }
