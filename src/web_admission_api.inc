@@ -1048,14 +1048,20 @@ static std::string admissionApi(const std::string& verb, const std::string& body
        verb=="ui.settings"){
         return "{\"ok\":true}";
     }
+    //  v1.85.0 CRASH FIX: these verbs CREATE / DESTROY WebView2 views. They are
+    //  delivered synchronously inside this view's own WebMessageReceived COM
+    //  callback, and WV2_CreateView pumps the thread message queue while it
+    //  waits. Running that nested pump (or ctrl->Close() on the very view that
+    //  is mid-callback) from inside the callback frees/uses dead objects
+    //  (0xC0000005 at a page-aligned EIP). Defer every tab mutation to a fresh
+    //  WM_APP_UI_TASK turn so the current callback fully unwinds first.
     if(verb=="ui.openTab"){
         std::string kind; jsonGetString(body,"kind",kind);
-        if(kind=="tools") Reception_OpenTools();
-        else if(kind=="cashier"){
-            if(!userHasPerm(g_session.user, L"cashier_view"))
-                return "{\"ok\":false,\"err\":\"perm\"}";
-            Reception_OpenCashier();
-        }
+        if(kind=="cashier" && !userHasPerm(g_session.user, L"cashier_view"))
+            return "{\"ok\":false,\"err\":\"perm\"}";
+        if(kind=="tools")           RunOnUiThread([](){ Reception_OpenTools(); });
+        else if(kind=="cashier")    RunOnUiThread([](){ Reception_OpenCashier(); });
+        else if(kind=="queue")      RunOnUiThread([](){ Reception_OpenQueue(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
@@ -1065,13 +1071,52 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::string raw=Cash_GetJson(u82w(idU));
         std::string ticket;
         if(!jsonGetRaw(raw,"ticket",ticket) || ticket.empty()) return raw;
-        Reception_OpenAdmissionTicket(ticket);
+        RunOnUiThread([ticket](){ Reception_OpenAdmissionTicket(ticket); });
+        return "{\"ok\":true}";
+    }
+    // ---- ui.openQueuePatient: open a queue row in a NEW پذیرش tab -----------
+    //  The queue row id is synthetic (epoch minutes), not a cash-ticket id, so
+    //  Cash_GetJson cannot resolve it. Build a minimal identity ticket from the
+    //  queue row and open a fresh admission tab (boot clearForm()s first).
+    if(verb=="ui.openQueuePatient"){
+        std::string idU; jsonGetString(body,"id",idU);
+        std::string kind; jsonGetString(body,"kind",kind);
+        if(idU.empty()) return "{\"ok\":false}";
+        std::wstring id=u82w(idU);
+        bool adm = kind=="admission";
+        auto rows=adQueueLoad(adm);
+        AdQueueRow found; bool have=false;
+        for(const auto& r:rows) if(r.id==id){ found=r; have=true; break; }
+        if(!have) return "{\"ok\":false,\"err\":\"بیمار در صف پیدا نشد\"}";
+        // Prefer the real UNPAID cash ticket (it carries services + amount) so
+        // the reopened پذیرش keeps the bill. Queue id is synthetic, so resolve
+        // by national id (barcode is often just the nid when the booklet is
+        // empty). Cash_LookupId takes g_opsMx itself — call it unlocked.
+        std::wstring tid=Cash_LookupId(found.nid,found.barcode,true);
+        std::string ticket;
+        if(!tid.empty()){
+            std::string raw=Cash_GetJson(tid);
+            if(jsonGetRaw(raw,"ticket",ticket) && !ticket.empty()){ /* got bill */ }
+            else ticket.clear();
+        }
+        if(ticket.empty()){
+            // Fallback: identity-only ticket (new visit — no pending bill yet).
+            ticket="{";
+            ticket+="\"nid\":"+jstr(found.nid)+",";
+            ticket+="\"first\":"+jstr(found.first)+",";
+            ticket+="\"last\":"+jstr(found.last)+",";
+            ticket+="\"mobile\":"+jstr(found.mobile)+",";
+            ticket+="\"barcode\":"+jstr(found.barcode);
+            ticket+="}";
+        }
+        RunOnUiThread([ticket](){ Reception_OpenAdmissionTicket(ticket); });
         return "{\"ok\":true}";
     }
     if(verb=="ui.closeTab"){
         std::string kind; jsonGetString(body,"kind",kind);
-        if(kind=="cashier") Reception_CloseCashier();
-        else if(kind=="tools") Reception_CloseTools();
+        if(kind=="cashier")      RunOnUiThread([](){ Reception_CloseCashier(); });
+        else if(kind=="tools")   RunOnUiThread([](){ Reception_CloseTools(); });
+        else if(kind=="queue")   RunOnUiThread([](){ Reception_CloseQueue(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
