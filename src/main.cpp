@@ -55,6 +55,12 @@ static ScreenId s_curScreen = SC_HOME;
 // 109 / 110 / 113 were the native bottom-bar print buttons — retired in v1.62.0
 // when printing moved into the embedded admission page. Do not reuse the ids.
 #define TIMER_CLOCK  1
+// v1.87.0: one-shot welcome-screen entrance animation (ribbon shimmer + logo
+// halo bloom). The timer self-kills after ~1.2 s so the idle screen costs
+// ZERO extra repaints (the v1.63.0 FPS lesson: no perpetual full-window
+// invalidation).
+#define TIMER_HOME_ANIM 3
+static int s_homePhase = -1;   // -1 = idle; 0..30 while the entrance plays
 
 // ------------------------------------------------------------------ fonts --
 static HFONT mkFont(int px, int weight){
@@ -324,7 +330,22 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // card corners on both themes.
         setFlatButtonBg(r,  homePanelBot());
         setFlatButtonBg(mg, homePanelBot());
+        // v1.87.0: play the entrance animation once (ribbon shimmer + logo
+        // halo bloom). ~30 frames at 40 ms, then the timer kills itself.
+        s_homePhase = 0;
+        SetTimer(h, TIMER_HOME_ANIM, 40, NULL);
         return 0; }
+    case WM_TIMER:
+        if(w==TIMER_HOME_ANIM){
+            s_homePhase++;
+            if(s_homePhase>30){ s_homePhase=-1; KillTimer(h,TIMER_HOME_ANIM); }
+            InvalidateRect(h,NULL,FALSE);
+            return 0;
+        }
+        break;
+    case WM_DESTROY:
+        KillTimer(h,TIMER_HOME_ANIM);
+        return 0;
     case WM_APP_THEME:
         setFlatButtonBg(GetDlgItem(h,ID_HM_RECEPTION), homePanelBot());
         setFlatButtonBg(GetDlgItem(h,ID_HM_MANAGE),    homePanelBot());
@@ -406,16 +427,38 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         gpGradRoundRect(dc, g.panel, g.radius, pTop, pBot,
                         g_dark ? blendColor(g_theme.border,g_theme.accent,18)
                                : blendColor(g_theme.border,g_theme.accent,30));
+        // v1.87.0: frosted-clay inner light rim just inside the panel edge.
+        {
+            RECT pit=g.panel; InflateRect(&pit,-S(1),-S(1));
+            gpRoundRect(dc, pit, g.radius>S(1)?g.radius-S(1):g.radius,
+                        CLR_INVALID, RGB(255,255,255), g_dark?30:110);
+        }
         // Accent ribbon hugging the panel's top edge. It is inset by the corner
         // radius so it never spills outside the rounded silhouette (drawing it
         // full-width would leave two hard accent squares in the corners).
+        // v1.87.0 gradialism: the ribbon sweeps indigo → sky → violet, and a
+        // soft shimmer glides along it once while the entrance animation plays.
+        // v1.87.0: entrance-animation bell curve, computed once per paint.
+        double animT = -1, animBell = 0;
+        if(s_homePhase>=0){
+            animT = s_homePhase/30.0;
+            animBell = animT<0.5 ? animT*2 : (1-animT)*2;
+        }
         {
             RECT rb = g.ribbon;
             rb.left  += g.radius;
             rb.right -= g.radius;
-            if(rb.right - rb.left > S(40))
-                gpGradRoundRectBgH(dc, rb, S(3), g_theme.accent2, g_theme.accent,
-                                   CLR_INVALID, CLR_INVALID);
+            if(rb.right - rb.left > S(40)){
+                gpGradRibbon3(dc, rb, S(3), g_theme.accent, g_theme.accent2,
+                              g_infoAccent);
+                if(animT>=0){
+                    int sx = rb.left + (int)((rb.right-rb.left) * animT);
+                    int sw = S(80);
+                    RECT gz={sx-sw/2, rb.top-S(2), sx+sw/2, rb.bottom+S(2)};
+                    int al = (int)(130 * animBell);
+                    if(al>8) gpFillAlpha(dc, gz, S(4), RGB(255,255,255), al);
+                }
+            }
         }
 
         // ---- 3. brand mark --------------------------------------------------
@@ -426,8 +469,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             int d  = g.logo.right-g.logo.left;
             int rr = d/2;
             RECT halo=g.logo; InflateRect(&halo,S(7),S(7));
+            // v1.87.0: the halo blooms once as the welcome screen enters, then
+            // settles back to its resting glow (driven by s_homePhase).
+            int haloA = g_dark?70:52;
+            if(animT>=0) haloA += (int)(48 * animBell);
             gpFillAlpha(dc, halo, (d+S(14))/2,
-                        blendColor(g_theme.accent, pTop, 55), g_dark?70:52);
+                        blendColor(g_theme.accent, pTop, 55), haloA);
             gpShadow(dc, g.logo, rr, S(9), g_dark?110:78);
             if(!gpDrawImageResCircle(dc, IMG_LOGO, g.logo)){
                 gpGradRoundRect(dc, g.logo, rr, g_theme.accent2, g_theme.accent, CLR_INVALID);
@@ -578,11 +625,13 @@ static void updateHeaderButtons(HWND h){
     ShowWindow(s_bNewPat,   showPat?SW_SHOW:SW_HIDE);
     ShowWindow(s_bNewTab,   show?SW_SHOW:SW_HIDE);
     if(!show) return;
-    // v1.86 — clay concave primary actions in action-bar, more breathing room
     RECT rc; GetClientRect(h,&rc);
-    int bh=S(40), pad=S(18), g=S(12);
+    int bh=S(38), pad=S(16), g=S(10);
+    // LAYER 2 (action bar) sits directly under LAYER 1.
     int y = mainBarH() + (actionBarH()-bh)/2;
-    int wNew=S(154), wTab=S(122);
+    // RIGHT-aligned cluster (v1.60.0 — «نوبت‌دهی» removed; right → left):
+    //     پذیرش بیمار  |  تب جدید        (پذیرش hidden when not permitted)
+    int wNew=S(134), wTab=S(112);
     int x = rc.right - pad - (showPat?wNew:wTab);
     if(showPat){
         MoveWindow(s_bNewPat, x,                      y, wNew,  bh, TRUE);
@@ -590,6 +639,7 @@ static void updateHeaderButtons(HWND h){
     } else {
         MoveWindow(s_bNewTab, x,                      y, wTab,  bh, TRUE);
     }
+    // blend the buttons' rounded corners into the LAYER 2 surface colour.
     setFlatButtonBg(s_bNewPat, g_theme.surface2);
     setFlatButtonBg(s_bNewTab, g_theme.surface2);
 }
@@ -632,11 +682,13 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         setFlatButtonImage(s_bCalc,     IMG_IC_CALC);
         // header action buttons (reception only) — created hidden, shown by
         // updateHeaderButtons() when the reception screen becomes active.
-        s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_USER, BS_PRIMARY,0,0,10,10,
+        // v1.87.0: «پذیرش بیمار» gets its OWN person-plus glyph (was the same
+        // generic plus/tab look as «تب جدید») so the two actions are distinct
+        // at a glance; «تب جدید» becomes a quiet OUTLINE button with a plus —
+        // lighter chrome, crisper text, clearly the secondary action.
+        s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_USER_ADD, BS_PRIMARY,0,0,10,10,
                           L"ثبت پذیرش بیمار جدید");
-        // v1.60.0: «نوبت‌دهی» removed completely; the new-tab button stays blue
-        // (BS_PRIMARY) for a consistent header action style.
-        s_bNewTab   = createFlatButton(h, ID_FR_NEWTAB, L"تب جدید",    ICO_TAB,  BS_PRIMARY,0,0,10,10,
+        s_bNewTab   = createFlatButton(h, ID_FR_NEWTAB, L"تب جدید",    ICO_PLUS,  BS_OUTLINE,0,0,10,10,
                           L"باز کردن یک تب خالی");
         // v1.62.0: no native print buttons here any more — the admission page
         // owns «چاپ آخرین قبض / چاپ نسخه / رسید بیمه» in its bottom-right card.
@@ -792,35 +844,50 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         SelectClipRgn(dc,dclip);
 
         // ===================== LAYER 1 — top header bar =====================
-        // v1.86: HEADER MUST BE LIGHT — pure white frosted glass band.
-        // No black blending ever, only white → tinted soft to give depth.
+        // v1.87.0: three-stop frosted-glass band — bright top, cool mid, deeper
+        // base — far richer than the old two-stop strip, and an inner light
+        // line just under the ribbon sells the "frosted pane" illusion.
         RECT tb={0,0,rc.right,mainBarH()};
-        gpGradRoundRect(dc,tb,0,g_theme.headerTop,g_theme.headerBot,CLR_INVALID);
+        {
+            COLORREF hMid = blendColor(g_theme.headerTop, g_theme.headerBot, 55);
+            RECT tbT={0,0,rc.right,mainBarH()/2};
+            RECT tbB={0,mainBarH()/2,rc.right,mainBarH()};
+            gpGradRoundRect(dc,tbT,0,g_theme.headerTop,hMid,CLR_INVALID);
+            gpGradRoundRect(dc,tbB,0,hMid,g_theme.headerBot,CLR_INVALID);
+        }
         // v1.77: a thin branded accent ribbon along the header's top edge — the
         // same "designed" signature the welcome panel carries, on both themes —
         // so the header reads as a polished, branded surface, not a flat strip.
-        RECT hrib={0,0,rc.right,S(3)};
-        gpGradRoundRectBgH(dc, hrib, 0, g_theme.accent, g_theme.accent2,
-                           CLR_INVALID, CLR_INVALID);
+        // v1.87.0 gradialism: the ribbon now sweeps indigo → sky → violet.
+        {
+            RECT hrib={0,0,rc.right,S(3)};
+            gpGradRibbon3(dc, hrib, 0, g_theme.accent, g_theme.accent2,
+                          g_infoAccent);
+        }
+        gpLine(dc,0,S(3),rc.right,S(3),RGB(255,255,255),1.0f,g_dark?26:110);
         // ===================== LAYER 2 — action sub-bar =====================
         if(headerHasActionBar()){
             RECT ab={0,mainBarH(),rc.right,mainBarH()+actionBarH()};
-            FillRect(dc,&ab,g_brSurface2);
+            // v1.87.0: a soft gradient + a drop-shade hairline underneath, so
+            // the action bar floats above the page instead of lying flat on it.
+            gpGradRoundRect(dc,ab,0,g_theme.surface2,
+                blendColor(g_theme.surface2,g_theme.bg2,45),CLR_INVALID);
             // crisp separator between the two header layers
             gpLine(dc,0,mainBarH(),rc.right,mainBarH(),g_theme.border,1.0f);
+            gpLine(dc,0,mainBarH()+actionBarH(),rc.right,mainBarH()+actionBarH(),
+                   RGB(30,45,70),1.0f,18);
         }
-        // bottom status bar — lighter tinted wash
+        // bottom status bar
         RECT bb={0,rc.bottom-botBarH(),rc.right,rc.bottom};
-        gpGradRoundRect(dc,bb,0,
-            blendColor(g_theme.surface2, RGB(255,255,255), 20),
-            g_theme.surface2, CLR_INVALID);
-        // middle bg — premium light clay
+        FillRect(dc,&bb,g_brSurface2);
+        // middle bg (gentle gradient page)
         RECT mid={0,topBarH(),rc.right,rc.bottom-botBarH()};
         gpGradRoundRect(dc,mid,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
-        // crisp separators — hairline, not heavy
-        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.border,1.0f,160);
-        gpLine(dc,0,rc.bottom-botBarH(),rc.right,rc.bottom-botBarH(),g_theme.border,1.0f,160);
-        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,32);
+        // crisp separators
+        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.border,1.0f);
+        gpLine(dc,0,rc.bottom-botBarH(),rc.right,rc.bottom-botBarH(),g_theme.border,1.0f);
+        // a thin accent underline under the header for that "designed" feel
+        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,40);
 
         SetBkMode(dc,TRANSPARENT);
 

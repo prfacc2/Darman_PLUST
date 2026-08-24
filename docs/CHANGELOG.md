@@ -5,65 +5,24 @@
 
 ---
 
-## 1.86.0 — 2026-08-24 — تم روشن ممتاز Claymorphism × Glassmorphism × Neumorphism × Gradialism
+## 1.87.0 — 2026-08-24 — بازگشت به پایهٔ سالم ۱.۸۵ + بازطراحی ممتاز «Clay × Glass × Neu»
 
-### Fixed — هدر نباید تیره شود / بازگشت از طرح تاریک
-- ریشه هدر سیاه: `theme.cpp` تم روشن `headerTop #FFFFFF → headerBot #ECF2FA` (سفید یک‌دستِ مات) با پالت خاکی ملایم `#E6EEF8 → #D9E3F2`، بدون blend سیاه در `main.cpp:frameProc` که باعث تیره/کدر شدن هدر می‌شد.
-- `assets/admission/admission.css` قبلی در انتها override کلی `body { background:#c3d2e6→#b2c5dc }` داشت که صفحه را تیره و متن‌ها را محو می‌کرد — کامل از صفر با تم روشن بازنویسی شد (`#EEF3FB → #E4ECF8` رادیال راست-بالا).
-- چک forbidden سبک dual-engine: هیچ `backdrop-filter` یا `var(--` فعال در `admission.css`/`crm.css`/`common.css` وجود ندارد (fake glass با translucent gradient + dual shadow + inset highlight ساخته شد — Trident-safe).
+> این نسخه کاملاً از روی پایهٔ پایدار ۱.۸۵.۰ ساخته شده (بدون تغییرات خرابکارانهٔ ۱.۸۶) و بازطراحی ظاهری با دقت و بدون حذف ساختارها روی آن اعمال شده است.
 
-### Changed — C++ ظاهر و تم (Claymorphism Concave)
-- `theme.cpp`: پالت روشن به `#EEF3FB` هوای مات با border `#D3DFEE`، accent بهبود یافته `#4B63E6 → #6A83F7`، header سفید frosted با ribbon accent 3px. دکمه‌های solid = Clay concave: شعاع پویا `h/3` (تا 16)، سایه نرم `S(14)/S(9) alpha 120/72` با `gpShadowColor`، گرادیان معکوس مقعر (بالا تیره‌تر، پایین روشن‌تر)، sheen سفید 45% + inner highlight سفید 130-alpha + bottom rim تیره. کارت‌های `BS_CARD` شعاع `S(30)` با سایه دو لایه + sheen بالا.
-- `main.cpp`: هدر `gpGradRoundRect(tb, headerTop, headerBot)` بدون blend مشکی، باند action بار `S(48)` با دکمه‌های واضح‌تر `پذیرش بیمار 154px + تب جدید 122px`، padding بیشتر `S(18)/S(12)` تا متن محو نشود/واضح‌تر باشد. کارت‌های ورود `حساب پرسنل / مدیریت` با accent متمایز (`#4B63E6` / `#7C56E4`) + corner-blend `homePanelBot()`.
-- `dialogs.cpp`: لاگین Claymorphic حرفه‌ای: کارت `S(28) radius` با سایه دونو (`S(30)/60 tinted + S(30)/110`), glass white gradient + inset highlight بالا، badge لوگو 64px با halo + ring + inner highlight سفید 140، عنوان با underline accent bar, input wellهای neumorphic با border accent + focus halo و inset highlight, متن error bold; دکمه‌ها وسط‌چین و واضح.
-- `reception.cpp`: نوار تب `tabBarH S(44)` بلندتر + شیشه‌ای سفیدی با bottom accent 2px line + inset white highlight top, تب‌ها Clay concave radius `S(12)`, تب فعال سفید با gradient + اکسنت indicator `BgH`, هاور با shadow و border اکسنتی, آیکون Medalion بزرگ‌تر + badge خالی.
-- نسخه به `1.86.0` در `app.h APP_VERSION_W` و `app.rc FILEVERSION/PRODUCTVERSION` و `update/version.txt`.
+### Changed — سطوح نیتیو C++
+- دکمه‌های توپر (PRIMARY/DANGER/INFO) به سبک **Concave**: گرادیان تیره‌تر→روشن‌تر از بالا به پایین، سایهٔ داخلی لبهٔ بالا، لبهٔ نورانی پایین و سایهٔ بیرونی رنگی (`src/theme.cpp`).
+- کارت‌های انتخاب حساب و کارت‌های BS_CARD عمق گِلی بیشتری گرفتند (سایهٔ دوم خنثی + لبهٔ نور داخلی + سایهٔ داخلی پایین).
+- هدر: گرادیان شیشه‌ای سه‌تکه، روبان بالای هدر با **Gradialism** نیلی→آبی→بنفش، نوار اکشن پذیرش با گرادیان و سایهٔ نرم (`src/main.cpp`).
+- صفحهٔ خوش‌آمد: انیمیشن ورود یک‌باره (shimmer روی روبان + شکوفایی هالهٔ لوگو، تایمر خودکُشنده بدون هزینهٔ FPS)، لبهٔ نورانی داخلی پنل hero.
+- دکمهٔ «پذیرش بیمار» آیکون اختصاصی «کاربر + پلاس» (ICO_USER_ADD) گرفت و «تب جدید» به سبک Outline با پلاس تغییر کرد تا کاملاً متمایز و خوانا باشند؛ آیکون زبانهٔ پذیرش نیز هم‌راستا شد.
+- دیالوگ ورود: کارت گِلی با گوشه‌های بزرگ‌تر، دو سایهٔ لایه‌ای و روبان نقش‌رنگ Gradialism (`src/dialogs.cpp`).
 
-### Changed — صفحه پذیرش بیمار (admission.css)
-- بک‌گراند اصلی کمی تیره‌تر و نرم‌تر (`#EEF3FB`) به جای سفید یک‌دست; کارت‌ها Glassmorphism `linear-gradient white → #F8FBFE` + border `#D0DBEA` radius 16 + dual shadow + inset highlight سفید => شیشه‌ای نیمه‌شفاف بدون `backdrop-filter`.
-- اینپوت‌ها Neumorphism concave: `#F2F6FC` + inset shadow `0 1.5px 4px` + focus ring `#4B63E6 + 0 0 0 3px rgba`, labelها خاکی خوانا `#334763` وزن 800.
-- جدول‌ها: header accent gradient `#E6EEFA→#DBE7F3` bold 900, zebra `#F7FAFF`, hover `#EAF2FF`, border crisp `#D0DBEA` + `1px solid col separators` تا از سادگی در بیاید.
-- دکمه‌ها: `btn-primary` با گرادیانت مقعر (`#5A74F0 → #4B63E6`) + elevation رنگی + sheen; `btn-submit` height 50 با gradient قوی + text-shadow + shadow بیرونی.
-- نوار عمل راست: ترتیب profile → datetime → action → queue launcher وسط‌چین pill → print با `margin-top:auto` پایین + status; کارت پروفایل آبی گرادیان حرفه‌ای + avatar شیشه‌ای با border سفید.
-
-### Changed — تب ابزارها App Store + همبرگر سمت راست
-- ساختار `tools-home-head` (بازگشت چپ + عنوان وسط + همبرگر راست `#toolsHamburgerBtn`), `tools-home-body flex row-reverse` تا sidebar واقعاً راست + grid-چپ اصلی; sidebar width بسته 0, باز `280px` با transition `0.36s cubic`.
-- سایدبار: glass white کارت `border #D0DBEA radius 20 + shadow`, باکس سرچ `#toolsSearchInput` + نتایج category فیلتر (`همه / گزارش / مالی / تنظیمات / عمومی`) با `data-cat`, JS live filter; دکمه همبرگر clay white (`42x42 radius 12 + shadow inset`).
-- تایل‌ها مثل App Store: `width 210px height 248px column center` با آیکون بالا وسط `64px radius 18` + گرادیان زنده (search `#6A83F7→#3B4ED0`, cash `#3FD6BB→#0B8A77`, stats `#FFCA5B→#D97706`, settings `#8A9AB0→#3F4D62`, phone `#A084F0→#5E42D0`) + dual shadow clay (elevation + inset white top-light + bottom dark), نام وسط‌چین 900 + sub + pill action bottom; hover `translateY(-4px) scale(1.02) + shadow accent`.
-- بک ابزارها `#E6EEF8 → #D0DBEA` کمی تیره‌تر از پذیرش ولی روشن + glass panel.
-
-### Changed — صفحه جستجوی قبض (Header + راست فیلترها + چپ جدول + چاپ/اکسل بالا-چپ + جستجو پایین-راست)
-- `tools-rc-head`: سفید glass کارت با shadow + title strong + `tools-rc-actions margin-right:auto` که چاپ/اکسل را چپ-بالا می‌برد.
-- `rc-content-layout { flex row-reverse }` راست=308px فیلترها, چپ=جدول انعطاف‌پذیر 73%; فیلترها عمودی ستونی با `overflow-y:auto` جذاب, concave inputs neumorphic radius 12, چک‌باکس‌های مرتب.
-- `btn-search-rc` پایین ستون فیلتر width 100% height 48 با گرادیانت مقعر clay آبی + shadow رنگی.
-- پالت راهنما: آیکون رنگی `rc-palette-guide` بالا راست جدول با pill سفید glass + hover popover شیشه‌ای `width 244px radius 16 + dual shadow` شامل `popover-circle` دایره خالص (16px) با گرادیان دورنگ هر رنگ + متن جدا (نه داخل دایره)، `z-index 4000`; `lg-*` قدیمی که متن داخل پس‌زمینه بود پاک شد و جای آن `popover-circle` نگه داشته شد.
-- ظاهر جدول جستجو خیلی بهتر: `rc-tbl-wrap glass card radius 16 + shadow layered + sticky header accent + zebra + hover glass + crisp borders + border-radius روی parent`; پالت‌های پشت سطرها نیمه‌شفاف حرفه‌ای (`rc-yellow #FFF7D1` etc) + selected `outline #4B63E6`.
-- `common.css` shell سبک‌ها هماهنگ: `#EEF3FB→#E4ECF8` + `.az-card clay` radius 16 + shadow + inset highlight + دکمه‌ها clay + toast pill radius 14 با elevation.
-
-### Changed — صندوق (طول شروع شیفت کم، دکمه‌ها وسط یک ردیف، Glass + Neumo + Gradialism)
-- هدر صندوق `radial-gradient(circle at 10% 20%, #15B581 → #057053)` با shadow واقعی + income pill glass سفید 16% + border 28% + dual shadow; آمار summary کارت‌ها Neumorphic با gradient `135deg #FFF→#F2F6FC` + border + dual shadow + inset highlight.
-- دکمه‌های `شروع شیفت / پایان شیفت / ثبت سند دستی`: خیلی زیاد بودن — متن کوتاه شد (شروع/پایان) + آیکون SVG برداری accent، وسط چین `flex justify-content:center gap:12px`, `height 46px min-width 150 max 200 flex1 160, border-radius 24px pill, box-shadow neumo dual + inset white`, حالت hover transform + elevation رنگی. `cash-actions` یک ردیف center اصلاح شد.
-- تب‌های صندوق glass white chip با border سفید شفاف + حالت فعال سفید با shadow + text indent/shadow جداسازی فعال.
-- آیکون SVG برداری docs: `ic_printer / ic_receipt / ic_shield / ic_settings / ic_calc / logo` در `Assets/icons/` همگی دیده می‌شوند (gdiplus fallback disc + glyph وقتی embed نیست).
-
-### Changed — حساب مدیریت CRM
-- بک گراند صفحه کمی تیره‌تر اما خیلی کمتر از `#d3dfef→#c4cde1` مشکی-قبلی: `#E8EEF6 → #DFE5EF` رادیال + faint diagonal weave `repeating-linear 75,99,230 0.025` با گرادیانت لایرد; `crm-main` بافت paper محو.
-- کارت‌ها Claymorphic glass: `white → #F8FBFE + border #D0DBEA radius 18px + shadow 0 2px 6px + 0 16px 32px + inset 1px 0 white + sheen 42% mask`; hover lift `translateY(-3px)` + shadow accent؛ `crm-page-head` گلاس white 16px radius.
-- داشبورد «CLINIC MORNING» دیگر ساده نیست: KPIها ترمیم شده با نوار رنگی کناری 5px + gradient accent + shadow tinted + hover lift 3px + `k-green/amber/violet/rose` رنگ‌های متمایز (پاستلی حرفه‌ای)، عنوان با underline accent bar، `crm-tile` App Store گرانولی با آیکون 56px gradient + dual shadow clay + sheen `::before 50%`, hover lift 4px مقوا.
-- منوی مدیریت همبرگری سمت راست: drawer ثابت width `320px` + glass white + دسته‌بندی با dot رنگی و shadow، آیتم‌های `crm-menu-item` white tinted well (`#F6F9FE` + border + inset highlight) با hover accent + lift + active با inset accent border و shadow tinted, آیکون‌های gradient بزرگ‌تر 38px radius 11 با dual shadow.
-- جداول مدیریت تقویت/دارای border-multi: `thead #EAF1FB gradient + bottom rule 2px #B8CCDE + vertical separators #D0DBEA`, zebra stripes `#F7FAFF`, hover `#EEF4FF`، pill codechip neumo monospaced، row-btn clay pill و غیره؛ دیگر یک‌دست و ساده نیستند. جدول بندی کلا تقویت شد.
-- Bک هیچ `backdrop-filter` غجرمجاز نخورد (قبلی احمقانه اضافه کرده بود) — همه با gradient + shadow غنی شد.
-
-### Files
-- پذیرش: `assets/admission/index.html` (ساختار AppStore grid + hamburger + palette circle guide + receipt layout RTL row-reverse), `admission.js` (sidebar toggle + cat filter + mock tiles toast), `admission.css` (ری‌رایت کامل 1709 خط تر و تمیز از main اساس + v1.86 glass/neumo/clay/gradial).
-- مدیریت: `assets/crm/crm.css` (ری‌رایت کامل premium light + hamburger + KPI gradial + table zebra), `index.html` (ساختار حفظ شد + topbar accent ribbon).
-- مشترک: `assets/shell/common.css` (ری‌رایت سبک clay + هماهنگ با admission).
-- هسته: `src/theme.cpp` (پالت ممتاز light `#EEF3FB` + header سفیدی `#FFF→#ECF2FA` + clay button concave shell با sheen و inner highlight وتعریض radius تا 16), `src/main.cpp` (حذف blend مشکی هدر — ریشه black header fix، اکشن‌بار بهینه padding و با اندازه بزرگ‌تر و واضح‌تر 154/122، separators و status bar glass tinted + accent underline)، `src/dialogs.cpp` (لاگین Claymorphic professional double-shadow + glass gradient + logo badge clay + input neumorphic wells + accent underline + 440/490 geom), `src/app.h` (`1.86.0`), `src/app.rc` (`1.86.0`), `update/version.txt` (`1.86.0`), `src/reception.cpp` (`tabBarH 44` + سفید frosted strip + Clay clay tabs radius 12 + accent top line + active accent gradient).
-
-### Technical — Dual-Engine Safe & Build
-- همه CSS‌ها: literal hex، بدون var/gap/backdrop-filter → هم روی Trident و هم WebView2 کاملاً می‌رندر.
-- `build.sh` MinGW i686 static build در لینوکس (x86 exe اجرا می‌شود روی x86 و x64 ویندوز) با `-Werror` pass — هیچ warning نخواهد داد.
-- `build/DarmanPlus.exe` (5.2M) + SHA256 sidecar به‌روز شد و پرامپت GitHub Actions با artifcat جدید ریلیز را verify می‌کند.
+### Changed — صفحات HTML (سازگار با Trident/WebView2)
+- پس‌زمینهٔ همهٔ سطوح یک پله عمیق‌تر؛ کارت‌ها Glassmorphism، ورودی‌ها Neumorphism، دکمه‌ها Concave، جدولها با قاب، هدر گرادیانی، zebra و hover قوی‌تر (`assets/admission/admission.css`, `assets/crm/crm.css`, `assets/shell/common.css`).
+- **ابزارها**: منوی همبرگر سمت راست با دراور دسته‌بندی‌شده + جستجو، گرید به سبک App Store (آیکون بزرگ بالا، نام و توضیح وسط‌چین، قرص «باز کردن»)، کاشی جدید «صندوق نرفته‌ها و صف پذیرش»، جستجوی زندهٔ کاشی‌ها.
+- **جستجوی قبض**: چیدمان تازه — هدر شیشه‌ای (عنوان راست، چاپ/اکسل چپ)، ریل فیلترهای سمت راست با دکمهٔ جستجو در انتهای آن، جدول در سمت چپ؛ راهنمای رنگ‌ها به‌صورت دایرهٔ رنگ خالص کنار متن + آیکون (?) با پاپ‌اور راهنما.
+- **صندوق**: دکمه‌های شروع/پایان شیفت و سند دستی وسط‌چین در یک ردیف با سبک Concave و آیکون، قرص درآمد با Gradialism فیروزه‌ای→آبی، کارت‌های آماری نئومورفیک، ردیف‌های پرداخت‌نشده با رنگ کهربایی.
+- **مدیریت/CRM**: پس‌زمینه عمیق‌تر، نوار بالایی شیشه‌ای، کارت‌های KPI و کاشی‌های داشبورد گِلی با عمق بیشتر، منوی کشویی شیشه‌ای، اصلاح سلکتور هدر جدول (`table.crm-tbl`).
 
 ---
 

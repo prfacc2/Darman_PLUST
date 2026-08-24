@@ -1,9 +1,5 @@
 /* ============================================================================
-   common.css — SHARED multi-page embedded-web SHELL stylesheet (v1.86)
-   LIGHT PREMIUM theme: soft clay #EEF3FB -> #DDE8F6, not pure white.
-   Header is pure white frosted glass. Cards extrude with clay shadows +
-   inset highlight. No backdrop-filter (Trident-safe: fake glass via translucent
-   gradients + dual outer shadows + inset top highlight).
+   common.css — SHARED multi-page embedded-web SHELL stylesheet (v1.40.0)
 
    This is the ONE stylesheet every embedded page (admission, ping, and any
    future page) pulls in BEFORE its own page-specific sheet. It owns the things
@@ -19,8 +15,9 @@
      · NO CSS custom properties  var(--x)      -> literal hex values
      · NO flexbox `gap`                          -> real margins
      · NO logical props (padding-inline / etc.) -> physical (RTL) properties
-     · NO backdrop-filter                       -> fake glass via gradients+shadows
      · flexbox always carries the -ms- prefixes
+   The matching runtime is assets/shell/common.js (AzBridge/AzUi/AzNav/AzBoot/
+   AzPerf). Keep the two in lock-step.
    ============================================================================ */
 
 @font-face{
@@ -32,15 +29,18 @@
 *{box-sizing:border-box;-ms-box-sizing:border-box;}
 html,body{height:100%;margin:0;padding:0;}
 
+/* Base page — RTL Persian, sharp text, soft blue-grey gradient (light theme).
+   The admission page overrides its own layout on top of this; the shell only
+   guarantees a consistent typographic + colour baseline. */
 html{direction:rtl;}
 body{
   direction:rtl;
   font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;
-  /* v1.86 LIGHT — soft airy clay, never pure white flat */
-  background:#EEF3FB;
-  background:-webkit-linear-gradient(top,#F6F9FE 0%,#E4ECF8 100%);
-  background:linear-gradient(180deg,#F6F9FE 0%,#E4ECF8 100%);
-  color:#18263D;
+  /* v1.87.0: one step deeper canvas so the glass layers lift off the page */
+  background:#d9e2ef;
+  background:-webkit-linear-gradient(top,#e6edf7 0%,#d3deec 100%);
+  background:linear-gradient(180deg,#e6edf7 0%,#d3deec 100%);
+  color:#0d1a2e;
   font-size:14px;
   line-height:1.55;
   -webkit-font-smoothing:auto;
@@ -48,73 +48,63 @@ body{
   text-rendering:optimizeSpeed;
   font-weight:600;
 }
-b{font-weight:900;}
+b{font-weight:800;}
 svg{display:inline-block;vertical-align:middle;}
-a{color:#4B63E6;text-decoration:none;}
-a:hover{color:#3B4ED0;text-decoration:underline;}
+a{color:#1d4ed8;text-decoration:none;}
 
-/* DARK — refined dark (not true black) for shell */
+/* ---------------------------------------------------------------- DARK THEME --
+   AzBoot.applyTheme() toggles the `theme-dark` class on <html>. Pages that want
+   dark-aware surfaces only need to use the shell primitives below. */
 html.theme-dark body{
-  background:#0E1622;
-  background:-webkit-linear-gradient(top,#131D2C 0%,#0A141E 100%);
-  background:linear-gradient(180deg,#131D2C 0%,#0A141E 100%);
-  color:#E6EDF6;
+  background:#0f1826;
+  background:-webkit-linear-gradient(top,#132033 0%,#0c1420 100%);
+  background:linear-gradient(180deg,#132033 0%,#0c1420 100%);
+  color:#e8eef8;
 }
-html.theme-dark a{color:#7AB0FF;}
+html.theme-dark a{color:#7ab0ff;}
 
-/* primitives — clay glass cards */
+/* ------------------------------------------------------------- primitives --- */
 .az-card{
-  background:#FFFFFF;
-  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F6F9FE 100%);
-  background:linear-gradient(180deg,#FFFFFF 0%,#F6F9FE 100%);
-  border:1.5px solid #D0DBEA;border-radius:16px;
-  padding:18px;margin:0 0 14px 0;
-  box-shadow:0 2px 8px rgba(22,42,70,.06),0 12px 28px rgba(22,42,70,.08),inset 0 1px 0 #FFFFFF;
+  background:#ffffff;border:1px solid #d3ddec;border-radius:12px;
+  padding:16px;margin:0 0 12px 0;
 }
-html.theme-dark .az-card{background:#172435;border-color:#2B3A4F;box-shadow:0 8px 24px rgba(0,0,0,.22);}
+html.theme-dark .az-card{background:#16233a;border-color:#28374f;}
 
 .az-row{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;}
-.az-muted{color:#6B7B92;font-weight:700;}
-html.theme-dark .az-muted{color:#93A4BD;}
+.az-muted{color:#5b6b82;font-weight:600;}
+html.theme-dark .az-muted{color:#93a4bd;}
 
 .az-btn{
-  display:inline-block;border:1.5px solid transparent;cursor:pointer;
-  font-family:inherit;font-size:13.5px;font-weight:900;
-  padding:10px 18px;border-radius:12px;
-  background:#4B63E6;
-  background:-webkit-linear-gradient(top,#6A83F7 0%,#4B63E6 100%);
-  background:linear-gradient(180deg,#6A83F7 0%,#4B63E6 100%);
-  color:#fff;border-color:#3C52C9;
-  box-shadow:0 4px 14px rgba(75,99,230,.24),inset 0 1px 0 rgba(255,255,255,.24);
-  transition:all .18s ease;
+  display:inline-block;border:0;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:800;
+  padding:9px 18px;border-radius:9px;
+  background:#1d4ed8;color:#fff;
 }
-.az-btn:hover{
-  background:-webkit-linear-gradient(top,#7C90F8 0%,#5470EC 100%);
-  background:linear-gradient(180deg,#7C90F8 0%,#5470EC 100%);
-  box-shadow:0 7px 20px rgba(75,99,230,.34);transform:translateY(-1px);
-}
-.az-btn:active{box-shadow:inset 0 2px 6px rgba(0,0,0,.20);transform:translateY(0);}
-.az-btn.ghost{background:#FFFFFF;color:#4B63E6;border:1.5px solid #C8D8EB;}
-.az-btn.ghost:hover{background:#EEF4FF;border-color:#A8BFE0;color:#3B4ED0;}
-html.theme-dark .az-btn.ghost{color:#7AB0FF;border-color:#3A4F6E;background:#172435;}
-.az-btn[disabled]{opacity:.55;cursor:default;transform:none !important;}
+.az-btn:hover{background:#1746c0;}
+.az-btn:active{background:#12379c;}
+.az-btn.ghost{background:transparent;color:#1d4ed8;border:1px solid #1d4ed8;}
+html.theme-dark .az-btn.ghost{color:#7ab0ff;border-color:#3a5175;}
+.az-btn[disabled]{opacity:.55;cursor:default;}
 
-/* toast — clay pill with elevation */
+/* ------------------------------------------------------------------ TOAST ---
+   Shared toast host. AzUi.toast(text,kind) appends a .toast into #azToastHost
+   (created lazily if the page did not declare one). The four kinds match the
+   admission page exactly so a page can move between shells with no restyling. */
 #azToastHost{
-  position:fixed;left:18px;bottom:18px;z-index:99999;
+  position:fixed;left:16px;bottom:16px;z-index:99999;
   display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
 }
 .toast{
-  min-width:200px;max-width:440px;margin-top:10px;
-  padding:12px 18px;border-radius:14px;
-  color:#fff;font-weight:900;font-size:13px;
-  box-shadow:0 8px 24px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.20);
-  opacity:0;transform:translateY(8px);
-  -webkit-transition:opacity .22s ease, transform .22s ease;
-  transition:opacity .22s ease, transform .22s ease;
+  min-width:180px;max-width:420px;margin-top:8px;
+  padding:11px 16px;border-radius:9px;
+  color:#fff;font-weight:700;font-size:13.5px;
+  box-shadow:0 6px 18px rgba(0,0,0,.22);
+  opacity:0;
+  -webkit-transition:opacity .18s ease;transition:opacity .18s ease;
 }
-.toast.show{opacity:1;transform:translateY(0);}
-.toast.ok{background:#10B981;background:-webkit-linear-gradient(top,#38D68C 0%,#0B8A5A 100%);background:linear-gradient(180deg,#38D68C 0%,#0B8A5A 100%);}
-.toast.err{background:#E05352;background:-webkit-linear-gradient(top,#FF7070 0%,#E05352 100%);background:linear-gradient(180deg,#FF7070 0%,#E05352 100%);}
-.toast.warn{background:#F0B43C;background:-webkit-linear-gradient(top,#FFCA5B 0%,#F0B43C 100%);background:linear-gradient(180deg,#FFCA5B 0%,#F0B43C 100%);color:#4A3800;}
-.toast.info{background:#4B63E6;background:-webkit-linear-gradient(top,#6A83F7 0%,#4B63E6 100%);background:linear-gradient(180deg,#6A83F7 0%,#4B63E6 100%);}
+.toast.show{opacity:1;}
+.toast.ok{background:#0f7a4e;}
+.toast.err{background:#b42318;}
+/* warn — soft yellow with dark text (e.g. classic-print fallback notice) */
+.toast.warn{background:#f5c518;color:#3a2f00;}
+.toast.info{background:#1d4ed8;}

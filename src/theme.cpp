@@ -64,36 +64,34 @@ void applyTheme(bool dark){
         //  bg #F5F8FD · surface #FFFFFF · surface2 #EAF4FF · border #DCE6F2
         //  text #233042 · muted #6B7A90 · accent #1976F3 · hover #2D8CFF
         //  success #16C47F · warning #F4B740 · danger #E24C4B.
-        // v1.86.0: premium light "CLINIC GLASS" — NOT a flat white sheet.
-        // Page is a soft blue-grey clay (#E6EEF8 → #DDE8F5) so white glass cards
-        // extrude with depth. Header is PURE WHITE frosted glass (#FFFFFF → #EEF3FB)
-        // — never dark. Borders are crisp clay edges (#C8D8EB). Accent is refined
-        // indigo #4B63E6 that matches the embedded admission page.
-        // The goal: modern, layered, readable, NEVER white-on-white washed out.
-        g_theme.bg          = RGB(0xE6, 0xEE, 0xF8); // #E6EEF8 soft clay page top
-        g_theme.bg2         = RGB(0xD9, 0xE3, 0xF2); // #D9E3F2 page gradient bottom
+        // v1.85.0: soften the light palette toward a neumorphic/claymorphic base
+        // and unify the accent with the embedded admission page (refined indigo).
+        // The page sits a touch deeper so the near-white clay cards extrude,
+        // borders stay soft, and the header reads as a frosted band.
+        g_theme.bg          = RGB(0xEC, 0xF1, 0xF8); // #ECF1F8 soft clay page
+        g_theme.bg2         = RGB(0xE1, 0xE9, 0xF4); // page gradient bottom
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
-        g_theme.surfaceTop  = RGB(0xFE, 0xFE, 0xFF); // #FEFEFF card top-light
-        g_theme.surface2    = RGB(0xEE, 0xF3, 0xFB); // #EEF3FB wells / bars / action-bar
-        g_theme.border      = RGB(0xC8, 0xD8, 0xEB); // #C8D8EB soft clay edge, visible
-        g_theme.text        = RGB(0x18, 0x26, 0x3D); // #18263D primary ink
-        g_theme.textDim     = RGB(0x61, 0x6E, 0x83); // #616E83 muted
-        g_theme.labelInk    = RGB(0x32, 0x3E, 0x52); // readable labels
-        g_theme.sectionInk  = RGB(0x16, 0x22, 0x35); // strong titles
-        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo
-        g_theme.accent2     = RGB(0x6B, 0x83, 0xFF); // #6B83FF gradient end
-        g_theme.accentHover = RGB(0x63, 0x7A, 0xF5); // hover
+        g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
+        g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
+        g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
+        g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
+        g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
+        g_theme.labelInk    = RGB(0x35, 0x3F, 0x4F); // readable labels
+        g_theme.sectionInk  = RGB(0x1C, 0x26, 0x35); // strong titles
+        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo (matches page)
+        g_theme.accent2     = RGB(0x6A, 0x83, 0xF7); // #6A83F7 gradient end / hover
+        g_theme.accentHover = RGB(0x6A, 0x83, 0xF7); // #6A83F7 lighter accent on hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
         g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
         g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
         g_theme.success     = RGB(0x15, 0xB5, 0x81); // #15B581
-        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C
-        g_theme.inputBg     = RGB(0xF1, 0xF5, 0xFB); // #F1F5FB tinted well
-        g_theme.inputText   = RGB(0x18, 0x26, 0x3D);
-        g_theme.hover       = RGB(0xE7, 0xED, 0xFA); // soft accent wash
-        // v1.86: HEADER MUST BE LIGHT — pure white → #ECF2FA frosted band
-        g_theme.headerTop   = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF
-        g_theme.headerBot   = RGB(0xEC, 0xF2, 0xFA); // #ECF2FA
+        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C warning
+        g_theme.inputBg     = RGB(0xF3, 0xF6, 0xFC); // tinted well
+        g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
+        g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
+        // frosted header band with real depth
+        g_theme.headerTop   = RGB(0xFB, 0xFC, 0xFE);
+        g_theme.headerBot   = RGB(0xE1, 0xEA, 0xF6);
         g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
         // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now
@@ -390,6 +388,19 @@ void drawIcon(HDC dc, int icon, RECT rc, COLORREF col, int thick){
         LineTo(dc,cx,cy+h/3);
         LineTo(dc,cx+w,cy-h);
         break; }
+    case ICO_USER_ADD: {   // v1.87.0: person + plus badge (پذیرش بیمار)
+        int hr=(r*40)/100; if(hr<2) hr=2;
+        int hx=cx-r/4;                                   // person nudged left
+        Ellipse(dc,hx-hr,cy-r+1,hx+hr,cy-r+1+hr*2);      // head
+        Arc(dc,cx-r+1,cy+1,cx+r/3,cy+2*r,                // shoulders
+            cx+r/3,cy+r, cx-r+1,cy+r);
+        int br=(r*36)/100; if(br<2) br=2;                // plus badge, low-right
+        int bx=cx+r-br+1, by=cy+r-br+1;
+        Ellipse(dc,bx-br,by-br,bx+br,by+br);
+        int d=(br*52)/100; if(d<1) d=1;
+        MoveToEx(dc,bx-d,by,0); LineTo(dc,bx+d+1,by);
+        MoveToEx(dc,bx,by-d,0); LineTo(dc,bx,by+d+1);
+        break; }
     }
     SetBkMode(dc, oldBk);
     SelectObject(dc, op); SelectObject(dc, ob);
@@ -622,43 +633,54 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //      the accent on hover plus a faint inner wash, so they respond
         //      without shouting.
         // ------------------------------------------------------------------
-        // v1.86 Claymorphism: chunky, rounded, extruded with soft shadows
         int hgt = rr.bottom-rr.top; if(hgt<1) hgt=1;
-        int rad = S(st==BS_CARD?30:12);
+        int rad = S(st==BS_CARD?22:10);   // v1.85: chunkier claymorphic card corner
         if(st!=BS_CARD){
-            rad = hgt/3;
-            if(rad > S(16)) rad = S(16);
-            if(rad < S(7))  rad = S(7);
+            rad = hgt/3;                       // proportional corner
+            if(rad > S(14)) rad = S(14);
+            if(rad < S(6))  rad = S(6);
         }
-        // v1.86 Claymorphic solid button: concave illusion via gradient
-        // (darker top → lighter bottom for pressed-in feel at rest, lighter top
-        // for pop-out; sheen strip + inner white highlight + bottom rim)
+        // shared helper: solid style body = shadow + SOLID BASE + gradient + sheen
+        // + rim. The solid base (the darker stop) is painted FIRST so the button
+        // always carries its brand colour even if the GDI+ gradient pass ever
+        // fails to draw — this is the definitive guard against the
+        // "white text on a white button" regression (v1.64.0).
+        // v1.87.0 CONCAVE refresh: the body gradient now runs darker→lighter
+        // top-to-bottom (the inverse of a convex pill), a soft inner shade hugs
+        // the TOP edge and a light inner rim hugs the BOTTOM edge, so the
+        // button reads as gently pressed INTO its seat — the claymorphic
+        // "concave" feel the design calls for. Pressing deepens the cave and
+        // collapses the lift shadow.
         auto solidBody = [&](COLORREF top, COLORREF bot, COLORREF glow){
             if(!dn){
-                gpShadowColor(dc, rr, rad, hv?S(14):S(9), hv?120:72, glow);
+                // elevation. hover lifts higher; the shadow is tinted with the
+                // button's own colour so it feels like coloured light.
+                gpShadowColor(dc, rr, rad, hv?S(10):S(6), hv?88:54, glow);
             }
-            // True concave: darker saturated top, lighter luminous bottom
-            COLORREF cTop, cBot;
-            if(dn){
-                cTop = bot; cBot = top;
-            } else {
-                cTop = blendColor(top, RGB(0,0,0), 10);
-                cBot = blendColor(bot, RGB(255,255,255), 14);
+            // v1.66.0: unconditional plain-GDI base painted FIRST — the GDI+
+            // path can fail per-call even when s_gdipOK is true (e.g. a
+            // LinearGradientBrush allocation failure), leaving the button body
+            // transparent and text invisible (white-on-white regression).
+            // fillRoundRect uses diameter (rad*2); gpRoundRect uses radius (rad).
+            COLORREF cT = blendColor(top, RGB(0,0,0),       dn?20:10); // darker top
+            COLORREF cB = blendColor(bot, RGB(255,255,255), dn? 4:16); // lighter bottom
+            fillRoundRect(dc, rr, rad*2, cB, CLR_INVALID);
+            gpGradRoundRect(dc, rr, rad, cT, cB, CLR_INVALID);
+            // inner top shade — the concave "cave" line just inside the top edge
+            {
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            blendColor(top, RGB(0,0,0), 34), dn?150:105);
             }
-            fillRoundRect(dc, rr, rad*2, cBot, CLR_INVALID);
-            gpGradRoundRect(dc, rr, rad, cTop, cBot, CLR_INVALID);
-            // top sheen 45% white wash
-            RECT sh = rr; sh.bottom = rr.top + (hgt*44)/100;
-            if(sh.bottom > sh.top+1)
-                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?10:28);
-            // inner white rim for clay highlight
-            RECT inner = rr; InflateRect(&inner, -S(1), -S(1));
-            if(inner.right>inner.left && inner.bottom>inner.top)
-                gpRoundRect(dc, inner, rad>S(1)?rad-S(1):rad, CLR_INVALID,
-                            blendColor(RGB(255,255,255), cBot, 22), 130);
-            // bottom rim
+            // inner bottom light rim — soft white inset line
+            {
+                RECT ib=rr; InflateRect(&ib,-S(2),-S(2));
+                gpRoundRect(dc, ib, rad>S(2)?rad-S(2):rad, CLR_INVALID,
+                            RGB(255,255,255), dn?28:64);
+            }
+            // crisp outer rim for definition against the page
             gpRoundRect(dc, rr, rad, CLR_INVALID,
-                blendColor(bot, RGB(0,0,0), dn?24:14));
+                blendColor(bot, RGB(0,0,0), dn?26:16));
         };
         // v1.3.0: anti-aliased GDI+ fills with a soft gradient on solid styles
         if(st==BS_PRIMARY){
@@ -697,7 +719,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // elevation — tinted with the card's own hue so it reads as
             // coloured light, not grey dirt.
             //  v1.85: deeper, softer resting lift for a claymorphic extrusion.
-            gpShadowColor(dc, rr, rad, hv?S(18):S(12), hv?110:68, cardAcc);
+            gpShadowColor(dc, rr, rad, hv?S(16):S(11), hv?96:62, cardAcc);
             // v1.66.0: unconditional GDI base before GDI+ decoration
             fillRoundRect(dc, rr, rad*2,
                 hv?blendColor(g_theme.hover,cardAcc,10):g_theme.surface, CLR_INVALID);
@@ -712,10 +734,15 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 if(csh.bottom > csh.top+1)
                     gpFillAlpha(dc, csh, rad, RGB(255,255,255), hv?24:18);
             }
-            // Inner Highlight (white outline with alpha 140) for Claymorphism
-            {
-                RECT inner = rr; InflateRect(&inner, -S(2), -S(2));
-                gpRoundRect(dc, inner, rad>S(2)?rad-S(2):rad, CLR_INVALID, RGB(255,255,255), 140);
+            // v1.87.0 clay depth: a bright inner rim along the top edge and a
+            // faint inner shade pooled at the bottom make the card read as
+            // soft extruded clay, not a printed sheet. (Kept subtle: a neutral
+            // secondary shadow reads as grey film on Wine/some GDI+ hosts, so
+            // the tinted shadow alone carries the elevation.)
+            if(!dn){
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            RGB(255,255,255), g_dark?40:120);
             }
             if(hv){
                 // accent glow ring just outside the border (drawn under text)
@@ -744,9 +771,18 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 fillRoundRect(dc, rr, rad*2, fill, CLR_INVALID);
                 gpRoundRect(dc, rr, rad, fill, blendColor(fill, acc, 22));
             } else {
-                // v1.66.0: unconditional GDI base before GDI+ decoration
+                // v1.87.0: the resting ghost tile is now a frosted CONCAVE
+                // plate — whisper-darker top edge, light bottom rim, hairline
+                // border — so the header tools read as pressed-glass buttons
+                // instead of flat smudges.
                 fillRoundRect(dc, rr, rad*2, fill, CLR_INVALID);
-                gpRoundRect(dc, rr, rad, fill, bord);
+                gpGradRoundRect(dc, rr, rad,
+                    blendColor(fill, RGB(0,0,0), 6),
+                    blendColor(fill, RGB(255,255,255), 12),
+                    blendColor(fill, g_theme.border, 42));
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            RGB(255,255,255), g_dark?36:90);
             }
         }
         // §C: explicit focus ring — a crisp accent hairline inset 2px so keyboard

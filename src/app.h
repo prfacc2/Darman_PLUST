@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.86.0"
+#define APP_VERSION_W   L"1.87.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -130,7 +130,10 @@ enum IconId {
     ICO_WALLET,
     // v1.77.0: پاکت نامه — closed envelope / letter glyph for the کارتابل
     // (management inbox) tab, replacing the old bell/message look.
-    ICO_LETTER
+    ICO_LETTER,
+    // v1.87.0: person-plus glyph for the «پذیرش بیمار» header action so it is
+    // visually distinct from «تب جدید» (which keeps the plain plus/tab glyph).
+    ICO_USER_ADD
 };
 // §F: spec name alias — the work order references this symbol explicitly.
 #define IC_SAVED_MSG ICO_SAVED_MSG
@@ -193,6 +196,9 @@ void gpGradRoundRectBg(HDC dc, RECT rc, int rad, COLORREF top, COLORREF bottom, 
 //  v1.19.0: HORIZONTAL 2-stop gradient rounded rect (left→right), corners first
 //  filled with `bg`. Used for the «مبلغ نهایی» card (sky-blue → royal-blue).
 void gpGradRoundRectBgH(HDC dc, RECT rc, int rad, COLORREF left, COLORREF right, COLORREF border, COLORREF bg);
+//  v1.87.0: three-stop horizontal "gradialism" ribbon (a → b → c) — the
+//  signature sweep used by the header, the welcome hero and the login card.
+void gpGradRibbon3(HDC dc, RECT rc, int rad, COLORREF a, COLORREF b, COLORREF c);
 //  Paint only the 4 rounded-corner gaps of `rc` (radius `rad`) with `bg`. Use
 //  this to "patch" the corners behind any rounded region whose interior is
 //  already drawn (e.g. owner-drawn lists / combos / regions).

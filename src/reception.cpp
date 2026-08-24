@@ -542,10 +542,9 @@ static bool upEditName(HWND owner, const wchar_t* title, std::wstring& val){
 static int infoBarH(){ return S(6); }
 // v1.12.0 (§2.C): slightly slimmer tab strip + a touch more breathing room
 // between tabs and from the strip edge, for a cleaner, more modern header.
-// v1.86 — tab strip a bit taller, clay feel, crisp readable tabs
-static int tabBarH(){ return S(44); }
-static int tabW()    { return S(220); }
-static int tabGap()  { return S(10); }
+static int tabBarH(){ return S(38); }
+static int tabW()    { return S(206); }
+static int tabGap()  { return S(8);  }
 // v1.75.0: each tab kind carries a distinct vector glyph so the strip reads as
 // a set of labelled, iconified tabs rather than a row of plain text buttons.
 static int tabIconFor(int kind){
@@ -554,7 +553,9 @@ static int tabIconFor(int kind){
     if(kind==TK_TOOLS)   return ICO_GEAR;
     if(kind==TK_CASHIER) return ICO_WALLET;
     if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
-    return ICO_USER;                         // پذیرش بیمار — patient admission
+    // v1.87.0: the admission tab carries the new person-plus glyph, echoing
+    // the «پذیرش بیمار» header action so both read as one feature.
+    return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
 }
 
 // ---------------------------------------------------------------- billing --
@@ -4904,21 +4905,26 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         HBITMAP bmp=CreateCompatibleBitmap(dc0,rc.right,rc.bottom);
         HGDIOBJ obm=SelectObject(dc,bmp);
 
-        // v1.86 LIGHT PREMIUM TAB STRIP — white glass band, soft elevation, crisp edge.
+        // ------------------------------------------------------------------
+        //  v1.63.0 RECEPTION CHROME REDESIGN.
+        //  The bars were three flat FillRect() slabs separated by one 1-px
+        //  GDI line — visually indistinguishable from a 1990s toolbar. They
+        //  now render as layered surfaces: the info + tab strip is one soft
+        //  vertical gradient sitting on the page, closed by a two-tone
+        //  separator (a hairline border over a lighter highlight) which is
+        //  what gives a bar an actual edge instead of a drawn line.
+        // ------------------------------------------------------------------
         RECT bd={0,infoBarH()+tabBarH(),rc.right,rc.bottom};
-        gpGradRoundRect(dc,bd,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
+        FillRect(dc,&bd,g_brBg);
         RECT strip={0,0,rc.right,infoBarH()+tabBarH()};
-        // pure white → tinted soft gradient for tab strip (light frosted)
         gpGradRoundRect(dc,strip,0,
-            RGB(0xFF,0xFF,0xFF),
-            g_theme.surface2,
-            CLR_INVALID);
-        // crisp accent underline + border
+            blendColor(g_theme.surfaceTop,g_theme.surface2,35),
+            g_theme.surface, CLR_INVALID);
+        // two-tone closing edge: darker rule + 1 px light lip beneath it
         int sepY = infoBarH()+tabBarH()-1;
-        gpLine(dc,0,sepY,rc.right,sepY,g_theme.border,1.0f,200);
-        gpLine(dc,0,sepY,rc.right,sepY,g_theme.accent,2.0f,28);
-        // inset white highlight on top edge
-        gpLine(dc,0,0,rc.right,0,RGB(255,255,255),1.0f,200);
+        gpLine(dc,0,sepY,rc.right,sepY,g_theme.border,1.0f,255);
+        gpLine(dc,0,sepY+1,rc.right,sepY+1,
+            blendColor(g_theme.bg,RGB(255,255,255),g_dark?8:60),1.0f,200);
 
         SetBkMode(dc,TRANSPARENT);
         // v1.10.0: the old "میز پذیرش بیمار" title row was removed — it was an
@@ -4947,36 +4953,36 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 //      accent-warmed hairline,
                 //    * cartable keeps its glowing unread counter.
                 // ------------------------------------------------------
-                // v1.86 CLAY TAB — extruded, soft lift, accent ring, sheen
-                int trad = S(12);
+                int trad = S(10);
                 if(act){
-                    // active: extruded white card merging into body + blue top accent
-                    gpShadowColor(dc,r,trad,S(8),82,g_theme.accent);
-                    gpGradRoundRectBg(dc,r,trad,
-                        RGB(255,255,255),
-                        blendColor(g_theme.surfaceTop, g_theme.surface2, 30),
-                        blendColor(g_theme.border,g_theme.accent,55),
-                        RGB(255,255,255));
-                    // merge with the body: paint over bottom 4 px
-                    RECT mb={r.left+S(2),r.bottom-S(4),r.right-S(2),r.bottom+S(3)};
+                    gpShadowColor(dc,r,trad,S(7),70,g_theme.accent);
+                    gpGradRoundRect(dc,r,trad,
+                        blendColor(g_theme.bg,g_theme.surfaceTop,45),
+                        g_theme.bg,
+                        blendColor(g_theme.border,g_theme.accent,55));
+                    // v1.87.0: frosted inner light rim inside the raised tab
+                    { RECT itr=r; InflateRect(&itr,-S(1),-S(1));
+                      gpRoundRect(dc, itr, trad-S(1)>2?trad-S(1):trad, CLR_INVALID,
+                                  RGB(255,255,255), g_dark?26:85); }
+                    // merge with the body: paint over the bottom 4 px
+                    RECT mb={r.left+S(2),r.bottom-S(4),r.right-S(2),r.bottom+S(2)};
                     HBRUSH mbr=CreateSolidBrush(g_theme.bg);
                     FillRect(dc,&mb,mbr); DeleteObject(mbr);
-                    // accent indicator on top
-                    RECT ind2={r.left+S(10),r.top+S(2),r.right-S(10),r.top+S(2)+S(4)};
-                    gpGradRoundRectBgH(dc,ind2,S(3),g_theme.accent2,g_theme.accent,CLR_INVALID,CLR_INVALID);
+                    // accent indicator across the top of the active tab —
+                    // v1.87.0: gradialism sweep indigo→sky instead of a flat bar
+                    RECT ind2={r.left+S(9),r.top+S(2),r.right-S(9),r.top+S(2)+S(3)};
+                    gpGradRoundRectBgH(dc,ind2,S(2),g_theme.accent,g_theme.accent2,
+                                       CLR_INVALID,CLR_INVALID);
                 } else if(hov){
-                    gpShadow(dc,r,trad,S(6),56);
-                    gpGradRoundRectBg(dc,r,trad,
-                        blendColor(RGB(255,255,255), g_theme.hover, 20),
+                    gpShadow(dc,r,trad,S(5),44);
+                    gpGradRoundRect(dc,r,trad,
+                        blendColor(g_theme.surfaceTop,g_theme.hover,40),
                         g_theme.hover,
-                        blendColor(g_theme.border,g_theme.accent,46),
-                        g_theme.surface2);
+                        blendColor(g_theme.border,g_theme.accent,38));
                 } else {
-                    gpGradRoundRectBg(dc,r,trad,
-                        RGB(255,255,255),
-                        blendColor(g_theme.surface, g_theme.surface2, 50),
-                        g_theme.border,
-                        g_theme.surface2);
+                    gpGradRoundRect(dc,r,trad,
+                        blendColor(g_theme.surfaceTop,g_theme.surface,55),
+                        g_theme.surface, g_theme.border);
                 }
                 // icon medallion at the leading (right/RTL) edge — solid accent
                 // on the active tab, a quiet accent tint on the others.

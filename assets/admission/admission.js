@@ -1434,6 +1434,86 @@
       if (!state.canCashView) { toast('دسترسی صندوق ندارید', 'err'); return; }
       Bridge.call('ui.openTab', { kind: 'cashier' });
     });
+    on($('toolsQueue'), 'click', function () {
+      Bridge.call('ui.openTab', { kind: 'queue' });
+    });
+    /* v1.87: tools hamburger drawer (categorised, searchable) + grid filter. */
+    (function () {
+      var drawer = $('toolsDrawer'), bk = $('toolsDrawerBk');
+      function openDrawer() {
+        if (drawer) drawer.className = 'tools-drawer open';
+        if (bk) bk.className = 'tools-drawer-bk open';
+      }
+      function closeDrawer() {
+        if (drawer) drawer.className = 'tools-drawer';
+        if (bk) bk.className = 'tools-drawer-bk';
+      }
+      on($('toolsBurger'), 'click', function () {
+        if (drawer && /(^|\s)open(\s|$)/.test(drawer.className)) closeDrawer();
+        else openDrawer();
+      });
+      on($('toolsDrawerClose'), 'click', closeDrawer);
+      on($('toolsDrawerBk'), 'click', closeDrawer);
+      /* drawer item → activate the matching grid tile */
+      var body = $('toolsDrawerBody');
+      if (body) {
+        var items = body.getElementsByClassName('tools-drawer-item');
+        var ii;
+        for (ii = 0; ii < items.length; ii++) {
+          (function (it) {
+            on(it, 'click', function () {
+              var t = $(it.getAttribute('data-tool'));
+              closeDrawer();
+              if (t) t.click();
+            });
+          })(items[ii]);
+        }
+      }
+      /* search — filters BOTH the grid tiles and the drawer items by their
+         visible text (name + subtitle). */
+      function norm(s) { return (s || '').replace(/\s+/g, ' ').toLowerCase(); }
+      function applyToolsFilter(q) {
+        q = norm(q);
+        var grid = $('toolsGrid');
+        var any = false;
+        var i, tiles, txt;
+        if (grid) {
+          tiles = grid.getElementsByClassName('tools-tile');
+          for (i = 0; i < tiles.length; i++) {
+            txt = norm(tiles[i].textContent || tiles[i].innerText);
+            var hide = q && txt.indexOf(q) < 0;
+            tiles[i].style.display = hide ? 'none' : '';
+            if (!hide) any = true;
+          }
+        }
+        var emp = $('toolsEmpty');
+        if (emp) emp.style.display = (q && !any) ? '' : 'none';
+        if (body) {
+          var dis = body.getElementsByClassName('tools-drawer-item');
+          for (i = 0; i < dis.length; i++) {
+            txt = norm(dis[i].textContent || dis[i].innerText);
+            dis[i].style.display = (q && txt.indexOf(q) < 0) ? 'none' : '';
+          }
+          /* hide a category heading when every item under it is filtered out */
+          var kids = body.childNodes, lastCat = null, lastVis = false;
+          for (i = 0; i < kids.length; i++) {
+            var k = kids[i];
+            if (!k.className) continue;
+            if (/(^|\s)tools-cat(\s|$)/.test(k.className)) {
+              if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+              lastCat = k; lastVis = false;
+            } else if (/(^|\s)tools-drawer-item(\s|$)/.test(k.className)) {
+              if (k.style.display !== 'none') lastVis = true;
+            }
+          }
+          if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+        }
+      }
+      on($('toolsQ'), 'keyup', function () { applyToolsFilter(this.value); });
+      on($('toolsQ'), 'input', function () { applyToolsFilter(this.value); });
+      on($('toolsDrawerQ'), 'keyup', function () { applyToolsFilter(this.value); });
+      on($('toolsDrawerQ'), 'input', function () { applyToolsFilter(this.value); });
+    })();
     on($('rcBack'), 'click', function () { state.rcPage = 'home'; showToolsHome(); });
     on($('rcSearchBtn'), 'click', searchReceipts);
     on($('rcExcel'), 'click', exportReceiptExcel);
@@ -2773,78 +2853,6 @@
     recompute();               /* zero invoice on open */
     tickClock();
     setInterval(tickClock, 1000);
-
-    // REDESIGNED: Wire Hamburger Sidebar Drawer toggle
-    var hamburgerBtn = $('toolsHamburgerBtn');
-    if (hamburgerBtn) {
-      on(hamburgerBtn, 'click', function() {
-        var sb = $('toolsSidebar');
-        if (sb) {
-          if (sb.className.indexOf('open') !== -1) {
-            sb.className = 'tools-sidebar';
-          } else {
-            sb.className = 'tools-sidebar open';
-          }
-        }
-      });
-    }
-
-    // REDESIGNED: Wire Category button filters
-    var catBtns = document.querySelectorAll('.sidebar-categories .cat-btn');
-    var idx;
-    for (idx = 0; idx < catBtns.length; idx++) {
-      on(catBtns[idx], 'click', function(e) {
-        var clickedBtn = e.target || e.srcElement;
-        var jdx;
-        for (jdx = 0; jdx < catBtns.length; jdx++) {
-          catBtns[jdx].className = 'cat-btn';
-        }
-        clickedBtn.className = 'cat-btn active';
-        filterTools();
-      });
-    }
-
-    // REDESIGNED: Wire Tools Search Input
-    var toolsSearch = $('toolsSearchInput');
-    if (toolsSearch) {
-      on(toolsSearch, 'keyup', filterTools);
-    }
-
-    function filterTools() {
-      var searchVal = (($('toolsSearchInput') && $('toolsSearchInput').value) || '').toLowerCase();
-      var activeCatBtn = document.querySelector('.sidebar-categories .cat-btn.active');
-      var activeFilter = activeCatBtn ? activeCatBtn.getAttribute('data-filter') : 'all';
-      
-      var tiles = document.querySelectorAll('.tools-grid .tools-tile');
-      var jdx;
-      for (jdx = 0; jdx < tiles.length; jdx++) {
-        var tile = tiles[jdx];
-        var nameEl = tile.querySelector('.tools-tile-name');
-        var subEl = tile.querySelector('.tools-tile-sub');
-        var name = nameEl ? (nameEl.innerText || nameEl.textContent || '').toLowerCase() : '';
-        var sub = subEl ? (subEl.innerText || subEl.textContent || '').toLowerCase() : '';
-        var cat = tile.getAttribute('data-cat') || '';
-        
-        var matchSearch = name.indexOf(searchVal) !== -1 || sub.indexOf(searchVal) !== -1;
-        var matchCat = activeFilter === 'all' || cat === activeFilter;
-        
-        if (matchSearch && matchCat) {
-          tile.style.display = '';
-        } else {
-          tile.style.display = 'none';
-        }
-      }
-    }
-
-    // REDESIGNED: Wire Mock tiles
-    var mockTiles = document.querySelectorAll('.tools-grid .mock-tile');
-    var kdx;
-    for (kdx = 0; kdx < mockTiles.length; kdx++) {
-      on(mockTiles[kdx], 'click', function() {
-        toast('این بخش در نسخهٔ ابری فعال می‌شود', 'info');
-      });
-    }
-
     Bridge.ready(boot);
     setTimeout(hideLoader, 8000);   /* safety net */
   });
