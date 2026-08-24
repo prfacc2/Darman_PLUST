@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.85.0"
+#define APP_VERSION_W   L"1.87.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -130,7 +130,10 @@ enum IconId {
     ICO_WALLET,
     // v1.77.0: پاکت نامه — closed envelope / letter glyph for the کارتابل
     // (management inbox) tab, replacing the old bell/message look.
-    ICO_LETTER
+    ICO_LETTER,
+    // v1.87.0: person-plus glyph for the «پذیرش بیمار» header action so it is
+    // visually distinct from «تب جدید» (which keeps the plain plus/tab glyph).
+    ICO_USER_ADD
 };
 // §F: spec name alias — the work order references this symbol explicitly.
 #define IC_SAVED_MSG ICO_SAVED_MSG

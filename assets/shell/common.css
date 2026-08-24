@@ -36,9 +36,10 @@ html{direction:rtl;}
 body{
   direction:rtl;
   font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;
-  background:#dde7f4;
-  background:-webkit-linear-gradient(top,#e9f0fa 0%,#d6e2f2 100%);
-  background:linear-gradient(180deg,#e9f0fa 0%,#d6e2f2 100%);
+  /* v1.87.0: one step deeper canvas so the glass layers lift off the page */
+  background:#d9e2ef;
+  background:-webkit-linear-gradient(top,#e6edf7 0%,#d3deec 100%);
+  background:linear-gradient(180deg,#e6edf7 0%,#d3deec 100%);
   color:#0d1a2e;
   font-size:14px;
   line-height:1.55;

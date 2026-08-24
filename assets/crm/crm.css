@@ -1114,3 +1114,236 @@ html, body{
 .bk-bar{height:10px;width:0;background:#0f766e;}
 .theme-dark .crm-muted{color:#93a4b8;}
 .theme-dark .bk-track{background:#1d2f44;}
+
+/* ==========================================================================
+   v1.87.0 — MANAGEMENT «OFFICE PREMIUM» refresh (clay × glass × neu)
+   Slightly deeper canvas, frosted top bar, clay KPIs, App-Store-ish tiles,
+   concave buttons, framed gradient-header tables, glassier drawer.
+   Trident-safe: no var(), no gap, no backdrop-filter, no logical props.
+   ========================================================================== */
+
+/* ---- page canvas: one step deeper --------------------------------------- */
+body{
+  background:#dce4f0;
+  background:-webkit-linear-gradient(160deg,#e4ebf7 0%,#d7e0ee 55%,#c9d4e6 100%);
+  background:linear-gradient(160deg,#e4ebf7 0%,#d7e0ee 55%,#c9d4e6 100%);
+}
+.crm-main{
+  background:-webkit-linear-gradient(170deg,#eef3fa 0%,#dde6f2 55%,#ccd7e8 100%);
+  background:linear-gradient(170deg,#eef3fa 0%,#dde6f2 55%,#ccd7e8 100%);
+}
+
+/* ---- frosted top bar with gradialism underline --------------------------- */
+.crm-topbar{
+  background:#fbfcfe;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#eef3fa 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#eef3fa 100%);
+  border-bottom:1px solid #c3d0e4;
+  -webkit-box-shadow:0 2px 4px rgba(20,40,72,.05), 0 12px 26px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+  box-shadow:0 2px 4px rgba(20,40,72,.05), 0 12px 26px rgba(20,40,72,.10), inset 0 1px 0 #fff;
+}
+.crm-topbar-burger,.crm-topbar .crm-btn{
+  background:#f4f8fc;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#eaf1fa 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#eaf1fa 100%);
+  border:1px solid #bccbe2;color:#3c4f78;border-radius:12px;
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.06), inset 0 -1px 0 #fff, 0 3px 8px rgba(20,40,72,.08);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.06), inset 0 -1px 0 #fff, 0 3px 8px rgba(20,40,72,.08);
+}
+.crm-topbar-burger:hover,.crm-topbar .crm-btn:hover{
+  color:#2f5fd0;border-color:#8ea2f0;
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 6px 14px rgba(47,111,228,.20);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 6px 14px rgba(47,111,228,.20);
+}
+.crm-topbar-search .crm-input{
+  background:#edf2fa;border:1px solid #c8d5e8;border-radius:999px;
+  -webkit-box-shadow:inset 2px 2px 5px rgba(20,40,72,.09), inset -1px -1px 2px rgba(255,255,255,.95);
+  box-shadow:inset 2px 2px 5px rgba(20,40,72,.09), inset -1px -1px 2px rgba(255,255,255,.95);
+}
+.crm-topbar-search .crm-input:focus{
+  background:#fff;border-color:#5468e4;
+  -webkit-box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+  box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+}
+
+/* ---- cards: deeper glass -------------------------------------------------- */
+.crm-card{
+  background:#fbfdff;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.97) 0%,rgba(243,248,253,.93) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(243,248,253,.93) 100%);
+  border:1px solid #c0cfe4;border-radius:20px;
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.06), 0 18px 36px rgba(20,40,72,.12), inset 0 1px 0 rgba(255,255,255,1);
+  box-shadow:0 2px 5px rgba(20,40,72,.06), 0 18px 36px rgba(20,40,72,.12), inset 0 1px 0 rgba(255,255,255,1);
+}
+
+/* ---- KPI cards: clay, tinted with their own accent ------------------------- */
+.crm-kpi{
+  border:1px solid #c0cfe4;border-radius:18px;
+  background:#fbfdff;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#f1f6fc 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#f1f6fc 100%);
+  -webkit-box-shadow:0 2px 4px rgba(20,40,72,.05), 0 14px 28px rgba(20,40,72,.10), inset 0 1px 0 #fff, inset 0 -2px 4px rgba(20,40,72,.04);
+  box-shadow:0 2px 4px rgba(20,40,72,.05), 0 14px 28px rgba(20,40,72,.10), inset 0 1px 0 #fff, inset 0 -2px 4px rgba(20,40,72,.04);
+}
+.crm-kpi:hover{
+  -webkit-transform:translateY(-3px);-ms-transform:translateY(-3px);transform:translateY(-3px);
+  border-color:#9db4ea;
+  -webkit-box-shadow:0 4px 8px rgba(20,40,72,.06), 0 22px 40px rgba(40,70,160,.16), inset 0 1px 0 #fff;
+  box-shadow:0 4px 8px rgba(20,40,72,.06), 0 22px 40px rgba(40,70,160,.16), inset 0 1px 0 #fff;
+}
+.crm-kpi-value{color:#16233c;}
+.crm-kpi-label{color:#4d5d78;}
+
+/* ---- dashboard tiles: App-Store feel --------------------------------------- */
+.crm-tile{
+  border:1px solid #bccbe2;border-radius:20px;
+  background:#fbfdff;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.98) 0%,rgba(240,246,253,.94) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(240,246,253,.94) 100%);
+  -webkit-box-shadow:0 2px 5px rgba(16,32,64,.06), 0 16px 32px rgba(16,32,64,.10), inset 0 1px 0 rgba(255,255,255,1), inset 0 -2px 4px rgba(20,40,72,.05);
+  box-shadow:0 2px 5px rgba(16,32,64,.06), 0 16px 32px rgba(16,32,64,.10), inset 0 1px 0 rgba(255,255,255,1), inset 0 -2px 4px rgba(20,40,72,.05);
+}
+.crm-tile:hover{
+  -webkit-transform:translateY(-3px);-ms-transform:translateY(-3px);transform:translateY(-3px);
+  border-color:#8ea2f0;
+  -webkit-box-shadow:0 4px 8px rgba(16,32,64,.07), 0 24px 44px rgba(60,80,180,.18), inset 0 1px 0 rgba(255,255,255,1);
+  box-shadow:0 4px 8px rgba(16,32,64,.07), 0 24px 44px rgba(60,80,180,.18), inset 0 1px 0 rgba(255,255,255,1);
+}
+.crm-tile-ic{
+  width:52px;height:52px;border-radius:16px;
+  -webkit-box-shadow:0 8px 18px rgba(20,40,80,.22), inset 0 2px 2px rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.14);
+  box-shadow:0 8px 18px rgba(20,40,80,.22), inset 0 2px 2px rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.14);
+}
+.crm-tile-lbl{color:#1a2942;}
+.crm-tile-sub{color:#5d6d88;}
+.crm-cat-title{color:#43536e;}
+
+/* ---- concave buttons -------------------------------------------------------- */
+.crm-btn.primary{
+  border:1px solid #1a5ac8;color:#fff;
+  background:#2f76e8;
+  background:-webkit-linear-gradient(top,#1f63d8 0%,#3d86f2 100%);
+  background:linear-gradient(180deg,#1f63d8 0%,#3d86f2 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(10,30,90,.30), inset 0 -2px 3px rgba(255,255,255,.26), 0 6px 14px rgba(31,99,216,.30);
+  box-shadow:inset 0 2px 4px rgba(10,30,90,.30), inset 0 -2px 3px rgba(255,255,255,.26), 0 6px 14px rgba(31,99,216,.30);
+}
+.crm-btn.primary:hover{
+  background:-webkit-linear-gradient(top,#2f6fe4 0%,#4f95f8 100%);
+  background:linear-gradient(180deg,#2f6fe4 0%,#4f95f8 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(10,30,90,.26), inset 0 -2px 3px rgba(255,255,255,.28), 0 8px 18px rgba(31,99,216,.38);
+  box-shadow:inset 0 2px 4px rgba(10,30,90,.26), inset 0 -2px 3px rgba(255,255,255,.28), 0 8px 18px rgba(31,99,216,.38);
+}
+.crm-btn.success{
+  border:1px solid #1d7a48;color:#fff;
+  background:#2fa764;
+  background:-webkit-linear-gradient(top,#248c50 0%,#3cba72 100%);
+  background:linear-gradient(180deg,#248c50 0%,#3cba72 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(5,60,30,.30), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(34,150,90,.30);
+  box-shadow:inset 0 2px 4px rgba(5,60,30,.30), inset 0 -2px 3px rgba(255,255,255,.24), 0 6px 14px rgba(34,150,90,.30);
+}
+.crm-btn.danger{
+  border:1px solid #b02838;color:#fff;
+  background:#d94855;
+  background:-webkit-linear-gradient(top,#c03240 0%,#e25662 100%);
+  background:linear-gradient(180deg,#c03240 0%,#e25662 100%);
+  -webkit-box-shadow:inset 0 2px 4px rgba(90,10,25,.30), inset 0 -2px 3px rgba(255,255,255,.22), 0 6px 14px rgba(201,40,61,.28);
+  box-shadow:inset 0 2px 4px rgba(90,10,25,.30), inset 0 -2px 3px rgba(255,255,255,.22), 0 6px 14px rgba(201,40,61,.28);
+}
+.crm-btn.ghost,.crm-btn.outline{
+  background:#f7fafd;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#eef3fb 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#eef3fb 100%);
+  border:1px solid #c3d1e5;color:#2b3a55;
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 2px 6px rgba(20,40,72,.07);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 2px 6px rgba(20,40,72,.07);
+}
+.crm-btn.ghost:hover,.crm-btn.outline:hover{
+  border-color:#8ea2f0;color:#2f5fd0;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#e9effc 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e9effc 100%);
+}
+
+/* ---- inputs: neumorphic wells ------------------------------------------------ */
+.crm-input,.crm-select,.crm-textarea{
+  background:#edf2fa;border:1px solid #c8d5e8;border-radius:12px;color:#1b2940;
+  -webkit-box-shadow:inset 2px 2px 5px rgba(20,40,72,.09), inset -1px -1px 2px rgba(255,255,255,.95);
+  box-shadow:inset 2px 2px 5px rgba(20,40,72,.09), inset -1px -1px 2px rgba(255,255,255,.95);
+}
+.crm-input:focus,.crm-select:focus,.crm-textarea:focus{
+  background:#fff;border-color:#5468e4;
+  -webkit-box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+  box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+}
+
+/* ---- tables: framed vessels, gradient headers --------------------------------- */
+.crm-table-wrap{
+  border:1px solid #bfcfe4;border-radius:16px;background:#fff;
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.05), 0 12px 26px rgba(20,40,72,.09), inset 0 1px 0 #fff;
+  box-shadow:0 2px 5px rgba(20,40,72,.05), 0 12px 26px rgba(20,40,72,.09), inset 0 1px 0 #fff;
+}
+/* v1.87: the old «.crm-table th» override never matched (the builder emits
+   table.crm-tbl) — target the real selector so headers get their gradient. */
+table.crm-tbl thead th{
+  background:#e8effa;
+  background:-webkit-linear-gradient(top,#eef3fc 0%,#dfe8f6 100%);
+  background:linear-gradient(180deg,#eef3fc 0%,#dfe8f6 100%);
+  color:#22314d;border-bottom:2px solid #a9bee0;
+  font-size:12px;font-weight:900;
+}
+table.crm-tbl td{border-bottom:1px solid #e2e9f4;color:#1b2a44;}
+table.crm-tbl tbody tr:nth-child(even) td{background:#f5f8fd;}
+table.crm-tbl tbody tr:hover td{background:#e9f0fd;}
+
+/* ---- hamburger drawer: glass + richer items ------------------------------------ */
+.crm-menu{
+  background:#f4f8fc;
+  background:-webkit-linear-gradient(top,#f8fbfe 0%,#ebf1f9 100%);
+  background:linear-gradient(180deg,#f8fbfe 0%,#ebf1f9 100%);
+  border-left:1px solid #bccbe2;
+  -webkit-box-shadow:-18px 0 44px rgba(16,32,64,.22);
+  box-shadow:-18px 0 44px rgba(16,32,64,.22);
+}
+.crm-menu-head{
+  border-bottom:1px solid #d5e0ee;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.85) 0%,rgba(238,244,252,.70) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(238,244,252,.70) 100%);
+}
+.crm-menu-title{color:#16233c;}
+.crm-menu-item{
+  border:1px solid transparent;border-radius:14px;
+}
+.crm-menu-item:hover{
+  background:-webkit-linear-gradient(top,#ffffff 0%,#e8eefe 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e8eefe 100%);
+  border-color:#c9d8f2;
+  -webkit-box-shadow:0 4px 10px rgba(75,99,230,.14), inset 0 1px 0 #fff;
+  box-shadow:0 4px 10px rgba(75,99,230,.14), inset 0 1px 0 #fff;
+}
+.crm-menu-item.active{
+  background:-webkit-linear-gradient(top,#eef3fe 0%,#dfe9fb 100%);
+  background:linear-gradient(180deg,#eef3fe 0%,#dfe9fb 100%);
+  border-color:#a9bff0;
+  -webkit-box-shadow:inset 3px 0 0 #3d6ee0, inset 0 1px 0 #fff;
+  box-shadow:inset 3px 0 0 #3d6ee0, inset 0 1px 0 #fff;
+}
+.crm-menu-ic{
+  -webkit-box-shadow:0 5px 12px rgba(20,40,80,.20), inset 0 1px 1px rgba(255,255,255,.5), inset 0 -2px 3px rgba(0,0,0,.12);
+  box-shadow:0 5px 12px rgba(20,40,80,.20), inset 0 1px 1px rgba(255,255,255,.5), inset 0 -2px 3px rgba(0,0,0,.12);
+}
+
+/* ---- page head + back pill ------------------------------------------------------ */
+.crm-page-title{color:#16233c;}
+.crm-back{
+  border:1px solid #bccbe2;
+  background:-webkit-linear-gradient(top,#ffffff 0%,#eaf1fa 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#eaf1fa 100%);
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 3px 8px rgba(20,40,72,.08);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.05), inset 0 -1px 0 #fff, 0 3px 8px rgba(20,40,72,.08);
+}
+
+/* ---- modals: glass card ---------------------------------------------------------- */
+.crm-modal{
+  border:1px solid #c0cfe4;border-radius:22px;
+  -webkit-box-shadow:0 30px 70px rgba(16,32,64,.30), inset 0 1px 0 #fff;
+  box-shadow:0 30px 70px rgba(16,32,64,.30), inset 0 1px 0 #fff;
+}

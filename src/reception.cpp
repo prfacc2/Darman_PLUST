@@ -553,7 +553,9 @@ static int tabIconFor(int kind){
     if(kind==TK_TOOLS)   return ICO_GEAR;
     if(kind==TK_CASHIER) return ICO_WALLET;
     if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
-    return ICO_USER;                         // پذیرش بیمار — patient admission
+    // v1.87.0: the admission tab carries the new person-plus glyph, echoing
+    // the «پذیرش بیمار» header action so both read as one feature.
+    return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
 }
 
 // ---------------------------------------------------------------- billing --
@@ -4958,13 +4960,19 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                         blendColor(g_theme.bg,g_theme.surfaceTop,45),
                         g_theme.bg,
                         blendColor(g_theme.border,g_theme.accent,55));
+                    // v1.87.0: frosted inner light rim inside the raised tab
+                    { RECT itr=r; InflateRect(&itr,-S(1),-S(1));
+                      gpRoundRect(dc, itr, trad-S(1)>2?trad-S(1):trad, CLR_INVALID,
+                                  RGB(255,255,255), g_dark?26:85); }
                     // merge with the body: paint over the bottom 4 px
                     RECT mb={r.left+S(2),r.bottom-S(4),r.right-S(2),r.bottom+S(2)};
                     HBRUSH mbr=CreateSolidBrush(g_theme.bg);
                     FillRect(dc,&mb,mbr); DeleteObject(mbr);
-                    // accent indicator across the top of the active tab
+                    // accent indicator across the top of the active tab —
+                    // v1.87.0: gradialism sweep indigo→sky instead of a flat bar
                     RECT ind2={r.left+S(9),r.top+S(2),r.right-S(9),r.top+S(2)+S(3)};
-                    gpRoundRect(dc,ind2,S(2),g_theme.accent,CLR_INVALID);
+                    gpGradRoundRectBgH(dc,ind2,S(2),g_theme.accent,g_theme.accent2,
+                                       CLR_INVALID,CLR_INVALID);
                 } else if(hov){
                     gpShadow(dc,r,trad,S(5),44);
                     gpGradRoundRect(dc,r,trad,

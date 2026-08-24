@@ -138,10 +138,27 @@ static LRESULT CALLBACK loginProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  a glowing gradient disc with a coloured halo instead of a flat blob.
         // ------------------------------------------------------------------
         COLORREF roleCol = (d&&d->role==2)?g_theme.danger:g_theme.accent;
-        gpShadow(dc,c,S(18),S(22),120);
-        gpGradRoundRectBg(dc,c,S(18),g_theme.surfaceTop,g_theme.surface,
+        // v1.87.0 claymorphic card: chunkier corner, a second wider ambient
+        // shadow under the crisp one, a frosted inner light rim, and a
+        // role-coloured gradialism ribbon hugging the card's top edge.
+        gpShadow(dc,c,S(24),S(30),70);
+        gpShadow(dc,c,S(24),S(14),120);
+        gpGradRoundRectBg(dc,c,S(24),g_theme.surfaceTop,g_theme.surface,
             blendColor(g_theme.border,roleCol,22),
             g_dark?RGB(6,8,12):RGB(126,138,158));
+        { RECT itr=c; InflateRect(&itr,-S(1),-S(1));
+          gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
+                      g_dark?30:120); }
+        { RECT rb={c.left+S(24), c.top+S(1), c.right-S(24), c.top+S(4)};
+          if(rb.right-rb.left > S(48)){
+              int mid=(rb.left+rb.right)/2;
+              RECT rL={rb.left,rb.top,mid,rb.bottom};
+              RECT rR={mid,rb.top,rb.right,rb.bottom};
+              gpGradRoundRectBgH(dc, rL, S(2), roleCol, g_theme.accent2,
+                                 CLR_INVALID, CLR_INVALID);
+              gpGradRoundRectBgH(dc, rR, S(2), g_theme.accent2, g_infoAccent,
+                                 CLR_INVALID, CLR_INVALID);
+          } }
 
         SetBkMode(dc,TRANSPARENT);
         // role badge — v1.64.0 (درمان پلاس): the circular brand logo now fills

@@ -388,6 +388,19 @@ void drawIcon(HDC dc, int icon, RECT rc, COLORREF col, int thick){
         LineTo(dc,cx,cy+h/3);
         LineTo(dc,cx+w,cy-h);
         break; }
+    case ICO_USER_ADD: {   // v1.87.0: person + plus badge (پذیرش بیمار)
+        int hr=(r*40)/100; if(hr<2) hr=2;
+        int hx=cx-r/4;                                   // person nudged left
+        Ellipse(dc,hx-hr,cy-r+1,hx+hr,cy-r+1+hr*2);      // head
+        Arc(dc,cx-r+1,cy+1,cx+r/3,cy+2*r,                // shoulders
+            cx+r/3,cy+r, cx-r+1,cy+r);
+        int br=(r*36)/100; if(br<2) br=2;                // plus badge, low-right
+        int bx=cx+r-br+1, by=cy+r-br+1;
+        Ellipse(dc,bx-br,by-br,bx+br,by+br);
+        int d=(br*52)/100; if(d<1) d=1;
+        MoveToEx(dc,bx-d,by,0); LineTo(dc,bx+d+1,by);
+        MoveToEx(dc,bx,by-d,0); LineTo(dc,bx,by+d+1);
+        break; }
     }
     SetBkMode(dc, oldBk);
     SelectObject(dc, op); SelectObject(dc, ob);
@@ -632,24 +645,40 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // always carries its brand colour even if the GDI+ gradient pass ever
         // fails to draw — this is the definitive guard against the
         // "white text on a white button" regression (v1.64.0).
+        // v1.87.0 CONCAVE refresh: the body gradient now runs darker→lighter
+        // top-to-bottom (the inverse of a convex pill), a soft inner shade hugs
+        // the TOP edge and a light inner rim hugs the BOTTOM edge, so the
+        // button reads as gently pressed INTO its seat — the claymorphic
+        // "concave" feel the design calls for. Pressing deepens the cave and
+        // collapses the lift shadow.
         auto solidBody = [&](COLORREF top, COLORREF bot, COLORREF glow){
             if(!dn){
                 // elevation. hover lifts higher; the shadow is tinted with the
                 // button's own colour so it feels like coloured light.
-                gpShadowColor(dc, rr, rad, hv?S(10):S(6), hv?96:60, glow);
+                gpShadowColor(dc, rr, rad, hv?S(10):S(6), hv?88:54, glow);
             }
             // v1.66.0: unconditional plain-GDI base painted FIRST — the GDI+
             // path can fail per-call even when s_gdipOK is true (e.g. a
             // LinearGradientBrush allocation failure), leaving the button body
             // transparent and text invisible (white-on-white regression).
             // fillRoundRect uses diameter (rad*2); gpRoundRect uses radius (rad).
-            fillRoundRect(dc, rr, rad*2, bot, CLR_INVALID);
-            gpGradRoundRect(dc, rr, rad, top, bot, CLR_INVALID);
-            // top sheen — a white wash over the upper 45 % of the body
-            RECT sh = rr; sh.bottom = rr.top + (hgt*45)/100;
-            if(sh.bottom > sh.top+1)
-                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?14:26);
-            // bottom rim — one hairline of the darker stop for definition
+            COLORREF cT = blendColor(top, RGB(0,0,0),       dn?20:10); // darker top
+            COLORREF cB = blendColor(bot, RGB(255,255,255), dn? 4:16); // lighter bottom
+            fillRoundRect(dc, rr, rad*2, cB, CLR_INVALID);
+            gpGradRoundRect(dc, rr, rad, cT, cB, CLR_INVALID);
+            // inner top shade — the concave "cave" line just inside the top edge
+            {
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            blendColor(top, RGB(0,0,0), 34), dn?150:105);
+            }
+            // inner bottom light rim — soft white inset line
+            {
+                RECT ib=rr; InflateRect(&ib,-S(2),-S(2));
+                gpRoundRect(dc, ib, rad>S(2)?rad-S(2):rad, CLR_INVALID,
+                            RGB(255,255,255), dn?28:64);
+            }
+            // crisp outer rim for definition against the page
             gpRoundRect(dc, rr, rad, CLR_INVALID,
                 blendColor(bot, RGB(0,0,0), dn?26:16));
         };
@@ -705,6 +734,16 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 if(csh.bottom > csh.top+1)
                     gpFillAlpha(dc, csh, rad, RGB(255,255,255), hv?24:18);
             }
+            // v1.87.0 clay depth: a bright inner rim along the top edge and a
+            // faint inner shade pooled at the bottom make the card read as
+            // soft extruded clay, not a printed sheet. (Kept subtle: a neutral
+            // secondary shadow reads as grey film on Wine/some GDI+ hosts, so
+            // the tinted shadow alone carries the elevation.)
+            if(!dn){
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            RGB(255,255,255), g_dark?40:120);
+            }
             if(hv){
                 // accent glow ring just outside the border (drawn under text)
                 RECT halo=rr; InflateRect(&halo,S(1),S(1));
@@ -732,9 +771,18 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 fillRoundRect(dc, rr, rad*2, fill, CLR_INVALID);
                 gpRoundRect(dc, rr, rad, fill, blendColor(fill, acc, 22));
             } else {
-                // v1.66.0: unconditional GDI base before GDI+ decoration
+                // v1.87.0: the resting ghost tile is now a frosted CONCAVE
+                // plate — whisper-darker top edge, light bottom rim, hairline
+                // border — so the header tools read as pressed-glass buttons
+                // instead of flat smudges.
                 fillRoundRect(dc, rr, rad*2, fill, CLR_INVALID);
-                gpRoundRect(dc, rr, rad, fill, bord);
+                gpGradRoundRect(dc, rr, rad,
+                    blendColor(fill, RGB(0,0,0), 6),
+                    blendColor(fill, RGB(255,255,255), 12),
+                    blendColor(fill, g_theme.border, 42));
+                RECT it=rr; InflateRect(&it,-S(1),-S(1));
+                gpRoundRect(dc, it, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            RGB(255,255,255), g_dark?36:90);
             }
         }
         // §C: explicit focus ring — a crisp accent hairline inset 2px so keyboard

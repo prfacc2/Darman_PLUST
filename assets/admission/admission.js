@@ -1434,6 +1434,84 @@
       if (!state.canCashView) { toast('دسترسی صندوق ندارید', 'err'); return; }
       Bridge.call('ui.openTab', { kind: 'cashier' });
     });
+    on($('toolsQueue'), 'click', function () {
+      Bridge.call('ui.openTab', { kind: 'queue' });
+    });
+    /* v1.87: tools hamburger drawer (categorised, searchable) + grid filter. */
+    (function () {
+      var drawer = $('toolsDrawer'), bk = $('toolsDrawerBk');
+      function openDrawer() {
+        if (drawer) drawer.className = 'tools-drawer open';
+        if (bk) bk.className = 'tools-drawer-bk open';
+      }
+      function closeDrawer() {
+        if (drawer) drawer.className = 'tools-drawer';
+        if (bk) bk.className = 'tools-drawer-bk';
+      }
+      on($('toolsBurger'), 'click', function () {
+        if (drawer && /(^|\s)open(\s|$)/.test(drawer.className)) closeDrawer();
+        else openDrawer();
+      });
+      on($('toolsDrawerClose'), 'click', closeDrawer);
+      on($('toolsDrawerBk'), 'click', closeDrawer);
+      /* drawer item → activate the matching grid tile */
+      var body = $('toolsDrawerBody');
+      if (body) {
+        var items = body.getElementsByClassName('tools-drawer-item');
+        var ii;
+        for (ii = 0; ii < items.length; ii++) {
+          (function (it) {
+            on(it, 'click', function () {
+              var t = $(it.getAttribute('data-tool'));
+              closeDrawer();
+              if (t) t.click();
+            });
+          })(items[ii]);
+        }
+      }
+      /* search — filters BOTH the grid tiles and the drawer items by their
+         visible text (name + subtitle). */
+      function norm(s) { return (s || '').replace(/\s+/g, ' ').toLowerCase(); }
+      function applyToolsFilter(q) {
+        q = norm(q);
+        var grid = $('toolsGrid');
+        var any = false;
+        var i, tiles, txt;
+        if (grid) {
+          tiles = grid.getElementsByClassName('tools-tile');
+          for (i = 0; i < tiles.length; i++) {
+            txt = norm(tiles[i].textContent || tiles[i].innerText);
+            var hide = q && txt.indexOf(q) < 0;
+            tiles[i].style.display = hide ? 'none' : '';
+            if (!hide) any = true;
+          }
+        }
+        var emp = $('toolsEmpty');
+        if (emp) emp.style.display = (q && !any) ? '' : 'none';
+        if (body) {
+          var dis = body.getElementsByClassName('tools-drawer-item');
+          for (i = 0; i < dis.length; i++) {
+            txt = norm(dis[i].textContent || dis[i].innerText);
+            dis[i].style.display = (q && txt.indexOf(q) < 0) ? 'none' : '';
+          }
+          /* hide a category heading when every item under it is filtered out */
+          var kids = body.childNodes, lastCat = null, lastVis = false;
+          for (i = 0; i < kids.length; i++) {
+            var k = kids[i];
+            if (!k.className) continue;
+            if (/(^|\s)tools-cat(\s|$)/.test(k.className)) {
+              if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+              lastCat = k; lastVis = false;
+            } else if (/(^|\s)tools-drawer-item(\s|$)/.test(k.className)) {
+              if (k.style.display !== 'none') lastVis = true;
+            }
+          }
+          if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+        }
+      }
+      on($('toolsQ'), 'keyup', function () { applyToolsFilter(this.value); });
+      on($('toolsDrawerQ'), 'keyup', function () { applyToolsFilter(this.value); });
+    })();
     on($('rcBack'), 'click', function () { state.rcPage = 'home'; showToolsHome(); });
     on($('rcSearchBtn'), 'click', searchReceipts);
     on($('rcExcel'), 'click', exportReceiptExcel);
