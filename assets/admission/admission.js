@@ -1510,7 +1510,9 @@
         }
       }
       on($('toolsQ'), 'keyup', function () { applyToolsFilter(this.value); });
+      on($('toolsQ'), 'input', function () { applyToolsFilter(this.value); });
       on($('toolsDrawerQ'), 'keyup', function () { applyToolsFilter(this.value); });
+      on($('toolsDrawerQ'), 'input', function () { applyToolsFilter(this.value); });
     })();
     on($('rcBack'), 'click', function () { state.rcPage = 'home'; showToolsHome(); });
     on($('rcSearchBtn'), 'click', searchReceipts);

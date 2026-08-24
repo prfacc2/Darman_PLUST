@@ -106,6 +106,14 @@ void gpFillAlpha(HDC dc, RECT rc, int rad, COLORREF fill, int alpha){
 //  `bg` FIRST, so corners always blend into the theme surface.
 // ---------------------------------------------------------------------------
 
+void gpGradRibbon3(HDC dc, RECT rc, int rad, COLORREF a, COLORREF b, COLORREF c){
+    int mid=(rc.left+rc.right)/2;
+    RECT rL={rc.left,rc.top,mid,rc.bottom};
+    RECT rR={mid,rc.top,rc.right,rc.bottom};
+    gpGradRoundRectBgH(dc,rL,rad,a,b,CLR_INVALID,CLR_INVALID);
+    gpGradRoundRectBgH(dc,rR,rad,b,c,CLR_INVALID,CLR_INVALID);
+}
+
 //  Paint just the 4 corner gaps of a rounded rect with `bg`.
 void gpFillCorners(HDC dc, RECT rc, int rad, COLORREF bg){
     int w = rc.right-rc.left, h = rc.bottom-rc.top;

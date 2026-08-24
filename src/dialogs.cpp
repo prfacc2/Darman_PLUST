@@ -150,15 +150,9 @@ static LRESULT CALLBACK loginProc(HWND h, UINT m, WPARAM w, LPARAM l){
           gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
                       g_dark?30:120); }
         { RECT rb={c.left+S(24), c.top+S(1), c.right-S(24), c.top+S(4)};
-          if(rb.right-rb.left > S(48)){
-              int mid=(rb.left+rb.right)/2;
-              RECT rL={rb.left,rb.top,mid,rb.bottom};
-              RECT rR={mid,rb.top,rb.right,rb.bottom};
-              gpGradRoundRectBgH(dc, rL, S(2), roleCol, g_theme.accent2,
-                                 CLR_INVALID, CLR_INVALID);
-              gpGradRoundRectBgH(dc, rR, S(2), g_theme.accent2, g_infoAccent,
-                                 CLR_INVALID, CLR_INVALID);
-          } }
+          if(rb.right-rb.left > S(48))
+              gpGradRibbon3(dc, rb, S(2), roleCol, g_theme.accent2,
+                            g_infoAccent); }
 
         SetBkMode(dc,TRANSPARENT);
         // role badge — v1.64.0 (درمان پلاس): the circular brand logo now fills

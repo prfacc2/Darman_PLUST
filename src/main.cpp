@@ -438,25 +438,24 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // full-width would leave two hard accent squares in the corners).
         // v1.87.0 gradialism: the ribbon sweeps indigo → sky → violet, and a
         // soft shimmer glides along it once while the entrance animation plays.
+        // v1.87.0: entrance-animation bell curve, computed once per paint.
+        double animT = -1, animBell = 0;
+        if(s_homePhase>=0){
+            animT = s_homePhase/30.0;
+            animBell = animT<0.5 ? animT*2 : (1-animT)*2;
+        }
         {
             RECT rb = g.ribbon;
             rb.left  += g.radius;
             rb.right -= g.radius;
             if(rb.right - rb.left > S(40)){
-                int mid = (rb.left + rb.right)/2;
-                RECT rL={rb.left, rb.top, mid, rb.bottom};
-                RECT rR={mid, rb.top, rb.right, rb.bottom};
-                gpGradRoundRectBgH(dc, rL, S(3), g_theme.accent, g_theme.accent2,
-                                   CLR_INVALID, CLR_INVALID);
-                gpGradRoundRectBgH(dc, rR, S(3), g_theme.accent2, g_infoAccent,
-                                   CLR_INVALID, CLR_INVALID);
-                if(s_homePhase>=0){
-                    double t = s_homePhase/30.0;
-                    int sx = rb.left + (int)((rb.right-rb.left) * t);
+                gpGradRibbon3(dc, rb, S(3), g_theme.accent, g_theme.accent2,
+                              g_infoAccent);
+                if(animT>=0){
+                    int sx = rb.left + (int)((rb.right-rb.left) * animT);
                     int sw = S(80);
                     RECT gz={sx-sw/2, rb.top-S(2), sx+sw/2, rb.bottom+S(2)};
-                    double bell = t<0.5 ? t*2 : (1-t)*2;
-                    int al = (int)(130 * bell);
+                    int al = (int)(130 * animBell);
                     if(al>8) gpFillAlpha(dc, gz, S(4), RGB(255,255,255), al);
                 }
             }
@@ -473,11 +472,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // v1.87.0: the halo blooms once as the welcome screen enters, then
             // settles back to its resting glow (driven by s_homePhase).
             int haloA = g_dark?70:52;
-            if(s_homePhase>=0){
-                double t = s_homePhase/30.0;
-                double bell = t<0.5 ? t*2 : (1-t)*2;
-                haloA += (int)(48 * bell);
-            }
+            if(animT>=0) haloA += (int)(48 * animBell);
             gpFillAlpha(dc, halo, (d+S(14))/2,
                         blendColor(g_theme.accent, pTop, 55), haloA);
             gpShadow(dc, g.logo, rr, S(9), g_dark?110:78);
@@ -693,8 +688,6 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // lighter chrome, crisper text, clearly the secondary action.
         s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_USER_ADD, BS_PRIMARY,0,0,10,10,
                           L"ثبت پذیرش بیمار جدید");
-        // v1.60.0: «نوبت‌دهی» removed completely; the new-tab button stays blue
-        // (BS_PRIMARY) for a consistent header action style.
         s_bNewTab   = createFlatButton(h, ID_FR_NEWTAB, L"تب جدید",    ICO_PLUS,  BS_OUTLINE,0,0,10,10,
                           L"باز کردن یک تب خالی");
         // v1.62.0: no native print buttons here any more — the admission page
@@ -867,12 +860,9 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // so the header reads as a polished, branded surface, not a flat strip.
         // v1.87.0 gradialism: the ribbon now sweeps indigo → sky → violet.
         {
-            RECT ribL={0,0,rc.right/2,S(3)};
-            RECT ribR={rc.right/2,0,rc.right,S(3)};
-            gpGradRoundRectBgH(dc, ribL, 0, g_theme.accent, g_theme.accent2,
-                               CLR_INVALID, CLR_INVALID);
-            gpGradRoundRectBgH(dc, ribR, 0, g_theme.accent2, g_infoAccent,
-                               CLR_INVALID, CLR_INVALID);
+            RECT hrib={0,0,rc.right,S(3)};
+            gpGradRibbon3(dc, hrib, 0, g_theme.accent, g_theme.accent2,
+                          g_infoAccent);
         }
         gpLine(dc,0,S(3),rc.right,S(3),RGB(255,255,255),1.0f,g_dark?26:110);
         // ===================== LAYER 2 — action sub-bar =====================
