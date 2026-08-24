@@ -122,7 +122,8 @@ enum TabKind {
     TK_EMPTY       = 2,   // a fresh blank tab (new-tab button)
     TK_TOOLS       = 3,   // v1.84: native «ابزارها» web surface
     TK_CASHIER     = 4,   // v1.84: native «صندوق» web surface
-    TK_QUEUE       = 5    // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
+    TK_QUEUE       = 5,   // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
+    TK_RECEIPTS    = 6    // v1.88: native «جستجوی قبض» web surface (was in-page)
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
@@ -553,6 +554,7 @@ static int tabIconFor(int kind){
     if(kind==TK_TOOLS)   return ICO_GEAR;
     if(kind==TK_CASHIER) return ICO_WALLET;
     if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
+    if(kind==TK_RECEIPTS) return ICO_RECEIPT; // جستجوی قبض — receipt glyph
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
@@ -2621,7 +2623,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
         if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
-           && t->kind!=TK_QUEUE)
+           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS)
             return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
@@ -2641,6 +2643,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             if(t->kind==TK_TOOLS) surf="tools";
             else if(t->kind==TK_CASHIER) surf="cashier";
             else if(t->kind==TK_QUEUE) surf="queue";
+            else if(t->kind==TK_RECEIPTS) surf="receipts";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
@@ -4643,6 +4646,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_TOOLS)     t->title=L"ابزارها";
     else if(kind==TK_CASHIER)   t->title=L"صندوق";
     else if(kind==TK_QUEUE)     t->title=L"صندوق نرفته‌ها و صف پذیرش";
+    else if(kind==TK_RECEIPTS)  t->title=L"جستجوی قبض";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5187,9 +5191,17 @@ void Reception_OpenQueue(){
     HWND h=recWnd(); if(!h) return;
     activateKind(h, TK_QUEUE);
 }
+// v1.88.0: «جستجوی قبض» gets its own native tab — opening it from the tools
+// grid spawns a tab, and its «بازگشت به ابزارها» closes that tab again, which
+// naturally lands the user back on the still-open tools tab (state kept).
+void Reception_OpenReceipts(){
+    HWND h=recWnd(); if(!h) return;
+    activateKind(h, TK_RECEIPTS);
+}
 void Reception_CloseTools(){ closeActiveKind(TK_TOOLS); }
 void Reception_CloseCashier(){ closeActiveKind(TK_CASHIER); }
 void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
+void Reception_CloseReceipts(){ closeActiveKind(TK_RECEIPTS); }
 void Reception_ResetZoom(){
     std::wstring user=g_session.user.username;
     std::wstring suffix=user.empty()?L"":L"."+user;

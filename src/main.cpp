@@ -215,8 +215,9 @@ struct HomeGeom {
     RECT title;      // «سامانه پذیرش و مدیریت درمانگاه»
     RECT sub;        // tagline
     RECT chips;      // capability chip row
-    RECT cardR;      // پذیرش  (RTL: right)
-    RECT cardL;      // مدیریت (RTL: left)
+    RECT tray;       // v1.88.0: glass vessel holding the two app icons
+    RECT cardR;      // پذیرش app-icon cell (RTL: right)
+    RECT cardL;      // مدیریت app-icon cell (RTL: left)
     RECT foot;       // footer pill (brand • version • security note)
     int  radius;     // panel corner radius
     int  chipH;      // chip height
@@ -227,10 +228,12 @@ static HomeGeom homeGeom(int W, int H){
     if(W < S(320)) W = S(320);
     if(H < S(260)) H = S(260);
 
-    // ---- horizontal: derive the panel width from the two entry cards -------
-    int padX  = S(40);
-    int cgap  = S(26);
-    int cardW = S(306);
+    // ---- horizontal: derive the panel width from the two app-icon cells ----
+    //  v1.88.0: the cells are phone-app-icon sized (a touch larger than a
+    //  mobile app icon, per request) — far airier than the old wide cards.
+    int padX  = S(46);
+    int cgap  = S(46);
+    int cardW = S(196);
     int maxW  = W - S(40);
     if(2*cardW + cgap + 2*padX > maxW){
         if(maxW < S(560)) padX = S(20);
@@ -240,12 +243,17 @@ static HomeGeom homeGeom(int W, int H){
         if(cardW < S(146)) cardW = S(146);
     }
     int panelW = 2*cardW + cgap + 2*padX;
+    // v1.88.0: the app-icon cells are compact, but the panel must still be wide
+    // enough for the full title «سامانه پذیرش و مدیریت درمانگاه و بیمارستان»
+    // and the 3-chip capability row — enforce a generous minimum width.
+    int minPanelW = S(760);
+    if(panelW < minPanelW) panelW = minPanelW;
     if(panelW > maxW) panelW = maxW;
 
     // ---- vertical: one stack, one fit factor ------------------------------
     int padTop = S(38), logoD = S(88), gLogo = S(20);
     int titleH = S(50), gTitle = S(4), subH = S(28), gSub = S(20);
-    int chipH  = S(32), gChip = S(28), cardH = S(198), padBot = S(34);
+    int chipH  = S(32), gChip = S(26), cardH = S(172), padBot = S(34);
     int footH  = S(38), footGap = S(22);
 
     int need = padTop+logoD+gLogo+titleH+gTitle+subH+gSub+chipH+gChip+cardH+padBot;
@@ -283,6 +291,9 @@ static HomeGeom homeGeom(int W, int H){
     int cl = cx - cardsW/2;
     SetRect(&g.cardR, cl+cardW+cgap, y, cl+cardsW,  y+cardH);   // RTL right
     SetRect(&g.cardL, cl,            y, cl+cardW,   y+cardH);   // RTL left
+    // the frosted glass tray vessel that holds both app icons
+    SetRect(&g.tray, g.cardL.left-S(24), y-S(16),
+            g.cardR.right+S(24), y+cardH+S(14));
 
     int fy = g.panel.bottom + footGap;
     SetRect(&g.foot, cx-S(250), fy, cx+S(250), fy+footH);
@@ -297,12 +308,71 @@ static HomeGeom homeGeom(int W, int H){
 // the dark panel keeps its deep slate gradient. The cards live in the lower
 // band of the panel, so homePanelBot() is the colour behind them.
 static COLORREF homePanelTop(){
+    // v1.88.0: a touch deeper + bluer so the page no longer reads all-white.
     return g_dark ? RGB(24,29,38)
-                  : blendColor(g_theme.surface, g_theme.accent, 5);
+                  : blendColor(g_theme.surface, g_theme.accent, 9);
 }
 static COLORREF homePanelBot(){
     return g_dark ? RGB(14,18,25)
-                  : blendColor(g_theme.surface, g_theme.surface2, 70);
+                  : blendColor(g_theme.surface,
+                               blendColor(g_theme.surface2, g_theme.accent, 10), 64);
+}
+
+// v1.88.0: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
+// 2 مدیریت left). The icons are painted directly on the hero buffer and
+// hit-tested — no child windows, so no background rectangles or chipped
+// corners behind the rounded badges.
+static int s_appHot = 0;
+
+// v1.88.0: iOS-style app icon — a glossy squircle badge with a white glyph, a
+// soft tinted shadow and the account name underneath; NO button chrome, NO
+// background — exactly like a pinned phone app, slightly larger.
+static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
+                         const wchar_t* name, const wchar_t* sub, bool hot){
+    int cw = cell.right-cell.left;
+    int bs = S(74);                              // badge size
+    int bx = cell.left + (cw-bs)/2;
+    int by = cell.top + S(4) - (hot?S(3):0);     // hover: gentle lift
+    RECT bd = {bx, by, bx+bs, by+bs};
+    int rad = S(22);                             // squircle corner
+    // tinted ambient shadow (deeper + wider when hovered)
+    gpShadowColor(dc, bd, rad, hot?S(13):S(9), hot?110:70, brand);
+    // glossy body: light top → deep bottom (convex app-icon)
+    gpGradRoundRect(dc, bd, rad,
+        blendColor(brand, RGB(255,255,255), 30),
+        blendColor(brand, RGB(0,0,0), 16),
+        blendColor(brand, RGB(0,0,0), 30));
+    // top gloss — radius clamped to half the strip height so the rounded path
+    // can never balloon outside the strip (the v1.87 card-shade lesson).
+    {
+        RECT gl = bd; gl.bottom = bd.top + (bs*44)/100;
+        int gh = gl.bottom-gl.top;
+        int grad = (gh/2-1) < rad ? (gh/2-1) : rad;
+        if(grad >= 2)
+            gpFillAlpha(dc, gl, grad, RGB(255,255,255), hot?44:32);
+    }
+    // inner light rim
+    { RECT ir=bd; InflateRect(&ir,-S(1),-S(1));
+      gpRoundRect(dc, ir, rad-S(1)>2?rad-S(1):rad, CLR_INVALID,
+                  RGB(255,255,255), 110); }
+    // glyph
+    int gr = (bs*30)/100;
+    RECT grc={bd.left+bs/2-gr, bd.top+bs/2-gr, bd.left+bs/2+gr, bd.top+bs/2+gr};
+    drawIcon(dc, icon, grc, RGB(255,255,255), S(2)+1);
+    // account name under the badge — bold ink, brand-tinted on hover
+    int ly = bd.bottom + S(9);
+    SetTextColor(dc, hot ? brand : g_theme.text);
+    SelectObject(dc, g_fUIB);
+    RECT nr={cell.left, ly, cell.right, ly+S(22)};
+    DrawTextW(dc, name, -1, &nr,
+        DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    if(sub && *sub){
+        SetTextColor(dc, g_theme.textDim);
+        SelectObject(dc, g_fSmall);
+        RECT sr={cell.left-S(6), ly+S(21), cell.right+S(6), ly+S(21)+S(17)};
+        DrawTextW(dc, sub, -1, &sr,
+            DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    }
 }
 
 static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
@@ -315,24 +385,16 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.79.0: «حساب پذیرش» → «حساب پرسنل» — the shared staff entrance:
         // doctors, receptionists, nurses and interns all sign in here; what
         // they can do afterwards is decided by their account's access ticks.
-        HWND r=createFlatButton(h, ID_HM_RECEPTION, L"حساب پرسنل", ICO_USER,
-            BS_CARD, 0,0,10,10, L"ورود دکتر، پرستار، پذیرشگر و کارآموز");
-        HWND mg=createFlatButton(h, ID_HM_MANAGE, L"حساب مدیریت", ICO_PEOPLE,
-            BS_CARD, 0,0,10,10, L"گزارش‌ها و خدمات و مدیریت");
-        // v1.78.0: distinct brand hues per account — reception carries the
-        // clinic blue, management a calm violet, so the two entry cards are
-        // recognisable at a glance (border / badge / halo / hover title).
-        setFlatButtonAccent(r,  RGB(0x4B,0x63,0xE6));   // پرسنل — refined indigo (v1.85)
-        setFlatButtonAccent(mg, RGB(0x7C,0x56,0xE4));   // مدیریت — violet
-        // the cards sit ON the hero panel, so their antialiased corners must
-        // blend into the panel surface (its lower band == homePanelBot()) — not
-        // the page background. This is the definitive fix for the chipped/white
-        // card corners on both themes.
-        setFlatButtonBg(r,  homePanelBot());
-        setFlatButtonBg(mg, homePanelBot());
+        // v1.88.0: the two entry accounts are now PAINTED iOS-style app icons
+        // (no child button windows) — a glossy squircle badge with the account
+        // name underneath, sitting in a frosted glass tray. Painting directly
+        // onto the hero panel's buffer means there are NO background rectangles
+        // and NO chipped square corners behind rounded shapes — the exact
+        // corner-artefact bug the user reported cannot occur here.
         // v1.87.0: play the entrance animation once (ribbon shimmer + logo
         // halo bloom). ~30 frames at 40 ms, then the timer kills itself.
         s_homePhase = 0;
+        s_appHot = 0;   // v1.88.0: fresh window — no stale hover from a prior home
         SetTimer(h, TIMER_HOME_ANIM, 40, NULL);
         return 0; }
     case WM_TIMER:
@@ -347,17 +409,38 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         KillTimer(h,TIMER_HOME_ANIM);
         return 0;
     case WM_APP_THEME:
-        setFlatButtonBg(GetDlgItem(h,ID_HM_RECEPTION), homePanelBot());
-        setFlatButtonBg(GetDlgItem(h,ID_HM_MANAGE),    homePanelBot());
         InvalidateRect(h,NULL,TRUE);
         return 0;
-    case WM_SIZE: {
-        HomeGeom g = homeGeom(LOWORD(l), HIWORD(l));
-        MoveWindow(GetDlgItem(h,ID_HM_RECEPTION), g.cardR.left, g.cardR.top,
-                   g.cardR.right-g.cardR.left, g.cardR.bottom-g.cardR.top, TRUE);
-        MoveWindow(GetDlgItem(h,ID_HM_MANAGE),    g.cardL.left, g.cardL.top,
-                   g.cardL.right-g.cardL.left, g.cardL.bottom-g.cardL.top, TRUE);
+    case WM_SIZE:
         InvalidateRect(h,NULL,TRUE);
+        return 0;
+    // ---- v1.88.0: app-icon hover / click (painted, hit-tested) -------------
+    case WM_MOUSEMOVE: {
+        RECT rc; GetClientRect(h,&rc);
+        HomeGeom g = homeGeom(rc.right, rc.bottom);
+        POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
+        int hot = PtInRect(&g.cardR,pt) ? 1 : PtInRect(&g.cardL,pt) ? 2 : 0;
+        if(hot != s_appHot){
+            s_appHot = hot;
+            InvalidateRect(h,NULL,FALSE);
+        }
+        SetCursor(LoadCursor(NULL, hot ? IDC_HAND : IDC_ARROW));
+        if(hot){
+            TRACKMOUSEEVENT te={sizeof(te),TME_LEAVE,h,0};
+            TrackMouseEvent(&te);
+        }
+        return 0; }
+    case WM_MOUSELEAVE:
+        if(s_appHot){ s_appHot=0; InvalidateRect(h,NULL,FALSE); }
+        return 0;
+    case WM_LBUTTONUP: {
+        // v1.88.0: hit-test the message coordinates directly — routing by the
+        // last HOVER value dead-clicks fast move-click and touch input.
+        RECT rc; GetClientRect(h,&rc);
+        HomeGeom g = homeGeom(rc.right, rc.bottom);
+        POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
+        if(PtInRect(&g.cardR,pt))      SendMessageW(h,WM_COMMAND,ID_HM_RECEPTION,0);
+        else if(PtInRect(&g.cardL,pt)) SendMessageW(h,WM_COMMAND,ID_HM_MANAGE,0);
         return 0; }
     case WM_COMMAND: {
         static bool s_busy=false;            // re-entry guard for modal dialogs
@@ -552,6 +635,26 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                     x += wid[i] + gapC;
                 }
             }
+        }
+
+        // ---- 5b. v1.88.0: glass tray + two app-icon entries ------------------
+        {
+            RECT tr=g.tray;
+            gpShadow(dc, tr, S(24), S(13), g_dark?90:40);
+            gpGradRoundRect(dc, tr, S(24),
+                blendColor(homePanelTop(), RGB(255,255,255), g_dark?6:52),
+                blendColor(homePanelBot(), RGB(255,255,255), g_dark?2:26),
+                blendColor(g_theme.border, g_theme.accent, 20));
+            RECT itr=tr; InflateRect(&itr,-S(1),-S(1));
+            gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
+                        g_dark?24:95);
+            // RTL: پرسنل on the RIGHT cell, مدیریت on the LEFT cell.
+            paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
+                         L"حساب پرسنل", L"دکتر، پرستار، پذیرشگر، کارآموز",
+                         s_appHot==1);
+            paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
+                         L"حساب مدیریت", L"گزارش‌ها، خدمات و مدیریت",
+                         s_appHot==2);
         }
 
         // ---- 6. footer pill -------------------------------------------------
@@ -843,6 +946,17 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         HRGN dclip=CreateRectRgn(0,0,dw,dh);
         SelectClipRgn(dc,dclip);
 
+        // v1.88.0 BLACK-LINE FIX: the compatible bitmap starts as UNINITIALISED
+        // (black) memory, and gpGradRoundRect paints `height-1` rows — so any
+        // scanline no primitive covers (e.g. the header band's last row at
+        // y=mainBarH()-1) showed up as a 1px black line. Fill the whole strip
+        // with the page base colour FIRST; every layer paints over it.
+        {
+            HBRUSH baseBr=CreateSolidBrush(g_theme.bg);
+            FillRect(dc,&rc,baseBr);
+            DeleteObject(baseBr);
+        }
+
         // ===================== LAYER 1 — top header bar =====================
         // v1.87.0: three-stop frosted-glass band — bright top, cool mid, deeper
         // base — far richer than the old two-stop strip, and an inner light
@@ -975,20 +1089,33 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // one composed element on the gradient.
             {
                 int dl = zL+S(14), dr = zR-S(14);
-                COLORREF hc = blendColor(g_theme.border, g_theme.accent, 30);
-                gpLine(dc, dl, S(10), dl, mainBarH()-S(10), hc, 1.0f, 90);
-                gpLine(dc, dr, S(10), dr, mainBarH()-S(10), hc, 1.0f, 90);
+                COLORREF hc = blendColor(g_theme.border, g_theme.accent, 45);
+                gpLine(dc, dl, S(10), dl, mainBarH()-S(10), hc, 1.0f, 110);
+                gpLine(dc, dr, S(10), dr, mainBarH()-S(10), hc, 1.0f, 110);
+                // v1.88.0: tiny accent diamonds capping each hairline, so the
+                // clock zone reads as one composed, designed element.
+                HBRUSH db=CreateSolidBrush(g_theme.accent);
+                HGDIOBJ ob2=SelectObject(dc,db);
+                HGDIOBJ op2=SelectObject(dc,GetStockObject(NULL_PEN));
+                int ds=S(4);
+                int dy=(S(10)+mainBarH()-S(10))/2;
+                POINT pl[4]={{dl,dy-ds},{dl+ds,dy},{dl,dy+ds},{dl-ds,dy}};
+                POINT pr2[4]={{dr,dy-ds},{dr+ds,dy},{dr,dy+ds},{dr-ds,dy}};
+                Polygon(dc,pl,4); Polygon(dc,pr2,4);
+                SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
-            // clock (centred, bold) — band tuned for the compact S(56) header
-            SetTextColor(dc,g_theme.accent);
-            SelectObject(dc,g_fMono);
-            RECT ck={zL,S(5),zR,S(5)+S(28)};
+            // clock (centred, bold Vazirmatn) — v1.88.0: swapped the fixed-pitch
+            // mono face for the bold UI cut in a deep blue ink; Persian digits
+            // read softer and more designed.
+            SetTextColor(dc, blendColor(g_theme.accent, g_theme.text, 30));
+            SelectObject(dc,g_fTitle);
+            RECT ck={zL,S(3),zR,S(3)+S(30)};
             DrawTextW(dc,clkStr.c_str(),-1,&ck,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
-            // date (centred, just below)
-            SetTextColor(dc,g_theme.textDim);
+            // date (centred, just below) — accent instead of grey
+            SetTextColor(dc,g_theme.accent);
             SelectObject(dc,g_fSmall);
-            RECT dr={zL,S(5)+S(28),zR,mainBarH()-S(2)};
+            RECT dr={zL,S(3)+S(29),zR,mainBarH()-S(2)};
             DrawTextW(dc,dateStr.c_str(),-1,&dr,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
         }

@@ -78,9 +78,11 @@ void applyTheme(bool dark){
         g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
         g_theme.labelInk    = RGB(0x35, 0x3F, 0x4F); // readable labels
         g_theme.sectionInk  = RGB(0x1C, 0x26, 0x35); // strong titles
-        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo (matches page)
-        g_theme.accent2     = RGB(0x6A, 0x83, 0xF7); // #6A83F7 gradient end / hover
-        g_theme.accentHover = RGB(0x6A, 0x83, 0xF7); // #6A83F7 lighter accent on hover
+        // v1.88.0: deeper royal BLUE (less violet) — white button text sits on
+        // a properly dark brand colour and the whole theme reads less purple.
+        g_theme.accent      = RGB(0x35, 0x50, 0xD8); // #3550D8 royal blue
+        g_theme.accent2     = RGB(0x54, 0x6E, 0xEE); // #546EEE gradient end / hover
+        g_theme.accentHover = RGB(0x54, 0x6E, 0xEE); // #546EEE hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
         g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
         g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
@@ -662,8 +664,11 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // LinearGradientBrush allocation failure), leaving the button body
             // transparent and text invisible (white-on-white regression).
             // fillRoundRect uses diameter (rad*2); gpRoundRect uses radius (rad).
-            COLORREF cT = blendColor(top, RGB(0,0,0),       dn?20:10); // darker top
-            COLORREF cB = blendColor(bot, RGB(255,255,255), dn? 4:16); // lighter bottom
+            // v1.88.0: less washed-out bottom — white text must never sit on a
+            // near-white gradient stop, so the bottom stop lightens only
+            // slightly now and the top shade deepens a touch.
+            COLORREF cT = blendColor(top, RGB(0,0,0),       dn?22:12); // darker top
+            COLORREF cB = blendColor(bot, RGB(255,255,255), dn? 6: 9); // barely-lighter bottom
             fillRoundRect(dc, rr, rad*2, cB, CLR_INVALID);
             gpGradRoundRect(dc, rr, rad, cT, cB, CLR_INVALID);
             // inner top shade — the concave "cave" line just inside the top edge
@@ -877,7 +882,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                          rc.right-S(12), rc.bottom/2+iszImg/2};
                 if(!gpDrawTintedImageRes(dc, d->imgIcon, ir, txt))
                     drawIcon(dc, d->icon, ir, txt, S(2));
-                SelectObject(dc, g_fUI);
+                SelectObject(dc, g_fUIB);   // v1.88.0: bold Vazirmatn label
                 RECT tr={S(10),0,rc.right-S(18)-iszImg,rc.bottom};
                 DrawTextW(dc, d->text.c_str(), -1, &tr,
                     DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
@@ -891,7 +896,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 RECT ir={rc.right-S(12)-isz, rc.bottom/2-isz/2,
                          rc.right-S(12), rc.bottom/2+isz/2};
                 drawIcon(dc, d->icon, ir, txt, S(2));
-                SelectObject(dc, g_fUI);
+                SelectObject(dc, g_fUIB);   // v1.88.0: bold Vazirmatn label
                 RECT tr={S(10),0,rc.right-S(16)-isz,rc.bottom};
                 DrawTextW(dc, d->text.c_str(), -1, &tr,
                     DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
@@ -900,7 +905,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                          rc.right/2+isz/2, rc.bottom/2+isz/2};
                 drawIcon(dc, d->icon, ir, txt, S(2));
             } else if(hasText){
-                SelectObject(dc, g_fUI);
+                SelectObject(dc, g_fUIB);   // v1.88.0: bold Vazirmatn label
                 DrawTextW(dc, d->text.c_str(), -1, &rc,
                     DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
             }

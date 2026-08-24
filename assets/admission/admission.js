@@ -1426,10 +1426,13 @@
     });
     on($('toolsBtn'), 'click', function () { Bridge.call('ui.openTab', { kind: 'tools' }); });
     on($('toolsBack'), 'click', function () {
-      if (state.rcPage === 'receipts') { state.rcPage = 'home'; showToolsHome(); return; }
       Bridge.call('ui.closeTab', { kind: 'tools' });
     });
-    on($('toolsReceipts'), 'click', function () { state.rcPage = 'receipts'; showReceiptsPage(); });
+    /* v1.88: «جستجوی قبض» opens in its own native C++ tab (like صندوق), so the
+       tools tab stays alive underneath with its state untouched. */
+    on($('toolsReceipts'), 'click', function () {
+      Bridge.call('ui.openTab', { kind: 'receipts' });
+    });
     on($('toolsCash'), 'click', function () {
       if (!state.canCashView) { toast('دسترسی صندوق ندارید', 'err'); return; }
       Bridge.call('ui.openTab', { kind: 'cashier' });
@@ -1514,7 +1517,13 @@
       on($('toolsDrawerQ'), 'keyup', function () { applyToolsFilter(this.value); });
       on($('toolsDrawerQ'), 'input', function () { applyToolsFilter(this.value); });
     })();
-    on($('rcBack'), 'click', function () { state.rcPage = 'home'; showToolsHome(); });
+    on($('rcBack'), 'click', function () {
+      if (state.surface === 'receipts') {
+        Bridge.call('ui.closeTab', { kind: 'receipts' });   /* back to tools tab */
+        return;
+      }
+      state.rcPage = 'home'; showToolsHome();
+    });
     on($('rcSearchBtn'), 'click', searchReceipts);
     on($('rcExcel'), 'click', exportReceiptExcel);
     on($('rcPrint'), 'click', printSelectedReceipt);
@@ -2715,14 +2724,17 @@
 
   function applySurfaceClass() {
     var surf = window.__azSurface || 'admission';
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue') surf = 'admission';
+    /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
+       grid); the same HTML file renders it full-page via body.surface-rc. */
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
+    else if (surf === 'receipts') cls += ' surface-rc';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -2784,6 +2796,9 @@
       if (state.surface === 'tools') {
         showToolsHome();
         toast('ابزارها آماده است', 'ok');
+      } else if (state.surface === 'receipts') {
+        state.rcPage = 'receipts';
+        showReceiptsPage();
       } else if (state.surface === 'queue') {
         setOverlay('queuePanel', 'queueBackdrop', true);
         refreshQueue();
