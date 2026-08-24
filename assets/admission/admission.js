@@ -1426,7 +1426,6 @@
     });
     on($('toolsBtn'), 'click', function () { Bridge.call('ui.openTab', { kind: 'tools' }); });
     on($('toolsBack'), 'click', function () {
-      if (state.rcPage === 'receipts') { state.rcPage = 'home'; showToolsHome(); return; }
       Bridge.call('ui.closeTab', { kind: 'tools' });
     });
     /* v1.88: «جستجوی قبض» opens in its own native C++ tab (like صندوق), so the

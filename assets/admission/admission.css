@@ -3264,8 +3264,6 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) #invoiceToggle{
   color:#b45309;border-color:#e7cc8f;background:#fff8e6;
 }
 
-/* INVOICE — v1.80.0: the warm gold edge is back (restored on request). */
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card{border:1px solid #e6cb8c;}
 /* date/shift + print metadata → SLATE (quiet, clearly separated) */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .datetime-card .card-head,
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .print-card .card-head{
@@ -3599,48 +3597,6 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .fld > span{color:#3d4f6
 
 /* ---- buttons: real gradient surfaces -------------------------------------- */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn{border-radius:10px;}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-primary{
-  border-color:#1d4fb0;
-  background:#2f6fe4;
-  background:-webkit-linear-gradient(top,#3b7ded 0%,#2058c8 100%);
-  background:linear-gradient(180deg,#3b7ded 0%,#2058c8 100%);
-  -webkit-box-shadow:0 2px 6px rgba(31,95,214,.28);
-  box-shadow:0 2px 6px rgba(31,95,214,.28);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-primary:hover{
-  background:#2058c8;
-  background:-webkit-linear-gradient(top,#2f6fe4 0%,#1a4db0 100%);
-  background:linear-gradient(180deg,#2f6fe4 0%,#1a4db0 100%);
-  -webkit-box-shadow:0 4px 10px rgba(31,95,214,.34);
-  box-shadow:0 4px 10px rgba(31,95,214,.34);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-submit{
-  border-color:#17469f;border-radius:12px;
-  background:#2f6fe4;
-  background:-webkit-linear-gradient(top,#4a8bf5 0%,#2058c8 100%);
-  background:linear-gradient(180deg,#4a8bf5 0%,#2058c8 100%);
-  -webkit-box-shadow:0 4px 14px rgba(31,95,214,.36),inset 0 1px 0 rgba(255,255,255,.25);
-  box-shadow:0 4px 14px rgba(31,95,214,.36),inset 0 1px 0 rgba(255,255,255,.25);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-submit:hover{
-  background:#2560d0;
-  background:-webkit-linear-gradient(top,#3b7ded 0%,#1a4db0 100%);
-  background:linear-gradient(180deg,#3b7ded 0%,#1a4db0 100%);
-  -webkit-box-shadow:0 6px 18px rgba(31,95,214,.42),inset 0 1px 0 rgba(255,255,255,.25);
-  box-shadow:0 6px 18px rgba(31,95,214,.42),inset 0 1px 0 rgba(255,255,255,.25);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-outline{background:#ffffff;}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-outline:hover{
-  border-color:#2563eb;color:#1d4ed8;
-  background:#f0f6ff;
-  background:-webkit-linear-gradient(top,#f6faff 0%,#e9f2fe 100%);
-  background:linear-gradient(180deg,#f6faff 0%,#e9f2fe 100%);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .btn-danger:hover{
-  background:#fdeeee;border-color:#d21d43;
-  background:-webkit-linear-gradient(top,#fdf2f2 0%,#fbe3e5 100%);
-  background:linear-gradient(180deg,#fdf2f2 0%,#fbe3e5 100%);
-}
 
 /* ---- counter strip: soft glass bar ---------------------------------------- */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .counter-strip{
@@ -3875,25 +3831,6 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .tbl tbody tr:hover{back
 /* ---- invoice card: the warm gold outer edge (re-asserted at this tier) ---- */
 body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card{border:1px solid #e6cb8c;}
 
-/* ---- invoice groups: the warm receipt panels get their gold depth back ------ */
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group{
-  border:1px solid #e8d29e;border-radius:12px;
-  background:#fffaf0;
-  background:-webkit-linear-gradient(top,#fffdf6 0%,#faf1dc 100%);
-  background:linear-gradient(180deg,#fffdf6 0%,#faf1dc 100%);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group:last-child{
-  border-color:#e0c37f;
-  background:#fdf4de;
-  background:-webkit-linear-gradient(top,#fef8e9 0%,#f9edd2 100%);
-  background:linear-gradient(180deg,#fef8e9 0%,#f9edd2 100%);
-}
-body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain{
-  border-color:#e6c887;
-  background:#fdf2d8;
-  background:-webkit-linear-gradient(top,#fef6e2 0%,#fbebc8 100%);
-  background:linear-gradient(180deg,#fef6e2 0%,#fbebc8 100%);
-}
 
 /* v1.82.0 cashier overlay + locked admission form */
 .cash-hub-rail{-ms-flex-order:4;order:4;}
@@ -3986,7 +3923,6 @@ body.form-locked::after{
 .rc-sel td{outline:2px solid #1f5fd6;}
 .rc-hit{font-weight:900;}
 .rc-tickmark{color:#15803d;font-weight:900;margin-left:4px;}
-.rc-legend{padding:8px 2px 0;font-size:11.5px;}
 
 .ops-dlg{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1800;background:rgba(15,28,48,.45);}
 .ops-dlg .fld{margin-bottom:10px;}
@@ -4150,7 +4086,6 @@ body.surface-cash #cashPanel.queue-overlay{
 .cash-act svg{margin-left:8px;}
 .cash-tbl{width:100%;table-layout:fixed;}
 
-.rc-legend{padding:0 2px 10px;font-size:11.5px;}
 .rc-pager{
   display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
   -ms-flex-pack:center;justify-content:center;
@@ -4480,23 +4415,6 @@ body.surface-cash .inp:focus,body.surface-queue .inp:focus{
 }
 
 /* ---- 3. concave clay buttons ---------------------------------------------- */
-body.surface-adm .btn-primary,body.surface-tools .btn-primary,
-body.surface-cash .btn-primary,body.surface-queue .btn-primary{
-  border:1px solid #3a4fc4;color:#fff;
-  background:#4b63e6;
-  background:-webkit-linear-gradient(top,#4056d2 0%,#5b75ef 100%);
-  background:linear-gradient(180deg,#4056d2 0%,#5b75ef 100%);
-  -webkit-box-shadow:inset 0 2px 4px rgba(13,21,70,.32), inset 0 -2px 3px rgba(255,255,255,.28), 0 6px 14px rgba(75,99,230,.30);
-  box-shadow:inset 0 2px 4px rgba(13,21,70,.32), inset 0 -2px 3px rgba(255,255,255,.28), 0 6px 14px rgba(75,99,230,.30);
-}
-body.surface-adm .btn-primary:hover,body.surface-tools .btn-primary:hover,
-body.surface-cash .btn-primary:hover,body.surface-queue .btn-primary:hover{
-  background:#5470ec;
-  background:-webkit-linear-gradient(top,#4b63e6 0%,#6a83f7 100%);
-  background:linear-gradient(180deg,#4b63e6 0%,#6a83f7 100%);
-  -webkit-box-shadow:inset 0 2px 4px rgba(13,21,70,.28), inset 0 -2px 3px rgba(255,255,255,.30), 0 8px 18px rgba(75,99,230,.38);
-  box-shadow:inset 0 2px 4px rgba(13,21,70,.28), inset 0 -2px 3px rgba(255,255,255,.30), 0 8px 18px rgba(75,99,230,.38);
-}
 body.surface-adm .btn-submit,body.surface-tools .btn-submit{
   border:1px solid #3547b4;color:#fff;border-radius:14px;
   background:#4b63e6;
@@ -4844,15 +4762,6 @@ body.surface-tools .tools-receipts.show{
 .rc-side .inp{width:100%;height:34px;font-size:12.5px;}
 .rc-ticks{margin:2px 0 12px;}
 .rc-ticks .chk{display:block;margin:0 0 6px;font-size:12px;font-weight:700;color:#33465f;}
-.rc-legend{
-  border-top:1px dashed #b9c9e0;padding-top:10px;margin:0 0 12px;
-}
-.rc-legend-head{
-  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
-  -ms-flex-pack:justify;justify-content:space-between;margin-bottom:8px;
-}
-.rc-legend-title{font-size:11.5px;font-weight:900;color:#43536e;}
-.lg2{display:inline-block;margin:0 0 6px 10px;font-size:11px;font-weight:700;color:#3a4a66;}
 .lg-dot{
   display:inline-block;width:13px;height:13px;border-radius:50%;margin-left:5px;
   vertical-align:-2px;border:1px solid rgba(20,40,72,.18);
@@ -4866,7 +4775,6 @@ body.surface-tools .tools-receipts.show{
   -webkit-box-shadow:inset 0 1px 2px rgba(20,40,72,.06), 0 1px 3px rgba(20,40,72,.08);
   box-shadow:inset 0 1px 2px rgba(20,40,72,.06), 0 1px 3px rgba(20,40,72,.08);
 }
-.rc-help svg{vertical-align:middle;}
 .rc-help-pop{
   display:none;position:absolute;left:0;bottom:132%;width:236px;z-index:2600;
   text-align:right;font-size:11.5px;color:#33425e;line-height:1.9;
@@ -4880,9 +4788,6 @@ body.surface-tools .tools-receipts.show{
 .rc-help-pop b{display:block;margin-bottom:6px;color:#1a2942;font-size:12px;}
 .rc-help-pop .lg-dot{width:11px;height:11px;vertical-align:-1px;}
 .rc-help:hover .rc-help-pop,.rc-help:focus .rc-help-pop{display:block;}
-.rc-search-btn{
-  width:100%;height:42px;margin-top:auto;font-size:14px;border-radius:13px;
-}
 .rc-main{
   -ms-flex:1 1 auto;flex:1 1 auto;min-width:0;
   display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
@@ -5023,12 +4928,9 @@ body.surface-queue .tab.active{
   background:linear-gradient(180deg,#1f2a3c 0%,#182130 100%);
   border-color:#344357;
 }
-.theme-dark .rc-side-title,.theme-dark .rc-legend-title{color:#d7e2f2;}
-.theme-dark .rc-side .fld > span{color:#9fb0c9;}
+.theme-dark .rc-side-title,.theme-dark .theme-dark .rc-side .fld > span{color:#9fb0c9;}
 .theme-dark .rc-ticks .chk{color:#b9c6da;}
-.theme-dark .rc-legend{border-top-color:#344357;}
-.theme-dark .lg2{color:#b9c6da;}
-.theme-dark .rc-help{background:#26324a;border-color:#3b4c68;color:#9db4f8;}
+.theme-dark .theme-dark .theme-dark .rc-help{background:#26324a;border-color:#3b4c68;}
 .theme-dark .rc-help-pop{
   background:-webkit-linear-gradient(top,#232f42 0%,#1a2434 100%);
   background:linear-gradient(180deg,#232f42 0%,#1a2434 100%);
@@ -5106,7 +5008,6 @@ body.surface-tools .tools-tile:hover .tools-tile-go{
   background:linear-gradient(180deg,#2c46c0 0%,#4e68e6 100%);
 }
 .tools-burger:hover{color:#2f47c4;border-color:#8fa4ef;}
-.rc-help{color:#3550d8;}
 
 /* ---- 1. receipts as its own full-page native tab (surface-rc) ------------- */
 body.surface-rc #appBody{display:none !important;}
@@ -5160,7 +5061,6 @@ body.surface-tools,body.surface-rc{
 .rc-help-hdr .rc-help-pop{
   top:124%;bottom:auto;right:0;left:auto;
 }
-.rc-help-hdr:hover .rc-help-pop,.rc-help-hdr:focus .rc-help-pop{display:block;}
 /* filter rail: a whisper of indigo in the glass */
 .rc-side{
   background:-webkit-linear-gradient(180deg,rgba(244,247,254,.95) 0%,rgba(226,233,248,.93) 100%);
@@ -5362,7 +5262,17 @@ body.theme-dark.surface-rc{
 .theme-dark .tools-topbar{background:#1d2735;border-color:#344357;}
 .theme-dark .tools-drawer-item{border-right-color:#3b4c68;}
 .theme-dark .tools-drawer-item:hover{border-right-color:#6a83f7;}
-.theme-dark .tools-tile:hover{background:rgba(35,47,66,.6);}
+/* raised specificity so the dark hover actually beats the light milk wash */
+body.theme-dark.surface-tools .tools-tile:hover{
+  background:rgba(35,47,66,.6);
+  -webkit-box-shadow:0 14px 30px rgba(0,0,0,.4);
+  box-shadow:0 14px 30px rgba(0,0,0,.4);
+}
+.theme-dark .tools-drawer-item:hover{
+  background:-webkit-linear-gradient(180deg,#26334a 0%,#1d2940 100%);
+  background:linear-gradient(180deg,#26334a 0%,#1d2940 100%);
+  border-color:#4a5f85;border-right-color:#6a83f7;
+}
 
 /* ---- 8. hue coherence: legacy indigo hexes → the v1.88 royal blue ---------- */
 body.surface-adm .ct-ico,body.surface-tools .ct-ico{color:#3550d8;}
