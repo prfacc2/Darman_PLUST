@@ -121,7 +121,8 @@ enum TabKind {
     TK_PORTAL      = 1,   // پیام پرتابل — portal/admin message page (post-login)
     TK_EMPTY       = 2,   // a fresh blank tab (new-tab button)
     TK_TOOLS       = 3,   // v1.84: native «ابزارها» web surface
-    TK_CASHIER     = 4    // v1.84: native «صندوق» web surface
+    TK_CASHIER     = 4,   // v1.84: native «صندوق» web surface
+    TK_QUEUE       = 5    // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
@@ -551,6 +552,7 @@ static int tabIconFor(int kind){
     if(kind==TK_EMPTY)   return ICO_TAB;     // تب جدید — fresh blank tab
     if(kind==TK_TOOLS)   return ICO_GEAR;
     if(kind==TK_CASHIER) return ICO_WALLET;
+    if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
     return ICO_USER;                         // پذیرش بیمار — patient admission
 }
 
@@ -2616,7 +2618,8 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // controls — they own no edit boxes, combos or buttons.
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
-        if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER)
+        if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
+           && t->kind!=TK_QUEUE)
             return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
@@ -2635,6 +2638,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             const char* surf="admission";
             if(t->kind==TK_TOOLS) surf="tools";
             else if(t->kind==TK_CASHIER) surf="cashier";
+            else if(t->kind==TK_QUEUE) surf="queue";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
@@ -4636,6 +4640,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_EMPTY)     t->title=L"تب جدید";
     else if(kind==TK_TOOLS)     t->title=L"ابزارها";
     else if(kind==TK_CASHIER)   t->title=L"صندوق";
+    else if(kind==TK_QUEUE)     t->title=L"صندوق نرفته‌ها و صف پذیرش";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5170,8 +5175,13 @@ static void closeActiveKind(int kind){
     TabPage* t=s_rd->tabs[s_rd->active];
     if(t && t->kind==kind) closeTab(t);
 }
+void Reception_OpenQueue(){
+    HWND h=recWnd(); if(!h) return;
+    activateKind(h, TK_QUEUE);
+}
 void Reception_CloseTools(){ closeActiveKind(TK_TOOLS); }
 void Reception_CloseCashier(){ closeActiveKind(TK_CASHIER); }
+void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
 void Reception_ResetZoom(){
     std::wstring user=g_session.user.username;
     std::wstring suffix=user.empty()?L"":L"."+user;

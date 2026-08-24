@@ -1355,7 +1355,7 @@
       var rep = findUp(tgt, 'data-q', body);
       if (rep) {
         var q = (state.queueView || [])[+rep.getAttribute('data-q')];
-        if (q) defer(function () { fillPatient(q); toast('بیمار از صندوق بازخوانی شد', 'ok'); });
+        if (q) defer(function () { queueRecall(q); });
         return;
       }
       var del = findUp(tgt, 'data-qdel', body);
@@ -1396,9 +1396,7 @@
       if (!tr) return;
       var qrow = (state.queueView || [])[+tr.getAttribute('data-qi')];
       if (!qrow) return;
-      closeQueuePanel();
-      fillPatient(qrow);
-      toast('بیمار از صف بازخوانی شد', 'ok');
+      queueRecall(qrow);
     });
 
     /* insurance changes → recompute (never blanks patient fields) */
@@ -1417,8 +1415,15 @@
       var c = $('invoiceCard'); if (!c) return;
       c.className = /collapsed/.test(c.className) ? c.className.replace(/\s*collapsed/, '') : c.className + ' collapsed';
     });
-    on($('queueLauncher'), 'click', function () { openQueuePanel('unpaid'); });
-    on($('queueClose'),    'click', function () { closeQueuePanel(); });
+    on($('queueLauncher'), 'click', function () {
+      /* v1.85: the queue opens as its own native C++ tab, not an overlay. */
+      if (state.surface === 'queue') { refreshQueue(); return; }
+      Bridge.call('ui.openTab', { kind: 'queue' });
+    });
+    on($('queueClose'),    'click', function () {
+      if (state.surface === 'queue') { Bridge.call('ui.closeTab', { kind: 'queue' }); return; }
+      closeQueuePanel();
+    });
     on($('toolsBtn'), 'click', function () { Bridge.call('ui.openTab', { kind: 'tools' }); });
     on($('toolsBack'), 'click', function () {
       if (state.rcPage === 'receipts') { state.rcPage = 'home'; showToolsHome(); return; }
@@ -1738,17 +1743,22 @@
      to the user's monitor (not a fixed draggable box). open/close go through
      one pair of helpers so the overlay + its dim backdrop can never fall out of
      sync. `tab` optionally selects the صندوق/صف tab before showing. */
-  function openQueuePanel(tab) {
-    if (!$('queuePanel')) return;
-    if (tab === 'admission') {
-      state.queueKind = 'admission'; setActiveTab('tabAdmQ');
-    } else if (tab === 'unpaid') {
-      state.queueKind = 'unpaid'; setActiveTab('tabQueue');
+  /* v1.85: recall a queue patient. On the queue tab we open a fresh پذیرش tab
+     (the queue document has no visible form); on the admission surface we fill
+     the live form in place. Never fill the hidden queue form. */
+  function queueRecall(q) {
+    if (!q) return;
+    if (state.surface === 'queue') {
+      Bridge.call('ui.openQueuePatient', { id: q.id, kind: state.queueKind });
+      return;
     }
-    setOverlay('queuePanel', 'queueBackdrop', true);
-    refreshQueue();
+    closeQueuePanel();
+    fillPatient(q);
+    toast('بیمار از صف بازخوانی شد', 'ok');
   }
   function closeQueuePanel() {
+    /* v1.85: on the queue tab the panel IS the page — never collapse it. */
+    if (state.surface === 'queue') return;
     setOverlay('queuePanel', 'queueBackdrop', false);
   }
 
@@ -2249,7 +2259,7 @@
     }
     var inc = (d.shift && d.shift.income != null) ? d.shift.income : (d.income || 0);
     var incEl = $('cashIncome');
-    if (incEl) incEl.innerHTML = 'درآمد شیفت: <b>' + money(inc) + '</b> ریال';
+    if (incEl) incEl.innerHTML = '<b>' + money(inc) + '</b> <span class="cash-cur">ریال</span>';
     var st = d.stats || {};
     setText($('cashStatP'), toFa(st.patients || 0));
     setText($('cashStatPaid'), toFa(st.paid || 0));
@@ -2625,13 +2635,14 @@
 
   function applySurfaceClass() {
     var surf = window.__azSurface || 'admission';
-    if (surf !== 'tools' && surf !== 'cashier') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
+    else if (surf === 'queue') cls += ' surface-queue';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -2693,6 +2704,10 @@
       if (state.surface === 'tools') {
         showToolsHome();
         toast('ابزارها آماده است', 'ok');
+      } else if (state.surface === 'queue') {
+        setOverlay('queuePanel', 'queueBackdrop', true);
+        refreshQueue();
+        toast('صندوق نرفته‌ها و صف پذیرش', 'ok');
       } else if (state.surface === 'cashier') {
         if (state.canCashView) {
           refreshCash();

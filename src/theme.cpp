@@ -64,31 +64,34 @@ void applyTheme(bool dark){
         //  bg #F5F8FD · surface #FFFFFF · surface2 #EAF4FF · border #DCE6F2
         //  text #233042 · muted #6B7A90 · accent #1976F3 · hover #2D8CFF
         //  success #16C47F · warning #F4B740 · danger #E24C4B.
-        g_theme.bg          = RGB(0xF5, 0xF8, 0xFD); // #F5F8FD app background
-        g_theme.bg2         = RGB(0xE8, 0xF0, 0xFA); // page gradient bottom (subtle)
+        // v1.85.0: soften the light palette toward a neumorphic/claymorphic base
+        // and unify the accent with the embedded admission page (refined indigo).
+        // The page sits a touch deeper so the near-white clay cards extrude,
+        // borders stay soft, and the header reads as a frosted band.
+        g_theme.bg          = RGB(0xEC, 0xF1, 0xF8); // #ECF1F8 soft clay page
+        g_theme.bg2         = RGB(0xE1, 0xE9, 0xF4); // page gradient bottom
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
-        g_theme.surfaceTop  = RGB(0xFF, 0xFF, 0xFF); // card gradient top (flat white)
-        g_theme.surface2    = RGB(0xEA, 0xF4, 0xFF); // #EAF4FF secondary wash
-        g_theme.border      = RGB(0xDC, 0xE6, 0xF2); // #DCE6F2 hairline
-        g_theme.text        = RGB(0x23, 0x30, 0x42); // #233042 primary ink
-        g_theme.textDim     = RGB(0x6B, 0x7A, 0x90); // #6B7A90 muted
-        g_theme.labelInk    = RGB(0x37, 0x41, 0x51); // #374151 readable labels
-        g_theme.sectionInk  = RGB(0x1F, 0x29, 0x37); // #1F2937 strong titles
-        g_theme.accent      = RGB(0x19, 0x76, 0xF3); // #1976F3 primary actions
-        g_theme.accent2     = RGB(0x2D, 0x8C, 0xFF); // #2D8CFF gradient end / hover
-        g_theme.accentHover = RGB(0x2D, 0x8C, 0xFF); // #2D8CFF lighter accent on hover
+        g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
+        g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
+        g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
+        g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
+        g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
+        g_theme.labelInk    = RGB(0x35, 0x3F, 0x4F); // readable labels
+        g_theme.sectionInk  = RGB(0x1C, 0x26, 0x35); // strong titles
+        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo (matches page)
+        g_theme.accent2     = RGB(0x6A, 0x83, 0xF7); // #6A83F7 gradient end / hover
+        g_theme.accentHover = RGB(0x6A, 0x83, 0xF7); // #6A83F7 lighter accent on hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
-        g_theme.danger      = RGB(0xE2, 0x4C, 0x4B); // #E24C4B
-        g_theme.dangerHover = RGB(0xEC, 0x66, 0x65);
-        g_theme.success     = RGB(0x16, 0xC4, 0x7F); // #16C47F
-        g_theme.warn        = RGB(0xF4, 0xB7, 0x40); // #F4B740 warning
-        g_theme.inputBg     = RGB(0xF7, 0xFA, 0xFE); // tinted well (just above bg)
-        g_theme.inputText   = RGB(0x23, 0x30, 0x42);
-        g_theme.hover       = RGB(0xEA, 0xF4, 0xFF); // #EAF4FF soft accent wash on hover
-        // v1.78.0: the header was pure white → nearly white (read as «سفید یک
-        // دست»). It is now a real soft-blue band with visible depth.
-        g_theme.headerTop   = RGB(0xF6, 0xF9, 0xFE);
-        g_theme.headerBot   = RGB(0xDA, 0xE7, 0xF7); // header reads as its own layer
+        g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
+        g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
+        g_theme.success     = RGB(0x15, 0xB5, 0x81); // #15B581
+        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C warning
+        g_theme.inputBg     = RGB(0xF3, 0xF6, 0xFC); // tinted well
+        g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
+        g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
+        // frosted header band with real depth
+        g_theme.headerTop   = RGB(0xFB, 0xFC, 0xFE);
+        g_theme.headerBot   = RGB(0xE1, 0xEA, 0xF6);
         g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
         // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now
@@ -618,7 +621,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //      without shouting.
         // ------------------------------------------------------------------
         int hgt = rr.bottom-rr.top; if(hgt<1) hgt=1;
-        int rad = S(st==BS_CARD?16:10);
+        int rad = S(st==BS_CARD?22:10);   // v1.85: chunkier claymorphic card corner
         if(st!=BS_CARD){
             rad = hgt/3;                       // proportional corner
             if(rad > S(14)) rad = S(14);
@@ -686,7 +689,8 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
             COLORREF cardAcc  = btnAccent(d);
             // elevation — tinted with the card's own hue so it reads as
             // coloured light, not grey dirt.
-            gpShadowColor(dc, rr, rad, hv?S(14):S(8), hv?88:48, cardAcc);
+            //  v1.85: deeper, softer resting lift for a claymorphic extrusion.
+            gpShadowColor(dc, rr, rad, hv?S(16):S(11), hv?96:62, cardAcc);
             // v1.66.0: unconditional GDI base before GDI+ decoration
             fillRoundRect(dc, rr, rad*2,
                 hv?blendColor(g_theme.hover,cardAcc,10):g_theme.surface, CLR_INVALID);

@@ -316,7 +316,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.78.0: distinct brand hues per account — reception carries the
         // clinic blue, management a calm violet, so the two entry cards are
         // recognisable at a glance (border / badge / halo / hover title).
-        setFlatButtonAccent(r,  RGB(0x19,0x76,0xF3));   // پذیرش — blue
+        setFlatButtonAccent(r,  RGB(0x4B,0x63,0xE6));   // پرسنل — refined indigo (v1.85)
         setFlatButtonAccent(mg, RGB(0x7C,0x56,0xE4));   // مدیریت — violet
         // the cards sit ON the hero panel, so their antialiased corners must
         // blend into the panel surface (its lower band == homePanelBot()) — not
