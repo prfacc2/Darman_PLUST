@@ -1114,3 +1114,145 @@ html, body{
 .bk-bar{height:10px;width:0;background:#0f766e;}
 .theme-dark .crm-muted{color:#93a4b8;}
 .theme-dark .bk-track{background:#1d2f44;}
+
+/* ============================================================================
+   DARMAN PLUS 2026 - PREMIUM CRM / MANAGEMENT REDESIGN (v1.85.0)
+   ============================================================================ */
+
+/* 1. Deeper and more elegant Page Backgrounds */
+html, body {
+  background: linear-gradient(165deg, #d3dfef 0%, #cbd4e6 50%, #c4cde1 100%) !important;
+}
+.theme-dark .crm-main {
+  background: linear-gradient(170deg, #090f19 0%, #05080f 100%) !important;
+}
+
+/* 2. Claymorphic Management Sidebar/Navigation Drawer (.crm-nav) */
+.crm-nav {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+  padding: 18px 12px !important;
+  box-shadow: 4px 0 24px rgba(13, 26, 46, 0.04);
+}
+.theme-dark .crm-nav {
+  background: rgba(20, 29, 44, 0.75) !important;
+  border-left-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Nav Items */
+.crm-nav-item {
+  margin-bottom: 6px !important;
+  padding: 12px 14px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  color: #5c6c80 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.theme-dark .crm-nav-item {
+  color: #94a5bd !important;
+}
+.crm-nav-item:hover {
+  background: rgba(75, 99, 230, 0.06) !important;
+  color: #4b63e6 !important;
+  transform: translateX(-2px);
+}
+.theme-dark .crm-nav-item:hover {
+  background: rgba(86, 170, 255, 0.08) !important;
+  color: #56aaff !important;
+}
+.crm-nav-item.active {
+  background: #ffffff !important;
+  color: #4b63e6 !important;
+  font-weight: 800 !important;
+  box-shadow: 2px 4px 12px rgba(75, 99, 230, 0.12), inset 3px 0 0 #4b63e6 !important;
+}
+.theme-dark .crm-nav-item.active {
+  background: #1e293b !important;
+  color: #56aaff !important;
+  box-shadow: 2px 4px 12px rgba(0,0,0,0.2), inset 3px 0 0 #56aaff !important;
+}
+
+/* 3. Claymorphic & Glassmorphic Dashboard Cards (.crm-card) */
+.crm-card {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(13, 26, 46, 0.06) !important;
+  padding: 24px !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.theme-dark .crm-card {
+  background: rgba(20, 29, 44, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24) !important;
+}
+.crm-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
+  pointer-events: none;
+}
+.theme-dark .crm-card::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+}
+.crm-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(13, 26, 46, 0.1) !important;
+}
+.theme-dark .crm-card:hover {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* 4. Beautiful KPI Widgets with Gradialism */
+.crm-kpi {
+  background: linear-gradient(135deg, #ffffff 0%, #f3f7fd 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(20, 36, 64, 0.05) !important;
+  transition: all 0.3s ease;
+}
+.theme-dark .crm-kpi {
+  background: linear-gradient(135deg, #1c2738 0%, #111a28 100%) !important;
+  border-color: rgba(255,255,255,0.05) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
+}
+.crm-kpi:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px rgba(75, 99, 230, 0.12) !important;
+  border-color: rgba(75, 99, 230, 0.3) !important;
+}
+.theme-dark .crm-kpi:hover {
+  box-shadow: 0 14px 32px rgba(86, 170, 255, 0.15) !important;
+  border-color: rgba(86, 170, 255, 0.3) !important;
+}
+
+/* 5. Polished Tables with clean rows and borders */
+.crm-table-wrap {
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  border: 1px solid #d0dceb !important;
+}
+.theme-dark .crm-table-wrap {
+  border-color: #2b3a4f !important;
+}
+table.crm-tbl thead th {
+  background: #f0f4fb !important;
+  color: #1e2a3c !important;
+  font-weight: 800 !important;
+  padding: 12px 14px !important;
+}
+.theme-dark table.crm-tbl thead th {
+  background: #1b2636 !important;
+  color: #cfe1fb !important;
+}
+table.crm-tbl tbody td {
+  padding: 12px 14px !important;
+}
+

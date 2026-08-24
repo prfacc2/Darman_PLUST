@@ -4425,8 +4425,578 @@ body.surface-queue .qov-sum-card{
   box-shadow:0 8px 20px rgba(16,32,64,.10), inset 0 1px 0 rgba(255,255,255,.9);
 }
 /* queue action buttons keep their semantic colors, gain clay depth */
+/* queue action buttons keep their semantic colors, gain clay depth */
 body.surface-queue .q-act-btn{
   border-radius:10px;
   -webkit-box-shadow:0 3px 8px rgba(16,32,64,.10), inset 0 1px 0 rgba(255,255,255,.5);
   box-shadow:0 3px 8px rgba(16,32,64,.10), inset 0 1px 0 rgba(255,255,255,.5);
 }
+
+/* ============================================================================
+   DARMAN PLUS 2026 PREMIUM REDESIGN - REDESIGNED STYLES (v1.85.0)
+   ============================================================================ */
+
+/* 1. Page & Workspace Backgrounds - Deeper and softer for contrast */
+body {
+  background: #c3d2e6;
+  background: -webkit-linear-gradient(top, #d8e4f5 0%, #b2c5dc 100%);
+  background: linear-gradient(180deg, #d8e4f5 0%, #b2c5dc 100%);
+}
+html.theme-dark body {
+  background: #090f19;
+  background: -webkit-linear-gradient(top, #0e1929 0%, #040810 100%);
+  background: linear-gradient(180deg, #0e1929 0%, #040810 100%);
+}
+
+/* 2. Glassmorphism for Main Workspace Cards & Containers */
+.card, .az-card {
+  background: rgba(255, 255, 255, 0.72) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px 0 rgba(13, 26, 46, 0.08) !important;
+}
+html.theme-dark .card, html.theme-dark .az-card {
+  background: rgba(20, 28, 38, 0.65) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.28) !important;
+}
+
+/* 3. Neumorphism for Input Fields & UI Wells */
+.inp, select.inp {
+  background: #f0f4f9 !important;
+  border: 1px solid #d0dceb !important;
+  border-radius: 12px !important;
+  box-shadow: inset 1px 1px 3px rgba(165,177,198,0.45), inset -1px -1px 3px rgba(255,255,255,0.8), 1px 1px 2px rgba(255,255,255,0.7) !important;
+  color: #1e2a3c !important;
+  font-weight: 700 !important;
+  transition: all 0.25s ease;
+}
+.inp:focus, select.inp:focus {
+  background: #ffffff !important;
+  border-color: #4b63e6 !important;
+  box-shadow: inset 1px 1px 2px rgba(165,177,198,0.2), 0 0 0 4px rgba(75,99,230,0.18) !important;
+}
+html.theme-dark .inp, html.theme-dark select.inp {
+  background: #151e2b !important;
+  border-color: #314258 !important;
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4), inset -1px -1px 3px rgba(255,255,255,0.05) !important;
+  color: #f2f7ff !important;
+}
+html.theme-dark .inp:focus, html.theme-dark select.inp:focus {
+  background: #1a2538 !important;
+  border-color: #56aaff !important;
+  box-shadow: 0 0 0 4px rgba(86,170,255,0.18) !important;
+}
+
+/* 4. Concave Button Gradients & Styling */
+.btn {
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-primary, .btn-submit {
+  background: #4b63e6;
+  background: -webkit-linear-gradient(135deg, #374dbd 0%, #6880f7 100%) !important;
+  background: linear-gradient(135deg, #374dbd 0%, #6880f7 100%) !important; /* Concave feeling: darker at top/right */
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  box-shadow: 0 6px 14px rgba(75,99,230,0.3) !important;
+}
+.btn-primary:hover, .btn-submit:hover {
+  background: #5d75eb !important;
+  box-shadow: 0 8px 18px rgba(75,99,230,0.4) !important;
+  transform: translateY(-1px);
+}
+.btn-primary:active, .btn-submit:active {
+  background: linear-gradient(135deg, #6880f7 0%, #374dbd 100%) !important; /* Invert to convex on press */
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+  transform: translateY(1px);
+}
+
+/* 5. Tools Home & App Store Grid Redesign with Hamburger Menu */
+body.surface-tools {
+  background: #d1dfef !important;
+}
+body.surface-tools .tools-panel {
+  background: rgba(235, 241, 249, 0.75) !important;
+  backdrop-filter: blur(20px);
+}
+html.theme-dark body.surface-tools .tools-panel {
+  background: rgba(14, 21, 33, 0.8) !important;
+}
+.tools-home-head {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between !important;
+  width: 100%;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.btn-hamburger {
+  background: #ffffff !important;
+  border: 1px solid #c5d4e6 !important;
+  color: #4b63e6 !important;
+  width: 44px;
+  height: 44px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px !important;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.05), -2px -2px 6px rgba(255,255,255,0.8) !important;
+  cursor: pointer;
+}
+html.theme-dark .btn-hamburger {
+  background: #1c2738 !important;
+  border-color: #314054 !important;
+  color: #56aaff !important;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.2) !important;
+}
+.btn-hamburger:hover {
+  transform: scale(1.05);
+  border-color: #4b63e6 !important;
+}
+
+/* Tools layout container */
+.tools-home-body {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 100%;
+  height: calc(100% - 56px);
+  margin-top: 14px;
+  overflow: hidden;
+}
+.tools-grid-container {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-left: 12px;
+}
+.tools-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  width: 100%;
+}
+
+/* App Store Style Tiles */
+.tools-tile {
+  width: 220px !important;
+  height: 240px !important;
+  margin: 0 0 16px 16px !important;
+  padding: 24px 16px 18px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  text-align: center !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8fd 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 24px rgba(20, 36, 64, 0.07), inset 0 1px 0 #ffffff !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+html.theme-dark .tools-tile {
+  background: linear-gradient(135deg, #1c2738 0%, #131d2c 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2) !important;
+}
+.tools-tile:hover {
+  transform: translateY(-4px) scale(1.02) !important;
+  box-shadow: 0 16px 32px rgba(75, 99, 230, 0.14) !important;
+  border-color: rgba(75, 99, 230, 0.35) !important;
+}
+.tools-appico {
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 0 12px 0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
+}
+.tools-appico-search {
+  background: linear-gradient(135deg, #4b63e6 0%, #1f5fd6 100%) !important;
+}
+.tools-appico-cash {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+}
+.tools-appico-stats {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+}
+.tools-appico-settings {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+}
+.tools-appico-phone {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important;
+}
+
+.tools-tile-name {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #1a2538 !important;
+  margin: 0 0 4px 0 !important;
+}
+html.theme-dark .tools-tile-name {
+  color: #f3f7fe !important;
+}
+.tools-tile-sub {
+  font-size: 11px !important;
+  color: #64748b !important;
+  margin-bottom: 12px !important;
+}
+html.theme-dark .tools-tile-sub {
+  color: #94a3b8 !important;
+}
+.tools-tile-action {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4b63e6;
+  background: rgba(75, 99, 230, 0.08);
+  padding: 6px 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+html.theme-dark .tools-tile-action {
+  color: #56aaff;
+  background: rgba(86, 170, 255, 0.1);
+}
+.tools-tile:hover .tools-tile-action {
+  background: #4b63e6;
+  color: #ffffff;
+}
+html.theme-dark .tools-tile:hover .tools-tile-action {
+  background: #56aaff;
+  color: #111a27;
+}
+
+/* Hamburger Sidebar Drawer on Right */
+.tools-sidebar {
+  width: 0px;
+  flex: 0 0 0px;
+  background: #ffffff;
+  border-radius: 20px;
+  margin-right: 0px;
+  padding: 0px;
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 4px 20px rgba(0,0,0,0.03);
+}
+html.theme-dark .tools-sidebar {
+  background: #151e2b;
+}
+.tools-sidebar.open {
+  width: 250px;
+  flex: 0 0 250px;
+  margin-right: 16px;
+  padding: 20px 16px;
+  opacity: 1;
+}
+
+.sidebar-search {
+  position: relative;
+  width: 100%;
+  margin-bottom: 20px;
+}
+.sidebar-search .inp {
+  width: 100% !important;
+  padding-left: 34px !important;
+}
+.sidebar-search .search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  margin-top: -8px;
+  color: #94a3b8;
+}
+
+.sidebar-categories h4 {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 10px 0;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.sidebar-categories .cat-btn {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  text-align: right;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+}
+html.theme-dark .sidebar-categories .cat-btn {
+  color: #94a3b8;
+}
+.sidebar-categories .cat-btn:hover {
+  background: rgba(0,0,0,0.03);
+  color: #1e2a3c;
+}
+html.theme-dark .sidebar-categories .cat-btn:hover {
+  background: rgba(255,255,255,0.03);
+  color: #f3f7fe;
+}
+.sidebar-categories .cat-btn.active {
+  background: rgba(75, 99, 230, 0.08) !important;
+  color: #4b63e6 !important;
+  font-weight: 800;
+}
+html.theme-dark .sidebar-categories .cat-btn.active {
+  background: rgba(86, 170, 255, 0.1) !important;
+  color: #56aaff !important;
+}
+
+/* 6. Receipt Search (جستجوی قبض) Side-By-Side Layout */
+.rc-content-layout {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 100%;
+  height: calc(100% - 56px);
+  margin-top: 12px;
+  overflow: hidden;
+}
+.rc-table-side {
+  flex: 1 1 73%;
+  width: 73%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-left: 16px;
+}
+.rc-filter-side {
+  flex: 0 0 27%;
+  width: 27%;
+  height: 100%;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.03);
+}
+html.theme-dark .rc-filter-side {
+  background: rgba(20, 28, 38, 0.5);
+  border-color: rgba(255,255,255,0.05);
+}
+
+.rc-filter-side .rc-filters {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  padding-right: 2px;
+  margin-bottom: 12px;
+}
+.rc-filter-side .rc-filters > .fld {
+  width: 100% !important;
+  margin-bottom: 10px !important;
+  padding: 0 !important;
+}
+.rc-filter-side .rc-filters .rc-tick {
+  width: 100% !important;
+}
+.rc-filter-side .rc-filters .rc-tick .chk {
+  margin-top: 6px !important;
+}
+
+.rc-search-action-container {
+  flex: 0 0 auto;
+}
+.btn-search-rc {
+  width: 100% !important;
+  height: 44px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px !important;
+  font-size: 14.5px !important;
+}
+
+/* Color Legend & Popover Tooltip */
+.rc-legend-container {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+.rc-palette-guide {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #c5d4e6;
+  border-radius: 10px;
+  padding: 6px 12px;
+  color: #4b63e6;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
+}
+html.theme-dark .rc-palette-guide {
+  background: #1a2538;
+  border-color: #314054;
+  color: #56aaff;
+}
+.rc-palette-guide:hover {
+  background: #f4f8fd;
+}
+html.theme-dark .rc-palette-guide:hover {
+  background: #233148;
+}
+.palette-guide-icon {
+  margin-left: 6px;
+}
+.rc-palette-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: #ffffff;
+  border: 1px solid #c5d4e6;
+  border-radius: 14px;
+  width: 220px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 32px rgba(13, 26, 46, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  z-index: 1000;
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform: translateY(10px);
+  text-align: right;
+  color: #1e2a3c;
+}
+html.theme-dark .rc-palette-popover {
+  background: #1c2738;
+  border-color: #314054;
+  color: #f3f7fe;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.rc-palette-guide:hover .rc-palette-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.rc-palette-popover h3 {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding-bottom: 6px;
+  color: #4b63e6;
+}
+html.theme-dark .rc-palette-popover h3 {
+  color: #56aaff;
+}
+.popover-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.popover-item:last-child {
+  margin-bottom: 0;
+}
+.popover-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-left: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+/* Color definitions */
+.popover-circle.lg-yellow { background: #ffe082; }
+.popover-circle.lg-orange { background: #ffb74d; }
+.popover-circle.lg-red { background: #e57373; }
+.popover-circle.lg-purple { background: #b39ddb; }
+.popover-circle.lg-soap { background: #a5d6a7; }
+.popover-circle.lg-green { background: #c8e6c9; }
+.popover-circle.lg-blue { background: #81d4fa; }
+
+/* 7. Cashier (صندوق) centered buttons & Gradialism */
+body.surface-cash .cash-overlay-head {
+  background: radial-gradient(circle at 10% 20%, #15b581 0%, #057053 90%) !important; /* Gradialism: beautiful radial gradient */
+  box-shadow: 0 10px 30px rgba(5,112,83,0.3) !important;
+}
+html.theme-dark body.surface-cash .cash-overlay-head {
+  background: radial-gradient(circle at 10% 20%, #116851 0%, #043828 90%) !important;
+}
+.cash-actions {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 4px 18px !important;
+}
+.cash-act {
+  height: 44px !important;
+  min-width: 140px !important;
+  max-width: 180px !important;
+  flex: 1 1 auto;
+  border-radius: 22px !important; /* pill Neumorphism shape */
+  padding: 0 24px !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13.5px !important;
+  box-shadow: 3px 3px 8px rgba(0,0,0,0.06), -3px -3px 8px rgba(255,255,255,0.85) !important;
+}
+.cash-shift-start {
+  background: #f0fdf4 !important;
+  border: 1px solid #bbf7d0 !important;
+  color: #166534 !important;
+}
+.cash-shift-end {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  color: #991b1b !important;
+}
+html.theme-dark .cash-shift-start {
+  background: rgba(22, 101, 52, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  color: #4ade80 !important;
+}
+html.theme-dark .cash-shift-end {
+  background: rgba(153, 27, 27, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #f87171 !important;
+}
+
+/* Cash Summary Neumorphic & Gradial look */
+.cash-summary .qov-sum-card {
+  background: linear-gradient(135deg, #ffffff 0%, #edf4f9 100%) !important;
+  border: 1px solid #d0dceb !important;
+  border-radius: 14px !important;
+  box-shadow: 4px 4px 10px rgba(165,177,198,0.35), -4px -4px 10px rgba(255,255,255,0.9) !important;
+}
+html.theme-dark .cash-summary .qov-sum-card {
+  background: linear-gradient(135deg, #1b2636 0%, #111a28 100%) !important;
+  border-color: #2b394f !important;
+  box-shadow: 4px 4px 10px rgba(0,0,0,0.35) !important;
+}
+

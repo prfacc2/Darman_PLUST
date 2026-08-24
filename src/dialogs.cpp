@@ -138,8 +138,8 @@ static LRESULT CALLBACK loginProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  a glowing gradient disc with a coloured halo instead of a flat blob.
         // ------------------------------------------------------------------
         COLORREF roleCol = (d&&d->role==2)?g_theme.danger:g_theme.accent;
-        gpShadow(dc,c,S(18),S(22),120);
-        gpGradRoundRectBg(dc,c,S(18),g_theme.surfaceTop,g_theme.surface,
+        gpShadow(dc,c,S(26),S(24),120);
+        gpGradRoundRectBg(dc,c,S(26),g_theme.surfaceTop,g_theme.surface,
             blendColor(g_theme.border,roleCol,22),
             g_dark?RGB(6,8,12):RGB(126,138,158));
 

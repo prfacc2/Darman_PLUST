@@ -2773,6 +2773,78 @@
     recompute();               /* zero invoice on open */
     tickClock();
     setInterval(tickClock, 1000);
+
+    // REDESIGNED: Wire Hamburger Sidebar Drawer toggle
+    var hamburgerBtn = $('toolsHamburgerBtn');
+    if (hamburgerBtn) {
+      on(hamburgerBtn, 'click', function() {
+        var sb = $('toolsSidebar');
+        if (sb) {
+          if (sb.className.indexOf('open') !== -1) {
+            sb.className = 'tools-sidebar';
+          } else {
+            sb.className = 'tools-sidebar open';
+          }
+        }
+      });
+    }
+
+    // REDESIGNED: Wire Category button filters
+    var catBtns = document.querySelectorAll('.sidebar-categories .cat-btn');
+    var idx;
+    for (idx = 0; idx < catBtns.length; idx++) {
+      on(catBtns[idx], 'click', function(e) {
+        var clickedBtn = e.target || e.srcElement;
+        var jdx;
+        for (jdx = 0; jdx < catBtns.length; jdx++) {
+          catBtns[jdx].className = 'cat-btn';
+        }
+        clickedBtn.className = 'cat-btn active';
+        filterTools();
+      });
+    }
+
+    // REDESIGNED: Wire Tools Search Input
+    var toolsSearch = $('toolsSearchInput');
+    if (toolsSearch) {
+      on(toolsSearch, 'keyup', filterTools);
+    }
+
+    function filterTools() {
+      var searchVal = (($('toolsSearchInput') && $('toolsSearchInput').value) || '').toLowerCase();
+      var activeCatBtn = document.querySelector('.sidebar-categories .cat-btn.active');
+      var activeFilter = activeCatBtn ? activeCatBtn.getAttribute('data-filter') : 'all';
+      
+      var tiles = document.querySelectorAll('.tools-grid .tools-tile');
+      var jdx;
+      for (jdx = 0; jdx < tiles.length; jdx++) {
+        var tile = tiles[jdx];
+        var nameEl = tile.querySelector('.tools-tile-name');
+        var subEl = tile.querySelector('.tools-tile-sub');
+        var name = nameEl ? (nameEl.innerText || nameEl.textContent || '').toLowerCase() : '';
+        var sub = subEl ? (subEl.innerText || subEl.textContent || '').toLowerCase() : '';
+        var cat = tile.getAttribute('data-cat') || '';
+        
+        var matchSearch = name.indexOf(searchVal) !== -1 || sub.indexOf(searchVal) !== -1;
+        var matchCat = activeFilter === 'all' || cat === activeFilter;
+        
+        if (matchSearch && matchCat) {
+          tile.style.display = '';
+        } else {
+          tile.style.display = 'none';
+        }
+      }
+    }
+
+    // REDESIGNED: Wire Mock tiles
+    var mockTiles = document.querySelectorAll('.tools-grid .mock-tile');
+    var kdx;
+    for (kdx = 0; kdx < mockTiles.length; kdx++) {
+      on(mockTiles[kdx], 'click', function() {
+        toast('این بخش در نسخهٔ ابری فعال می‌شود', 'info');
+      });
+    }
+
     Bridge.ready(boot);
     setTimeout(hideLoader, 8000);   /* safety net */
   });

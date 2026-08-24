@@ -68,8 +68,8 @@ void applyTheme(bool dark){
         // and unify the accent with the embedded admission page (refined indigo).
         // The page sits a touch deeper so the near-white clay cards extrude,
         // borders stay soft, and the header reads as a frosted band.
-        g_theme.bg          = RGB(0xEC, 0xF1, 0xF8); // #ECF1F8 soft clay page
-        g_theme.bg2         = RGB(0xE1, 0xE9, 0xF4); // page gradient bottom
+        g_theme.bg          = RGB(0xE3, 0xEB, 0xF5); // #E3EBF5 slightly darker soft clay page
+        g_theme.bg2         = RGB(0xD5, 0xE0, 0xF0); // page gradient bottom slightly darker
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
         g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
         g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
@@ -621,7 +621,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //      without shouting.
         // ------------------------------------------------------------------
         int hgt = rr.bottom-rr.top; if(hgt<1) hgt=1;
-        int rad = S(st==BS_CARD?22:10);   // v1.85: chunkier claymorphic card corner
+        int rad = S(st==BS_CARD?28:10);   // v1.85: chunkier claymorphic card corner
         if(st!=BS_CARD){
             rad = hgt/3;                       // proportional corner
             if(rad > S(14)) rad = S(14);
@@ -634,21 +634,26 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // "white text on a white button" regression (v1.64.0).
         auto solidBody = [&](COLORREF top, COLORREF bot, COLORREF glow){
             if(!dn){
-                // elevation. hover lifts higher; the shadow is tinted with the
-                // button's own colour so it feels like coloured light.
-                gpShadowColor(dc, rr, rad, hv?S(10):S(6), hv?96:60, glow);
+                // Tinted soft outer shadow: larger and softer for Claymorphism
+                gpShadowColor(dc, rr, rad, hv?S(12):S(8), hv?110:66, glow);
             }
-            // v1.66.0: unconditional plain-GDI base painted FIRST — the GDI+
-            // path can fail per-call even when s_gdipOK is true (e.g. a
-            // LinearGradientBrush allocation failure), leaving the button body
-            // transparent and text invisible (white-on-white regression).
-            // fillRoundRect uses diameter (rad*2); gpRoundRect uses radius (rad).
-            fillRoundRect(dc, rr, rad*2, bot, CLR_INVALID);
-            gpGradRoundRect(dc, rr, rad, top, bot, CLR_INVALID);
+            // For Concave styling: top of gradient is slightly darker/saturated, bottom is lighter
+            COLORREF cTop = dn ? bot : blendColor(top, RGB(0,0,0), 12);
+            COLORREF cBot = dn ? top : blendColor(bot, RGB(255,255,255), 18);
+
+            // GDI fallback
+            fillRoundRect(dc, rr, rad*2, cBot, CLR_INVALID);
+            gpGradRoundRect(dc, rr, rad, cTop, cBot, CLR_INVALID);
+
             // top sheen — a white wash over the upper 45 % of the body
             RECT sh = rr; sh.bottom = rr.top + (hgt*45)/100;
             if(sh.bottom > sh.top+1)
-                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?14:26);
+                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?12:26);
+
+            // Inner Highlight (white outline with alpha 110) for Claymorphism
+            RECT inner = rr; InflateRect(&inner, -S(1), -S(1));
+            gpRoundRect(dc, inner, rad>S(1)?rad-S(1):rad, CLR_INVALID, RGB(255,255,255), 110);
+
             // bottom rim — one hairline of the darker stop for definition
             gpRoundRect(dc, rr, rad, CLR_INVALID,
                 blendColor(bot, RGB(0,0,0), dn?26:16));
@@ -690,7 +695,7 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // elevation — tinted with the card's own hue so it reads as
             // coloured light, not grey dirt.
             //  v1.85: deeper, softer resting lift for a claymorphic extrusion.
-            gpShadowColor(dc, rr, rad, hv?S(16):S(11), hv?96:62, cardAcc);
+            gpShadowColor(dc, rr, rad, hv?S(18):S(12), hv?110:68, cardAcc);
             // v1.66.0: unconditional GDI base before GDI+ decoration
             fillRoundRect(dc, rr, rad*2,
                 hv?blendColor(g_theme.hover,cardAcc,10):g_theme.surface, CLR_INVALID);
@@ -704,6 +709,11 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 RECT csh = rr; csh.bottom = rr.top + (hgt*40)/100;
                 if(csh.bottom > csh.top+1)
                     gpFillAlpha(dc, csh, rad, RGB(255,255,255), hv?24:18);
+            }
+            // Inner Highlight (white outline with alpha 140) for Claymorphism
+            {
+                RECT inner = rr; InflateRect(&inner, -S(2), -S(2));
+                gpRoundRect(dc, inner, rad>S(2)?rad-S(2):rad, CLR_INVALID, RGB(255,255,255), 140);
             }
             if(hv){
                 // accent glow ring just outside the border (drawn under text)

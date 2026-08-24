@@ -635,7 +635,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         setFlatButtonImage(s_bCalc,     IMG_IC_CALC);
         // header action buttons (reception only) — created hidden, shown by
         // updateHeaderButtons() when the reception screen becomes active.
-        s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_PLUS, BS_PRIMARY,0,0,10,10,
+        s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_USER, BS_PRIMARY,0,0,10,10,
                           L"ثبت پذیرش بیمار جدید");
         // v1.60.0: «نوبت‌دهی» removed completely; the new-tab button stays blue
         // (BS_PRIMARY) for a consistent header action style.
@@ -796,9 +796,11 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
 
         // ===================== LAYER 1 — top header bar =====================
         // Soft vertical gradient so the header reads as a distinct, polished
-        // surface (not a flat strip).
+        // surface (not a flat strip). Concave gradient feeling for header: slightly darker at top
         RECT tb={0,0,rc.right,mainBarH()};
-        gpGradRoundRect(dc,tb,0,g_theme.headerTop,g_theme.headerBot,CLR_INVALID);
+        COLORREF hTop = blendColor(g_theme.headerTop, RGB(0,0,0), 10);
+        COLORREF hBot = blendColor(g_theme.headerBot, RGB(255,255,255), 10);
+        gpGradRoundRect(dc,tb,0,hTop,hBot,CLR_INVALID);
         // v1.77: a thin branded accent ribbon along the header's top edge — the
         // same "designed" signature the welcome panel carries, on both themes —
         // so the header reads as a polished, branded surface, not a flat strip.

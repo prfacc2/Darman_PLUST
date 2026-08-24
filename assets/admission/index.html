@@ -358,33 +358,95 @@
       <div class="tools-home" id="toolsHome">
         <div class="tools-home-head">
           <button type="button" class="btn btn-outline" id="toolsBack">بازگشت</button>
+          
+          <!-- Hamburger Toggle Button -->
+          <button type="button" class="btn btn-hamburger" id="toolsHamburgerBtn" title="منوی دسته‌بندی">
+            <svg viewBox="0 0 24 24" width="22" height="22" style="fill:currentColor;"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+          </button>
         </div>
-        <div class="tools-grid">
-          <button type="button" class="tools-tile" id="toolsReceipts">
-            <span class="tools-appico tools-appico-search" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
-            </span>
-            <span class="tools-tile-name">جستجوی قبض</span>
-            <span class="tools-tile-sub">فیلتر، چاپ مجدد، خروجی اکسل</span>
-          </button>
-          <button type="button" class="tools-tile" id="toolsCash">
-            <span class="tools-appico tools-appico-cash" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
-            </span>
-            <span class="tools-tile-name">صندوق <span class="cash-f7">F7</span></span>
-            <span class="tools-tile-sub">شیفت، پرداخت، سند دستی</span>
-          </button>
+
+        <div class="tools-home-body">
+          <!-- App Store Grid on Left -->
+          <div class="tools-grid-container">
+            <div class="tools-grid" id="toolsGrid">
+              <!-- Tile 1 (Receipts) -->
+              <button type="button" class="tools-tile" id="toolsReceipts" data-cat="reports">
+                <span class="tools-appico tools-appico-search" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
+                </span>
+                <span class="tools-tile-name">جستجوی قبض</span>
+                <span class="tools-tile-sub">فیلتر، چاپ، اکسل</span>
+                <span class="tools-tile-action">مشاهده ابزار</span>
+              </button>
+              
+              <!-- Tile 2 (Cash) -->
+              <button type="button" class="tools-tile" id="toolsCash" data-cat="finance">
+                <span class="tools-appico tools-appico-cash" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
+                </span>
+                <span class="tools-tile-name">صندوق <span class="cash-f7">F7</span></span>
+                <span class="tools-tile-sub">شیفت و پرداخت</span>
+                <span class="tools-tile-action">ورود به صندوق</span>
+              </button>
+
+              <!-- Mock Tile 3 (Stats Chart) -->
+              <button type="button" class="tools-tile mock-tile" id="toolsStats" data-cat="reports">
+                <span class="tools-appico tools-appico-stats" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
+                </span>
+                <span class="tools-tile-name">گزارش عملکرد</span>
+                <span class="tools-tile-sub">نمودارهای مراجعات امروز</span>
+                <span class="tools-tile-action">دریافت گزارش</span>
+              </button>
+
+              <!-- Mock Tile 4 (Settings) -->
+              <button type="button" class="tools-tile mock-tile" id="toolsQuickSettings" data-cat="settings">
+                <span class="tools-appico tools-appico-settings" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M19.14 12.94a7.1 7.1 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.2 7.2 0 00-1.63-.94L14.5 2.5a.5.5 0 00-.5-.4h-4a.5.5 0 00-.5.4l-.35 2.42c-.58.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 00-.6.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58a7.1 7.1 0 000 1.88L2.83 14.52a.5.5 0 00-.12.64l1.92 3.32a.5.5 0 00.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.35 2.42a.5.5 0 00.5.4h4a.5.5 0 00.5-.4l.35-2.42c.58-.23 1.13-.54 1.63-.94l2.39.96a.5.5 0 00.6-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
+                </span>
+                <span class="tools-tile-name">تنظیمات سریع</span>
+                <span class="tools-tile-sub">شخصی‌سازی سریع پنل</span>
+                <span class="tools-tile-action">ویرایش تنظیمات</span>
+              </button>
+
+              <!-- Mock Tile 5 (Phone) -->
+              <button type="button" class="tools-tile mock-tile" id="toolsPhonebook" data-cat="general">
+                <span class="tools-appico tools-appico-phone" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27c1.12.44 2.33.68 3.58.68a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.24 2.46.68 3.58a1 1 0 01-.27 1.11l-2.29 2.2z"/></svg>
+                </span>
+                <span class="tools-tile-name">دفترچه تلفن</span>
+                <span class="tools-tile-sub">تلفن پزشکان و بخش‌ها</span>
+                <span class="tools-tile-action">نمایش شماره‌ها</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Hamburger Drawer Sidebar on Right -->
+          <div class="tools-sidebar" id="toolsSidebar">
+            <!-- Sidebar Search -->
+            <div class="sidebar-search">
+              <input type="text" id="toolsSearchInput" class="inp" placeholder="جستجوی ابزارها…" />
+              <svg viewBox="0 0 24 24" width="16" height="16" class="search-icon" style="fill:currentColor;"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 001.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 00-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 005.34-1.48l.27.28v.79l4.25 4.92c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49l-4.25-4.25zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </div>
+
+            <!-- Categories -->
+            <div class="sidebar-categories">
+              <h4>دسته‌بندی‌ها</h4>
+              <button type="button" class="cat-btn active" data-filter="all">همه ابزارها</button>
+              <button type="button" class="cat-btn" data-filter="reports">گزارش‌ها و آمار</button>
+              <button type="button" class="cat-btn" data-filter="finance">مالی و صندوق</button>
+              <button type="button" class="cat-btn" data-filter="settings">تنظیمات</button>
+              <button type="button" class="cat-btn" data-filter="general">عمومی</button>
+            </div>
+          </div>
         </div>
       </div>
+      
       <div class="tools-receipts" id="toolsReceiptsView">
         <div class="tools-rc-head">
           <button type="button" class="btn btn-outline" id="rcBack">بازگشت به ابزارها</button>
           <h2 class="tools-title">جستجوی قبض</h2>
           <span class="tools-rc-actions">
-            <button type="button" class="btn btn-primary btn-ico" id="rcSearchBtn" title="جستجو">
-              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
-              جستجو
-            </button>
             <button type="button" class="btn btn-outline btn-ico" id="rcExcel" title="خروجی اکسل">
               <svg viewBox="0 0 24 24" width="15" height="15"><path fill="#217346" d="M4 3h10l6 6v12a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2zm9 1.5V10h5.5L13 4.5zM8.2 13l2.1 3.2L12.4 13h1.8l-2.8 4 2.9 4h-1.8L10.3 17.7 8.2 21H6.4l2.9-4L6.5 13h1.7z"/></svg>
               اکسل
@@ -399,35 +461,31 @@
             </button>
           </span>
         </div>
-        <div class="rc-filters">
-          <label class="fld"><span>بخش</span><select id="rcSect" class="inp"></select></label>
-          <label class="fld"><span>از تاریخ</span><input type="text" id="rcFrom" class="inp" data-date maxlength="10" /></label>
-          <label class="fld"><span>تا تاریخ</span><input type="text" id="rcTo" class="inp" data-date maxlength="10" /></label>
-          <label class="fld"><span>نام</span><input type="text" id="rcFirst" class="inp" /></label>
-          <label class="fld"><span>نام خانوادگی</span><input type="text" id="rcLast" class="inp" /></label>
-          <label class="fld"><span>کد ملی</span><input type="text" id="rcNid" class="inp" inputmode="numeric" /></label>
-          <label class="fld"><span>موبایل</span><input type="text" id="rcMobile" class="inp" inputmode="numeric" /></label>
-          <label class="fld"><span>ش پرونده</span><input type="text" id="rcFile" class="inp" /></label>
-          <label class="fld"><span>بایگانی</span><input type="text" id="rcArch" class="inp" /></label>
-          <label class="fld"><span>بارکد</span><input type="text" id="rcBar" class="inp" /></label>
-          <label class="fld"><span>پزشک</span><input type="text" id="rcDoc" class="inp" /></label>
-          <label class="fld rc-tick"><span>&nbsp;</span>
-            <label class="chk"><input type="checkbox" id="rcOnlyUser" /> کاربر فعال</label>
-          </label>
-          <label class="fld rc-tick"><span>&nbsp;</span>
-            <label class="chk"><input type="checkbox" id="rcByAppt" /> نمایش بر اساس نوبت</label>
-          </label>
-        </div>
-        <div class="rc-legend">
-          <span class="lg lg-yellow">زرد پرداخت نکرده</span>
-          <span class="lg lg-orange">نارنجی حذف بیمه‌ای</span>
-          <span class="lg lg-red">قرمز استرداد</span>
-          <span class="lg lg-purple">بنفش بدهکار</span>
-          <span class="lg lg-soap">صابونی بستانکار</span>
-          <span class="lg lg-green">سبز کم‌رنگ نوبت از قبل</span>
-          <span class="lg lg-blue">آبی روشن جوابدهی شده</span>
-        </div>
-        <div class="tbl-wrap rc-tbl-wrap" id="rcWrap">
+
+        <div class="rc-content-layout">
+          <!-- LEFT SIDE: TABLE & PAGER -->
+          <div class="rc-table-side">
+            <div class="rc-legend-container">
+              <!-- Palette/Guide Icon -->
+              <div class="rc-palette-guide" id="rcPaletteGuide">
+                <svg viewBox="0 0 24 24" width="20" height="20" class="palette-guide-icon" style="fill:currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <span class="palette-guide-text">راهنمای رنگ‌ها</span>
+                
+                <!-- Tooltip popover with beautiful design explaining color palettes -->
+                <div class="rc-palette-popover">
+                  <h3>راهنمای رنگ‌های قبض</h3>
+                  <div class="popover-item"><span class="popover-circle lg-yellow"></span><span>پرداخت نکرده</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-orange"></span><span>حذف بیمه‌ای</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-red"></span><span>استرداد</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-purple"></span><span>بدهکار</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-soap"></span><span>بستانکار</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-green"></span><span>نوبت از قبل</span></div>
+                  <div class="popover-item"><span class="popover-circle lg-blue"></span><span>جوابدهی شده</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tbl-wrap rc-tbl-wrap" id="rcWrap">
           <table class="tbl rc-tbl" id="rcTable">
             <thead><tr>
               <th class="c-chk"><input type="checkbox" id="rcAll" /></th>
@@ -452,9 +510,40 @@
           <span class="rc-page-lbl" id="rcPageLbl">صفحه ۱ از ۱</span>
           <button type="button" class="btn btn-outline btn-sm" id="rcNext">بعدی</button>
         </div>
+      </div> <!-- Close rc-table-side -->
+
+      <!-- RIGHT SIDE: FILTERS & SEARCH BUTTON -->
+      <div class="rc-filter-side">
+        <div class="rc-filters">
+          <label class="fld"><span>بخش</span><select id="rcSect" class="inp"></select></label>
+          <label class="fld"><span>از تاریخ</span><input type="text" id="rcFrom" class="inp" data-date maxlength="10" /></label>
+          <label class="fld"><span>تا تاریخ</span><input type="text" id="rcTo" class="inp" data-date maxlength="10" /></label>
+          <label class="fld"><span>نام</span><input type="text" id="rcFirst" class="inp" /></label>
+          <label class="fld"><span>نام خانوادگی</span><input type="text" id="rcLast" class="inp" /></label>
+          <label class="fld"><span>کد ملی</span><input type="text" id="rcNid" class="inp" inputmode="numeric" /></label>
+          <label class="fld"><span>موبایل</span><input type="text" id="rcMobile" class="inp" inputmode="numeric" /></label>
+          <label class="fld"><span>ش پرونده</span><input type="text" id="rcFile" class="inp" /></label>
+          <label class="fld"><span>بایگانی</span><input type="text" id="rcArch" class="inp" /></label>
+          <label class="fld"><span>بارکد</span><input type="text" id="rcBar" class="inp" /></label>
+          <label class="fld"><span>پزشک</span><input type="text" id="rcDoc" class="inp" /></label>
+          <label class="fld rc-tick"><span>&nbsp;</span>
+            <label class="chk"><input type="checkbox" id="rcOnlyUser" /> کاربر فعال</label>
+          </label>
+          <label class="fld rc-tick"><span>&nbsp;</span>
+            <label class="chk"><input type="checkbox" id="rcByAppt" /> نمایش بر اساس نوبت</label>
+          </label>
+        </div>
+        
+        <div class="rc-search-action-container">
+          <button type="button" class="btn btn-primary btn-search-rc" id="rcSearchBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" style="margin-left: 6px; fill: currentColor;"><path d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
+            جستجو
+          </button>
+        </div>
+      </div> <!-- Close rc-filter-side -->
+    </div> <!-- Close rc-content-layout -->
       </div>
     </div>
-  </div>
 
   <!-- v1.83: queue overlay is a centered panel (not full-screen) and is a
        sibling of #app so admission zoom never scales it. -->
