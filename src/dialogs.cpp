@@ -37,10 +37,10 @@ static const wchar_t* roleTitle(int r){
     }
 }
 
-// card geometry (shared by layout + paint)
+// v1.86 PREMIUM CLAY LOGIN — card geometry with breathing room, taller to fit well depth
 static void loginCard(HWND h, RECT& card){
     RECT rc; GetClientRect(h,&rc);
-    int cw=S(420), chh=S(460);
+    int cw=S(440), chh=S(490);
     int cx=(rc.right-cw)/2, cy=(rc.bottom-chh)/2;
     card.left=cx; card.top=cy; card.right=cx+cw; card.bottom=cy+chh;
 }
@@ -48,10 +48,10 @@ static void loginLayout(HWND h, LoginData* d){
     RECT c; loginCard(h,c);
     int cw=c.right-c.left;
     int ew=cw-S(96), ex=c.left+S(48);
-    MoveWindow(d->eUser, ex, c.top+S(168), ew, S(30), TRUE);
-    MoveWindow(d->ePass, ex, c.top+S(252), ew, S(30), TRUE);
-    MoveWindow(d->bOk,    c.left+S(40), c.top+S(346), cw-S(80), S(46), TRUE);
-    MoveWindow(d->bCancel,c.left+S(40), c.top+S(400), cw-S(80), S(38), TRUE);
+    MoveWindow(d->eUser, ex, c.top+S(170), ew, S(34), TRUE);
+    MoveWindow(d->ePass, ex, c.top+S(258), ew, S(34), TRUE);
+    MoveWindow(d->bOk,    c.left+S(40), c.top+S(356), cw-S(80), S(50), TRUE);
+    MoveWindow(d->bCancel,c.left+S(40), c.top+S(414), cw-S(80), S(42), TRUE);
 }
 
 static LRESULT CALLBACK loginProc(HWND h, UINT m, WPARAM w, LPARAM l){
@@ -137,67 +137,91 @@ static LRESULT CALLBACK loginProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  soft surface gradient, and a hairline accent ring; the role badge is
         //  a glowing gradient disc with a coloured halo instead of a flat blob.
         // ------------------------------------------------------------------
+        // v1.86 PREMIUM CLAY LOGIN — deeper double-shadow, white glass panel, accent ring
         COLORREF roleCol = (d&&d->role==2)?g_theme.danger:g_theme.accent;
-        gpShadow(dc,c,S(26),S(24),120);
-        gpGradRoundRectBg(dc,c,S(26),g_theme.surfaceTop,g_theme.surface,
-            blendColor(g_theme.border,roleCol,22),
-            g_dark?RGB(6,8,12):RGB(126,138,158));
+        // double shadow for clay extrusion
+        gpShadowColor(dc,c,S(26),S(30),60,roleCol);
+        gpShadow(dc,c,S(26),S(30),110);
+        // glass white panel with subtle gradient and inset highlight
+        gpGradRoundRectBg(dc,c,S(28),
+            blendColor(g_theme.surfaceTop, RGB(255,255,255), 40),
+            g_theme.surface,
+            blendColor(g_theme.border,roleCol,28),
+            g_dark?RGB(6,8,12):RGB(160,172,190));
+        // inset top highlight line for clay
+        {
+            RECT innerTop = c; innerTop.bottom = c.top + S(50); innerTop.left+=S(2); innerTop.right-=S(2); innerTop.top+=S(2);
+            if(innerTop.bottom>innerTop.top+1)
+                gpFillAlpha(dc, innerTop, S(26), RGB(255,255,255), g_dark?22:38);
+        }
 
         SetBkMode(dc,TRANSPARENT);
-        // role badge — v1.64.0 (درمان پلاس): the circular brand logo now fills
-        // this disc, framed by a role-tinted halo + ring (danger red for the
-        // hidden admin, accent blue otherwise). Falls back to the gradient disc
-        // + glyph if the embedded logo resource is unavailable.
-        int ir=S(28);
-        RECT ic={cx+cw/2-ir,cy+S(26),cx+cw/2+ir,cy+S(26)+2*ir};
-        { RECT halo=ic; InflateRect(&halo,S(7),S(7));
-          gpFillAlpha(dc,halo,(halo.bottom-halo.top)/2,roleCol,g_dark?70:52); }
-        gpShadowColor(dc,ic,ir,S(9),120,roleCol);
+        // role badge — circular brand logo halo+ring, concave
+        int ir=S(32);
+        RECT ic={cx+cw/2-ir,cy+S(30),cx+cw/2+ir,cy+S(30)+2*ir};
+        { RECT halo=ic; InflateRect(&halo,S(8),S(8));
+          gpFillAlpha(dc,halo,(halo.bottom-halo.top)/2,roleCol,g_dark?68:56); }
+        gpShadowColor(dc,ic,ir,S(12),120,roleCol);
+        gpShadow(dc,ic,ir,S(8),80);
         if(!gpDrawImageResCircle(dc, IMG_LOGO, ic)){
             gpGradRoundRect(dc,ic,ir,
-                blendColor(roleCol,RGB(255,255,255),26),roleCol,CLR_INVALID);
+                blendColor(roleCol,RGB(255,255,255),18),roleCol,CLR_INVALID);
             RECT ii={ic.left+S(14),ic.top+S(14),ic.right-S(14),ic.bottom-S(14)};
             drawIcon(dc, (d&&d->role==2)?ICO_SHIELD:ICO_USER, ii, RGB(255,255,255), S(2)+1);
         }
-        gpRoundRect(dc, ic, ir, CLR_INVALID,
-                    blendColor(roleCol, g_theme.border, 30));
+        gpRoundRect(dc, ic, ir, CLR_INVALID, blendColor(roleCol, g_theme.border, 36));
+        // inner highlight
+        {
+            RECT innerI = ic; InflateRect(&innerI, -S(2), -S(2));
+            if(innerI.right>innerI.left) gpRoundRect(dc, innerI, S(30), CLR_INVALID, RGB(255,255,255), 140);
+        }
 
-        SetTextColor(dc,g_theme.text);
+        SetTextColor(dc,g_theme.sectionInk);
         SelectObject(dc,g_fTitle);
-        RECT tr={cx,cy+S(94),cx+cw,cy+S(128)};
-        DrawTextW(dc,roleTitle(d?d->role:0),-1,&tr,
-            DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
+        RECT tr={cx,cy+S(106),cx+cw,cy+S(140)};
+        DrawTextW(dc,roleTitle(d?d->role:0),-1,&tr, DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
+        // small underline accent bar under title
+        {
+            int uw=S(56), ux=cx+cw/2-uw/2, uy=tr.bottom-S(2);
+            RECT ur={ux,uy,ux+uw,uy+S(3)};
+            gpGradRoundRectBgH(dc, ur, S(2), g_theme.accent, g_theme.accent2, CLR_INVALID, CLR_INVALID);
+        }
 
-        // labels + input boxes (frames around the EDIT controls)
-        SelectObject(dc,g_fSmall);
-        SetTextColor(dc,g_theme.textDim);
-        RECT lu={cx+S(48),cy+S(136),cx+cw-S(48),cy+S(158)};
+        // labels — stronger readable ink
+        SelectObject(dc,g_fLabel);
+        SetTextColor(dc,g_theme.labelInk);
+        RECT lu={cx+S(48),cy+S(148),cx+cw-S(48),cy+S(170)};
         DrawTextW(dc,L"نام کاربری",-1,&lu,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
-        RECT lp={cx+S(48),cy+S(220),cx+cw-S(48),cy+S(242)};
+        RECT lp={cx+S(48),cy+S(230),cx+cw-S(48),cy+S(252)};
         DrawTextW(dc,L"رمز عبور",-1,&lp,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
 
-        // v1.63.0: recessed input wells with an accent glow on the focused one,
-        // so the caret's location is obvious even at a glance.
+        // input wells — clay concave inset + focus halo
         { HWND foc=GetFocus();
-          RECT bu={cx+S(40),cy+S(160),cx+cw-S(40),cy+S(206)};
-          RECT bp={cx+S(40),cy+S(244),cx+cw-S(40),cy+S(290)};
+          RECT bu={cx+S(40),cy+S(174),cx+cw-S(40),cy+S(214)};
+          RECT bp={cx+S(40),cy+S(256),cx+cw-S(40),cy+S(296)};
           bool fu=(d && d->eUser && foc==d->eUser);
           bool fp=(d && d->ePass && foc==d->ePass);
           for(int k=0;k<2;k++){
               RECT wr2 = k? bp : bu;
               bool fo  = k? fp : fu;
-              if(fo) gpShadowColor(dc,wr2,S(10),S(6),80,g_theme.accent);
-              gpGradRoundRect(dc,wr2,S(10),
-                  blendColor(g_theme.inputBg,g_theme.border,g_dark?26:34),
-                  g_theme.inputBg, fo?g_theme.accent:g_theme.border);
+              if(fo) gpShadowColor(dc,wr2,S(11),S(7),90,g_theme.accent);
+              gpGradRoundRectBg(dc,wr2,S(11),
+                  blendColor(g_theme.inputBg, g_theme.border, 20),
+                  g_theme.inputBg,
+                  fo?g_theme.accent:blendColor(g_theme.border,g_theme.accent,18),
+                  g_theme.bg);
+              // inset highlight top edge
+              if(!fo) {
+                  RECT hi={wr2.left+S(4), wr2.top+S(2), wr2.right-S(4), wr2.top+S(8)};
+                  if(hi.bottom>hi.top) gpFillAlpha(dc, hi, S(8), RGB(255,255,255), 120);
+              }
           } }
 
         if(d && !d->errMsg.empty()){
             SetTextColor(dc,g_theme.danger);
-            SelectObject(dc,g_fUI);
-            RECT er={cx+S(40),cy+S(300),cx+cw-S(40),cy+S(338)};
-            DrawTextW(dc,d->errMsg.c_str(),-1,&er,
-                DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
+            SelectObject(dc,g_fUIB);
+            RECT er={cx+S(40),cy+S(308),cx+cw-S(40),cy+S(344)};
+            DrawTextW(dc,d->errMsg.c_str(),-1,&er, DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
         }
         BitBlt(dc0,0,0,rc.right,rc.bottom,dc,0,0,SRCCOPY);
         SelectObject(dc,obm); DeleteObject(bmp); DeleteDC(dc);
@@ -406,14 +430,21 @@ static LRESULT CALLBACK shiftProc(HWND h, UINT m, WPARAM w, LPARAM l){
             g_dark?RGB(6,8,12):RGB(126,138,158),
             g_dark?RGB(14,18,26):RGB(168,178,194),CLR_INVALID);
         RECT c; shiftCard(h,c);
-        // v1.63.0: real layered blur shadow + surface gradient (the old code
-        // drew a solid grey duplicate of the card offset by 6 px, which looked
-        // like a rendering artefact rather than elevation).
-        gpShadow(dc,c,S(18),S(22),120);
-        gpGradRoundRectBg(dc,c,S(18),g_theme.surfaceTop,g_theme.surface,
-            g_theme.border,g_dark?RGB(6,8,12):RGB(126,138,158));
+        // v1.86 PREMIUM CLAY SHIFT — double shadow + white glass gradient
+        gpShadowColor(dc,c,S(22),S(32),52,g_theme.accent);
+        gpShadow(dc,c,S(22),S(32),120);
+        gpGradRoundRectBg(dc,c,S(22),
+            blendColor(g_theme.surfaceTop, RGB(255,255,255), 40),
+            g_theme.surface,
+            blendColor(g_theme.border, g_theme.accent, 24),
+            g_dark?RGB(6,8,12):RGB(160,172,190));
+        // top highlight
+        {
+            RECT ht = c; ht.bottom = c.top + S(60); ht.left+=S(2); ht.right-=S(2); ht.top+=S(2);
+            if(ht.bottom>ht.top+1) gpFillAlpha(dc, ht, S(22), RGB(255,255,255), g_dark?18:34);
+        }
         SetBkMode(dc,TRANSPARENT);
-        SetTextColor(dc,g_theme.text);
+        SetTextColor(dc,g_theme.sectionInk);
         SelectObject(dc,g_fTitle);
         RECT tr={c.left,c.top+S(24),c.right,c.top+S(58)};
         DrawTextW(dc,L"انتخاب شیفت کاری",-1,&tr,
@@ -581,14 +612,20 @@ static LRESULT CALLBACK profProc(HWND h, UINT m, WPARAM w, LPARAM l){
             g_dark?RGB(6,8,12):RGB(126,138,158),
             g_dark?RGB(14,18,26):RGB(168,178,194),CLR_INVALID);
         RECT c; profCard(h,c);
-        // v1.63.0: real layered blur shadow + surface gradient (the old code
-        // drew a solid grey duplicate of the card offset by 6 px, which looked
-        // like a rendering artefact rather than elevation).
-        gpShadow(dc,c,S(18),S(22),120);
-        gpGradRoundRectBg(dc,c,S(18),g_theme.surfaceTop,g_theme.surface,
-            g_theme.border,g_dark?RGB(6,8,12):RGB(126,138,158));
+        // v1.86 PREMIUM CLAY PROFILE — double shadow + white glass
+        gpShadowColor(dc,c,S(22),S(32),52,g_theme.accent);
+        gpShadow(dc,c,S(22),S(32),120);
+        gpGradRoundRectBg(dc,c,S(22),
+            blendColor(g_theme.surfaceTop, RGB(255,255,255), 40),
+            g_theme.surface,
+            blendColor(g_theme.border, g_theme.accent, 24),
+            g_dark?RGB(6,8,12):RGB(160,172,190));
+        {
+            RECT ht = c; ht.bottom = c.top + S(60); ht.left+=S(2); ht.right-=S(2); ht.top+=S(2);
+            if(ht.bottom>ht.top+1) gpFillAlpha(dc, ht, S(22), RGB(255,255,255), g_dark?18:34);
+        }
         SetBkMode(dc,TRANSPARENT);
-        SetTextColor(dc,g_theme.text);
+        SetTextColor(dc,g_theme.sectionInk);
         SelectObject(dc,g_fTitle);
         RECT tr={c.left,c.top+S(22),c.right,c.top+S(56)};
         DrawTextW(dc,L"ویرایش پروفایل کاربر",-1,&tr,

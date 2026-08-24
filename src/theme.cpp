@@ -64,34 +64,36 @@ void applyTheme(bool dark){
         //  bg #F5F8FD · surface #FFFFFF · surface2 #EAF4FF · border #DCE6F2
         //  text #233042 · muted #6B7A90 · accent #1976F3 · hover #2D8CFF
         //  success #16C47F · warning #F4B740 · danger #E24C4B.
-        // v1.85.0: soften the light palette toward a neumorphic/claymorphic base
-        // and unify the accent with the embedded admission page (refined indigo).
-        // The page sits a touch deeper so the near-white clay cards extrude,
-        // borders stay soft, and the header reads as a frosted band.
-        g_theme.bg          = RGB(0xE3, 0xEB, 0xF5); // #E3EBF5 slightly darker soft clay page
-        g_theme.bg2         = RGB(0xD5, 0xE0, 0xF0); // page gradient bottom slightly darker
+        // v1.86.0: premium light "CLINIC GLASS" — NOT a flat white sheet.
+        // Page is a soft blue-grey clay (#E6EEF8 → #DDE8F5) so white glass cards
+        // extrude with depth. Header is PURE WHITE frosted glass (#FFFFFF → #EEF3FB)
+        // — never dark. Borders are crisp clay edges (#C8D8EB). Accent is refined
+        // indigo #4B63E6 that matches the embedded admission page.
+        // The goal: modern, layered, readable, NEVER white-on-white washed out.
+        g_theme.bg          = RGB(0xE6, 0xEE, 0xF8); // #E6EEF8 soft clay page top
+        g_theme.bg2         = RGB(0xD9, 0xE3, 0xF2); // #D9E3F2 page gradient bottom
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
-        g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
-        g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
-        g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
-        g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
-        g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
-        g_theme.labelInk    = RGB(0x35, 0x3F, 0x4F); // readable labels
-        g_theme.sectionInk  = RGB(0x1C, 0x26, 0x35); // strong titles
-        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo (matches page)
-        g_theme.accent2     = RGB(0x6A, 0x83, 0xF7); // #6A83F7 gradient end / hover
-        g_theme.accentHover = RGB(0x6A, 0x83, 0xF7); // #6A83F7 lighter accent on hover
+        g_theme.surfaceTop  = RGB(0xFE, 0xFE, 0xFF); // #FEFEFF card top-light
+        g_theme.surface2    = RGB(0xEE, 0xF3, 0xFB); // #EEF3FB wells / bars / action-bar
+        g_theme.border      = RGB(0xC8, 0xD8, 0xEB); // #C8D8EB soft clay edge, visible
+        g_theme.text        = RGB(0x18, 0x26, 0x3D); // #18263D primary ink
+        g_theme.textDim     = RGB(0x61, 0x6E, 0x83); // #616E83 muted
+        g_theme.labelInk    = RGB(0x32, 0x3E, 0x52); // readable labels
+        g_theme.sectionInk  = RGB(0x16, 0x22, 0x35); // strong titles
+        g_theme.accent      = RGB(0x4B, 0x63, 0xE6); // #4B63E6 refined indigo
+        g_theme.accent2     = RGB(0x6B, 0x83, 0xFF); // #6B83FF gradient end
+        g_theme.accentHover = RGB(0x63, 0x7A, 0xF5); // hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
         g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
         g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
         g_theme.success     = RGB(0x15, 0xB5, 0x81); // #15B581
-        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C warning
-        g_theme.inputBg     = RGB(0xF3, 0xF6, 0xFC); // tinted well
-        g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
-        g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
-        // frosted header band with real depth
-        g_theme.headerTop   = RGB(0xFB, 0xFC, 0xFE);
-        g_theme.headerBot   = RGB(0xE1, 0xEA, 0xF6);
+        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C
+        g_theme.inputBg     = RGB(0xF1, 0xF5, 0xFB); // #F1F5FB tinted well
+        g_theme.inputText   = RGB(0x18, 0x26, 0x3D);
+        g_theme.hover       = RGB(0xE7, 0xED, 0xFA); // soft accent wash
+        // v1.86: HEADER MUST BE LIGHT — pure white → #ECF2FA frosted band
+        g_theme.headerTop   = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF
+        g_theme.headerBot   = RGB(0xEC, 0xF2, 0xFA); // #ECF2FA
         g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
         // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now
@@ -620,43 +622,43 @@ static LRESULT CALLBACK btnProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //      the accent on hover plus a faint inner wash, so they respond
         //      without shouting.
         // ------------------------------------------------------------------
+        // v1.86 Claymorphism: chunky, rounded, extruded with soft shadows
         int hgt = rr.bottom-rr.top; if(hgt<1) hgt=1;
-        int rad = S(st==BS_CARD?28:10);   // v1.85: chunkier claymorphic card corner
+        int rad = S(st==BS_CARD?30:12);
         if(st!=BS_CARD){
-            rad = hgt/3;                       // proportional corner
-            if(rad > S(14)) rad = S(14);
-            if(rad < S(6))  rad = S(6);
+            rad = hgt/3;
+            if(rad > S(16)) rad = S(16);
+            if(rad < S(7))  rad = S(7);
         }
-        // shared helper: solid style body = shadow + SOLID BASE + gradient + sheen
-        // + rim. The solid base (the darker stop) is painted FIRST so the button
-        // always carries its brand colour even if the GDI+ gradient pass ever
-        // fails to draw — this is the definitive guard against the
-        // "white text on a white button" regression (v1.64.0).
+        // v1.86 Claymorphic solid button: concave illusion via gradient
+        // (darker top → lighter bottom for pressed-in feel at rest, lighter top
+        // for pop-out; sheen strip + inner white highlight + bottom rim)
         auto solidBody = [&](COLORREF top, COLORREF bot, COLORREF glow){
             if(!dn){
-                // Tinted soft outer shadow: larger and softer for Claymorphism
-                gpShadowColor(dc, rr, rad, hv?S(12):S(8), hv?110:66, glow);
+                gpShadowColor(dc, rr, rad, hv?S(14):S(9), hv?120:72, glow);
             }
-            // For Concave styling: top of gradient is slightly darker/saturated, bottom is lighter
-            COLORREF cTop = dn ? bot : blendColor(top, RGB(0,0,0), 12);
-            COLORREF cBot = dn ? top : blendColor(bot, RGB(255,255,255), 18);
-
-            // GDI fallback
+            // True concave: darker saturated top, lighter luminous bottom
+            COLORREF cTop, cBot;
+            if(dn){
+                cTop = bot; cBot = top;
+            } else {
+                cTop = blendColor(top, RGB(0,0,0), 10);
+                cBot = blendColor(bot, RGB(255,255,255), 14);
+            }
             fillRoundRect(dc, rr, rad*2, cBot, CLR_INVALID);
             gpGradRoundRect(dc, rr, rad, cTop, cBot, CLR_INVALID);
-
-            // top sheen — a white wash over the upper 45 % of the body
-            RECT sh = rr; sh.bottom = rr.top + (hgt*45)/100;
+            // top sheen 45% white wash
+            RECT sh = rr; sh.bottom = rr.top + (hgt*44)/100;
             if(sh.bottom > sh.top+1)
-                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?12:26);
-
-            // Inner Highlight (white outline with alpha 110) for Claymorphism
+                gpFillAlpha(dc, sh, rad, RGB(255,255,255), dn?10:28);
+            // inner white rim for clay highlight
             RECT inner = rr; InflateRect(&inner, -S(1), -S(1));
-            gpRoundRect(dc, inner, rad>S(1)?rad-S(1):rad, CLR_INVALID, RGB(255,255,255), 110);
-
-            // bottom rim — one hairline of the darker stop for definition
+            if(inner.right>inner.left && inner.bottom>inner.top)
+                gpRoundRect(dc, inner, rad>S(1)?rad-S(1):rad, CLR_INVALID,
+                            blendColor(RGB(255,255,255), cBot, 22), 130);
+            // bottom rim
             gpRoundRect(dc, rr, rad, CLR_INVALID,
-                blendColor(bot, RGB(0,0,0), dn?26:16));
+                blendColor(bot, RGB(0,0,0), dn?24:14));
         };
         // v1.3.0: anti-aliased GDI+ fills with a soft gradient on solid styles
         if(st==BS_PRIMARY){

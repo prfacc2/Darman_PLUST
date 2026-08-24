@@ -578,13 +578,11 @@ static void updateHeaderButtons(HWND h){
     ShowWindow(s_bNewPat,   showPat?SW_SHOW:SW_HIDE);
     ShowWindow(s_bNewTab,   show?SW_SHOW:SW_HIDE);
     if(!show) return;
+    // v1.86 — clay concave primary actions in action-bar, more breathing room
     RECT rc; GetClientRect(h,&rc);
-    int bh=S(38), pad=S(16), g=S(10);
-    // LAYER 2 (action bar) sits directly under LAYER 1.
+    int bh=S(40), pad=S(18), g=S(12);
     int y = mainBarH() + (actionBarH()-bh)/2;
-    // RIGHT-aligned cluster (v1.60.0 — «نوبت‌دهی» removed; right → left):
-    //     پذیرش بیمار  |  تب جدید        (پذیرش hidden when not permitted)
-    int wNew=S(134), wTab=S(112);
+    int wNew=S(154), wTab=S(122);
     int x = rc.right - pad - (showPat?wNew:wTab);
     if(showPat){
         MoveWindow(s_bNewPat, x,                      y, wNew,  bh, TRUE);
@@ -592,7 +590,6 @@ static void updateHeaderButtons(HWND h){
     } else {
         MoveWindow(s_bNewTab, x,                      y, wTab,  bh, TRUE);
     }
-    // blend the buttons' rounded corners into the LAYER 2 surface colour.
     setFlatButtonBg(s_bNewPat, g_theme.surface2);
     setFlatButtonBg(s_bNewTab, g_theme.surface2);
 }
@@ -795,12 +792,10 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         SelectClipRgn(dc,dclip);
 
         // ===================== LAYER 1 — top header bar =====================
-        // Soft vertical gradient so the header reads as a distinct, polished
-        // surface (not a flat strip). Concave gradient feeling for header: slightly darker at top
+        // v1.86: HEADER MUST BE LIGHT — pure white frosted glass band.
+        // No black blending ever, only white → tinted soft to give depth.
         RECT tb={0,0,rc.right,mainBarH()};
-        COLORREF hTop = blendColor(g_theme.headerTop, RGB(0,0,0), 10);
-        COLORREF hBot = blendColor(g_theme.headerBot, RGB(255,255,255), 10);
-        gpGradRoundRect(dc,tb,0,hTop,hBot,CLR_INVALID);
+        gpGradRoundRect(dc,tb,0,g_theme.headerTop,g_theme.headerBot,CLR_INVALID);
         // v1.77: a thin branded accent ribbon along the header's top edge — the
         // same "designed" signature the welcome panel carries, on both themes —
         // so the header reads as a polished, branded surface, not a flat strip.
@@ -814,17 +809,18 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // crisp separator between the two header layers
             gpLine(dc,0,mainBarH(),rc.right,mainBarH(),g_theme.border,1.0f);
         }
-        // bottom status bar
+        // bottom status bar — lighter tinted wash
         RECT bb={0,rc.bottom-botBarH(),rc.right,rc.bottom};
-        FillRect(dc,&bb,g_brSurface2);
-        // middle bg (gentle gradient page)
+        gpGradRoundRect(dc,bb,0,
+            blendColor(g_theme.surface2, RGB(255,255,255), 20),
+            g_theme.surface2, CLR_INVALID);
+        // middle bg — premium light clay
         RECT mid={0,topBarH(),rc.right,rc.bottom-botBarH()};
         gpGradRoundRect(dc,mid,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
-        // crisp separators
-        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.border,1.0f);
-        gpLine(dc,0,rc.bottom-botBarH(),rc.right,rc.bottom-botBarH(),g_theme.border,1.0f);
-        // a thin accent underline under the header for that "designed" feel
-        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,40);
+        // crisp separators — hairline, not heavy
+        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.border,1.0f,160);
+        gpLine(dc,0,rc.bottom-botBarH(),rc.right,rc.bottom-botBarH(),g_theme.border,1.0f,160);
+        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,32);
 
         SetBkMode(dc,TRANSPARENT);
 
