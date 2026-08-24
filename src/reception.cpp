@@ -684,6 +684,7 @@ static void MsgToast_Show(HWND recHwnd, const KMsg& msg, int unseen){
     KillTimer(t,1);
     SetTimer(t,1,9000,NULL);   // auto-dismiss after 9 s
     InvalidateRect(t,NULL,TRUE);
+    UpdateWindow(t);           // paint now, not at the next idle pass
 }
 
 // ---------------------------------------------------------------- billing --
@@ -4755,6 +4756,12 @@ static void recLayoutTabs(HWND h){
             ShowWindow(t->page,SW_SHOW);
         } else ShowWindow(t->page,SW_HIDE);
     }
+    // v1.89.0: keep the message toast above the tab pages. Showing a page
+    // with SW_SHOW raises it to the top of the Z order, which would sink a
+    // live toast behind a full-screen page (invisible + unclickable for the
+    // rest of its 9 s). Re-assert the toast on top after every relayout.
+    if(HWND tw=FindWindowExW(h,NULL,AZ_TOAST_CLS,NULL))
+        if(IsWindowVisible(tw)) BringWindowToTop(tw);
 }
 static void addTabKind(HWND h, int kind, const std::string& extra=""){
     if(!s_rd) return;
@@ -4905,6 +4912,17 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
             }
             s_rd->lastUnseen=n;
         }
+        // v1.89.0: the message toast is a transient notification and must stay
+        // above every tab page for its whole 9 s life. Any path that shows or
+        // raises a page (tab switch, web-view re-creation, detach/reattach)
+        // would otherwise sink it behind a full-screen page. The repaint also
+        // keeps it fresh if a page painted over it (seen under Wine).
+        if(HWND tw=FindWindowExW(h,NULL,AZ_TOAST_CLS,NULL))
+            if(IsWindowVisible(tw)){
+                BringWindowToTop(tw);
+                InvalidateRect(tw,NULL,TRUE);
+                UpdateWindow(tw);
+            }
         return 0;
     case WM_NCDESTROY:
         KillTimer(h,77);
