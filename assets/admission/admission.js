@@ -2726,21 +2726,117 @@
     var surf = window.__azSurface || 'admission';
     /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
        grid); the same HTML file renders it full-page via body.surface-rc. */
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
     else if (surf === 'receipts') cls += ' surface-rc';
+    else if (surf === 'dash') cls += ' surface-dash';
     else cls += ' surface-adm';
     b.className = cls;
   }
 
   function boot() {
     applySurfaceClass();
+    /* v1.89: reception DASHBOARD — app-icon actions, envelope unread badge,
+       drawer with categories + search. Wired ONLY on the dash surface so the
+       broadcast «dash.unread» event never touches other surfaces. */
+    (function () {
+      if ((window.__azSurface || '') !== 'dash') return;
+      function dashSetUnread(n) {
+        var fa = 0; try { fa = n | 0; } catch (e) { fa = 0; }
+        var b1 = $('dashMailBadge'), b2 = $('dashTileBadge');
+        var txt = toFa(fa);
+        if (b1) {
+          b1.textContent = txt;
+          b1.className = 'dash-mail-badge' + (fa > 0 ? ' has' : '');
+        }
+        if (b2) {
+          b2.textContent = txt;
+          b2.className = 'dash-app-badge' + (fa > 0 ? ' has' : '');
+        }
+      }
+      function openApp(kind) { Bridge.call('ui.openTab', { kind: kind }); }
+      on($('dashNewPat'), 'click', function () { openApp('admission'); });
+      on($('dashNewTab'), 'click', function () { openApp('empty'); });
+      on($('dashPortal'), 'click', function () { openApp('portal'); });
+      on($('dashMail'), 'click', function () { openApp('portal'); });
+      /* initial count + live sync from the native poll */
+      Bridge.call('portal.unread', {}).then(function (d) {
+        if (d && d.ok) dashSetUnread(d.n);
+      });
+      Bridge.on('dash.unread', function (d) { if (d && d.n != null) dashSetUnread(d.n); });
+      /* drawer */
+      var drawer = $('dashDrawer'), bk = $('dashDrawerBk');
+      function openD() { if (drawer) drawer.className = 'dash-drawer open'; if (bk) bk.className = 'dash-drawer-bk open'; }
+      function closeD() { if (drawer) drawer.className = 'dash-drawer'; if (bk) bk.className = 'dash-drawer-bk'; }
+      on($('dashBurger'), 'click', function () {
+        if (drawer && /(^|\s)open(\s|$)/.test(drawer.className)) closeD(); else openD();
+      });
+      on($('dashDrawerClose'), 'click', closeD);
+      on($('dashDrawerBk'), 'click', closeD);
+      var body = $('dashDrawerBody');
+      if (body) {
+        var items = body.getElementsByClassName('dash-drawer-item');
+        for (var ii = 0; ii < items.length; ii++) {
+          (function (it) {
+            on(it, 'click', function () {
+              var t = $(it.getAttribute('data-app'));
+              closeD();
+              if (t && t.style.display !== 'none') t.click();
+            });
+          })(items[ii]);
+        }
+      }
+      /* search — filters the app icons AND the drawer items */
+      function norm(x) { return (x || '').replace(/\s+/g, ' ').toLowerCase(); }
+      function dashFilter(q) {
+        q = norm(q);
+        var grid = $('dashGrid'), any = false, i, txt;
+        if (grid) {
+          var apps = grid.getElementsByClassName('dash-app');
+          for (i = 0; i < apps.length; i++) {
+            txt = norm(apps[i].getAttribute('data-name') + ' ' + (apps[i].textContent || apps[i].innerText));
+            var hide = !!(q && txt.indexOf(q) < 0);
+            apps[i].style.display = hide ? 'none' : '';
+            if (!hide) any = true;
+          }
+        }
+        var emp = $('dashEmpty');
+        if (emp) emp.style.display = (q && !any) ? '' : 'none';
+        if (body) {
+          var dis = body.getElementsByClassName('dash-drawer-item');
+          for (i = 0; i < dis.length; i++) {
+            txt = norm(dis[i].textContent || dis[i].innerText);
+            dis[i].style.display = (q && txt.indexOf(q) < 0) ? 'none' : '';
+          }
+          /* hide a category heading when every item under it is filtered out */
+          var kids = body.childNodes, lastCat = null, lastVis = false;
+          for (i = 0; i < kids.length; i++) {
+            var k = kids[i];
+            if (!k.className) continue;
+            if (/(^|\s)dash-cat(\s|$)/.test(k.className)) {
+              if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+              lastCat = k; lastVis = false;
+            } else if (/(^|\s)dash-drawer-item(\s|$)/.test(k.className)) {
+              if (k.style.display !== 'none') lastVis = true;
+            }
+          }
+          if (lastCat) lastCat.style.display = lastVis ? '' : 'none';
+        }
+      }
+      on($('dashQ'), 'keyup', function () { dashFilter(this.value); });
+      on($('dashQ'), 'input', function () { dashFilter(this.value); });
+      on($('dashDrawerQ'), 'keyup', function () { dashFilter(this.value); });
+      on($('dashDrawerQ'), 'input', function () { dashFilter(this.value); });
+      /* permission gating — same ticks as the rest of the app */
+      Bridge.ready(function () { /* bridge already up at boot */ });
+    })();
+
     loaderText('در حال همگام‌سازی با برنامه…');
     Bridge.call('init', {}).then(function (r) {
       if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
@@ -2775,6 +2871,14 @@
       if (r.perms && r.perms.cashier === false) {
         var ql = $('queueLauncher'); if (ql) ql.style.display = 'none';
       }
+      /* v1.89: dashboard tiles honour the same access ticks */
+      if (r.perms && r.perms.admission === false) {
+        var dnp = $('dashNewPat'); if (dnp) dnp.style.display = 'none';
+      }
+      if (r.perms && r.perms.worklist === false) {
+        var dpt = $('dashPortal'); if (dpt) dpt.style.display = 'none';
+        var dml = $('dashMail'); if (dml) dml.style.display = 'none';
+      }
       state.canCashView = !r.perms || r.perms.cashier_view !== false;
       state.canCashEdit = !r.perms || r.perms.cashier_edit !== false;
       if (!state.canCashView) {
@@ -2793,7 +2897,12 @@
       setSync('ok', 'همگام با برنامه');
       state.ready = true;
       hideLoader();
-      if (state.surface === 'tools') {
+      if (state.surface === 'dash') {
+        /* dashboard: greet with the user name; badges sync via portal.unread */
+        var du = $('dashUser');
+        if (du && r.user) du.textContent = r.user;
+        toast('داشبورد آماده است', 'ok');
+      } else if (state.surface === 'tools') {
         showToolsHome();
         toast('ابزارها آماده است', 'ok');
       } else if (state.surface === 'receipts') {

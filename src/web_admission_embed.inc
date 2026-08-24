@@ -190,7 +190,8 @@ static std::string AdmissionPageForHost(bool withFont, HWND host){
         auto it=g_adInject.find(host);
         if(it!=g_adInject.end()){ surf=it->second.first; ticket=it->second.second; }
     }
-    if(surf!="tools" && surf!="cashier" && surf!="queue" && surf!="receipts") surf="admission";  // v1.88: receipts tab
+    if(surf!="tools" && surf!="cashier" && surf!="queue" && surf!="receipts"
+       && surf!="dash") surf="admission";  // v1.88: receipts; v1.89: dashboard
     if(ticket.find("</")!=std::string::npos) ticket.clear();
     std::string inj="<script>window.__azSurface=\"";
     inj+=surf;

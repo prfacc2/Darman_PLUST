@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.88.0"
+#define APP_VERSION_W   L"1.89.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -133,7 +133,9 @@ enum IconId {
     ICO_LETTER,
     // v1.87.0: person-plus glyph for the «پذیرش بیمار» header action so it is
     // visually distinct from «تب جدید» (which keeps the plain plus/tab glyph).
-    ICO_USER_ADD
+    ICO_USER_ADD,
+    // v1.89.0: house glyph for the permanent «داشبورد» reception tab.
+    ICO_HOME
 };
 // §F: spec name alias — the work order references this symbol explicitly.
 #define IC_SAVED_MSG ICO_SAVED_MSG
@@ -562,11 +564,15 @@ void Reception_OpenTools();
 void Reception_OpenCashier();
 void Reception_OpenQueue();
 void Reception_OpenReceipts();
+void Reception_OpenPortal();
+void Reception_OpenNewTab();
+void Reception_OpenAdmissionNew();
 void Reception_OpenAdmissionTicket(const std::string& ticketJson);
 void Reception_CloseTools();
 void Reception_CloseCashier();
 void Reception_CloseQueue();
 void Reception_CloseReceipts();
+void Reception_ClosePortal();
 void Reception_ResetZoom();
 
 // ---------------------------------------------------------------- dialogs --
