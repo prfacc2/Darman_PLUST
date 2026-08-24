@@ -58,7 +58,6 @@ static ScreenId s_curScreen = SC_HOME;
 // v1.89.0: the welcome-screen entrance animation was REMOVED on request — the
 // 30-frame repaint burst caused a visible FPS drop/stutter on real machines.
 // No timer, no shimmer; the home screen now repaints ONLY what changed.
-static int s_homePhase = -1;   // always idle (kept for the paint branches)
 
 // ------------------------------------------------------------------ fonts --
 static HFONT mkFont(int px, int weight){

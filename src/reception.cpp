@@ -628,6 +628,8 @@ static LRESULT CALLBACK toastProc(HWND h, UINT m, WPARAM w, LPARAM l){
         BitBlt(dc0,0,0,rc.right,rc.bottom,dc,0,0,SRCCOPY);
         SelectObject(dc,obm); DeleteObject(bmp); DeleteDC(dc);
         EndPaint(h,&ps);
+        { wchar_t tb[160]; swprintf(tb,160,L"toastDBG: paint hwnd=%p w=%d h=%d vis=%d",
+            (void*)h, rc.right, rc.bottom, (int)IsWindowVisible(h)); logLine(tb); }
         return 0; }
     case WM_LBUTTONUP: {
         ShowWindow(h,SW_HIDE);
@@ -673,7 +675,6 @@ static void MsgToast_Show(HWND recHwnd, const KMsg& msg, int unseen){
                           0,0,10,10,recHwnd,NULL,g_hInst,NULL);
         if(!t){ logLine(L"toast: CreateWindowEx failed"); return; }
     }
-    writeFileUtf8(logsDir()+L"\\logs\\toast_marker.txt", L"shown", true);   // DEBUGTEMP
     KMsg* old=(KMsg*)GetWindowLongPtrW(t,GWLP_USERDATA);
     delete old;
     SetWindowLongPtrW(t,GWLP_USERDATA,(LONG_PTR)new KMsg(msg));
@@ -685,6 +686,19 @@ static void MsgToast_Show(HWND recHwnd, const KMsg& msg, int unseen){
     KillTimer(t,1);
     SetTimer(t,1,9000,NULL);   // auto-dismiss after 9 s
     InvalidateRect(t,NULL,TRUE);
+    { wchar_t tb[256]; swprintf(tb,256,L"toastDBG: pos x=%d y=%d w=%d h=%d parent=%p vis=%d",
+        rc.right-tw-S(14), rc.bottom-th-S(14), tw, th, (void*)recHwnd, (int)IsWindowVisible(t));
+      logLine(tb); }
+    { // enumerate reception children top-to-bottom to see Z-order
+      wchar_t zb[1024]={0}; size_t off=0;
+      for(HWND c=GetWindow(recHwnd,GW_CHILD); c && off<900; c=GetWindow(c,GW_HWNDNEXT)){
+          wchar_t cn[64]={0}; GetClassNameW(c,cn,63);
+          RECT cr; GetWindowRect(c,&cr);
+          off+=swprintf(zb+off,1024-off,L" [%s %p vis=%d r=%d,%d-%d,%d]",cn,(void*)c,
+              (int)IsWindowVisible(c),cr.left,cr.top,cr.right,cr.bottom);
+      }
+      logLine(std::wstring(L"toastDBG zorder:")+zb);
+    }
 }
 
 // ---------------------------------------------------------------- billing --
@@ -2775,7 +2789,9 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
-        if(t->kind!=TK_RECEPTION) return 0;
+        // v1.89: TK_DASH also falls back to the native admission form, so a
+        // machine without WebView2 AND MSHTML still has a working پذیرش path.
+        if(t->kind!=TK_RECEPTION && t->kind!=TK_DASH) return 0;
         // v1.25.0: ES_RIGHT so every textbox is right-aligned (راست‌چین) by
         // default — Persian RTL data entry. Fields with enableAutoDir still flip
         // alignment live based on typed content (Latin vs Persian).
@@ -4874,6 +4890,12 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         s_rd->bCalc   = NULL;   // calculator also in the frame header
         s_rd->lastUnseen = unseenMessageCount(g_session.user.username);
         SetTimer(h, 77, 5000, NULL);   // poll the cartable for new messages
+        {   // toastDBG: pre-create the toast at entry (replicates the 22:52 working config)
+            KMsg tm; tm.from=L"مدیریت"; tm.to=L"*"; tm.time=L"1405/06/03";
+            tm.seen=false; tm.type=KMSG_CRITICAL;
+            tm.text=L"متن تست…";
+            MsgToast_Show(h, tm, 1);
+        }
         return 0;
     case WM_APP_THEME:
         InvalidateRect(h,NULL,TRUE);
@@ -4903,6 +4925,20 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 WebAdmission_PushEvent("dash.unread", js);
             }
             s_rd->lastUnseen=n;
+        }
+        { // toastDBG: re-raise and repaint any live toast each poll tick
+            HWND tw=FindWindowExW(h,NULL,AZ_TOAST_CLS,NULL);
+            if(tw && IsWindowVisible(tw)){
+                logLine(L"toastDBG: tick re-raise");
+                BringWindowToTop(tw);
+                InvalidateRect(tw,NULL,TRUE);
+                UpdateWindow(tw);
+                HDC tdc=GetDC(tw);
+                if(tdc){ HBRUSH rb=CreateSolidBrush(RGB(255,0,0));
+                    RECT rr={0,0,60,60}; FillRect(tdc,&rr,rb); DeleteObject(rb);
+                    ReleaseDC(tw,tdc); logLine(L"toastDBG: GetDC red fill done"); }
+                else logLine(L"toastDBG: GetDC FAILED");
+            }
         }
         return 0;
     case WM_NCDESTROY:
@@ -5353,6 +5389,7 @@ void Reception_OpenReceipts(){
 // header action bar: reuse an EMPTY tab if focused, else open a fresh one).
 void Reception_OpenPortal(){
     HWND h=recWnd(); if(!h) return;
+    if(!userHasPerm(g_session.user, L"worklist")) return;   // v1.89: tick gate
     activateKind(h, TK_PORTAL);
 }
 void Reception_OpenNewTab(){
@@ -5361,6 +5398,7 @@ void Reception_OpenNewTab(){
 }
 void Reception_OpenAdmissionNew(){
     HWND h=recWnd(); if(!h) return;
+    if(!userHasPerm(g_session.user, L"admission")) return;  // v1.89: tick gate
     if(s_rd && s_rd->active>=0 && s_rd->active<(int)s_rd->tabs.size()
        && s_rd->tabs[s_rd->active]->kind==TK_EMPTY)
         addTab(h);          // reuse the empty placeholder
