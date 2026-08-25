@@ -1,0 +1,798 @@
+/* ============================================================================
+   surface-dash.css — staff dashboard
+   ----------------------------------------------------------------------------
+   Part of the v1.91.0 ordered theme layer. Load order is fixed in index.html:
+     common.css → admission.css (structure) → css/core.css → css/surface-*.css
+   This file owns its layer EXCLUSIVELY. Never restyle another layer's
+   selectors from here, and never append a dated "polish pass" block.
+
+   DUAL-ENGINE CONTRACT (WebView2 Chromium + MSHTML/Trident): no var(), no
+   grid, no flex gap, no backdrop-filter, no CSS logical properties, literal
+   hex colours only, every flex declaration paired with its -ms- equivalent.
+   Palette values come from docs/DESIGN_SYSTEM.md — no ad-hoc colours.
+   ----------------------------------------------------------------------------
+   THE DASHBOARD SHELL (DESIGN_SYSTEM §9, §10.1)
+     canvas   canvas-dash-* three-stop + glow-indigo (top-right)
+              + glow-azure (bottom-left) + 1px diagonal weave
+     header   FLOATING rounded glass bar, inset 14px, radius 16, sh-3
+     nav      centred pill search (460px / 42%) + exactly two app icons
+              inside one glass tray («اقدامات اصلی»)
+     rhythm   airy · centred · few large targets · 16–24px corner language
+
+   HUES (one hue per thing, §2.1)
+     پذیرش بیمار · اقدامات اصلی · focus   indigo  #E7ECFD #BCC8F4 #3550D8 #22349C
+     تب جدید                              teal    #DEF1F1 #A7D8D9 #0F8B8D #095A5C
+     کارتابل پیام (drawer chip)           azure   #E3F1FB #AFD4EE #0E7FC0 #0A4A72
+     unread count                         red     #D24343 → #B62F2F, white ink
+   Fields are the §6 crisp flat plate and the §8.7 rounded pill search — the
+   old inset/concave/neumorphic well was rejected by the owner and never
+   returns. No coloured halo, plate or glow behind an app icon (§3, §8.4).
+   Every selector is scoped to body.surface-dash so this file can never leak
+   into the admission, tools, cashier, receipts or queue surfaces.
+   ============================================================================ */
+
+/* ==========================================================================
+   1. CANVAS — the designed page background (§1.1, §9)
+   Tinted, lit, layered. Never dark, never a plain white sheet.
+   ========================================================================== */
+body.surface-dash{
+  background:#C6D4EA;
+  background:-webkit-linear-gradient(top right,#DCE6F4 0%,#C6D4EA 46%,#B2C3DE 100%);
+  background:linear-gradient(216deg,#DCE6F4 0%,#C6D4EA 46%,#B2C3DE 100%);
+  color:#1D2B42;
+}
+body.surface-dash #appBody{display:none !important;}
+/* #dashPortal is a permission-gating stub only — it must stay invisible */
+body.surface-dash #dashPortal{display:none !important;}
+
+/* the dashboard panel IS the page on this surface (its own native C++ tab) */
+body.surface-dash .dash-panel{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;
+  overflow-y:auto;overflow-x:hidden;
+  padding:14px 16px 12px;
+}
+/* 1.1 canvas decoration — two low-alpha glows + the 1px diagonal weave.
+   This layer (not colour on the cards) is what makes the page read as
+   *designed*; it sits under everything and never eats a click. */
+body.surface-dash .dash-panel:before{
+  content:"";
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:0;
+  pointer-events:none;
+  background-image:
+    -webkit-radial-gradient(86% 4%, ellipse, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 50%),
+    -webkit-radial-gradient(6% 94%, ellipse, rgba(14,127,192,.14) 0%, rgba(14,127,192,0) 52%),
+    -webkit-repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+  background-image:
+    radial-gradient(ellipse at 86% 4%, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 50%),
+    radial-gradient(ellipse at 6% 94%, rgba(14,127,192,.14) 0%, rgba(14,127,192,0) 52%),
+    repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+}
+/* 1.2 hairline light rings + two soft light pools — the graphic "architecture"
+   of the page. Drawn as ring stops inside radial gradients so nothing needs an
+   image, an SVG filter or a network asset. Alphas stay low: the canvas must
+   keep its tint, it may never wash out to white. */
+body.surface-dash .dash-panel:after{
+  content:"";
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:0;
+  pointer-events:none;
+  background-image:
+    -webkit-radial-gradient(98% -3%, circle, rgba(255,255,255,0) 246px, rgba(255,255,255,.55) 249px, rgba(255,255,255,0) 252px),
+    -webkit-radial-gradient(98% -3%, circle, rgba(255,255,255,0) 148px, rgba(255,255,255,.40) 151px, rgba(255,255,255,0) 154px),
+    -webkit-radial-gradient(-4% 103%, circle, rgba(255,255,255,0) 196px, rgba(255,255,255,.40) 199px, rgba(255,255,255,0) 202px),
+    -webkit-radial-gradient(98% -3%, circle, rgba(255,255,255,.24) 0%, rgba(255,255,255,0) 26%),
+    -webkit-radial-gradient(50% 116%, ellipse, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 44%);
+  background-image:
+    radial-gradient(circle at 98% -3%, rgba(255,255,255,0) 246px, rgba(255,255,255,.55) 249px, rgba(255,255,255,0) 252px),
+    radial-gradient(circle at 98% -3%, rgba(255,255,255,0) 148px, rgba(255,255,255,.40) 151px, rgba(255,255,255,0) 154px),
+    radial-gradient(circle at -4% 103%, rgba(255,255,255,0) 196px, rgba(255,255,255,.40) 199px, rgba(255,255,255,0) 202px),
+    radial-gradient(circle at 98% -3%, rgba(255,255,255,.24) 0%, rgba(255,255,255,0) 26%),
+    radial-gradient(ellipse at 50% 116%, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 44%);
+}
+/* everything real sits above the two decoration layers */
+body.surface-dash .dash-topbar,
+body.surface-dash .dash-search,
+body.surface-dash .dash-vessel,
+body.surface-dash .dash-foot{position:relative;z-index:1;}
+
+/* ==========================================================================
+   2. FLOATING GLASS HEADER (§5 faked glass, §9, §10.1)
+   Inset from the page edges by the panel padding, radius 16, sh-3.
+   RTL: hamburger on the RIGHT · title + user kicker · envelope on the LEFT.
+   ========================================================================== */
+body.surface-dash .dash-topbar{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  position:relative;
+  height:64px;padding:0 14px;border-radius:16px;
+  background:#EEF3FB;
+  background:-webkit-linear-gradient(top left,rgba(255,255,255,.94) 0%,rgba(240,245,252,.72) 52%,rgba(255,255,255,.86) 100%);
+  background:linear-gradient(150deg,rgba(255,255,255,.94) 0%,rgba(240,245,252,.72) 52%,rgba(255,255,255,.86) 100%);
+  border:1px solid rgba(255,255,255,.92);
+  outline:1px solid #9FB1CD;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(19,38,72,.06);
+  box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(19,38,72,.06);
+}
+/* 3px identity ribbon, indigo → azure (§11.1) — no violet, ever */
+body.surface-dash .dash-topbar:before{
+  content:"";
+  position:absolute;top:0;right:16px;left:16px;z-index:3;
+  height:3px;border-radius:0 0 3px 3px;
+  pointer-events:none;
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#4A62E6 52%,#0E7FC0 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#4A62E6 52%,#0E7FC0 100%);
+}
+/* specular sweep — the "lit pane" cue that makes faked glass read as glass */
+body.surface-dash .dash-topbar:after{
+  content:"";
+  position:absolute;top:1px;right:1px;left:1px;z-index:0;
+  height:52%;border-radius:15px 15px 20px 20px;
+  pointer-events:none;
+  background:transparent;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+}
+body.surface-dash .dash-topbar-side{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  position:relative;z-index:2;min-width:0;
+}
+/* 2.1 hamburger (RTL: right edge of the bar) */
+body.surface-dash .dash-burger{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 40px;flex:0 0 40px;
+  width:40px;height:40px;padding:0;
+  border-radius:11px;cursor:pointer;
+  color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EFF4FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EFF4FC 100%);
+  border:1px solid #9FB1CD;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07),inset 0 1px 0 #FFFFFF;
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-dash .dash-burger:hover{
+  border-color:#3550D8;color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+}
+body.surface-dash .dash-burger:focus{outline:none;border-color:#3550D8;}
+/* 2.2 title + user kicker (§7) */
+body.surface-dash .dash-titles{margin-right:12px;min-width:0;}
+body.surface-dash .dash-title{
+  display:block;font-size:20px;font-weight:800;color:#10203A;line-height:1.2;
+}
+body.surface-dash .dash-sub{
+  display:block;margin-top:0;
+  font-size:12px;font-weight:700;color:#67768F;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ==========================================================================
+   3. «کارتابل پیام» ENVELOPE + UNREAD BADGE (§8.6, §10.1)
+   The envelope lives ONLY in the header. Zero state is quiet grey; the unread
+   badge is the single filled badge in the product (red, white ink, white ring)
+   and sits top-left of the button in RTL.
+   ========================================================================== */
+body.surface-dash .dash-mail{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 44px;flex:0 0 44px;
+  position:relative;z-index:2;
+  width:44px;height:44px;padding:0;
+  border-radius:13px;cursor:pointer;
+  color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EFF4FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EFF4FC 100%);
+  border:1px solid #9FB1CD;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07),inset 0 1px 0 #FFFFFF;
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-dash .dash-mail:hover{
+  border-color:#3550D8;color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+}
+body.surface-dash .dash-mail:focus{outline:none;border-color:#3550D8;}
+/* zero state — quiet, never alarming. .dash-app-badge is the same badge on an
+   app tile: dashSetUnread() in admission.js writes to both, so it is grouped
+   here rather than re-declared — one badge component, one recipe (§8.6). */
+body.surface-dash .dash-mail-badge,
+body.surface-dash .dash-app-badge{
+  position:absolute;top:-6px;left:-6px;z-index:2;
+  min-width:22px;height:22px;padding:0 5px;
+  border-radius:999px;
+  text-align:center;line-height:19px;
+  font-size:11px;font-weight:800;
+  color:#67768F;
+  background:#E7EDF6;
+  border:2px solid #FFFFFF;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 0 0 1px #C0CDE0;
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 0 0 1px #C0CDE0;
+}
+/* unread — the one filled badge in the product */
+body.surface-dash .dash-mail-badge.has,
+body.surface-dash .dash-app-badge.has{
+  color:#FFFFFF;
+  background:#D24343;
+  background:-webkit-linear-gradient(top,#E05B5B 0%,#B62F2F 100%);
+  background:linear-gradient(180deg,#E05B5B 0%,#B62F2F 100%);
+  border-color:#FFFFFF;
+  -webkit-box-shadow:0 2px 6px rgba(139,32,32,.35),inset 0 1px 0 rgba(255,255,255,.28);
+  box-shadow:0 2px 6px rgba(139,32,32,.35),inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+/* ==========================================================================
+   4. CENTRED PILL SEARCH (§8.7 + §6)
+   Clearly narrower than full width, centred in its line, rounded, visible
+   border, magnifier inset on the right (RTL). Crisp and flat — NEVER inset,
+   concave or neumorphic.
+   ========================================================================== */
+body.surface-dash .dash-search{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:20px 0 0;text-align:center;
+}
+body.surface-dash .dash-search-wrap{
+  display:inline-block;position:relative;
+  width:460px;max-width:42%;
+  text-align:right;
+}
+body.surface-dash .dash-search-wrap .inp{
+  display:block;width:100%;height:42px;
+  padding:0 40px 0 18px;
+  border-radius:999px;
+  font-family:inherit;font-size:13.5px;font-weight:600;color:#1D2B42;text-align:right;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 4px 12px rgba(16,32,58,.10);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 4px 12px rgba(16,32,58,.10);
+  -webkit-transition:border-color .14s,box-shadow .14s;
+  transition:border-color .14s,box-shadow .14s;
+}
+body.surface-dash .dash-search-wrap .inp:hover{border-color:#7B90B4;}
+body.surface-dash .dash-search-wrap .inp:focus{
+  outline:none;border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22),0 4px 12px rgba(16,32,58,.10);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22),0 4px 12px rgba(16,32,58,.10);
+}
+body.surface-dash .dash-search-wrap .inp::-webkit-input-placeholder{color:#8C99AC;font-weight:600;}
+body.surface-dash .dash-search-wrap .inp:-ms-input-placeholder{color:#8C99AC;font-weight:600;}
+body.surface-dash .dash-search-ic{
+  position:absolute;top:13px;right:15px;
+  color:#67768F;
+  pointer-events:none;
+}
+
+/* ==========================================================================
+   5. «اقدامات اصلی» GLASS TRAY (§5 faked glass, §4 mini accent line)
+   One glass tray, centred in the space between search and footer, holding
+   exactly the two app icons. Its label gets the 26×3px indigo mini line —
+   never a heavy full-width rule.
+   ========================================================================== */
+body.surface-dash .dash-vessel{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  position:relative;
+  width:580px;max-width:94%;
+  margin-top:auto;margin-bottom:auto;margin-right:auto;margin-left:auto;
+  padding:22px 28px 26px;
+  border-radius:26px;
+  background:#EEF3FB;
+  background:-webkit-linear-gradient(top left,rgba(255,255,255,.94) 0%,rgba(240,245,252,.72) 52%,rgba(255,255,255,.86) 100%);
+  background:linear-gradient(150deg,rgba(255,255,255,.94) 0%,rgba(240,245,252,.72) 52%,rgba(255,255,255,.86) 100%);
+  border:1px solid rgba(255,255,255,.92);
+  outline:1px solid #9FB1CD;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(19,38,72,.06);
+  box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(19,38,72,.06);
+}
+body.surface-dash .dash-vessel:after{
+  content:"";
+  position:absolute;top:1px;right:1px;left:1px;z-index:0;
+  height:42%;border-radius:24px 24px 28px 28px;
+  pointer-events:none;
+  background:transparent;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 100%);
+}
+/* tray kicker + THE MINI ACCENT LINE (indigo, 26×3, RTL start = right) */
+body.surface-dash .dash-vessel-title{
+  position:relative;z-index:2;
+  margin:0 2px 18px;
+  font-size:13.5px;font-weight:800;letter-spacing:.1px;color:#22349C;
+}
+body.surface-dash .dash-vessel-title:after{
+  content:"";
+  display:block;width:26px;height:3px;margin-top:4px;
+  border-radius:2px;
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+body.surface-dash .dash-grid{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex-align:start;align-items:flex-start;
+  position:relative;z-index:2;
+}
+
+/* ==========================================================================
+   6. APP ICONS (§8.4, §2.1)
+   Squircle 84×84 · radius 24 · hue ramp (base+white → base → deep) · sh-icon
+   · top gloss · inner white rim · white 34px glyph. Hover scales the badge
+   only: NO coloured halo, NO plate, NO glow (owner request — «just the icon»).
+   RTL order: پذیرش بیمار (indigo) first = RIGHT · تب جدید (teal) = LEFT.
+   ========================================================================== */
+body.surface-dash .dash-app{
+  display:block;width:190px;
+  margin:0 14px;padding:12px 6px 6px;
+  background:transparent;
+  background-image:none;
+  border:0;cursor:pointer;
+  font:inherit;text-align:center;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.surface-dash .dash-app:focus{outline:none;}
+body.surface-dash .dash-appico{
+  position:relative;display:block;
+  width:84px;height:84px;line-height:84px;
+  margin:0 auto 13px;
+  border-radius:24px;
+  text-align:center;color:#FFFFFF;
+  -webkit-box-shadow:0 8px 18px rgba(16,32,58,.26),inset 0 2px 2px rgba(255,255,255,.45),inset 0 -3px 6px rgba(0,0,0,.14),inset 0 0 0 1px rgba(255,255,255,.42);
+  box-shadow:0 8px 18px rgba(16,32,58,.26),inset 0 2px 2px rgba(255,255,255,.45),inset 0 -3px 6px rgba(0,0,0,.14),inset 0 0 0 1px rgba(255,255,255,.42);
+  -webkit-transition:-webkit-transform .16s ease;
+  transition:transform .16s ease;
+}
+body.surface-dash .dash-appico svg{vertical-align:middle;}
+/* top gloss */
+body.surface-dash .dash-appico:after{
+  content:"";
+  position:absolute;top:3px;right:9%;left:9%;
+  height:44%;border-radius:16px 16px 22px 22px;
+  pointer-events:none;
+  background:transparent;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.50) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.50) 0%,rgba(255,255,255,0) 100%);
+}
+/* پذیرش بیمار — indigo */
+body.surface-dash .dash-appico-adm{
+  background:#3550D8;
+  background:-webkit-linear-gradient(top,#5A72E6 0%,#3550D8 56%,#22349C 100%);
+  background:linear-gradient(180deg,#5A72E6 0%,#3550D8 56%,#22349C 100%);
+}
+/* تب جدید — teal */
+body.surface-dash .dash-appico-tab{
+  background:#0F8B8D;
+  background:-webkit-linear-gradient(top,#35A8AA 0%,#0F8B8D 56%,#095A5C 100%);
+  background:linear-gradient(180deg,#35A8AA 0%,#0F8B8D 56%,#095A5C 100%);
+}
+/* کارتابل پیام — azure (drawer only; the tile itself stays hidden) */
+body.surface-dash .dash-appico-mail{
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(top,#3FA9E6 0%,#0E7FC0 56%,#0A4A72 100%);
+  background:linear-gradient(180deg,#3FA9E6 0%,#0E7FC0 56%,#0A4A72 100%);
+}
+body.surface-dash .dash-app:hover .dash-appico{
+  -webkit-transform:scale(1.06);-ms-transform:scale(1.06);transform:scale(1.06);
+}
+body.surface-dash .dash-appname{
+  display:block;
+  font-size:14px;font-weight:800;color:#10203A;
+}
+body.surface-dash .dash-app:hover .dash-appname{color:#22349C;}
+body.surface-dash .dash-app:focus .dash-appname{color:#22349C;text-decoration:underline;}
+
+/* ==========================================================================
+   7. SEARCH "NO MATCH" PLATE
+   ========================================================================== */
+body.surface-dash .dash-empty{
+  position:relative;z-index:2;
+  margin:6px 2px 0;padding:16px 12px;
+  border-radius:14px;
+  text-align:center;font-size:13px;font-weight:700;color:#67768F;
+  background:#DFE7F3;
+  border:1px solid #C6D2E4;
+}
+
+/* ==========================================================================
+   8. FOOTER META STRIP (§7 footer/meta, §1.3 ink-muted)
+   ========================================================================== */
+body.surface-dash .dash-foot{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  -ms-flex-item-align:center;align-self:center;
+  height:32px;margin-top:0;padding:0 18px;
+  border-radius:999px;
+  font-size:11.5px;font-weight:700;color:#3B4C69;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.86) 0%,rgba(240,245,252,.66) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.86) 0%,rgba(240,245,252,.66) 100%);
+  border:1px solid rgba(255,255,255,.90);
+  outline:1px solid #B9C8DF;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+
+/* ==========================================================================
+   9. NAV DRAWER — «منوی داشبورد» (§5, §6, §4, §8.3)
+   A light glass panel docked to the RIGHT edge (RTL), with a designed head,
+   its own pill search, clear category rhythm and hue-tinted item chips.
+   Helper sentences under item titles stay hidden — the owner does not want
+   explanatory text under a title anywhere in the product.
+   ========================================================================== */
+body.surface-dash .dash-drawer-bk{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:2300;
+  background:rgba(16,32,58,.44);
+  opacity:0;visibility:hidden;
+  -webkit-transition:opacity .22s ease;transition:opacity .22s ease;
+}
+body.surface-dash .dash-drawer-bk.open{opacity:1;visibility:visible;}
+body.surface-dash .dash-drawer{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  position:fixed;top:0;right:0;bottom:0;z-index:2400;
+  width:320px;
+  background:#EEF3FB;
+  background:-webkit-linear-gradient(top,#F9FBFE 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#F9FBFE 0%,#E8EFF9 100%);
+  border-left:1px solid #9FB1CD;
+  -webkit-box-shadow:-6px 0 12px rgba(16,32,58,.10),-34px 0 64px rgba(16,32,58,.22),inset 1px 0 0 rgba(255,255,255,.92);
+  box-shadow:-6px 0 12px rgba(16,32,58,.10),-34px 0 64px rgba(16,32,58,.22),inset 1px 0 0 rgba(255,255,255,.92);
+  -webkit-transform:translateX(105%);-ms-transform:translateX(105%);transform:translateX(105%);
+  -webkit-transition:-webkit-transform .24s ease;transition:transform .24s ease;
+}
+body.surface-dash .dash-drawer.open{
+  -webkit-transform:translateX(0);-ms-transform:translateX(0);transform:translateX(0);
+}
+/* 9.1 drawer head — indigo panel head with the 26×3 mini line (§4) */
+body.surface-dash .dash-drawer-head{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:start;align-items:flex-start;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  padding:14px 14px 11px;
+  background:#EFF3FE;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+  border-bottom:1px solid #BCC8F4;
+}
+body.surface-dash .dash-drawer-title{
+  display:block;
+  font-size:14px;font-weight:800;color:#22349C;
+}
+body.surface-dash .dash-drawer-title svg{
+  vertical-align:-3px;margin-left:7px;color:#3550D8;
+}
+body.surface-dash .dash-drawer-title:after{
+  content:"";
+  display:block;width:26px;height:3px;margin-top:5px;
+  border-radius:2px;
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+body.surface-dash .dash-drawer-head .btn,
+body.surface-dash #dashDrawerClose{
+  -ms-flex:0 0 30px;flex:0 0 30px;
+  width:30px;height:30px;padding:0;
+  border-radius:9px;
+  font-size:16px;font-weight:800;line-height:1;
+  color:#3B4C69;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  border:1px solid #9FB1CD;
+}
+body.surface-dash #dashDrawerClose:hover{
+  color:#8B2020;border-color:#EEBDBD;
+  background:#FBE8E8;
+  background-image:none;
+}
+/* 9.2 drawer search — same pill language as the dashboard search (§6, §8.7) */
+body.surface-dash .dash-drawer-search{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  position:relative;
+  padding:11px 14px;
+  background:#F2F6FC;
+  border-bottom:1px solid #C6D2E4;
+}
+body.surface-dash .dash-drawer-search .inp{
+  display:block;width:100%;height:36px;
+  padding:0 13px;
+  border-radius:999px;
+  font-family:inherit;font-size:13px;font-weight:600;color:#1D2B42;text-align:right;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  -webkit-box-shadow:0 1px 1px rgba(16,32,58,.05);
+  box-shadow:0 1px 1px rgba(16,32,58,.05);
+  -webkit-transition:border-color .14s,box-shadow .14s;
+  transition:border-color .14s,box-shadow .14s;
+}
+body.surface-dash .dash-drawer-search .inp:hover{border-color:#7B90B4;}
+body.surface-dash .dash-drawer-search .inp:focus{
+  outline:none;border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+body.surface-dash .dash-drawer-search .inp::-webkit-input-placeholder{color:#8C99AC;font-weight:600;}
+body.surface-dash .dash-drawer-search .inp:-ms-input-placeholder{color:#8C99AC;font-weight:600;}
+/* 9.3 category rhythm — kicker + dot + a hairline that runs to the far edge */
+body.surface-dash .dash-drawer-body{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  padding:6px 12px 16px;
+  overflow-y:auto;
+  min-height:0;
+}
+body.surface-dash .dash-cat{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  margin:16px 2px 8px;
+  font-size:11px;font-weight:800;letter-spacing:.3px;color:#67768F;
+}
+body.surface-dash .dash-cat:after{
+  content:"";
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  height:1px;margin-right:10px;
+  background:#C6D2E4;
+}
+/* the markup carries an inline hue on the dot; violet is banned (§2) so the
+   dashboard layer pins it back to the two hues this drawer actually uses */
+body.surface-dash .dash-cat-dot{
+  display:inline-block;
+  -ms-flex:0 0 8px;flex:0 0 8px;
+  width:8px;height:8px;margin-left:7px;
+  border-radius:50%;
+  background:#3550D8 !important;
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 2px rgba(16,32,58,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 2px rgba(16,32,58,.22);
+}
+body.surface-dash .dash-drawer-body .dash-cat:nth-of-type(2) .dash-cat-dot{background:#0E7FC0 !important;}
+/* 9.4 item rows — white plate, 3px RTL leading edge that lights up on hover */
+body.surface-dash .dash-drawer-item{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  width:100%;margin:0 0 8px;padding:9px 11px;
+  border-radius:12px;
+  text-align:right;cursor:pointer;font:inherit;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #C6D2E4;
+  border-right:3px solid #C0CDE0;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-dash .dash-drawer-item:hover{
+  border-color:#BCC8F4;border-right-color:#3550D8;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+}
+body.surface-dash .dash-drawer-item:focus{outline:none;border-right-color:#3550D8;}
+/* 9.5 item chip — hue tint fill + hue edge + hue glyph (§4 chip recipe).
+   These spans also carry the .dash-appico-* tile classes, so the chip rules
+   are written with both class names to win without !important. */
+body.surface-dash .dash-drico,
+body.surface-dash .dash-drico.dash-appico-adm,
+body.surface-dash .dash-drico.dash-appico-tab,
+body.surface-dash .dash-drico.dash-appico-mail{
+  display:block;
+  -ms-flex:0 0 34px;flex:0 0 34px;
+  width:34px;height:34px;line-height:32px;
+  margin-left:10px;
+  border-radius:10px;
+  text-align:center;
+  background:#E7EDF6;
+  background-image:none;
+  border:1px solid #C0CDE0;
+  color:#55688A;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-dash .dash-drico.dash-appico-adm{background:#E7ECFD;border-color:#BCC8F4;color:#3550D8;}
+body.surface-dash .dash-drico.dash-appico-tab{background:#DEF1F1;border-color:#A7D8D9;color:#0F8B8D;}
+body.surface-dash .dash-drico.dash-appico-mail{background:#E3F1FB;border-color:#AFD4EE;color:#0E7FC0;}
+body.surface-dash .dash-drico svg{vertical-align:middle;}
+body.surface-dash .dash-dri-tx{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;
+}
+body.surface-dash .dash-dri-tx b{
+  display:block;
+  font-size:13px;font-weight:800;color:#10203A;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* no explanatory helper sentence under any title (owner request) */
+body.surface-dash .dash-dri-tx small{display:none;}
+
+/* ==========================================================================
+   10. DARK-THEME PARITY (§12) — identical structure, tokens swapped
+   ========================================================================== */
+body.theme-dark.surface-dash{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 46%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 46%,#0A1019 100%);
+  color:#DCE5F2;
+}
+body.theme-dark.surface-dash .dash-panel:after{
+  background-image:
+    -webkit-radial-gradient(90% 0%, circle, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 26%),
+    -webkit-radial-gradient(2% 56%, circle, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 30%);
+  background-image:
+    radial-gradient(circle at 90% 0%, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 26%),
+    radial-gradient(circle at 2% 56%, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 30%);
+}
+body.theme-dark.surface-dash .dash-topbar,
+body.theme-dark.surface-dash .dash-vessel{
+  background:#1C2739;
+  background:-webkit-linear-gradient(top left,rgba(28,39,57,.92) 0%,rgba(20,29,44,.86) 52%,rgba(28,39,57,.90) 100%);
+  background:linear-gradient(150deg,rgba(28,39,57,.92) 0%,rgba(20,29,44,.86) 52%,rgba(28,39,57,.90) 100%);
+  border-color:rgba(255,255,255,.10);
+  outline-color:#45577A;
+  -webkit-box-shadow:0 3px 6px rgba(0,0,0,.30),0 20px 40px rgba(0,0,0,.44),inset 0 1px 0 rgba(255,255,255,.10);
+  box-shadow:0 3px 6px rgba(0,0,0,.30),0 20px 40px rgba(0,0,0,.44),inset 0 1px 0 rgba(255,255,255,.10);
+}
+body.theme-dark.surface-dash .dash-topbar:after,
+body.theme-dark.surface-dash .dash-vessel:after{
+  background:transparent;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.08) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,0) 100%);
+}
+body.theme-dark.surface-dash .dash-topbar:before{
+  background:#6A83F7;
+  background:-webkit-linear-gradient(right,#6A83F7 0%,#3550D8 52%,#3FA9E6 100%);
+  background:linear-gradient(270deg,#6A83F7 0%,#3550D8 52%,#3FA9E6 100%);
+}
+body.theme-dark.surface-dash .dash-title{color:#EEF3FB;}
+body.theme-dark.surface-dash .dash-sub{color:#8B9BB3;}
+body.theme-dark.surface-dash .dash-burger,
+body.theme-dark.surface-dash .dash-mail{
+  color:#A9B8FF;
+  background:#1B2537;
+  background-image:none;
+  border-color:#45577A;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08);
+  box-shadow:0 2px 6px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08);
+}
+body.theme-dark.surface-dash .dash-burger:hover,
+body.theme-dark.surface-dash .dash-mail:hover{
+  border-color:#6A83F7;background:#232F55;background-image:none;color:#A9B8FF;
+}
+body.theme-dark.surface-dash .dash-mail-badge,
+body.theme-dark.surface-dash .dash-app-badge{
+  color:#B4C2D6;background:#25314A;border-color:#182234;
+}
+body.theme-dark.surface-dash .dash-mail-badge.has,
+body.theme-dark.surface-dash .dash-app-badge.has{
+  color:#FFFFFF;
+  background:#D24343;
+  background:-webkit-linear-gradient(top,#E86A6A 0%,#B62F2F 100%);
+  background:linear-gradient(180deg,#E86A6A 0%,#B62F2F 100%);
+  border-color:#182234;
+}
+body.theme-dark.surface-dash .dash-search-wrap .inp{
+  color:#DCE5F2;
+  background:#141D2C;
+  background-image:none;
+  border-color:#45577A;border-bottom-color:#45577A;
+}
+body.theme-dark.surface-dash .dash-search-wrap .inp:focus{
+  border-color:#6A83F7;
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);
+  box-shadow:0 0 0 3px rgba(106,131,247,.26);
+}
+body.theme-dark.surface-dash .dash-search-wrap .inp::-webkit-input-placeholder{color:#8B9BB3;}
+body.theme-dark.surface-dash .dash-search-wrap .inp:-ms-input-placeholder{color:#8B9BB3;}
+body.theme-dark.surface-dash .dash-search-ic{color:#8B9BB3;}
+body.theme-dark.surface-dash .dash-vessel-title{color:#A9B8FF;}
+body.theme-dark.surface-dash .dash-vessel-title:after{
+  background:#6A83F7;
+  background:-webkit-linear-gradient(right,#6A83F7 0%,#A9B8FF 100%);
+  background:linear-gradient(270deg,#6A83F7 0%,#A9B8FF 100%);
+}
+body.theme-dark.surface-dash .dash-appname{color:#EEF3FB;}
+body.theme-dark.surface-dash .dash-app:hover .dash-appname,
+body.theme-dark.surface-dash .dash-app:focus .dash-appname{color:#A9B8FF;}
+body.theme-dark.surface-dash .dash-empty{
+  color:#8B9BB3;background:#0E1522;border-color:#33425C;
+}
+body.theme-dark.surface-dash .dash-foot{
+  color:#B4C2D6;
+  background:#182234;
+  background:-webkit-linear-gradient(top,rgba(28,39,57,.86) 0%,rgba(20,29,44,.72) 100%);
+  background:linear-gradient(180deg,rgba(28,39,57,.86) 0%,rgba(20,29,44,.72) 100%);
+  border-color:rgba(255,255,255,.10);
+  outline-color:#45577A;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);
+  box-shadow:0 2px 6px rgba(0,0,0,.30);
+}
+body.theme-dark.surface-dash .dash-drawer-bk{background:rgba(6,10,18,.62);}
+body.theme-dark.surface-dash .dash-drawer{
+  background:#141D2C;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#141D2C 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#141D2C 100%);
+  border-left-color:#45577A;
+  -webkit-box-shadow:-6px 0 12px rgba(0,0,0,.34),-34px 0 64px rgba(0,0,0,.50),inset 1px 0 0 rgba(255,255,255,.10);
+  box-shadow:-6px 0 12px rgba(0,0,0,.34),-34px 0 64px rgba(0,0,0,.50),inset 1px 0 0 rgba(255,255,255,.10);
+}
+body.theme-dark.surface-dash .dash-drawer-head{
+  background:#232F55;
+  background:-webkit-linear-gradient(top,#232F55 0%,#1B2537 100%);
+  background:linear-gradient(180deg,#232F55 0%,#1B2537 100%);
+  border-bottom-color:#33425C;
+}
+body.theme-dark.surface-dash .dash-drawer-title{color:#A9B8FF;}
+body.theme-dark.surface-dash .dash-drawer-title svg{color:#6A83F7;}
+body.theme-dark.surface-dash .dash-drawer-title:after{
+  background:#6A83F7;
+  background:-webkit-linear-gradient(right,#6A83F7 0%,#A9B8FF 100%);
+  background:linear-gradient(270deg,#6A83F7 0%,#A9B8FF 100%);
+}
+body.theme-dark.surface-dash #dashDrawerClose{
+  color:#B4C2D6;background:#1B2537;background-image:none;border-color:#45577A;
+}
+body.theme-dark.surface-dash #dashDrawerClose:hover{
+  color:#F6B4B4;background:#3A1C1C;background-image:none;border-color:#E86A6A;
+}
+body.theme-dark.surface-dash .dash-drawer-search{
+  background:#141D2C;border-bottom-color:#33425C;
+}
+body.theme-dark.surface-dash .dash-drawer-search .inp{
+  color:#DCE5F2;background:#0E1522;background-image:none;
+  border-color:#45577A;border-bottom-color:#45577A;
+}
+body.theme-dark.surface-dash .dash-drawer-search .inp:focus{
+  border-color:#6A83F7;
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);
+  box-shadow:0 0 0 3px rgba(106,131,247,.26);
+}
+body.theme-dark.surface-dash .dash-cat{color:#8B9BB3;}
+body.theme-dark.surface-dash .dash-cat:after{background:#33425C;}
+body.theme-dark.surface-dash .dash-cat-dot{background:#6A83F7 !important;}
+body.theme-dark.surface-dash .dash-drawer-body .dash-cat:nth-of-type(2) .dash-cat-dot{background:#3FA9E6 !important;}
+body.theme-dark.surface-dash .dash-drawer-item{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-color:#33425C;border-right-color:#45577A;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);
+  box-shadow:0 2px 6px rgba(0,0,0,.30);
+}
+body.theme-dark.surface-dash .dash-drawer-item:hover{
+  background:#232F55;background-image:none;
+  border-color:#45577A;border-right-color:#6A83F7;
+}
+body.theme-dark.surface-dash .dash-drico,
+body.theme-dark.surface-dash .dash-drico.dash-appico-adm,
+body.theme-dark.surface-dash .dash-drico.dash-appico-tab,
+body.theme-dark.surface-dash .dash-drico.dash-appico-mail{
+  background:#25314A;border-color:#33425C;color:#B4C2D6;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.theme-dark.surface-dash .dash-drico.dash-appico-adm{background:#232F55;color:#A9B8FF;}
+body.theme-dark.surface-dash .dash-drico.dash-appico-tab{background:#0F3436;color:#93DEDF;}
+body.theme-dark.surface-dash .dash-drico.dash-appico-mail{background:#12324A;color:#9BD3F5;}
+body.theme-dark.surface-dash .dash-dri-tx b{color:#EEF3FB;}

@@ -1,0 +1,654 @@
+/* ============================================================================
+   core.css — shared design system
+   ----------------------------------------------------------------------------
+   Part of the v1.91.0 ordered theme layer. Load order is fixed in index.html:
+     common.css → admission.css (structure) → css/core.css → css/surface-*.css
+   This file owns its layer EXCLUSIVELY. Never restyle another layer's
+   selectors from here, and never append a dated "polish pass" block.
+
+   DUAL-ENGINE CONTRACT (WebView2 Chromium + MSHTML/Trident): no var(), no
+   grid, no flex gap, no backdrop-filter, no CSS logical properties, literal
+   hex colours only, every flex declaration paired with its -ms- equivalent.
+   Palette values come from docs/DESIGN_SYSTEM.md — no ad-hoc colours.
+   ----------------------------------------------------------------------------
+   WHAT THIS FILE OWNS (do not restyle these from a surface file unless the
+   change is genuinely specific to that one surface):
+     · page ink + base typography
+     · .card / .card-head / .card-title / .ct-ico / .card-body   (§8.1, §4)
+     · the section-header MINI ACCENT LINE and the per-hue head variants (§4)
+     · .fld / .inp / select.inp / .with-ico / .in-ico / .chk      (§6)
+     · .btn and every variant                                    (§8.3)
+     · .tbl / .tbl-wrap / .empty                                 (§8.5)
+     · .mini-list, .loader, .toast, .ctx-menu, modals, queue overlay chrome
+     · dark-theme parity for all of the above
+   ============================================================================ */
+
+/* ==========================================================================
+   1. PAGE INK
+   ========================================================================== */
+body{
+  color:#1D2B42;
+  font-weight:600;
+  line-height:1.5;
+}
+b,strong{font-weight:800;}
+
+/* ==========================================================================
+   2. CARD / PANEL  (§8.1)
+   A card body is ALWAYS neutral. Hue lives only in the head.
+   ========================================================================== */
+.card{
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #C6D2E4;
+  border-radius:12px;
+  overflow:hidden;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+.card-body{background:transparent;}
+
+/* ---- 2.1 section header + THE MINI ACCENT LINE (§4) ----------------------
+   The owner explicitly rejected a full-width heavy rule across the card top.
+   The accent is a SHORT 26px 3px line under the title, drawn as a :after on
+   .card-head and anchored to the RTL start (right) just past the icon chip.
+   `inset 0 3px 0 <hue>` across the whole head is BANNED. */
+.card-head{
+  position:relative;
+  padding:9px 13px 13px;
+  border-bottom:1px solid #E1E8F2;
+  background:#F3F7FD;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EFF4FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EFF4FC 100%);
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+.card-head:after{
+  content:"";
+  position:absolute;
+  right:47px;                 /* 13px pad + 26px chip + 8px chip margin */
+  bottom:7px;
+  width:26px;
+  height:3px;
+  border-radius:2px;
+  background:#55688A;         /* slate default; per-hue variants below */
+}
+.card-title{
+  display:block;
+  font-size:13.5px;
+  font-weight:800;
+  letter-spacing:.1px;
+  color:#2C3D5C;
+}
+/* icon chip — hue tint fill + hue edge + hue glyph */
+.card-title .ct-ico,.ct-ico{
+  display:inline-block;
+  width:26px;height:26px;
+  border-radius:8px;
+  margin-left:8px;
+  padding:5px;
+  vertical-align:middle;
+  background:#E7EDF6;
+  border:1px solid #C0CDE0;
+  color:#55688A;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+
+/* ---- 2.2 per-hue head variants (§2, §4) ---------------------------------
+   ONE hue per panel: head wash = -tint, bottom border = -tintEdge,
+   title ink = -deep, chip = tint/tintEdge/base, mini line = base→deep.
+   A surface file assigns the hue class; it never invents a new hue. */
+.hue-indigo .card-head,.card-head.hue-indigo{
+  background:#EFF3FE;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+  border-bottom:1px solid #BCC8F4;
+}
+.hue-indigo .card-head:after,.card-head.hue-indigo:after{
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+.hue-indigo .card-head .card-title,.card-head.hue-indigo .card-title{color:#22349C;}
+.hue-indigo .card-head .ct-ico,.card-head.hue-indigo .ct-ico{
+  background:#E7ECFD;border-color:#BCC8F4;color:#3550D8;}
+
+.hue-azure .card-head,.card-head.hue-azure{
+  background:#EDF6FC;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E3F1FB 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E3F1FB 100%);
+  border-bottom:1px solid #AFD4EE;
+}
+.hue-azure .card-head:after,.card-head.hue-azure:after{
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(right,#0E7FC0 0%,#0A4A72 100%);
+  background:linear-gradient(270deg,#0E7FC0 0%,#0A4A72 100%);
+}
+.hue-azure .card-head .card-title,.card-head.hue-azure .card-title{color:#0A4A72;}
+.hue-azure .card-head .ct-ico,.card-head.hue-azure .ct-ico{
+  background:#E3F1FB;border-color:#AFD4EE;color:#0E7FC0;}
+
+.hue-teal .card-head,.card-head.hue-teal{
+  background:#EAF6F6;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#DEF1F1 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#DEF1F1 100%);
+  border-bottom:1px solid #A7D8D9;
+}
+.hue-teal .card-head:after,.card-head.hue-teal:after{
+  background:#0F8B8D;
+  background:-webkit-linear-gradient(right,#0F8B8D 0%,#095A5C 100%);
+  background:linear-gradient(270deg,#0F8B8D 0%,#095A5C 100%);
+}
+.hue-teal .card-head .card-title,.card-head.hue-teal .card-title{color:#095A5C;}
+.hue-teal .card-head .ct-ico,.card-head.hue-teal .ct-ico{
+  background:#DEF1F1;border-color:#A7D8D9;color:#0F8B8D;}
+
+.hue-emerald .card-head,.card-head.hue-emerald{
+  background:#EBF7F1;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E1F4EA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E1F4EA 100%);
+  border-bottom:1px solid #A9DCC6;
+}
+.hue-emerald .card-head:after,.card-head.hue-emerald:after{
+  background:#0E9C77;
+  background:-webkit-linear-gradient(right,#0E9C77 0%,#075E45 100%);
+  background:linear-gradient(270deg,#0E9C77 0%,#075E45 100%);
+}
+.hue-emerald .card-head .card-title,.card-head.hue-emerald .card-title{color:#075E45;}
+.hue-emerald .card-head .ct-ico,.card-head.hue-emerald .ct-ico{
+  background:#E1F4EA;border-color:#A9DCC6;color:#0E9C77;}
+
+.hue-amber .card-head,.card-head.hue-amber{
+  background:#FCF6E7;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#FBF1DB 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#FBF1DB 100%);
+  border-bottom:1px solid #E6CE93;
+}
+.hue-amber .card-head:after,.card-head.hue-amber:after{
+  background:#C4890F;
+  background:-webkit-linear-gradient(right,#C4890F 0%,#6D4A05 100%);
+  background:linear-gradient(270deg,#C4890F 0%,#6D4A05 100%);
+}
+.hue-amber .card-head .card-title,.card-head.hue-amber .card-title{color:#6D4A05;}
+.hue-amber .card-head .ct-ico,.card-head.hue-amber .ct-ico{
+  background:#FBF1DB;border-color:#E6CE93;color:#C4890F;}
+
+.hue-slate .card-head,.card-head.hue-slate{
+  background:#F0F4FA;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7EDF6 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7EDF6 100%);
+  border-bottom:1px solid #C0CDE0;
+}
+.hue-slate .card-head:after,.card-head.hue-slate:after{
+  background:#55688A;
+  background:-webkit-linear-gradient(right,#55688A 0%,#2C3D5C 100%);
+  background:linear-gradient(270deg,#55688A 0%,#2C3D5C 100%);
+}
+.hue-slate .card-head .card-title,.card-head.hue-slate .card-title{color:#2C3D5C;}
+.hue-slate .card-head .ct-ico,.card-head.hue-slate .ct-ico{
+  background:#E7EDF6;border-color:#C0CDE0;color:#55688A;}
+
+/* ==========================================================================
+   3. FIELDS (§6)
+   The previous inset/neumorphic "concave" well was rejected by the owner:
+   fields are now a crisp flat white plate with a real edge and a heavier
+   bottom border, so a field always reads as a field.
+   ========================================================================== */
+.fld > span,.fld > label > span{
+  display:block;
+  font-size:12.5px;
+  font-weight:700;
+  color:#3B4C69;
+  margin-bottom:5px;
+  text-align:right;
+}
+.inp,select.inp,textarea.inp,input.inp{
+  display:block;
+  width:100%;
+  height:36px;
+  padding:0 11px;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+  color:#1D2B42;
+  text-align:right;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  border-radius:8px;
+  -webkit-box-shadow:0 1px 1px rgba(16,32,58,.05);
+  box-shadow:0 1px 1px rgba(16,32,58,.05);
+}
+.inp:hover{border-color:#7B90B4;}
+.inp:focus,select.inp:focus,textarea.inp:focus{
+  outline:none;
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+.inp[readonly],.inp:disabled,select.inp:disabled{
+  background:#F2F6FC;
+  color:#67768F;
+  border-color:#C6D2E4;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+select.inp{padding-left:26px;}
+.inp-sm{height:32px;font-size:13px;}
+.inp-mini{height:30px;font-size:13px;padding:0 8px;}
+.with-ico{position:relative;}
+.with-ico .in-ico{
+  position:absolute;top:10px;left:10px;
+  color:#67768F;
+  pointer-events:none;
+}
+.chk,.chk-block{color:#3B4C69;font-weight:700;}
+
+/* ==========================================================================
+   4. BUTTONS (§8.3)
+   ========================================================================== */
+.btn{
+  height:34px;
+  padding:0 14px;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:800;
+  border-radius:9px;
+  border:1px solid #9FB1CD;
+  color:#1D2B42;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
+  box-shadow:0 1px 2px rgba(16,32,58,.06);
+}
+.btn:hover{
+  border-color:#7B90B4;
+  color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+}
+.btn .i,.btn svg{margin-left:7px;vertical-align:middle;}
+.btn-sm{height:30px;padding:0 11px;font-size:12.5px;}
+.btn-block{width:100%;height:38px;}
+
+.btn-primary,.btn-submit{
+  color:#FFFFFF;
+  border:1px solid #22349C;
+  background:#3550D8;
+  background:-webkit-linear-gradient(top,#3550D8 0%,#2A41B8 100%);
+  background:linear-gradient(180deg,#3550D8 0%,#2A41B8 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.28);
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.28);
+}
+.btn-primary:hover,.btn-submit:hover{
+  color:#FFFFFF;
+  border-color:#22349C;
+  background:#4A62E6;
+  background:-webkit-linear-gradient(top,#4A62E6 0%,#3550D8 100%);
+  background:linear-gradient(180deg,#4A62E6 0%,#3550D8 100%);
+}
+.btn-outline{
+  color:#1D2B42;
+  border:1px solid #9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+}
+.btn-danger{
+  color:#FFFFFF;
+  border:1px solid #8B2020;
+  background:#D24343;
+  background:-webkit-linear-gradient(top,#D24343 0%,#B62F2F 100%);
+  background:linear-gradient(180deg,#D24343 0%,#B62F2F 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.24);
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.24);
+}
+.btn-danger:hover{color:#FFFFFF;border-color:#8B2020;background:#E05B5B;}
+.btn-icon,.btn-icon-only{
+  width:34px;padding:0;
+  -ms-flex-pack:center;justify-content:center;
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-direction:row;flex-direction:row;
+}
+/* .btn-ico is the icon + LABEL variant (.btn-icon above is the square
+   icon-ONLY one). Both live here because they are button shapes, not one
+   surface's look: #rcPrint / #rcExcel / #rcDelete on the receipt surface and
+   the print buttons on the admission form all use it. Glyph and label share
+   one optical centre line, and in RTL the icon LEADS on the right (§8.3). */
+.btn-ico{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  line-height:1;
+}
+.btn-ico svg,.btn-ico .i{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin-left:7px;vertical-align:middle;
+}
+.btn-ghost{
+  border-color:transparent;
+  background:transparent;
+  -webkit-box-shadow:none;box-shadow:none;
+  color:#3B4C69;
+}
+.btn-ghost:hover{background:#EAF0FA;border-color:#C6D2E4;}
+
+/* soft hue buttons — a panel's own hue, never a third colour */
+.btn-soft-emerald{background:#E1F4EA;border-color:#A9DCC6;color:#075E45;background-image:none;}
+.btn-soft-amber{background:#FBF1DB;border-color:#E6CE93;color:#6D4A05;background-image:none;}
+.btn-soft-azure{background:#E3F1FB;border-color:#AFD4EE;color:#0A4A72;background-image:none;}
+.btn-soft-teal{background:#DEF1F1;border-color:#A7D8D9;color:#095A5C;background-image:none;}
+
+/* DISABLED must be unmistakable — flat, unlit, muted, and inert */
+.btn:disabled,.btn.is-off,.btn[aria-disabled="true"]{
+  color:#93A0B4;
+  border-color:#CBD5E5;
+  background:#EDF1F8;
+  background-image:none;
+  cursor:default;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+.btn:disabled:hover,.btn.is-off:hover,.btn[aria-disabled="true"]:hover{
+  color:#93A0B4;
+  border-color:#CBD5E5;
+  background:#EDF1F8;
+  background-image:none;
+}
+
+/* ==========================================================================
+   5. TABLES (§8.5)
+   ========================================================================== */
+.tbl-wrap{
+  background:#F2F6FC;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  overflow:auto;
+}
+.tbl{border-collapse:collapse;width:100%;}
+.tbl thead th{
+  font-size:12px;
+  font-weight:800;
+  color:#3B4C69;
+  padding:7px 10px;
+  text-align:right;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;
+}
+.tbl tbody td{
+  font-size:13px;
+  font-weight:600;
+  color:#1D2B42;
+  padding:7px 10px;
+  border-bottom:1px solid #E1E8F2;
+}
+.tbl tbody tr:nth-child(even){background:#F7FAFE;}
+.tbl tbody tr:hover{
+  background:#EDF3FC;
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+.tbl tbody td.empty,.tbl .empty{
+  color:#67768F;
+  font-weight:700;
+  text-align:center;
+  padding:18px 10px;
+  background:#DFE7F3;
+}
+.tbl tfoot td{
+  font-size:15px;
+  font-weight:800;
+  color:#10203A;
+  background:#E8EFF9;
+  border-top:1px solid #C6D2E4;
+}
+
+/* ==========================================================================
+   6. MINI RESULT LISTS / DROPDOWNS
+   ========================================================================== */
+.mini-list{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+.mini-list .row,.mini-list .s-row{
+  color:#1D2B42;
+  font-weight:600;
+  border-bottom:1px solid #E1E8F2;
+}
+.mini-list .row:hover,.mini-list .s-row:hover{background:#EDF3FC;color:#22349C;}
+
+/* ==========================================================================
+   7. SHELL CHROME — loader · toast · context menu · modals · queue overlay
+   ========================================================================== */
+.loader{background:#D6E0EF;}
+.loader-box{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:14px;
+  -webkit-box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+  box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+}
+.loader-text{color:#3B4C69;font-weight:700;}
+
+.ctx-menu{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16);
+  box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16);
+}
+.ctx-item{color:#1D2B42;font-weight:600;}
+.ctx-item:hover{background:#EDF3FC;color:#22349C;}
+.ctx-sep{background:#E1E8F2;}
+.ctx-shortcut,.ctx-label{color:#67768F;}
+
+.modal-overlay{background:rgba(16,32,58,.44);}
+.modal-card{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:14px;
+  -webkit-box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+  box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+}
+.modal-title{color:#10203A;font-weight:800;}
+
+/* ---- the shared confirm dialogue (.ops-dlg) ------------------------------
+   #opsDlg («عملیات پذیرش» confirmations) and #cancelDlg («لغو پذیرش») carry
+   class="cash-dlg ops-dlg" and are opened from EVERY surface, not just the
+   cashier. .cash-dlg / .cash-dlg-card are painted by surface-cashier.css only
+   under body.surface-cash, so the shared chrome has to live here — without it
+   the dialogue drops into the page flow as unstyled text on the admission,
+   tools and queue surfaces. Values are the §3 sh-4 modal recipe, identical to
+   .modal-card above, so the two dialogue families read as one component. */
+.ops-dlg{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:1800;
+  background:rgba(16,32,58,.44);
+}
+.ops-dlg .cash-dlg-card{
+  width:380px;max-width:88%;margin:16% auto 0;padding:16px;
+  border-radius:14px;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #9FB1CD;
+  -webkit-box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+  box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+}
+.ops-dlg .cash-dlg-msg{
+  font-size:14px;font-weight:800;color:#10203A;text-align:right;
+  margin-bottom:14px;
+}
+.ops-dlg .fld{margin-bottom:10px;text-align:right;}
+.ops-dlg .cash-dlg-act{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:end;justify-content:flex-end;
+}
+.ops-dlg .cash-dlg-act .btn{margin-right:8px;}
+
+/* ---- locked-form body state (.form-locked) -------------------------------
+   setFormLocked() in admission.js puts this class on <body> (it also sets
+   disabled/readonly on the fields themselves — this is the VISUAL half, so the
+   operator can see at a glance that the form is a read-only view of a ticket
+   and that F4 reopens it). It is a page-level state rather than one surface's
+   look, so it belongs to the shared layer; amber is the §2 warning/pending hue
+   and the badge is the only coloured element it adds. */
+body.form-locked .col-center input,
+body.form-locked .col-center select,
+body.form-locked .col-center textarea,
+body.form-locked .col-left input,
+body.form-locked .col-left select,
+body.form-locked .col-left textarea{
+  background:#F2F6FC;
+  color:#67768F;
+  border-color:#C6D2E4;
+  pointer-events:none;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.form-locked .action-card button,
+body.form-locked .print-card button{pointer-events:none;}
+body.form-locked:after{
+  content:'فرم قفل است — F4 برای ویرایش';
+  position:fixed;bottom:12px;left:16px;z-index:1500;
+  padding:6px 12px;border-radius:999px;
+  font-size:12px;font-weight:800;
+  background:#FBF1DB;
+  border:1px solid #E6CE93;
+  color:#6D4A05;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+
+/* the shared full-screen queue / cashier overlay shell */
+.queue-overlay{
+  background:#F2F6FC;
+  border:1px solid #C6D2E4;
+  color:#1D2B42;
+}
+.queue-overlay-head{
+  background:#EEF3FB;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E8EFF9 100%);
+  border-bottom:1px solid #C6D2E4;
+}
+.qov-title-main{color:#10203A;font-weight:800;}
+.qov-subtitle{color:#67768F;font-weight:700;}
+.qov-sum-card{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+.qov-sum-num{color:#10203A;font-weight:900;}
+.qov-sum-lbl{color:#67768F;font-weight:700;}
+.queue-backdrop{background:rgba(16,32,58,.40);}
+
+/* ==========================================================================
+   8. DARK-THEME PARITY (§12) — structure identical, tokens swapped
+   ========================================================================== */
+body.theme-dark{color:#DCE5F2;}
+body.theme-dark .card{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-color:#33425C;
+}
+body.theme-dark .card-head{
+  background:#1B2537;
+  background:-webkit-linear-gradient(top,#1F2A3E 0%,#182131 100%);
+  background:linear-gradient(180deg,#1F2A3E 0%,#182131 100%);
+  border-bottom-color:#25314A;
+}
+body.theme-dark .card-title{color:#EEF3FB;}
+body.theme-dark .ct-ico{background:#25314A;border-color:#33425C;color:#B4C2D6;}
+body.theme-dark .card-head:after{background:#45577A;}
+body.theme-dark .hue-indigo .card-head .card-title{color:#A9B8FF;}
+body.theme-dark .hue-indigo .card-head:after{background:#6A83F7;}
+body.theme-dark .hue-indigo .card-head .ct-ico{background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark .hue-azure .card-head .card-title{color:#9BD3F5;}
+body.theme-dark .hue-azure .card-head:after{background:#3FA9E6;}
+body.theme-dark .hue-azure .card-head .ct-ico{background:#12324A;border-color:#33425C;color:#9BD3F5;}
+body.theme-dark .hue-teal .card-head .card-title{color:#93DEDF;}
+body.theme-dark .hue-teal .card-head:after{background:#2FB3B5;}
+body.theme-dark .hue-teal .card-head .ct-ico{background:#0F3436;border-color:#33425C;color:#93DEDF;}
+body.theme-dark .hue-emerald .card-head .card-title{color:#8FE7C4;}
+body.theme-dark .hue-emerald .card-head:after{background:#2CC191;}
+body.theme-dark .hue-emerald .card-head .ct-ico{background:#0F3A2C;border-color:#33425C;color:#8FE7C4;}
+body.theme-dark .hue-amber .card-head .card-title{color:#F4D79A;}
+body.theme-dark .hue-amber .card-head:after{background:#E0A83A;}
+body.theme-dark .hue-amber .card-head .ct-ico{background:#3A2E12;border-color:#33425C;color:#F4D79A;}
+body.theme-dark .fld > span,body.theme-dark .fld > label > span{color:#B4C2D6;}
+body.theme-dark .inp,body.theme-dark select.inp,body.theme-dark textarea.inp{
+  background:#141D2C;color:#DCE5F2;border-color:#45577A;border-bottom-color:#45577A;}
+body.theme-dark .inp:focus{border-color:#6A83F7;
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);box-shadow:0 0 0 3px rgba(106,131,247,.26);}
+body.theme-dark .inp[readonly],body.theme-dark .inp:disabled{
+  background:#101927;color:#8B9BB3;border-color:#33425C;}
+body.theme-dark .btn{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;}
+body.theme-dark .btn:hover{background:#25314A;color:#EEF3FB;border-color:#45577A;}
+body.theme-dark .btn-primary,body.theme-dark .btn-submit{
+  background:#3550D8;background-image:none;border-color:#6A83F7;color:#FFFFFF;}
+body.theme-dark .btn-danger{background:#B62F2F;background-image:none;border-color:#E86A6A;color:#FFFFFF;}
+body.theme-dark .btn:disabled,body.theme-dark .btn.is-off,body.theme-dark .btn[aria-disabled="true"]{
+  background:#141D2C;background-image:none;border-color:#33425C;color:#67768F;}
+body.theme-dark .tbl-wrap{background:#141D2C;border-color:#33425C;}
+body.theme-dark .tbl thead th{
+  background:#1B2537;background-image:none;color:#B4C2D6;border-bottom-color:#33425C;}
+body.theme-dark .tbl tbody td{color:#DCE5F2;border-bottom-color:#25314A;}
+body.theme-dark .tbl tbody tr:nth-child(even){background:#161F2E;}
+body.theme-dark .tbl tbody tr:hover{background:#1F2A3E;}
+body.theme-dark .tbl tbody td.empty,body.theme-dark .tbl .empty{background:#101927;color:#8B9BB3;}
+body.theme-dark .tbl tfoot td{background:#1B2537;color:#EEF3FB;border-top-color:#33425C;}
+body.theme-dark .mini-list{background:#182234;border-color:#33425C;}
+body.theme-dark .mini-list .row,body.theme-dark .mini-list .s-row{
+  color:#DCE5F2;border-bottom-color:#25314A;}
+body.theme-dark .mini-list .row:hover,body.theme-dark .mini-list .s-row:hover{
+  background:#1F2A3E;color:#A9B8FF;}
+body.theme-dark .loader{background:#0E1522;}
+body.theme-dark .loader-box{background:#182234;border-color:#33425C;}
+body.theme-dark .loader-text{color:#B4C2D6;}
+body.theme-dark .ctx-menu,body.theme-dark .modal-card{background:#182234;border-color:#33425C;}
+body.theme-dark .ctx-item{color:#DCE5F2;}
+body.theme-dark .ctx-item:hover{background:#1F2A3E;color:#A9B8FF;}
+body.theme-dark .modal-title{color:#EEF3FB;}
+body.theme-dark .ops-dlg{background:rgba(6,10,18,.62);}
+body.theme-dark .ops-dlg .cash-dlg-card{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-color:#45577A;
+}
+body.theme-dark .ops-dlg .cash-dlg-msg{color:#EEF3FB;}
+body.theme-dark.form-locked .col-center input,
+body.theme-dark.form-locked .col-center select,
+body.theme-dark.form-locked .col-center textarea,
+body.theme-dark.form-locked .col-left input,
+body.theme-dark.form-locked .col-left select,
+body.theme-dark.form-locked .col-left textarea{
+  background:#101927;color:#8B9BB3;border-color:#33425C;
+}
+body.theme-dark.form-locked:after{
+  background:#3A2E12;border-color:#E0A83A;color:#F4D79A;
+}
+body.theme-dark .queue-overlay{background:#141D2C;border-color:#33425C;color:#DCE5F2;}
+body.theme-dark .queue-overlay-head{
+  background:#1B2537;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark .qov-title-main{color:#EEF3FB;}
+body.theme-dark .qov-subtitle,body.theme-dark .qov-sum-lbl{color:#8B9BB3;}
+body.theme-dark .qov-sum-card{background:#182234;border-color:#33425C;}
+body.theme-dark .qov-sum-num{color:#EEF3FB;}

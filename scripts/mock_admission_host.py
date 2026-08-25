@@ -20,6 +20,12 @@ FILES = {
     "/": (ADM, "index.html", "text/html; charset=utf-8"),
     "/index.html": (ADM, "index.html", "text/html; charset=utf-8"),
     "/admission.css": (ADM, "admission.css", "text/css; charset=utf-8"),
+    # v1.91.0 ordered theme layer (mirrors src/app.rc ids 420..424)
+    "/css/core.css": (ADM, "css/core.css", "text/css; charset=utf-8"),
+    "/css/surface-dash.css": (ADM, "css/surface-dash.css", "text/css; charset=utf-8"),
+    "/css/surface-tools.css": (ADM, "css/surface-tools.css", "text/css; charset=utf-8"),
+    "/css/surface-admission.css": (ADM, "css/surface-admission.css", "text/css; charset=utf-8"),
+    "/css/surface-cashier.css": (ADM, "css/surface-cashier.css", "text/css; charset=utf-8"),
     "/admission.js": (ADM, "admission.js", "application/javascript; charset=utf-8"),
     "/bridge.js": (ADM, "bridge.js", "application/javascript; charset=utf-8"),
     "/contextmenu.js": (ADM, "contextmenu.js", "application/javascript; charset=utf-8"),
@@ -93,6 +99,20 @@ class H(BaseHTTPRequestHandler):
             marker = b'<script src="common.js"></script>'
             dev = b'<script>window.__AZADI_DEV_ALLOW_HTTP__ = true;</script>\n  ' + marker
             body = body.replace(marker, dev, 1)
+            # index.html hosts SIX screens; the real app picks one by injecting
+            # window.__azSurface from C++. Mirror that here so every surface can
+            # be reviewed in a browser: /index.html?surface=dash|tools|receipts|
+            # cashier|queue|admission  (default: admission).
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            surface = ""
+            for part in qs.split("&"):
+                if part.startswith("surface="):
+                    surface = part[len("surface="):]
+            if surface in ("dash", "tools", "receipts", "cashier", "queue",
+                           "admission"):
+                inject = ('<script>window.__azSurface=%r;</script>'
+                          % surface).encode("utf-8")
+                body = body.replace(b"<body>", b"<body>" + inject, 1)
         self._send(200, ct, body)
 
     def do_POST(self):
@@ -114,7 +134,12 @@ class H(BaseHTTPRequestHandler):
                 "zoom": 100,
                 "theme": theme,
                 "palette": "blue",
-                "user": {"name": "زهرا احمدی", "dept": "پذیرش عمومی"},
+                # C++ sends `user` as a plain display STRING (see the
+                # `init` handler in src/web_admission_api.inc), so the
+                # mock must too — an object here rendered as
+                # "[object Object]" on the dashboard.
+                "user": "زهرا احمدی",
+                "userDept": "پذیرش عمومی",
                 "ps": {"s": 37, "p": 29},
                 "services": [],
             }

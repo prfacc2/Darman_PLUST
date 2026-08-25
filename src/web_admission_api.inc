@@ -1170,6 +1170,11 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     }
 
     // ---- v1.82.0 cashier page ----------------------------------------------
+    static const wchar_t* kCashNoShiftWarn =
+        L"\u067e\u0631\u062f\u0627\u062e\u062a \u062b\u0628\u062a \u0634\u062f "
+        L"\u0627\u0645\u0627 \u0634\u06cc\u0641\u062a\u06cc \u0628\u0627\u0632 "
+        L"\u0646\u06cc\u0633\u062a \u2014 \u062f\u0631\u0622\u0645\u062f \u062f\u0631 "
+        L"\u0634\u06cc\u0641\u062a \u062b\u0628\u062a \u0646\u0634\u062f.";
     if(verb=="cashier.page"){
         std::string qU; jsonGetString(body,"q",qU);
         double tab=0; jsonGetNumber(body,"tab",tab);
@@ -1179,11 +1184,17 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::string idU; jsonGetString(body,"id",idU);
         return Cash_GetJson(u82w(idU));
     }
+    // v1.91.0: a successful payment with NO open shift used to lose the income
+    // silently (shiftAddIncome bailed out). It still succeeds — refusing it would
+    // block the desk — but the response now carries a non-fatal "warn" the JS
+    // shows as a warning toast.
     if(verb=="cashier.pay"){
         std::string idU; jsonGetString(body,"id",idU);
-        std::wstring err;
-        if(!Cash_Pay(u82w(idU),err))
+        std::wstring err; bool noShift=false;
+        if(!Cash_Pay(u82w(idU),err,&noShift))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        if(noShift)
+            return std::string("{\"ok\":true,\"warn\":")+jstr(kCashNoShiftWarn)+"}";
         return "{\"ok\":true}";
     }
     if(verb=="cashier.manual"){
@@ -1193,9 +1204,11 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         jsonGetString(body,"last",lU);
         jsonGetString(body,"doctor",dU);
         jsonGetNumber(body,"amount",amt);
-        std::wstring err;
-        if(!Cash_Manual(u82w(nidU),u82w(fU),u82w(lU),u82w(dU),(long long)amt,err))
+        std::wstring err; bool noShift=false;
+        if(!Cash_Manual(u82w(nidU),u82w(fU),u82w(lU),u82w(dU),(long long)amt,err,&noShift))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        if(noShift)
+            return std::string("{\"ok\":true,\"warn\":")+jstr(kCashNoShiftWarn)+"}";
         return "{\"ok\":true}";
     }
     if(verb=="cashier.shift.start"){

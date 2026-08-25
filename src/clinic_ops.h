@@ -50,13 +50,29 @@ bool Ops_IsReception(const Section& s);
 CashScope Cash_ResolveScope();
 
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err);
-bool Cash_Pay(const std::wstring& id, std::wstring& err);
+// v1.91.0: outNoShift (optional) reports that the payment SUCCEEDED but no
+// cashier shift was open, so the money could not be attributed to a shift.
+// Non-fatal on purpose — refusing the payment would block the desk workflow —
+// but the caller must surface it instead of losing the income silently.
+bool Cash_Pay(const std::wstring& id, std::wstring& err, bool* outNoShift = nullptr);
 bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
                  const std::wstring& last, const std::wstring& doctor,
-                 long long amount, std::wstring& err);
+                 long long amount, std::wstring& err, bool* outNoShift = nullptr);
 
 // q filters barcode/name/doctor/section inside the active tab only.
 // tabSectionId==0 → «صندوق نرفته‌ها» (unpaid). Otherwise a top-level section id.
+// Response (v1.91.0 adds "sections", "totals" and "lastShift"; every older key
+// keeps its exact name and shape):
+//   {"ok":true,
+//    "tabs":[{id,name,kind}…],           tab 0 is the synthetic unpaid tab
+//    "shift":{…open shift…}|{"open":false,"income":0},
+//    "lastShift":{…last CLOSED shift…},  only when no shift is open
+//    "income":N,
+//    "stats":{patients,paid,unpaid,queue},          ← describes the ACTIVE TAB
+//    "sections":[{id,name,code,patients,unpaidCount,unpaidSum,
+//                 paidCount,paidSum}…],             ← per-department, 24h scope
+//    "totals":{patients,unpaidCount,unpaidSum,paidCount,paidSum},
+//    "rows":[…]}
 std::string Cash_PageJson(const std::wstring& q, int tabSectionId);
 std::string Cash_GetJson(const std::wstring& id);
 std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode, bool unpaidOnly);

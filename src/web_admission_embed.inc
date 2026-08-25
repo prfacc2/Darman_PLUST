@@ -103,6 +103,18 @@ static bool adReplaceRequired(std::string& hay, const std::string& needle,
 //      unavailable (falling through to Segoe/Tahoma). So the Trident page gets
 //      NO @font-face at all; plain font-family:'Vazirmatn' resolves to the
 //      process-installed font.
+// v1.91.0: the ordered theme layer (RCDATA 420..424). Each entry pairs the
+// <link> marker in index.html with its resource id; the table IS the load
+// order, and it must stay in sync with index.html and src/app.rc.
+struct AdThemeLayer { const char* href; int id; };
+static const AdThemeLayer kAdThemeLayers[] = {
+    { "css/core.css",              420 },
+    { "css/surface-dash.css",      421 },
+    { "css/surface-tools.css",     422 },
+    { "css/surface-admission.css", 423 },
+    { "css/surface-cashier.css",   424 },
+};
+
 static std::string AdmissionBuildInlinePage(bool withFontFace){
     std::string html,commonCss,admCss,commonJs,bridgeJs,ctxJs,admJs;
     if(!adLoadRes(400,html)      || html.empty()      ||
@@ -114,6 +126,19 @@ static std::string AdmissionBuildInlinePage(bool withFontFace){
        !adLoadRes(403,admJs)     || admJs.empty())
         return "";
     if(!adStripFontFace(commonCss) || !adStripFontFace(admCss)) return "";
+
+    // Inline every theme-layer sheet in the declared order. A missing or empty
+    // layer is a hard failure: shipping the page without its design system
+    // would render the whole surface unstyled on the customer's machine.
+    for(size_t i=0;i<sizeof(kAdThemeLayers)/sizeof(kAdThemeLayers[0]);++i){
+        std::string layer;
+        if(!adLoadRes(kAdThemeLayers[i].id,layer) || layer.empty()) return "";
+        if(!adStripFontFace(layer)) return "";
+        std::string marker=std::string("<link rel=\"stylesheet\" href=\"")
+                          + kAdThemeLayers[i].href + "\" />";
+        if(!adReplaceRequired(html,marker,"<style>\n"+layer+"\n</style>"))
+            return "";
+    }
 
     std::string face;
     if(withFontFace){

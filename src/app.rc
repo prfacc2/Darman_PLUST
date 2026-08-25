@@ -49,6 +49,20 @@
 404 RCDATA "../assets/admission/vazir.ttf"
 405 RCDATA "../assets/admission/contextmenu.js"
 
+// v1.91.0: the ORDERED THEME LAYER. admission.css (401) keeps only structure
+// and layout; every colour, elevation and surface treatment now lives in one
+// exclusively-owned file per layer, loaded in this order AFTER 401. This
+// replaced ~4400 lines of sixteen stacked "polish pass" layers (v1.65 → v1.90)
+// that each repainted the previous one — the reason the UI kept drifting.
+// Ids 420..424 are RESERVED for the theme layer and MUST NOT collide with the
+// admission (400..405), shell (500..502), ping (600..602), WebView2Loader (700)
+// or CRM (800..816) blocks. See docs/DESIGN_SYSTEM.md.
+420 RCDATA "../assets/admission/css/core.css"
+421 RCDATA "../assets/admission/css/surface-dash.css"
+422 RCDATA "../assets/admission/css/surface-tools.css"
+423 RCDATA "../assets/admission/css/surface-admission.css"
+424 RCDATA "../assets/admission/css/surface-cashier.css"
+
 // v1.40.0: shared multi-page embedded-web SHELL assets — one common stylesheet
 // (RTL Persian + Vazirmatn + themes), one common runtime (AzBridge/AzUi/AzNav/
 // AzBoot/AzPerf helpers) and the embedded Vazirmatn font every page pulls in.
@@ -114,8 +128,8 @@
 1 24 "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-  FILEVERSION 1,90,0,0
-  PRODUCTVERSION 1,90,0,0
+  FILEVERSION 1,91,0,0
+  PRODUCTVERSION 1,91,0,0
   FILEFLAGSMASK 0x3fL
   FILEFLAGS 0x0L
   FILEOS 0x40004L
@@ -128,11 +142,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "DarmanPlus"
             VALUE "FileDescription", "DarmanPlus Clinic Reception & Management System"
-            VALUE "FileVersion", "1.90.0.0"
+            VALUE "FileVersion", "1.91.0.0"
             VALUE "InternalName", "DarmanPlus"
             VALUE "OriginalFilename", "DarmanPlus.exe"
             VALUE "ProductName", "DarmanPlus"
-            VALUE "ProductVersion", "1.90.0"
+            VALUE "ProductVersion", "1.91.0"
         END
     END
     BLOCK "VarFileInfo"

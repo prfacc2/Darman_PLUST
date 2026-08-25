@@ -25,6 +25,11 @@ Session   g_session;
 HFONT g_fUI=0, g_fUIB=0, g_fSmall=0, g_fTitle=0, g_fBig=0, g_fHuge=0, g_fMono=0;
 HFONT g_fLabel=0, g_fSection=0;   // v1.27.0 UI redesign fonts
 HFONT g_fCode=0;   // §G: fixed-pitch code font (Consolas → Courier New)
+// v1.91.0 (DESIGN_SYSTEM §11.1): the window header's clock and Jalali date get
+// their OWN fonts (22 bold / 14 semibold). g_fTitle and g_fSmall are shared by
+// every other screen, so their sizes must not move — these two are file-local
+// and are only ever selected by the header paint.
+static HFONT g_fClock=0, g_fDate=0;
 
 // frame children
 //  v1.4.0: the header now carries ONLY the exit button (right) and the gear
@@ -91,6 +96,8 @@ static void buildFonts(){
     if(g_fCode) DeleteObject(g_fCode);
     if(g_fLabel)  DeleteObject(g_fLabel);
     if(g_fSection)DeleteObject(g_fSection);
+    if(g_fClock)  DeleteObject(g_fClock);
+    if(g_fDate)   DeleteObject(g_fDate);
     g_fUI    = mkFont(15, FW_NORMAL);
     g_fUIB   = mkFont(15, FW_BOLD);
     g_fSmall = mkFont(12, FW_NORMAL);
@@ -104,6 +111,11 @@ static void buildFonts(){
     // the label the requested weight without looking bold.
     g_fLabel   = mkFont(13, FW_SEMIBOLD);
     g_fSection = mkFont(16, FW_BOLD);
+    // v1.91.0 §11.1: the owner asked for a bigger clock + date in the window
+    // header. Dedicated fonts (NOT g_fTitle / g_fSmall, which the rest of the
+    // app shares) so no other screen changes size.
+    g_fClock   = mkFont(22, FW_BOLD);
+    g_fDate    = mkFont(14, FW_SEMIBOLD);
 }
 
 // v1.31.0 RESPONSIVE-LABEL FIX — a tiny cache of fonts whose logical height is
@@ -292,11 +304,12 @@ static HomeGeom homeGeom(int W, int H){
     int cl = cx - cardsW/2;
     SetRect(&g.cardR, cl+cardW+cgap, y, cl+cardsW,  y+cardH);   // RTL right
     SetRect(&g.cardL, cl,            y, cl+cardW,   y+cardH);   // RTL left
-    // v1.90.0: the glass tray matches the hero panel's width (inset S(28)),
-    // not just the two compact icon cells — so the vessel reads as the same
-    // length as the container behind it.
-    SetRect(&g.tray, g.panel.left+S(28), y-S(16),
-            g.panel.right-S(28), y+cardH+S(14));
+    // v1.91.0 (DESIGN_SYSTEM §11.2): the glass tray is EXACTLY as wide as the
+    // hero panel behind it — tray.left == panel.left, tray.right == panel.right.
+    // The owner's complaint was that the vessel holding the icons was shorter
+    // than its container; it is now flush with it.
+    SetRect(&g.tray, g.panel.left, y-S(16),
+            g.panel.right, y+cardH+S(14));
 
     int fy = g.panel.bottom + footGap;
     SetRect(&g.foot, cx-S(250), fy, cx+S(250), fy+footH);
@@ -311,14 +324,31 @@ static HomeGeom homeGeom(int W, int H){
 // the dark panel keeps its deep slate gradient. The cards live in the lower
 // band of the panel, so homePanelBot() is the colour behind them.
 static COLORREF homePanelTop(){
-    // v1.90.0: one more step off white — a cool periwinkle wash so the hero
-    // no longer reads as a blank sheet on the light theme.
+    // v1.91.0 §11.2: the hero is WHITE-leaning again — the owner reported the
+    // v1.90 periwinkle wash "collided with the background image and went dark".
+    // Depth now comes from light + shadow, not from tinting the panel.
     return g_dark ? RGB(24,29,38)
-                  : blendColor(g_theme.surface2, g_theme.accent, 18);
+                  : RGB(0xFF,0xFF,0xFF);      // #FFFFFF
 }
 static COLORREF homePanelBot(){
     return g_dark ? RGB(14,18,25)
-                  : blendColor(g_theme.bg2, g_theme.accent, 14);
+                  : RGB(0xEE,0xF3,0xFB);      // #EEF3FB
+}
+
+// v1.91.0 (DESIGN_SYSTEM §3 `sh-glow-tray` / §11.2): a soft LIGHT outer glow.
+// gpShadowColor() deliberately shades its tint to 32% — it paints shade, never
+// light — so a light-leaning halo has to be layered here. Six passes only (the
+// same discipline as the 12-ring cap in gpShadow) and it is used ONLY on the
+// welcome screen, never in the header's twice-a-second timer paint path.
+static void homeGlow(HDC dc, RECT rc, int rad, int spread, int alpha, COLORREF tint){
+    const int rings = 6;
+    for(int i=rings; i>=1; i--){
+        int off = (spread*i)/rings;
+        RECT gr = rc; InflateRect(&gr, off, off);
+        int a = (alpha*(rings-i+1))/(rings*2);
+        if(a < 1) a = 1;
+        gpFillAlpha(dc, gr, rad+off, tint, a);
+    }
 }
 
 // v1.88.0: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
@@ -327,10 +357,27 @@ static COLORREF homePanelBot(){
 // corners behind the rounded badges.
 static int s_appHot = 0;
 
+// v1.91.0: extrapolate along the a→b ray (a + (b-a)*num/den), clamped per
+// channel. Used to build a seamless three-stop badge sweep out of two two-stop
+// GDI+ gradients: each pass is given the colour it must START from so that both
+// passes evaluate to EXACTLY the middle stop where they meet.
+static COLORREF rayColor(COLORREF a, COLORREF b, int num, int den){
+    if(den <= 0) return b;
+    auto cl=[](int v){ return v<0 ? 0 : (v>255 ? 255 : v); };
+    return RGB(cl(GetRValue(a)+(GetRValue(b)-GetRValue(a))*num/den),
+               cl(GetGValue(a)+(GetGValue(b)-GetGValue(a))*num/den),
+               cl(GetBValue(a)+(GetBValue(b)-GetBValue(a))*num/den));
+}
+
 // v1.88.0: iOS-style app icon — a glossy squircle badge with a white glyph, a
 // soft tinted shadow and the account name underneath; NO button chrome, NO
 // background — exactly like a pinned phone app, slightly larger.
-static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
+// v1.91.0 (DESIGN_SYSTEM §11.2): the coloured halo AND the tinted plate are
+// GONE ("remove the glow from the account icons — let it just be the icon").
+// The badge body is the hue's three-stop sweep (light → base → deep) and the
+// only elevation is one tight NEUTRAL shadow.
+static void paintAppIcon(HDC dc, RECT cell, int icon,
+                         COLORREF bLo, COLORREF bMid, COLORREF bDeep,
                          const wchar_t* name, const wchar_t* sub, bool hot){
     int cw = cell.right-cell.left;
     int bs = S(82);                              // v1.90: slightly larger badge
@@ -338,30 +385,50 @@ static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
     int by = cell.top + S(6) - (hot?S(3):0);     // hover: gentle lift
     RECT bd = {bx, by, bx+bs, by+bs};
     int rad = S(24);                             // squircle corner
-    // a quiet tinted plate under the badge so the icon reads as a designed
-    // button, not a glyph floating on white (no extra timers — still dirty-rect)
+    // neutral ambient shadow only — §3 `sh-icon` (never a coloured halo/plate)
+    gpShadow(dc, bd, rad, hot?S(11):S(9), hot?86:70);
+    // Three-stop glossy body (light → base → deep). GDI+ has no vertical 3-stop
+    // helper here, so pass 1 paints the WHOLE squircle and pass 2 repaints the
+    // lower 42% clipped to that band. Both passes are handed EXTRAPOLATED end
+    // colours (rayColor) so each one evaluates to exactly `bMid` at the 58%
+    // seam — that is what keeps the two gradients from showing the "split in
+    // two" step the v1.89 ribbon fix warned about. Pass 2's rect starts a radius
+    // ABOVE the seam, so its rounded top corners fall entirely in the clipped-
+    // away area and can never bite a notch out of the silhouette.
     {
-        RECT plate={bd.left-S(10), bd.top-S(8), bd.right+S(10), bd.bottom+S(10)};
-        gpGradRoundRect(dc, plate, S(28),
-            blendColor(brand, RGB(255,255,255), g_dark?8:78),
-            blendColor(brand, g_theme.surface2, g_dark?18:22),
-            blendColor(brand, g_theme.border, 28));
+        int my = bd.top + (bs*58)/100;
+        gpGradRoundRect(dc, bd, rad, bLo, rayColor(bLo, bMid, 100, 58),
+                        CLR_INVALID);
+        int sv = SaveDC(dc);
+        IntersectClipRect(dc, bd.left, my, bd.right, bd.bottom);
+        RECT low = {bd.left, my-rad, bd.right, bd.bottom};
+        gpGradRoundRect(dc, low, rad, rayColor(bDeep, bMid, 17, 10), bDeep,
+                        CLR_INVALID);
+        RestoreDC(dc, sv);
     }
-    // tinted ambient shadow (deeper + wider when hovered)
-    gpShadowColor(dc, bd, rad, hot?S(14):S(10), hot?120:78, brand);
-    // glossy body: light top → deep bottom (convex app-icon)
-    gpGradRoundRect(dc, bd, rad,
-        blendColor(brand, RGB(255,255,255), 30),
-        blendColor(brand, RGB(0,0,0), 16),
-        blendColor(brand, RGB(0,0,0), 30));
-    // top gloss — radius clamped to half the strip height so the rounded path
-    // can never balloon outside the strip (the v1.87 card-shade lesson).
+    // Top gloss. v1.91.0: ONE uniform translucent strip left a visible hard
+    // edge where it stopped (it read as a band across the icon), so the mock's
+    // rgba(255,255,255,.48) → transparent fade is faked with a few nested strips
+    // anchored at the badge top: the shortest strip is the brightest because the
+    // alphas stack. Everything is clipped to the squircle itself, so a strip
+    // whose radius is clamped to its own height can never spill past the badge's
+    // rounded corners (the v1.87 card-shade lesson).
     {
-        RECT gl = bd; gl.bottom = bd.top + (bs*44)/100;
-        int gh = gl.bottom-gl.top;
-        int grad = (gh/2-1) < rad ? (gh/2-1) : rad;
-        if(grad >= 2)
-            gpFillAlpha(dc, gl, grad, RGB(255,255,255), hot?44:32);
+        POINT vo={0,0}; GetViewportOrgEx(dc,&vo);
+        HRGN body=CreateRoundRectRgn(bd.left+vo.x, bd.top+vo.y,
+                                     bd.right+vo.x, bd.bottom+vo.y,
+                                     rad*2, rad*2);
+        int sv=SaveDC(dc);
+        if(body) ExtSelectClipRgn(dc, body, RGN_AND);
+        const int steps = 5;
+        for(int i=steps; i>=1; i--){
+            RECT gl = bd;
+            gl.bottom = bd.top + ((bs*46)/100)*i/steps;
+            if(gl.bottom - gl.top < S(5)) continue;
+            gpFillAlpha(dc, gl, rad, RGB(255,255,255), hot?11:9);
+        }
+        RestoreDC(dc, sv);
+        if(body) DeleteObject(body);
     }
     // inner light rim
     { RECT ir=bd; InflateRect(&ir,-S(1),-S(1));
@@ -371,9 +438,9 @@ static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
     int gr = (bs*30)/100;
     RECT grc={bd.left+bs/2-gr, bd.top+bs/2-gr, bd.left+bs/2+gr, bd.top+bs/2+gr};
     drawIcon(dc, icon, grc, RGB(255,255,255), S(2)+1);
-    // account name under the badge — deep ink, brand-tinted on hover
+    // account name under the badge — §11.2 ink #10203A bold, hue-tinted on hover
     int ly = bd.bottom + S(10);
-    SetTextColor(dc, hot ? brand : (g_dark?g_theme.text:g_theme.sectionInk));
+    SetTextColor(dc, hot ? bMid : (g_dark?g_theme.text:g_theme.sectionInk));
     SelectObject(dc, g_fUIB);
     RECT nr={cell.left, ly, cell.right, ly+S(22)};
     DrawTextW(dc, name, -1, &nr,
@@ -517,7 +584,13 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // dark artwork is deeper, so it gets a stronger wash.
         // v1.77: the light scrim was nudged up so the page reads as a calm tinted
         // surface (less flat-white) while the illustration still shows through.
-        if(!gpDrawBackground(dc, rc, g_dark, g_theme.bg, g_dark?96:58)){
+        // v1.91.0 §11.2: the owner reported this page "went dark and collided
+        // with the background image". The light scrim is now a LIGHT tint
+        // (#E4ECF8) at a higher alpha, so the artwork still shows through but
+        // the page reads white-leaning instead of murky.
+        if(!gpDrawBackground(dc, rc, g_dark,
+                             g_dark?g_theme.bg:RGB(0xE4,0xEC,0xF8),
+                             g_dark?96:86)){
             RECT full={0,0,rc.right,rc.bottom};
             gpGradRoundRect(dc,full,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
         }
@@ -535,12 +608,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         COLORREF pBot = homePanelBot();
         gpGradRoundRect(dc, g.panel, g.radius, pTop, pBot,
                         g_dark ? blendColor(g_theme.border,g_theme.accent,18)
-                               : blendColor(g_theme.border,g_theme.accent,30));
+                               : RGB(0xB9,0xC8,0xDF));      // §11.2 hero border
         // v1.87.0: frosted-clay inner light rim just inside the panel edge.
         {
             RECT pit=g.panel; InflateRect(&pit,-S(1),-S(1));
             gpRoundRect(dc, pit, g.radius>S(1)?g.radius-S(1):g.radius,
-                        CLR_INVALID, RGB(255,255,255), g_dark?30:110);
+                        CLR_INVALID, RGB(255,255,255), g_dark?30:120);
         }
         // Accent ribbon hugging the panel's top edge. It is inset by the corner
         // radius so it never spills outside the rounded silhouette (drawing it
@@ -630,10 +703,13 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 int x = rc.right/2 - tot/2;
                 for(int i=0;i<3;i++){
                     RECT cr={x, g.chips.top, x+wid[i], g.chips.top+ch};
+                    // §11.2 / mock: on white the chip is a quiet tinted pill
+                    // (#F2F6FC on a #C6D2E4 hairline) — not another white box.
                     COLORREF cf = g_dark ? blendColor(pTop, g_theme.accent, 16)
-                                         : blendColor(g_theme.surface2, g_theme.accent, 8);
+                                         : RGB(0xF2,0xF6,0xFC);
                     gpRoundRectBg(dc, cr, ch/2, cf,
-                                  blendColor(g_theme.border, g_theme.accent, 30), pTop);
+                                  g_dark ? blendColor(g_theme.border, g_theme.accent, 30)
+                                         : g_theme.border, pTop);
                     RECT ir={cr.right-pad-icoD, (cr.top+cr.bottom)/2-icoD/2,
                              cr.right-pad,      (cr.top+cr.bottom)/2+icoD/2};
                     drawIcon(dc, CH[i].ico, ir, g_theme.accent, S(2));
@@ -646,30 +722,49 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             }
         }
 
-        // ---- 5b. v1.88.0 / v1.90.0: glass tray + two app-icon entries --------
+        // ---- 5b. v1.88.0 / v1.91.0: glass tray + two app-icon entries --------
+        // §11.2: the tray is now flush with the hero panel, LIGHT (#F9FBFE →
+        // #E8EFF9) instead of the old dark periwinkle slab, lifted by a neutral
+        // shadow and wrapped in one soft light-leaning glow. Both the glow and
+        // the shadow are clipped to the hero panel (the mock's `overflow:hidden`)
+        // so nothing spills onto the background artwork.
         {
             RECT tr=g.tray;
-            gpShadow(dc, tr, S(24), S(16), g_dark?100:48);
-            gpShadowColor(dc, tr, S(24), S(8), g_dark?70:36, g_theme.accent);
+            int trad = S(24);
+            {
+                int sv = SaveDC(dc);
+                IntersectClipRect(dc, g.panel.left, g.panel.top,
+                                      g.panel.right, g.panel.bottom);
+                if(!g_dark)
+                    homeGlow(dc, tr, trad, S(30), 40, RGB(0xA6,0xC6,0xF0));
+                gpShadowColor(dc, tr, trad, S(18), g_dark?96:54,
+                              RGB(0x16,0x25,0x3C));
+                RestoreDC(dc, sv);
+            }
             COLORREF trayTop = g_dark
                 ? blendColor(homePanelTop(), RGB(255,255,255), 8)
-                : blendColor(RGB(214,226,244), g_theme.accent, 12);
+                : RGB(0xF9,0xFB,0xFE);
             COLORREF trayBot = g_dark
                 ? blendColor(homePanelBot(), RGB(255,255,255), 4)
-                : blendColor(RGB(188,206,230), g_theme.accent, 10);
-            gpGradRoundRect(dc, tr, S(24), trayTop, trayBot,
-                blendColor(g_theme.border, g_theme.accent, 28));
+                : RGB(0xE8,0xEF,0xF9);
+            gpGradRoundRect(dc, tr, trad, trayTop, trayBot,
+                g_dark ? blendColor(g_theme.border, g_theme.accent, 28)
+                       : RGB(0xB9,0xC8,0xDF));
             RECT itr=tr; InflateRect(&itr,-S(1),-S(1));
-            gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
-                        g_dark?28:88);
-            // v1.90: a thin faint divider between the two programs
+            gpRoundRect(dc, itr, trad-S(1), CLR_INVALID, RGB(255,255,255),
+                        g_dark?28:150);
+            // §11.2: a thin FAINT divider between the two programs — 1px
+            // #C6D2E4 at alpha 140, inset S(26) top and bottom.
             {
                 int mx = (g.cardL.right + g.cardR.left)/2;
-                int y1 = tr.top + S(28), y2 = tr.bottom - S(28);
-                COLORREF dc1 = blendColor(g_theme.border, g_theme.accent, 40);
-                gpLine(dc, mx, y1, mx, y2, dc1, 1.0f, 150);
-                // tiny accent diamonds at both ends so it reads as designed
-                HBRUSH db=CreateSolidBrush(blendColor(g_theme.accent, trayTop, 35));
+                int y1 = tr.top + S(26), y2 = tr.bottom - S(26);
+                COLORREF dc1 = g_dark ? blendColor(g_theme.border, g_theme.accent, 40)
+                                      : RGB(0xC6,0xD2,0xE4);
+                gpLine(dc, mx, y1, mx, y2, dc1, 1.0f, 140);
+                // tiny diamonds at both ends so it reads as designed
+                HBRUSH db=CreateSolidBrush(
+                    g_dark ? blendColor(g_theme.accent, trayTop, 35)
+                           : RGB(0x8F,0xA6,0xC8));
                 HGDIOBJ ob2=SelectObject(dc,db);
                 HGDIOBJ op2=SelectObject(dc,GetStockObject(NULL_PEN));
                 int ds=S(3);
@@ -680,9 +775,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
             // RTL: پرسنل on the RIGHT cell, مدیریت on the LEFT cell.
-            paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
+            // §11.2 badge sweeps: پرسنل = indigo, مدیریت = teal (never violet).
+            paintAppIcon(dc, g.cardR, ICO_USER_ADD,
+                         RGB(0x5A,0x72,0xE6), RGB(0x35,0x50,0xD8), RGB(0x22,0x34,0x9C),
                          L"حساب پرسنل", NULL, s_appHot==1);
-            paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
+            paintAppIcon(dc, g.cardL, ICO_PEOPLE,
+                         RGB(0x35,0xA8,0xAA), RGB(0x0F,0x8B,0x8D), RGB(0x09,0x5A,0x5C),
                          L"حساب مدیریت", NULL, s_appHot==2);
         }
 
@@ -992,9 +1090,13 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.87.0: three-stop frosted-glass band — bright top, cool mid, deeper
         // base — far richer than the old two-stop strip, and an inner light
         // line just under the ribbon sells the "frosted pane" illusion.
+        // v1.91.0 §11.1: the band is LIGHTER (#F2F6FD → #E9EFF9 → #D8E2F1) —
+        // the owner reported the old strip as "very dark".
         RECT tb={0,0,rc.right,mainBarH()};
+        COLORREF hMid = g_dark
+            ? blendColor(g_theme.headerTop, g_theme.headerBot, 55)
+            : RGB(0xE9,0xEF,0xF9);
         {
-            COLORREF hMid = blendColor(g_theme.headerTop, g_theme.headerBot, 55);
             RECT tbT={0,0,rc.right,mainBarH()/2};
             RECT tbB={0,mainBarH()/2,rc.right,mainBarH()};
             gpGradRoundRect(dc,tbT,0,g_theme.headerTop,hMid,CLR_INVALID);
@@ -1003,7 +1105,8 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.77: a thin branded accent ribbon along the header's top edge — the
         // same "designed" signature the welcome panel carries, on both themes —
         // so the header reads as a polished, branded surface, not a flat strip.
-        // v1.87.0 gradialism: the ribbon now sweeps indigo → sky → violet.
+        // v1.91.0 §11.1 gradialism: indigo → indigo-light → azure (no violet;
+        // g_infoAccent is azure since v1.91.0).
         {
             RECT hrib={0,0,rc.right,S(3)};
             gpGradRibbon3(dc, hrib, 0, g_theme.accent, g_theme.accent2,
@@ -1028,11 +1131,13 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // middle bg (gentle gradient page)
         RECT mid={0,topBarH(),rc.right,rc.bottom-botBarH()};
         gpGradRoundRect(dc,mid,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
-        // crisp separators
+        // crisp separators — §11.1: the header's bottom hairline is #C6D2E4,
+        // which is exactly g_theme.border since the v1.91.0 palette port.
         gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.border,1.0f);
         gpLine(dc,0,rc.bottom-botBarH(),rc.right,rc.bottom-botBarH(),g_theme.border,1.0f);
-        // a thin accent underline under the header for that "designed" feel
-        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,40);
+        // §11.1: a 2px indigo underline at 18% alpha under the header — the
+        // "designed" edge that separates the band from the page.
+        gpLine(dc,0,topBarH()-1,rc.right,topBarH()-1,g_theme.accent,2.0f,46);
 
         SetBkMode(dc,TRANSPARENT);
 
@@ -1064,7 +1169,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // logo badge, so the app name is no longer repeated here.
             // §2.B: offsets tuned for the compact S(56) header.
             SelectObject(dc,g_fUIB);
-            SetTextColor(dc,g_theme.text);
+            SetTextColor(dc,g_dark?g_theme.text:g_theme.sectionInk); // §11.1 #10203A
             RECT nr={S(160),S(5),idRight,S(5)+S(24)};
             DrawTextW(dc,g_session.user.fullname.c_str(),-1,&nr,
                 DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
@@ -1107,7 +1212,11 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // under DPI scaling. Stacked: clock on top (bold mono), date below.
             int bandL = leftBtns + S(8);
             int bandR = idRight  - S(8);
-            int zoneW = S(240);
+            // v1.91.0 §11.1: the clock is 22px and the date 14px now, so the
+            // zone is wider (S(240) → S(300)) — the longest Jalali date
+            // («چهارشنبه ۲۹ اردیبهشت ۱۴۰۵») must fit between the two framing
+            // hairlines without clipping.
+            int zoneW = S(300);
             int cx    = (bandL + bandR)/2;
             int zL    = cx - zoneW/2;
             if(zL < bandL) zL = bandL;
@@ -1115,17 +1224,22 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             if(zR > bandR && bandR>bandL) { zR = bandR; }
             // v1.79.0: the frosted pill behind the clock was REMOVED on request
             // (it read as a stray patch on the band). The clock+date now float
-            // as clean typography — accent-tinted time over a dim date, framed
+            // as clean typography — deep-navy time over a muted date, framed
             // by two whisper-thin vertical hairlines so the zone still reads as
             // one composed element on the gradient.
             {
                 int dl = zL+S(14), dr = zR-S(14);
-                COLORREF hc = blendColor(g_theme.border, g_theme.accent, 45);
+                // §11.1: framing hairlines #B9C8DF at alpha 110.
+                COLORREF hc = g_dark ? blendColor(g_theme.border, g_theme.accent, 45)
+                                     : RGB(0xB9,0xC8,0xDF);
                 gpLine(dc, dl, S(10), dl, mainBarH()-S(10), hc, 1.0f, 110);
                 gpLine(dc, dr, S(10), dr, mainBarH()-S(10), hc, 1.0f, 110);
                 // v1.88.0: tiny accent diamonds capping each hairline, so the
-                // clock zone reads as one composed, designed element.
-                HBRUSH db=CreateSolidBrush(g_theme.accent);
+                // clock zone reads as one composed, designed element. §11.1:
+                // indigo blended 70% toward the band so they stay quiet.
+                HBRUSH db=CreateSolidBrush(
+                    g_dark ? g_theme.accent
+                           : blendColor(g_theme.accent, hMid, 70));
                 HGDIOBJ ob2=SelectObject(dc,db);
                 HGDIOBJ op2=SelectObject(dc,GetStockObject(NULL_PEN));
                 int ds=S(4);
@@ -1135,17 +1249,19 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 Polygon(dc,pl,4); Polygon(dc,pr2,4);
                 SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
-            // clock (centred, bold Vazirmatn) — v1.90.0: deep navy / sectionInk
-            // so the time no longer blends into the frosted header. Date is a
-            // distinct muted ink (not the same accent as the clock).
-            SetTextColor(dc, g_dark ? RGB(240,246,252) : g_theme.sectionInk);
-            SelectObject(dc,g_fTitle);
-            RECT ck={zL,S(3),zR,S(3)+S(30)};
+            // v1.91.0 §11.1: clock 22px BOLD in #16253C, Jalali date 14px in
+            // #3B4C69 (= g_theme.labelInk since the palette port). The two rects
+            // split the S(56) band as 3..34 / 34..55, so at 22px + 14px neither
+            // line collides with the other, with the 3px ribbon above or with
+            // the header's bottom hairline.
+            SetTextColor(dc, g_dark ? RGB(240,246,252) : RGB(0x16,0x25,0x3C));
+            SelectObject(dc,g_fClock);
+            RECT ck={zL,S(3),zR,S(3)+S(31)};
             DrawTextW(dc,clkStr.c_str(),-1,&ck,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
             SetTextColor(dc, g_dark ? RGB(168,180,197) : g_theme.labelInk);
-            SelectObject(dc,g_fSmall);
-            RECT dr={zL,S(3)+S(29),zR,mainBarH()-S(2)};
+            SelectObject(dc,g_fDate);
+            RECT dr={zL,S(3)+S(31),zR,mainBarH()-S(1)};
             DrawTextW(dc,dateStr.c_str(),-1,&dr,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
         }
@@ -1154,6 +1270,10 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.70.0: shift labels removed per user request. Only the product tag
         // (name + version) remains on the right side.
         // bottom-right: small product tag
+        // v1.91.0: select g_fSmall EXPLICITLY. This used to inherit whatever the
+        // Jalali date left selected — the moment the date got its own 14px font
+        // the footer tag would silently have grown with it.
+        SelectObject(dc,g_fSmall);
         SetTextColor(dc, g_dark ? g_theme.textDim : g_theme.labelInk);
         RECT pr={rc.right-S(360),rc.bottom-botBarH(),rc.right-S(16),rc.bottom};
         std::wstring tag=std::wstring(APP_NAME_W)+L"  نسخه "+toFaDigits(APP_VERSION_W);

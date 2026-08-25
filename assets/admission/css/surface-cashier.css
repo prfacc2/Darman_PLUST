@@ -1,0 +1,1330 @@
+/* ============================================================================
+   surface-cashier.css — cashier «صندوق»
+   ----------------------------------------------------------------------------
+   Part of the v1.91.0 ordered theme layer. Load order is fixed in index.html:
+     common.css → admission.css (structure) → css/core.css → css/surface-*.css
+   This file owns its layer EXCLUSIVELY. Never restyle another layer's
+   selectors from here, and never append a dated "polish pass" block.
+
+   DUAL-ENGINE CONTRACT (WebView2 Chromium + MSHTML/Trident): no var(), no
+   grid, no flex gap, no backdrop-filter, no CSS logical properties, literal
+   hex colours only, every flex declaration paired with its -ms- equivalent.
+   Palette values come from docs/DESIGN_SYSTEM.md — no ad-hoc colours.
+   ============================================================================
+
+   Hues, per the one-hue-per-panel rule (DESIGN_SYSTEM §2.1):
+     صندوق · شیفت · مبالغ          emerald  #E1F4EA #A9DCC6 #0E9C77 #075E45
+     صندوق نرفته‌ها · پرداخت‌نشده   amber    #FBF1DB #E6CE93 #C4890F #6D4A05
+     بخش‌ها (departments)          teal     #DEF1F1 #A7D8D9 #0F8B8D #095A5C
+     neutral panels / secondary    slate    #E7EDF6 #C0CDE0 #55688A #2C3D5C
+     primary action                indigo   #E7ECFD #BCC8F4 #3550D8 #22349C
+   Every selector below is scoped to body.surface-cash so this file can never
+   leak into the dashboard, tools, admission or queue surfaces.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- 1. SHELL */
+/* Cashier belongs to the tools family: cool-steel canvas (canvas-tools-*),
+   docked flat header, dense list-first rhythm, 12-14px radii. */
+body.surface-cash{
+  background:#BCC8D8;
+  background:-webkit-linear-gradient(top right,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  background:linear-gradient(216deg,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  color:#1D2B42;
+}
+body.surface-cash #appBody{display:none !important;}
+body.surface-cash #cashBackdrop{display:none !important;}
+body.surface-cash #cashClose{display:none !important;}
+
+/* the cashier panel IS the page on this surface (its own native C++ tab) */
+body.surface-cash .cash-overlay,
+body.surface-cash #cashPanel.queue-overlay{
+  display:-ms-flexbox !important;display:flex !important;
+  -ms-flex-direction:column;flex-direction:column;
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:2;
+  max-width:none;max-height:none;margin:0;border-radius:0;
+  background:#BCC8D8;
+  background:-webkit-linear-gradient(top right,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  background:linear-gradient(216deg,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  color:#1D2B42;
+  font-family:'Vazirmatn','Tahoma','Segoe UI',sans-serif;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+/* canvas decoration — low-alpha glows + hairline weave, never a white sheet */
+body.surface-cash #cashPanel:before{
+  content:"";position:absolute;top:0;right:0;bottom:0;left:0;z-index:0;
+  pointer-events:none;
+  background-image:
+    -webkit-radial-gradient(6% 90%, ellipse, rgba(15,139,141,.16) 0%, rgba(15,139,141,0) 52%),
+    -webkit-radial-gradient(94% 4%, ellipse, rgba(53,80,216,.14) 0%, rgba(53,80,216,0) 46%),
+    -webkit-repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+  background-image:
+    radial-gradient(ellipse at 6% 90%, rgba(15,139,141,.16) 0%, rgba(15,139,141,0) 52%),
+    radial-gradient(ellipse at 94% 4%, rgba(53,80,216,.14) 0%, rgba(53,80,216,0) 46%),
+    repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+}
+body.surface-cash .cash-overlay-head,
+body.surface-cash .cash-subbar,
+body.surface-cash .queue-overlay-body{position:relative;z-index:1;}
+
+/* --------------------------------------------------------------- 2. HEADER */
+body.surface-cash .cash-overlay-head{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  min-height:58px;padding:9px 16px;border-radius:0;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E8EFF9 100%);
+  border-bottom:1px solid #9FB1CD;color:#10203A;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+}
+body.surface-cash .cash-overlay-head .qov-title{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  color:#10203A;font-size:20px;font-weight:800;
+}
+body.surface-cash .cash-overlay-head .qov-title svg{
+  width:22px;height:22px;margin-left:10px;color:#0E9C77;
+}
+body.surface-cash .qov-title-stack{display:block;}
+body.surface-cash .qov-title-main{
+  display:block;font-size:20px;font-weight:800;color:#10203A;line-height:1.15;
+}
+body.surface-cash .qov-subtitle{
+  display:block;font-size:12px;font-weight:700;color:#67768F;margin-top:2px;
+}
+/* shift income pill — the money figure of the screen, emerald */
+body.surface-cash .cash-income{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:baseline;align-items:baseline;
+  margin:0;padding:7px 14px;border-radius:12px;
+  background:#F1FAF5;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E1F4EA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E1F4EA 100%);
+  border:1px solid #8FD1B4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+}
+body.surface-cash .cash-income b{
+  font-size:22px;font-weight:900;color:#064E3B;letter-spacing:-.02em;
+  direction:ltr;text-shadow:none;
+}
+body.surface-cash .cash-cur{font-size:12px;font-weight:700;color:#0A6B52;margin-right:6px;}
+
+/* --------------------------------------------------------------- 3. SUBBAR */
+body.surface-cash .cash-subbar{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  padding:9px 16px;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;
+}
+body.surface-cash .cash-subbar .q-search-wrap{
+  -ms-flex:0 1 420px;flex:0 1 420px;max-width:40%;margin:0;position:relative;
+}
+/* core.css owns the field itself (§6 crisp flat-white plate + indigo focus
+   ring); only the search pill's geometry is cashier-specific. */
+body.surface-cash .cash-subbar .inp{
+  display:block;width:100%;height:38px;padding:0 34px 0 12px;border-radius:999px;
+  font-size:13.5px;
+}
+body.surface-cash .cash-subbar .in-ico{
+  position:absolute;top:11px;right:12px;left:auto;color:#67768F;
+}
+
+/* ------------------------------------------------------- 4. BODY / RHYTHM */
+body.surface-cash .queue-overlay-body{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;overflow:auto;padding:12px 16px 14px;
+}
+
+
+/* ---------------------------------------------------------- 5. SHIFT PANEL */
+/* ONE row: state · start/end date-time · operator/بخش · income · the
+   شروع/پایان pair. Geometry and values follow mock-cashier.html. */
+body.surface-cash .cash-shift{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 10px;padding:9px 13px;border-radius:14px;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+body.surface-cash .sh-block{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+}
+body.surface-cash .sh-state{-ms-flex:0 1 210px;flex:0 1 210px;min-width:0;}
+body.surface-cash .sh-when{-ms-flex:1 1 auto;flex:1 1 auto;min-width:0;}
+body.surface-cash .sh-end{-ms-flex:0 0 auto;flex:0 0 auto;}
+body.surface-cash .sh-stack{display:block;min-width:0;}
+body.surface-cash .sh-title{display:block;font-size:11.5px;font-weight:800;color:#3B4C69;}
+body.surface-cash .sh-line{
+  display:block;width:26px;height:3px;border-radius:2px;margin:3px 0 7px;
+  background:#0E9C77;
+  background:-webkit-linear-gradient(right,#0E9C77 0%,#075E45 100%);
+  background:linear-gradient(270deg,#0E9C77 0%,#075E45 100%);
+}
+/* state chip — باز (emerald) · بسته (slate) · شروع‌نشده (amber) */
+body.surface-cash .state-chip{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  height:26px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:800;
+  background:#E7EDF6;border:1px solid #C0CDE0;color:#2C3D5C;
+}
+body.surface-cash .state-chip:before{
+  content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-left:7px;background:#55688A;
+}
+body.surface-cash .state-chip.is-open{background:#E1F4EA;border-color:#A9DCC6;color:#075E45;}
+body.surface-cash .state-chip.is-open:before{background:#0E9C77;}
+body.surface-cash .state-chip.is-closed{background:#E7EDF6;border-color:#C0CDE0;color:#2C3D5C;}
+body.surface-cash .state-chip.is-closed:before{background:#55688A;}
+body.surface-cash .state-chip.is-none{background:#FBF1DB;border-color:#E6CE93;color:#6D4A05;}
+body.surface-cash .state-chip.is-none:before{background:#C4890F;}
+body.surface-cash .sh-meta{
+  display:block;margin-top:5px;font-size:11px;font-weight:700;color:#67768F;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* a shift with no open till gets the amber (pending) mini line */
+body.surface-cash .cash-shift.is-none .sh-line{
+  background:#C4890F;
+  background:-webkit-linear-gradient(right,#C4890F 0%,#6D4A05 100%);
+  background:linear-gradient(270deg,#C4890F 0%,#6D4A05 100%);
+}
+
+/* date-time plates: big clock over the Jalali date, «--:--» when unset */
+body.surface-cash .dt{
+  -ms-flex:0 1 172px;flex:0 1 172px;min-width:0;
+  padding:6px 11px;border-radius:11px;margin:0 0 0 10px;
+  background:#F2F6FC;border:1px solid #C6D2E4;
+}
+body.surface-cash .dt-lbl{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  font-size:11px;font-weight:800;color:#3B4C69;
+}
+body.surface-cash .dt-lbl svg{margin-left:6px;color:#55688A;}
+body.surface-cash .dt-val{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:baseline;align-items:baseline;
+  margin-top:2px;min-width:0;
+}
+body.surface-cash .dt-val-stack{
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex-align:start;align-items:flex-start;
+}
+body.surface-cash .dt-time{
+  font-size:19px;font-weight:900;color:#10203A;letter-spacing:.4px;line-height:1.15;
+  direction:ltr;white-space:nowrap;
+}
+body.surface-cash .dt-date{
+  font-size:11.5px;font-weight:700;color:#67768F;margin-right:8px;
+  direction:ltr;white-space:nowrap;
+}
+body.surface-cash .dt-empty .dt-time{color:#93A0B4;}
+body.surface-cash .dt-empty .dt-date{color:#8C99AC;}
+body.surface-cash .dt-start{border-top:3px solid #0E9C77;}
+body.surface-cash .dt-end{border-top:3px solid #55688A;}
+body.surface-cash .dt-who{border-top:3px solid #0F8B8D;}
+body.surface-cash .dt-user{
+  display:block;font-size:13.5px;font-weight:800;color:#10203A;
+  max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body.surface-cash .dt-dept{
+  display:block;font-size:11.5px;font-weight:700;color:#095A5C;
+  max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* shift income — the hero money figure of this panel */
+body.surface-cash .sh-money{
+  padding:5px 13px;border-radius:12px;margin:0 0 0 12px;text-align:left;
+  background:#F1FAF5;border:2px solid #8FD1B4;
+  -webkit-box-shadow:0 2px 4px rgba(7,94,69,.08),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(7,94,69,.08),inset 0 1px 0 #FFFFFF;
+}
+body.surface-cash .sh-money span{
+  display:block;font-size:11px;font-weight:800;color:#075E45;text-align:right;
+}
+body.surface-cash .sh-money b{
+  font-size:24px;font-weight:900;color:#064E3B;letter-spacing:-.02em;direction:ltr;
+}
+body.surface-cash .sh-money i{
+  font-style:normal;font-size:11.5px;font-weight:700;color:#0A6B52;margin-right:5px;
+}
+
+/* ------------------------------------------------------------- 6. BUTTONS */
+/* core.css owns .btn (shape, outline default, indigo primary and the
+   flat/unlit disabled treatment). Only the two cashier-specific fills live
+   here — emerald «شروع شیفت» / red «پایان شیفت» — plus a disabled override
+   that MUST out-specify those fills, since this rule is more specific than
+   core's .btn:disabled and would otherwise leave a lit green/red button
+   looking clickable while it is inert. */
+body.surface-cash .cash-actions{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:end;justify-content:flex-end;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex:0 1 auto;flex:0 1 auto;
+}
+body.surface-cash .cash-act{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  margin:2px 0 2px 8px;
+}
+body.surface-cash .cash-act svg{margin-left:7px;vertical-align:middle;}
+body.surface-cash .cash-shift-start{
+  color:#FFFFFF;border-color:#075E45;
+  background:#0E9C77;
+  background:-webkit-linear-gradient(top,#0E9C77 0%,#075E45 100%);
+  background:linear-gradient(180deg,#0E9C77 0%,#075E45 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.28);
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.28);
+}
+body.surface-cash .cash-shift-start:hover{
+  color:#FFFFFF;border-color:#075E45;
+  background:#2CC191;
+  background:-webkit-linear-gradient(top,#2CC191 0%,#0E9C77 100%);
+  background:linear-gradient(180deg,#2CC191 0%,#0E9C77 100%);
+}
+body.surface-cash .cash-shift-end{
+  color:#FFFFFF;border-color:#8B2020;
+  background:#D24343;
+  background:-webkit-linear-gradient(top,#D24343 0%,#B62F2F 100%);
+  background:linear-gradient(180deg,#D24343 0%,#B62F2F 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.24);
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 rgba(255,255,255,.24);
+}
+body.surface-cash .cash-shift-end:hover{
+  color:#FFFFFF;border-color:#8B2020;
+  background:#E05B5B;
+  background:-webkit-linear-gradient(top,#E05B5B 0%,#D24343 100%);
+  background:linear-gradient(180deg,#E05B5B 0%,#D24343 100%);
+}
+body.surface-cash .cash-act.is-off,
+body.surface-cash .cash-act[disabled],
+body.surface-cash .cash-act[aria-disabled="true"],
+body.surface-cash .cash-act.is-off:hover,
+body.surface-cash .cash-act[disabled]:hover,
+body.surface-cash .cash-act[aria-disabled="true"]:hover{
+  color:#93A0B4;border-color:#CBD5E5;background:#EDF1F8;background-image:none;
+  cursor:default;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+
+/* ---------------------------------------------------------- 7. MANUAL FORM */
+body.surface-cash .cash-manual{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 12px;padding:10px;border-radius:12px;
+  background:#F2F6FC;border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);box-shadow:0 1px 2px rgba(16,32,58,.06);
+}
+body.surface-cash .cash-manual-grid{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+}
+/* fields and buttons are core.css's (.inp / .btn); only the row layout here */
+body.surface-cash .cash-manual-grid .inp{
+  -ms-flex:1 1 150px;flex:1 1 150px;width:auto;min-width:0;
+  margin:0 0 6px 8px;
+}
+body.surface-cash .cash-manual-grid .btn{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:36px;margin:0 0 6px 8px;
+}
+
+/* -------------------------------------------------------- 8. TAB COUNTERS */
+/* the four counters describe the ACTIVE TAB; they ride in the sub-bar so they
+   cost no vertical space of their own. core.css paints .qov-sum-card. */
+body.surface-cash .cash-summary{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:end;justify-content:flex-end;
+  -ms-flex:1 1 auto;flex:1 1 auto;min-width:0;
+  margin:0;padding:0;background:transparent;border:0;
+}
+body.surface-cash .cash-summary .qov-sum-card{
+  -ms-flex:0 1 116px;flex:0 1 116px;min-width:0;
+  margin:0 8px 0 0;padding:3px 10px 4px;text-align:center;
+  border-top:3px solid #C0CDE0;
+}
+body.surface-cash .cash-summary .qov-sum-num{
+  display:block;font-size:17px;font-weight:900;color:#10203A;direction:ltr;line-height:1.2;
+}
+body.surface-cash .cash-summary .qov-sum-lbl{
+  display:block;font-size:10.5px;font-weight:800;color:#67768F;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(1){border-top-color:#3550D8;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(2){border-top-color:#0E9C77;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(3){border-top-color:#C4890F;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(4){border-top-color:#0F8B8D;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(2) .qov-sum-num{color:#075E45;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(3) .qov-sum-num{color:#6D4A05;}
+body.surface-cash .cash-summary .qov-sum-card:nth-child(4) .qov-sum-num{color:#095A5C;}
+
+/* --------------------------------------------------- 9. DEPARTMENT TABLE */
+/* Departments are runtime data from مدیریت. ONE ROW PER DEPARTMENT inside a
+   scrolling table with a sticky head and a totals foot: the row height is
+   constant, the wrapper height is capped, so 2 or 20+ departments read the
+   same and can never collide with the ticket table below. */
+body.surface-cash .cash-depts{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 10px;border-radius:12px;overflow:hidden;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+body.surface-cash .cd-head{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  padding:8px 13px 7px;
+  background:#DEF1F1;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#DEF1F1 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#DEF1F1 100%);
+  border-bottom:1px solid #A7D8D9;
+}
+body.surface-cash .cd-head-side{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+}
+body.surface-cash .cd-chip{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  width:26px;height:26px;border-radius:8px;margin-left:8px;
+  background:#DEF1F1;border:1px solid #A7D8D9;color:#0F8B8D;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-cash .cd-stack{display:block;}
+body.surface-cash .cd-title{display:block;font-size:13.5px;font-weight:800;color:#095A5C;}
+body.surface-cash .cd-line{
+  display:block;width:26px;height:3px;border-radius:2px;margin-top:4px;
+  background:#0F8B8D;
+  background:-webkit-linear-gradient(right,#0F8B8D 0%,#095A5C 100%);
+  background:linear-gradient(270deg,#0F8B8D 0%,#095A5C 100%);
+}
+body.surface-cash .cd-count{
+  display:inline-block;height:20px;line-height:19px;padding:0 9px;border-radius:999px;
+  font-size:11px;font-weight:800;background:#DEF1F1;border:1px solid #A7D8D9;color:#095A5C;
+}
+body.surface-cash .cd-wrap{
+  max-height:170px;overflow:auto;margin:9px;border-radius:10px;
+  background:#F7FAFE;border:1px solid #C6D2E4;
+}
+body.surface-cash .cd-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+body.surface-cash .cd-tbl thead th{
+  position:-webkit-sticky;position:sticky;top:0;z-index:1;
+  padding:7px 10px;text-align:center;font-size:12px;font-weight:800;color:#3B4C69;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;white-space:nowrap;
+}
+body.surface-cash .cd-tbl tbody td{
+  padding:6px 10px;text-align:center;font-size:13px;font-weight:600;color:#1D2B42;
+  border-bottom:1px solid #E1E8F2;
+}
+body.surface-cash .cd-tbl tbody tr:nth-child(even) td{background:#F2F6FC;}
+body.surface-cash .cd-tbl tbody tr.cd-row{cursor:pointer;}
+body.surface-cash .cd-tbl tbody tr.cd-row:hover td{
+  background:#EDF3FC;
+}
+body.surface-cash .cd-tbl tbody tr.cd-row.is-active td{
+  background:#DEF1F1;color:#095A5C;font-weight:800;
+}
+body.surface-cash .cd-tbl .cd-c-name{
+  text-align:right;font-weight:800;color:#10203A;white-space:nowrap;
+}
+body.surface-cash .cd-tbl .cd-c-name b{font-size:13px;font-weight:800;color:#10203A;}
+body.surface-cash .cd-tbl .cd-c-name small{
+  font-size:10.5px;font-weight:700;color:#67768F;margin-right:7px;direction:ltr;
+}
+body.surface-cash .cd-pill{
+  display:inline-block;min-width:28px;height:20px;line-height:18px;padding:0 8px;
+  border-radius:999px;font-size:11.5px;font-weight:800;
+  background:#F2F6FC;border:1px solid #C6D2E4;color:#67768F;
+}
+body.surface-cash .cd-pill.is-hot{background:#FBF1DB;border-color:#E6CE93;color:#6D4A05;}
+body.surface-cash .cd-dot{
+  display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:8px;
+  background:#0F8B8D;
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+body.surface-cash .cd-tbl tbody tr.has-unpaid .cd-dot{background:#C4890F;}
+body.surface-cash .cd-tbl .cd-c-n{font-size:13.5px;font-weight:800;color:#10203A;direction:ltr;}
+body.surface-cash .cd-tbl .cd-c-m{font-size:13.5px;font-weight:800;color:#10203A;direction:ltr;}
+body.surface-cash .cd-tbl .cd-c-m.is-money{color:#075E45;}
+body.surface-cash .cd-tbl .is-warn{color:#6D4A05;}
+body.surface-cash .cd-tbl tfoot td{
+  position:-webkit-sticky;position:sticky;bottom:0;z-index:1;
+  padding:8px 10px;text-align:center;font-size:15px;font-weight:800;color:#10203A;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-top:1px solid #C6D2E4;direction:ltr;
+}
+body.surface-cash .cd-tbl tfoot .cd-c-name{text-align:right;font-size:13px;direction:rtl;}
+body.surface-cash .cd-tbl .empty{
+  padding:14px;text-align:center;font-size:12.5px;font-weight:700;color:#67768F;
+}
+
+/* ------------------------------- 10. «صندوق نرفته‌ها» BAR + TAB STRIP ----- */
+/* Both sit directly ABOVE the table (owner request: out of the header). The
+   amber bar is the unpaid summary; the tab strip never wraps into extra rows —
+   it scrolls horizontally — so page height is stable at any department count. */
+body.surface-cash .unpaid-bar{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 8px;padding:7px 12px;border-radius:12px;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  border:1px solid #C6D2E4;
+}
+body.surface-cash .unpaid-bar.has{
+  background:#FBF1DB;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#FBF1DB 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#FBF1DB 100%);
+  border-color:#E6CE93;
+}
+body.surface-cash .ub-side{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  min-width:0;
+}
+body.surface-cash .ub-chip{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  width:30px;height:30px;border-radius:10px;margin-left:10px;color:#FFFFFF;
+  background:#C4890F;
+  background:-webkit-linear-gradient(top,#C4890F 0%,#6D4A05 100%);
+  background:linear-gradient(180deg,#C4890F 0%,#6D4A05 100%);
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.34);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34);
+}
+body.surface-cash .ub-stack{display:block;min-width:0;}
+body.surface-cash .ub-t{display:block;font-size:13px;font-weight:800;color:#6D4A05;}
+body.surface-cash .ub-s{
+  display:block;font-size:11px;font-weight:700;color:#67768F;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body.surface-cash .ub-stat{display:block;margin-left:20px;text-align:center;}
+body.surface-cash .ub-stat span{display:block;font-size:11px;font-weight:700;color:#67768F;}
+body.surface-cash .ub-stat b{display:block;font-size:17px;font-weight:900;color:#6D4A05;direction:ltr;}
+body.surface-cash .ub-stat-money b{font-size:19px;}
+body.surface-cash .unpaid-bar .ub-btn{
+  margin-right:18px;color:#FFFFFF;border-color:#6D4A05;
+  background:#C4890F;
+  background:-webkit-linear-gradient(top,#C4890F 0%,#6D4A05 100%);
+  background:linear-gradient(180deg,#C4890F 0%,#6D4A05 100%);
+}
+body.surface-cash .unpaid-bar .ub-btn:hover{color:#FFFFFF;border-color:#6D4A05;background:#C4890F;}
+body.surface-cash .unpaid-bar.is-active .ub-btn{
+  color:#6D4A05;border-color:#6D4A05;background:#FBF1DB;background-image:none;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+
+body.surface-cash .cash-tabbar{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 8px;padding:4px 6px;border-radius:11px;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#E8EFF9 100%);
+  border:1px solid #C6D2E4;
+}
+body.surface-cash .cash-tabs{
+  display:block;-ms-flex:1 1 auto;flex:1 1 auto;min-width:0;
+  white-space:nowrap;overflow-x:auto;overflow-y:hidden;padding:1px 2px 2px;
+}
+body.surface-cash .cash-tab{
+  display:inline-block;height:30px;line-height:28px;padding:0 13px;margin-left:6px;
+  border-radius:9px;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer;
+  background:#FFFFFF;border:1px solid #C6D2E4;color:#3B4C69;white-space:nowrap;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.05);box-shadow:0 1px 2px rgba(16,32,58,.05);
+}
+body.surface-cash .cash-tab:hover{border-color:#9FB1CD;color:#22349C;}
+body.surface-cash .cash-tab.active{background:#DEF1F1;border-color:#A7D8D9;color:#095A5C;}
+body.surface-cash .cash-tab:first-child{background:#FBF1DB;border-color:#E6CE93;color:#6D4A05;}
+body.surface-cash .cash-tab:first-child.active{background:#FBF1DB;border-color:#C4890F;color:#6D4A05;}
+
+/* ------------------------------------------------------ 11. TICKET TABLE */
+body.surface-cash #cashWrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;min-height:120px;max-height:none;overflow:auto;
+  border-radius:12px;background:#F7FAFE;border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+body.surface-cash .cash-tbl{width:100%;table-layout:fixed;border-collapse:collapse;}
+body.surface-cash .queue-overlay-body .cash-tbl thead th{
+  padding:8px 10px;font-size:12px;font-weight:800;color:#3B4C69;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;border-left:1px solid #E1E8F2;
+}
+body.surface-cash .queue-overlay-body .cash-tbl tbody td{
+  padding:7px 10px;font-size:13px;font-weight:600;color:#1D2B42;
+  border-bottom:1px solid #E1E8F2;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body.surface-cash .queue-overlay-body .cash-tbl tbody tr:nth-child(even) td{background:#F2F6FC;}
+body.surface-cash .queue-overlay-body .cash-tbl tbody tr:hover td{background:#EDF3FC;}
+body.surface-cash .cash-tbl .c-mono{direction:ltr;font-weight:800;color:#10203A;}
+/* row states: unpaid = amber, paid rows stay neutral (their action cell says so) */
+body.surface-cash .queue-overlay-body .cash-tbl tbody tr.cash-unpaid td{
+  background:#FBF1DB;color:#6D4A05;
+}
+body.surface-cash .queue-overlay-body .cash-tbl tbody tr.cash-unpaid:hover td{
+  background:#E6CE93;
+}
+body.surface-cash .cash-tbl .q-act-btn{
+  height:28px;padding:0 12px;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:800;
+  border:1px solid #075E45;color:#FFFFFF;
+  background:#0E9C77;
+  background:-webkit-linear-gradient(top,#0E9C77 0%,#075E45 100%);
+  background:linear-gradient(180deg,#0E9C77 0%,#075E45 100%);
+}
+body.surface-cash .cash-tbl .q-act-btn:hover{
+  background:#2CC191;
+  background:-webkit-linear-gradient(top,#2CC191 0%,#0E9C77 100%);
+  background:linear-gradient(180deg,#2CC191 0%,#0E9C77 100%);
+  border-color:#075E45;
+}
+body.surface-cash .cash-tbl .empty{
+  padding:16px;text-align:center;font-size:12.5px;font-weight:700;color:#67768F;
+}
+
+/* ------------------------------------------------- 12. CONFIRM DIALOGUE */
+body.surface-cash .cash-dlg{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:1700;
+  background:rgba(16,32,58,.42);
+}
+body.surface-cash .cash-dlg-card{
+  width:380px;max-width:88%;margin:16% auto 0;padding:16px;border-radius:14px;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #9FB1CD;
+  -webkit-box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+  box-shadow:0 6px 12px rgba(16,32,58,.10),0 34px 64px rgba(16,32,58,.22);
+}
+body.surface-cash .cash-dlg-msg{
+  font-size:14px;font-weight:800;color:#10203A;text-align:right;margin-bottom:14px;
+}
+body.surface-cash .cash-dlg-act{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:end;justify-content:flex-end;
+}
+body.surface-cash .cash-dlg-act .btn{margin-right:8px;}
+
+/* --------------------------------------------------------- 13. NARROW FIT */
+@media (max-width:1180px){
+  body.surface-cash .cash-subbar{-ms-flex-wrap:wrap;flex-wrap:wrap;}
+  body.surface-cash .cash-subbar .q-search-wrap{-ms-flex:1 1 100%;flex:1 1 100%;max-width:100%;margin-bottom:7px;}
+  body.surface-cash .cash-summary{-ms-flex-pack:start;justify-content:flex-start;}
+}
+@media (max-width:760px){
+  body.surface-cash .cash-overlay-head{
+    -ms-flex-wrap:wrap;flex-wrap:wrap;padding:8px 12px;
+  }
+  body.surface-cash .cash-subbar .q-search-wrap{-ms-flex:1 1 100%;flex:1 1 100%;max-width:100%;}
+  body.surface-cash .cd-wrap{max-height:116px;}
+}
+/* short screens (1024×768 desks): give the ticket table back its height by
+   compressing the panels above it — nothing is hidden, only tightened. */
+@media (max-height:820px){
+  body.surface-cash .queue-overlay-body{padding:9px 12px 10px;}
+  body.surface-cash .cd-wrap{max-height:126px;margin:7px;}
+  body.surface-cash .cash-summary .qov-sum-card{padding:5px 6px 5px;}
+  body.surface-cash .cash-summary .qov-sum-num{font-size:19px;}
+  body.surface-cash .dt-time{font-size:17px;}
+  body.surface-cash .sh-money b{font-size:21px;}
+  body.surface-cash .cash-shift{padding:8px 11px;}
+  body.surface-cash .cash-depts{margin-bottom:8px;}
+}
+
+/* ==========================================================================
+   14. THE QUEUE SURFACE — «صف پذیرش» / «صندوق نرفته‌ها»  (#queuePanel)
+   --------------------------------------------------------------------------
+   This file owns body.surface-queue as well as body.surface-cash, and the queue
+   is a real screen: the C++ shell opens it as its own native tab, where
+   #queuePanel fills the page (see the SURFACE GATING block in admission.css).
+   The SAME overlay is also opened as a centred floating panel from the
+   admission form's «صف پذیرش» launcher, so the row family below is scoped to
+   #queuePanel — its own root, owned by this file either way — instead of to
+   body.surface-queue, which would leave the floating copy unstyled. Only the
+   full-page canvas and the docked-header treatment are body-scoped.
+
+   Hue: amber (§2.1 — «صندوق نرفته‌ها · صف پذیرش · پرداخت‌نشده»). The table body
+   stays NEUTRAL (§2.1 rule 3): zebra rows, slate identity chips, and the single
+   amber signal is the waiting-time pill, which is what the screen is about. The
+   action buttons are the one place a second hue is allowed — indigo for the
+   primary «بازخوانی», emerald for «پرداخت» (money, §2.1 rule 5) and red for the
+   destructive pair (§2.1 rule 4's stated exception).
+   ========================================================================== */
+
+/* ---- 14.1 full-page shell (native tab): cool-steel canvas, docked header --- */
+body.surface-queue{
+  background:#BCC8D8;
+  background:-webkit-linear-gradient(top right,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  background:linear-gradient(216deg,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  color:#1D2B42;
+}
+body.surface-queue #queuePanel.queue-overlay{
+  background:#BCC8D8;
+  background:-webkit-linear-gradient(top right,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  background:linear-gradient(216deg,#D2DBE6 0%,#BCC8D8 48%,#A8B7CB 100%);
+  color:#1D2B42;
+  font-family:'Vazirmatn','Tahoma','Segoe UI',sans-serif;
+  border:0;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+/* canvas decoration — the same low-alpha glow + hairline weave as the cashier,
+   so the two native tabs are visibly one family (§9) */
+body.surface-queue #queuePanel:before{
+  content:"";position:absolute;top:0;right:0;bottom:0;left:0;z-index:0;
+  pointer-events:none;
+  background-image:
+    -webkit-radial-gradient(6% 90%, ellipse, rgba(15,139,141,.16) 0%, rgba(15,139,141,0) 52%),
+    -webkit-radial-gradient(94% 4%, ellipse, rgba(53,80,216,.14) 0%, rgba(53,80,216,0) 46%),
+    -webkit-repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+  background-image:
+    radial-gradient(ellipse at 6% 90%, rgba(15,139,141,.16) 0%, rgba(15,139,141,0) 52%),
+    radial-gradient(ellipse at 94% 4%, rgba(53,80,216,.14) 0%, rgba(53,80,216,0) 46%),
+    repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+}
+body.surface-queue #queuePanel .queue-overlay-head,
+body.surface-queue #queuePanel .queue-overlay-body{position:relative;z-index:1;}
+/* full-bleed flat bar docked to the top edge (§9, Tools/Cashier column) */
+body.surface-queue #queuePanel .queue-overlay-head{
+  border-radius:0;border-bottom:1px solid #9FB1CD;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+}
+
+/* ---- 14.2 header: title · tabs · filters ---------------------------------
+   core.css paints the head wash and the title/subtitle ink; the pieces below
+   are the head's own children, which the wash change left unreadable (they were
+   authored white-on-blue before v1.91). */
+#queuePanel .queue-overlay-head{
+  min-height:58px;padding:9px 16px;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+}
+#queuePanel .queue-overlay-head .qov-title{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  color:#10203A;
+}
+#queuePanel .queue-overlay-head .qov-title svg{
+  width:22px;height:22px;margin-left:10px;color:#C4890F;
+}
+#queuePanel .qov-title-stack{display:block;}
+#queuePanel .qov-title-main{
+  display:block;font-size:20px;font-weight:800;color:#10203A;line-height:1.15;
+}
+#queuePanel .qov-subtitle{
+  display:block;font-size:12px;font-weight:700;color:#67768F;margin-top:2px;
+}
+/* the two tabs are a segmented control on a surface-3 tray, NOT the old
+   translucent-white-on-blue pills */
+#queuePanel .queue-overlay-head .tabs{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin-right:16px;padding:4px;border-radius:11px;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#E8EFF9 100%);
+  border:1px solid #C6D2E4;
+}
+#queuePanel .queue-overlay-head .tab{
+  height:30px;line-height:28px;padding:0 14px;margin-left:5px;
+  border-radius:9px;
+  font-family:inherit;font-size:12.5px;font-weight:800;
+  background:#FFFFFF;border:1px solid #C6D2E4;color:#3B4C69;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.05);box-shadow:0 1px 2px rgba(16,32,58,.05);
+}
+#queuePanel .queue-overlay-head .tab:last-child{margin-left:0;}
+#queuePanel .queue-overlay-head .tab:hover{border-color:#9FB1CD;color:#22349C;}
+#queuePanel .queue-overlay-head .tab.active{
+  background:#FBF1DB;border-color:#C4890F;color:#6D4A05;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+/* the minute filter + the search pill: core.css owns the field, only the pill
+   geometry and the (previously white-on-white) edge are set here. Both carry an
+   explicit basis: core's .inp is width:100%, which inside an auto-width flex
+   tray resolves against nothing and let the select eat the search box. */
+#queuePanel .queue-overlay-head .head-tools .inp{
+  background:#FFFFFF;background-image:none;
+  border:1px solid #9FB1CD;border-bottom-color:#8699B8;color:#1D2B42;
+}
+#queuePanel .queue-overlay-head #qMinutes{
+  -ms-flex:0 0 140px;flex:0 0 140px;
+  width:140px;height:34px;font-size:13px;
+}
+#queuePanel .queue-overlay-head .q-search-wrap{
+  -ms-flex:0 0 300px;flex:0 0 300px;
+  width:300px;min-width:0;
+}
+#queuePanel .queue-overlay-head .q-search-wrap .inp{
+  width:100%;height:34px;padding:0 32px 0 12px;border-radius:999px;font-size:13px;
+}
+#queuePanel .queue-overlay-head .q-search-wrap .in-ico{
+  position:absolute;top:9px;right:11px;left:auto;color:#67768F;
+}
+/* the collapse and close affordances (hidden on the native tab, visible when
+   the overlay floats over the admission form) */
+#queuePanel .queue-overlay-head #queueToggle,
+#queuePanel .queue-overlay-head .qov-close{
+  width:34px;height:34px;font-size:18px;border-radius:9px;
+  background:#FFFFFF;background-image:none;
+  border:1px solid #9FB1CD;color:#3B4C69;
+}
+#queuePanel .queue-overlay-head #queueToggle:hover,
+#queuePanel .queue-overlay-head .qov-close:hover{
+  background:#EAF0FA;border-color:#7B90B4;color:#22349C;
+}
+
+/* ---- 14.3 body + the summary strip (.qov-summary / .qov-sum-hint) --------- */
+#queuePanel .queue-overlay-body{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;padding:12px 16px 14px;
+}
+#queuePanel .qov-summary{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 10px;
+}
+/* core.css paints .qov-sum-card; the amber top rule marks it as the pending
+   count, exactly as the cashier's counter cards are hue-topped */
+#queuePanel .qov-summary .qov-sum-card{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  min-width:132px;padding:6px 18px 7px;margin:0 0 0 12px;
+  border-top:3px solid #C4890F;text-align:center;
+}
+#queuePanel .qov-summary .qov-sum-num{
+  display:block;font-size:22px;font-weight:900;color:#6D4A05;
+  line-height:1.2;direction:ltr;
+}
+#queuePanel .qov-summary .qov-sum-lbl{
+  display:block;font-size:10.5px;font-weight:800;color:#67768F;white-space:nowrap;
+}
+/* the row-action hint: a quiet dashed surface-2 plate, never a second card */
+#queuePanel .qov-sum-hint{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;padding:8px 13px;border-radius:10px;
+  background:#F2F6FC;
+  border:1px dashed #C6D2E4;
+  color:#67768F;font-size:11.5px;font-weight:700;
+}
+
+/* ---- 14.4 the table ------------------------------------------------------- */
+/* max-height:none is load-bearing: the generic `.tbl-wrap{max-height:150px}` in
+   the structure layer is meant for the admission form's short in-card lists and
+   would otherwise cap the queue's full-page table at 150px (the cashier's
+   #cashWrap resets it the same way). */
+#queuePanel .queue-overlay-body .tbl-wrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:120px;max-height:none;border-radius:12px;
+  background:#F7FAFE;border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+#queuePanel .q-tbl{width:100%;border-collapse:collapse;}
+#queuePanel .queue-overlay-body .q-tbl thead th{
+  padding:8px 10px;font-size:12px;font-weight:800;color:#3B4C69;text-align:right;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;border-left:1px solid #E1E8F2;
+  white-space:nowrap;
+}
+#queuePanel .queue-overlay-body .q-tbl thead th:last-child{border-left:0;}
+#queuePanel .queue-overlay-body .q-tbl tbody td{
+  padding:7px 10px;font-size:13px;font-weight:600;color:#1D2B42;
+  border-bottom:1px solid #E1E8F2;
+}
+#queuePanel .queue-overlay-body .q-tbl tbody tr:nth-child(even){background:#F7FAFE;}
+#queuePanel .queue-overlay-body .q-tbl tbody tr:hover{
+  background:#EDF3FC;
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+/* ردیف — the turn number: a quiet LTR digit run, never the loudest cell */
+#queuePanel .q-tbl .q-idx{
+  width:46px;text-align:center;
+  font-size:13px;font-weight:800;color:#67768F;direction:ltr;
+}
+/* بیمار — avatar initial + name. The disc is neutral slate on purpose: the
+   panel's hue is amber, so a second identity hue here would break §2.1. */
+#queuePanel .q-tbl .q-pname{text-align:right;white-space:nowrap;}
+#queuePanel .q-tbl .q-avatar{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  width:30px;height:30px;border-radius:50%;
+  margin-left:9px;vertical-align:middle;
+  background:#E7EDF6;border:1px solid #C0CDE0;color:#2C3D5C;
+  font-size:13px;font-weight:900;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;box-shadow:inset 0 1px 0 #FFFFFF;
+}
+#queuePanel .q-tbl .q-pname-text{
+  vertical-align:middle;font-size:13.5px;font-weight:800;color:#10203A;
+}
+/* کد پرونده — a bounded LTR badge so a barcode never reads as body text */
+#queuePanel .q-tbl .q-file-badge{
+  display:inline-block;
+  height:20px;line-height:18px;padding:0 9px;border-radius:8px;
+  background:#F2F6FC;border:1px solid #C6D2E4;color:#3B4C69;
+  font-size:11.5px;font-weight:800;direction:ltr;white-space:nowrap;
+}
+#queuePanel .q-tbl .q-date,
+#queuePanel .q-tbl .q-time{
+  font-size:13px;font-weight:700;color:#3B4C69;direction:ltr;white-space:nowrap;
+}
+/* مدت انتظار — THE amber signal of the screen (§2 warning/pending) */
+#queuePanel .q-tbl .q-wait-pill{
+  display:inline-block;
+  height:20px;line-height:18px;padding:0 10px;border-radius:999px;
+  background:#FBF1DB;border:1px solid #E6CE93;color:#6D4A05;
+  font-size:11.5px;font-weight:800;white-space:nowrap;
+}
+/* empty state — a real sunken plate, not a blank strip */
+#queuePanel .queue-overlay-body .q-tbl tbody td.q-empty{
+  padding:42px 14px;text-align:center;
+  font-size:13px;font-weight:700;color:#67768F;background:#DFE7F3;
+}
+#queuePanel .queue-overlay-body .q-tbl tbody tr:hover td.q-empty{
+  background:#DFE7F3;
+}
+
+/* ---- 14.5 the action cell ------------------------------------------------- */
+#queuePanel .q-tbl .q-act{white-space:nowrap;text-align:center;}
+#queuePanel .q-tbl .q-act-btn{
+  height:28px;padding:0 11px;margin-left:6px;
+  border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:800;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  border:1px solid #9FB1CD;color:#1D2B42;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);box-shadow:0 1px 2px rgba(16,32,58,.06);
+  -webkit-transition:background .14s,border-color .14s,color .14s;
+  transition:background .14s,border-color .14s,color .14s;
+}
+#queuePanel .q-tbl .q-act-btn:last-child{margin-left:0;}
+#queuePanel .q-tbl .q-act-btn:hover{border-color:#7B90B4;color:#22349C;}
+/* بازخوانی — the primary row action: indigo soft (§8.3) */
+#queuePanel .q-tbl .q-recall{
+  background:#E7ECFD;background-image:none;border-color:#BCC8F4;color:#22349C;
+}
+#queuePanel .q-tbl .q-recall:hover{
+  background:#E7ECFD;border-color:#3550D8;color:#22349C;
+}
+/* به صندوق / به صف — a lateral move: stays the neutral outline default */
+#queuePanel .q-tbl .q-xfer:hover{border-color:#7B90B4;color:#22349C;}
+/* پرداخت — money, therefore emerald (§2.1 rule 5) */
+#queuePanel .q-tbl .q-pay{
+  background:#E1F4EA;background-image:none;border-color:#A9DCC6;color:#075E45;
+}
+#queuePanel .q-tbl .q-pay:hover{
+  background:#E1F4EA;border-color:#0E9C77;color:#075E45;
+}
+/* لغو / × — destructive: red is a STATE, and only on the button itself */
+#queuePanel .q-tbl .q-cancel{
+  background:#FBE8E8;background-image:none;border-color:#EEBDBD;color:#8B2020;
+}
+#queuePanel .q-tbl .q-cancel:hover{
+  background:#FBE8E8;border-color:#D24343;color:#8B2020;
+}
+#queuePanel .q-tbl .q-remove{
+  width:28px;padding:0;
+  background:#FFFFFF;background-image:none;border-color:#EEBDBD;color:#D24343;
+  font-size:15px;line-height:1;
+}
+#queuePanel .q-tbl .q-remove:hover{
+  background:#FBE8E8;border-color:#D24343;color:#8B2020;
+}
+
+/* ---- 14.6 the foot ------------------------------------------------------- */
+#queuePanel .queue-overlay-body .queue-foot{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin-top:10px;padding:9px 2px 0;
+  border-top:1px solid #E1E8F2;background:transparent;
+}
+#queuePanel .q-count{font-size:12.5px;font-weight:700;color:#67768F;}
+#queuePanel .q-count b{font-size:14px;font-weight:900;color:#10203A;direction:ltr;}
+
+/* ---- 14.7 narrow / short fit -------------------------------------------- */
+@media (max-width:1180px){
+  #queuePanel .queue-overlay-head{-ms-flex-wrap:wrap;flex-wrap:wrap;}
+  #queuePanel .queue-overlay-head .tabs{margin-right:0;margin-top:6px;}
+  #queuePanel .qov-sum-hint{display:none;}
+}
+@media (max-height:820px){
+  #queuePanel .queue-overlay-body{padding:9px 12px 10px;}
+  #queuePanel .qov-summary .qov-sum-card{padding:4px 14px 5px;}
+  #queuePanel .qov-summary .qov-sum-num{font-size:19px;}
+}
+
+/* ------------------------------------------------------- 15. DARK PARITY */
+/* Same structure, swapped tokens (DESIGN_SYSTEM §12). Still scoped to the
+   cashier surface so another surface's dark theme is untouched. core.css
+   already carries dark parity for .btn/.inp/.tbl/.qov-*; only cashier-specific
+   pieces are repainted here. */
+body.surface-cash.theme-dark{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  color:#DCE5F2;
+}
+/* the panel keeps its own OPAQUE canvas in dark too — the admission shell is
+   still behind it in the same document. */
+body.surface-cash.theme-dark .cash-overlay,
+body.surface-cash.theme-dark #cashPanel.queue-overlay{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  color:#DCE5F2;
+}
+body.surface-cash.theme-dark .cash-overlay-head{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-bottom-color:#45577A;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.34),0 12px 26px rgba(0,0,0,.30);
+  box-shadow:0 2px 6px rgba(0,0,0,.34),0 12px 26px rgba(0,0,0,.30);
+}
+body.surface-cash.theme-dark .cash-overlay-head .qov-title,
+body.surface-cash.theme-dark .qov-title-main{color:#EEF3FB;}
+body.surface-cash.theme-dark .qov-subtitle{color:#8B9BB3;}
+body.surface-cash.theme-dark .cash-overlay-head .qov-title svg{color:#2CC191;}
+body.surface-cash.theme-dark .cash-income{
+  background:#0F3A2C;border-color:#2CC191;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.32);box-shadow:0 2px 6px rgba(0,0,0,.32);
+}
+body.surface-cash.theme-dark .cash-income b{color:#8FE7C4;}
+body.surface-cash.theme-dark .cash-cur{color:#8FE7C4;}
+body.surface-cash.theme-dark .cash-subbar{
+  background:#141D2C;
+  background:-webkit-linear-gradient(top,#1B2537 0%,#141D2C 100%);
+  background:linear-gradient(180deg,#1B2537 0%,#141D2C 100%);
+  border-bottom-color:#33425C;
+}
+body.surface-cash.theme-dark .cash-subbar .in-ico{color:#8B9BB3;}
+
+/* ---- shift panel ---- */
+body.surface-cash.theme-dark .cash-shift,
+body.surface-cash.theme-dark .cash-depts{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-color:#33425C;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);box-shadow:0 2px 6px rgba(0,0,0,.30);
+}
+body.surface-cash.theme-dark .sh-title{color:#B4C2D6;}
+body.surface-cash.theme-dark .sh-line{background:#2CC191;}
+body.surface-cash.theme-dark .cash-shift.is-none .sh-line{background:#E0A83A;}
+body.surface-cash.theme-dark .sh-meta{color:#8B9BB3;}
+body.surface-cash.theme-dark .state-chip{background:#1B2537;border-color:#45577A;color:#DCE5F2;}
+body.surface-cash.theme-dark .state-chip:before{background:#8B9BB3;}
+body.surface-cash.theme-dark .state-chip.is-open{background:#0F3A2C;border-color:#2CC191;color:#8FE7C4;}
+body.surface-cash.theme-dark .state-chip.is-open:before{background:#2CC191;}
+body.surface-cash.theme-dark .state-chip.is-closed{background:#1B2537;border-color:#45577A;color:#DCE5F2;}
+body.surface-cash.theme-dark .state-chip.is-closed:before{background:#8B9BB3;}
+body.surface-cash.theme-dark .state-chip.is-none{background:#3A2E12;border-color:#E0A83A;color:#F4D79A;}
+body.surface-cash.theme-dark .state-chip.is-none:before{background:#E0A83A;}
+body.surface-cash.theme-dark .dt{background:#141D2C;border-color:#33425C;}
+body.surface-cash.theme-dark .dt-start{border-top-color:#2CC191;}
+body.surface-cash.theme-dark .dt-end{border-top-color:#45577A;}
+body.surface-cash.theme-dark .dt-who{border-top-color:#2FB3B5;}
+body.surface-cash.theme-dark .dt-lbl{color:#B4C2D6;}
+body.surface-cash.theme-dark .dt-lbl svg{color:#8B9BB3;}
+body.surface-cash.theme-dark .dt-time{color:#EEF3FB;}
+body.surface-cash.theme-dark .dt-date{color:#8B9BB3;}
+body.surface-cash.theme-dark .dt-empty .dt-time,
+body.surface-cash.theme-dark .dt-empty .dt-date{color:#67768F;}
+body.surface-cash.theme-dark .dt-user{color:#EEF3FB;}
+body.surface-cash.theme-dark .dt-dept{color:#93DEDF;}
+body.surface-cash.theme-dark .sh-money{background:#0F3A2C;border-color:#2CC191;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);box-shadow:0 2px 6px rgba(0,0,0,.30);}
+body.surface-cash.theme-dark .sh-money span,
+body.surface-cash.theme-dark .sh-money i{color:#8FE7C4;}
+body.surface-cash.theme-dark .sh-money b{color:#8FE7C4;}
+body.surface-cash.theme-dark .cash-shift-start{
+  color:#075E45;border-color:#0F3A2C;
+  background:#2CC191;
+  background:-webkit-linear-gradient(top,#2CC191 0%,#0E9C77 100%);
+  background:linear-gradient(180deg,#2CC191 0%,#0E9C77 100%);
+}
+body.surface-cash.theme-dark .cash-shift-end{
+  color:#FFFFFF;border-color:#E86A6A;background:#B62F2F;background-image:none;
+}
+body.surface-cash.theme-dark .cash-act.is-off,
+body.surface-cash.theme-dark .cash-act[disabled],
+body.surface-cash.theme-dark .cash-act[aria-disabled="true"],
+body.surface-cash.theme-dark .cash-act.is-off:hover,
+body.surface-cash.theme-dark .cash-act[disabled]:hover,
+body.surface-cash.theme-dark .cash-act[aria-disabled="true"]:hover{
+  color:#67768F;border-color:#25314A;background:#141D2C;background-image:none;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.surface-cash.theme-dark .cash-manual{background:#141D2C;border-color:#33425C;}
+
+/* ---- counters ---- */
+body.surface-cash.theme-dark .cash-summary .qov-sum-card{
+  background:#182234;background-image:none;border-color:#33425C;border-top-color:#45577A;
+}
+body.surface-cash.theme-dark .cash-summary .qov-sum-num{color:#EEF3FB;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-lbl{color:#8B9BB3;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(1){border-top-color:#6A83F7;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(2){border-top-color:#2CC191;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(3){border-top-color:#E0A83A;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(4){border-top-color:#2FB3B5;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(2) .qov-sum-num{color:#8FE7C4;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(3) .qov-sum-num{color:#F4D79A;}
+body.surface-cash.theme-dark .cash-summary .qov-sum-card:nth-child(4) .qov-sum-num{color:#93DEDF;}
+
+/* ---- department table ---- */
+body.surface-cash.theme-dark .cd-head{
+  background:#0F3436;
+  background:-webkit-linear-gradient(top,#0F3436 0%,#141D2C 100%);
+  background:linear-gradient(180deg,#0F3436 0%,#141D2C 100%);
+  border-bottom-color:#2FB3B5;
+}
+body.surface-cash.theme-dark .cd-chip{background:#0F3436;border-color:#2FB3B5;color:#93DEDF;}
+body.surface-cash.theme-dark .cd-title{color:#93DEDF;}
+body.surface-cash.theme-dark .cd-line{background:#2FB3B5;}
+body.surface-cash.theme-dark .cd-count{background:#0F3436;border-color:#2FB3B5;color:#93DEDF;}
+body.surface-cash.theme-dark .cd-wrap{background:#141D2C;border-color:#33425C;}
+body.surface-cash.theme-dark .cd-tbl thead th{
+  background:#1B2537;background-image:none;color:#B4C2D6;border-bottom-color:#33425C;
+}
+body.surface-cash.theme-dark .cd-tbl tbody td{color:#DCE5F2;border-bottom-color:#25314A;}
+body.surface-cash.theme-dark .cd-tbl tbody tr:nth-child(even) td{background:#1B2537;}
+body.surface-cash.theme-dark .cd-tbl tbody tr.cd-row:hover td{background:#25314A;}
+body.surface-cash.theme-dark .cd-tbl tbody tr.cd-row.is-active td{background:#0F3436;color:#93DEDF;}
+body.surface-cash.theme-dark .cd-tbl .cd-c-name,
+body.surface-cash.theme-dark .cd-tbl .cd-c-name b{color:#EEF3FB;}
+body.surface-cash.theme-dark .cd-tbl .cd-c-name small{color:#8B9BB3;}
+body.surface-cash.theme-dark .cd-dot{background:#2FB3B5;}
+body.surface-cash.theme-dark .cd-tbl tbody tr.has-unpaid .cd-dot{background:#E0A83A;}
+body.surface-cash.theme-dark .cd-pill{background:#141D2C;border-color:#33425C;color:#8B9BB3;}
+body.surface-cash.theme-dark .cd-pill.is-hot{background:#3A2E12;border-color:#E0A83A;color:#F4D79A;}
+body.surface-cash.theme-dark .cd-tbl .cd-c-n,
+body.surface-cash.theme-dark .cd-tbl .cd-c-m{color:#EEF3FB;}
+body.surface-cash.theme-dark .cd-tbl .cd-c-m.is-money{color:#8FE7C4;}
+body.surface-cash.theme-dark .cd-tbl .is-warn{color:#F4D79A;}
+body.surface-cash.theme-dark .cd-tbl tfoot td{
+  background:#1B2537;background-image:none;color:#EEF3FB;border-top-color:#33425C;
+}
+body.surface-cash.theme-dark .cd-tbl .empty{color:#8B9BB3;}
+
+/* ---- «صندوق نرفته‌ها» bar + tab strip ---- */
+body.surface-cash.theme-dark .unpaid-bar{
+  background:#141D2C;background-image:none;border-color:#33425C;
+}
+body.surface-cash.theme-dark .unpaid-bar.has{
+  background:#3A2E12;background-image:none;border-color:#E0A83A;
+}
+body.surface-cash.theme-dark .ub-chip{
+  background:#C4890F;background-image:none;color:#3A2E12;
+}
+body.surface-cash.theme-dark .ub-t{color:#F4D79A;}
+body.surface-cash.theme-dark .ub-s{color:#8B9BB3;}
+body.surface-cash.theme-dark .ub-stat span{color:#8B9BB3;}
+body.surface-cash.theme-dark .ub-stat b{color:#F4D79A;}
+body.surface-cash.theme-dark .unpaid-bar .ub-btn{
+  color:#3A2E12;border-color:#E0A83A;background:#E0A83A;background-image:none;
+}
+body.surface-cash.theme-dark .unpaid-bar.is-active .ub-btn{
+  color:#F4D79A;border-color:#E0A83A;background:#3A2E12;background-image:none;
+}
+body.surface-cash.theme-dark .cash-tabbar{
+  background:#141D2C;background-image:none;border-color:#33425C;
+}
+body.surface-cash.theme-dark .cash-tab{background:#1B2537;border-color:#33425C;color:#B4C2D6;}
+body.surface-cash.theme-dark .cash-tab:hover{border-color:#45577A;color:#EEF3FB;}
+body.surface-cash.theme-dark .cash-tab.active{background:#0F3436;border-color:#2FB3B5;color:#93DEDF;}
+body.surface-cash.theme-dark .cash-tab:first-child{background:#3A2E12;border-color:#33425C;color:#F4D79A;}
+body.surface-cash.theme-dark .cash-tab:first-child.active{background:#3A2E12;border-color:#E0A83A;color:#F4D79A;}
+
+/* ---- ticket table ---- */
+body.surface-cash.theme-dark #cashWrap{
+  background:#141D2C;border-color:#33425C;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);box-shadow:0 2px 6px rgba(0,0,0,.30);
+}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl thead th{
+  background:#1B2537;background-image:none;color:#B4C2D6;
+  border-bottom-color:#33425C;border-left-color:#25314A;
+}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl tbody td{
+  color:#DCE5F2;border-bottom-color:#25314A;
+}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl tbody tr:nth-child(even) td{background:#1B2537;}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl tbody tr:hover td{background:#25314A;}
+body.surface-cash.theme-dark .cash-tbl .c-mono{color:#EEF3FB;}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl tbody tr.cash-unpaid td{
+  background:#3A2E12;color:#F4D79A;
+}
+body.surface-cash.theme-dark .queue-overlay-body .cash-tbl tbody tr.cash-unpaid:hover td{background:#4A3A16;}
+body.surface-cash.theme-dark .cash-tbl .q-act-btn{
+  background:#2CC191;background-image:none;border-color:#0F3A2C;color:#075E45;
+}
+body.surface-cash.theme-dark .cash-tbl .empty{color:#8B9BB3;}
+
+/* ---- confirm dialogue ---- */
+body.surface-cash.theme-dark .cash-dlg{background:rgba(6,10,18,.62);}
+body.surface-cash.theme-dark .cash-dlg-card{
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  border-color:#45577A;
+}
+body.surface-cash.theme-dark .cash-dlg-msg{color:#EEF3FB;}
+
+/* ---- the queue surface / overlay (§14) ---- */
+body.surface-queue.theme-dark{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  color:#DCE5F2;
+}
+body.surface-queue.theme-dark #queuePanel.queue-overlay{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 48%,#0A1019 100%);
+  color:#DCE5F2;
+}
+body.surface-queue.theme-dark #queuePanel .queue-overlay-head{
+  border-bottom-color:#45577A;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.34),0 12px 26px rgba(0,0,0,.30);
+  box-shadow:0 2px 6px rgba(0,0,0,.34),0 12px 26px rgba(0,0,0,.30);
+}
+body.theme-dark #queuePanel .queue-overlay-head .qov-title{color:#EEF3FB;}
+body.theme-dark #queuePanel .queue-overlay-head .qov-title svg{color:#E0A83A;}
+body.theme-dark #queuePanel .qov-title-main{color:#EEF3FB;}
+body.theme-dark #queuePanel .qov-subtitle{color:#8B9BB3;}
+body.theme-dark #queuePanel .queue-overlay-head .tabs{
+  background:#141D2C;background-image:none;border-color:#33425C;
+}
+body.theme-dark #queuePanel .queue-overlay-head .tab{
+  background:#1B2537;border-color:#33425C;color:#B4C2D6;
+}
+body.theme-dark #queuePanel .queue-overlay-head .tab:hover{border-color:#45577A;color:#EEF3FB;}
+body.theme-dark #queuePanel .queue-overlay-head .tab.active{
+  background:#3A2E12;border-color:#E0A83A;color:#F4D79A;
+}
+body.theme-dark #queuePanel .queue-overlay-head .head-tools .inp{
+  background:#141D2C;background-image:none;
+  border-color:#45577A;border-bottom-color:#45577A;color:#DCE5F2;
+}
+body.theme-dark #queuePanel .queue-overlay-head .q-search-wrap .in-ico{color:#8B9BB3;}
+body.theme-dark #queuePanel .queue-overlay-head #queueToggle,
+body.theme-dark #queuePanel .queue-overlay-head .qov-close{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;
+}
+body.theme-dark #queuePanel .queue-overlay-head #queueToggle:hover,
+body.theme-dark #queuePanel .queue-overlay-head .qov-close:hover{
+  background:#25314A;border-color:#45577A;color:#EEF3FB;
+}
+body.theme-dark #queuePanel .qov-summary .qov-sum-card{
+  background:#182234;background-image:none;border-color:#33425C;border-top-color:#E0A83A;
+}
+body.theme-dark #queuePanel .qov-summary .qov-sum-num{color:#F4D79A;}
+body.theme-dark #queuePanel .qov-summary .qov-sum-lbl{color:#8B9BB3;}
+body.theme-dark #queuePanel .qov-sum-hint{
+  background:#141D2C;border-color:#33425C;color:#8B9BB3;
+}
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap{
+  background:#141D2C;border-color:#33425C;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.30);box-shadow:0 2px 6px rgba(0,0,0,.30);
+}
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl thead th{
+  background:#1B2537;background-image:none;color:#B4C2D6;
+  border-bottom-color:#33425C;border-left-color:#25314A;
+}
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl tbody td{
+  color:#DCE5F2;border-bottom-color:#25314A;
+}
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl tbody tr:nth-child(even){background:#161F2E;}
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl tbody tr:hover{background:#1F2A3E;}
+body.theme-dark #queuePanel .q-tbl .q-idx{color:#8B9BB3;}
+body.theme-dark #queuePanel .q-tbl .q-avatar{
+  background:#25314A;border-color:#33425C;color:#B4C2D6;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.theme-dark #queuePanel .q-tbl .q-pname-text{color:#EEF3FB;}
+body.theme-dark #queuePanel .q-tbl .q-file-badge{
+  background:#141D2C;border-color:#33425C;color:#B4C2D6;
+}
+body.theme-dark #queuePanel .q-tbl .q-date,
+body.theme-dark #queuePanel .q-tbl .q-time{color:#B4C2D6;}
+body.theme-dark #queuePanel .q-tbl .q-wait-pill{
+  background:#3A2E12;border-color:#E0A83A;color:#F4D79A;
+}
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl tbody td.q-empty,
+body.theme-dark #queuePanel .queue-overlay-body .q-tbl tbody tr:hover td.q-empty{
+  background:#101927;color:#8B9BB3;
+}
+body.theme-dark #queuePanel .q-tbl .q-act-btn{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;
+}
+body.theme-dark #queuePanel .q-tbl .q-act-btn:hover{border-color:#6A83F7;color:#EEF3FB;}
+body.theme-dark #queuePanel .q-tbl .q-recall{
+  background:#232F55;border-color:#6A83F7;color:#A9B8FF;
+}
+body.theme-dark #queuePanel .q-tbl .q-recall:hover{background:#232F55;color:#A9B8FF;}
+body.theme-dark #queuePanel .q-tbl .q-pay{
+  background:#0F3A2C;border-color:#2CC191;color:#8FE7C4;
+}
+body.theme-dark #queuePanel .q-tbl .q-pay:hover{background:#0F3A2C;color:#8FE7C4;}
+body.theme-dark #queuePanel .q-tbl .q-cancel{
+  background:#3A1C1C;border-color:#E86A6A;color:#F6B4B4;
+}
+body.theme-dark #queuePanel .q-tbl .q-cancel:hover{background:#3A1C1C;color:#F6B4B4;}
+body.theme-dark #queuePanel .q-tbl .q-remove{
+  background:#1B2537;border-color:#E86A6A;color:#E86A6A;
+}
+body.theme-dark #queuePanel .q-tbl .q-remove:hover{background:#3A1C1C;color:#F6B4B4;}
+body.theme-dark #queuePanel .queue-overlay-body .queue-foot{border-top-color:#25314A;}
+body.theme-dark #queuePanel .q-count{color:#8B9BB3;}
+body.theme-dark #queuePanel .q-count b{color:#EEF3FB;}

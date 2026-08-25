@@ -1,0 +1,1647 @@
+/* ============================================================================
+   surface-admission.css — admission form
+   ----------------------------------------------------------------------------
+   Part of the v1.91.0 ordered theme layer. Load order is fixed in index.html:
+     common.css → admission.css (structure) → css/core.css → css/surface-*.css
+   This file owns its layer EXCLUSIVELY. Never restyle another layer's
+   selectors from here, and never append a dated "polish pass" block.
+
+   DUAL-ENGINE CONTRACT (WebView2 Chromium + MSHTML/Trident): no var(), no
+   grid, no flex gap, no backdrop-filter, no CSS logical properties, literal
+   hex colours only, every flex declaration paired with its -ms- equivalent.
+   Palette values come from docs/DESIGN_SYSTEM.md — no ad-hoc colours.
+   ============================================================================
+
+   HOW TO FIND THINGS IN HERE
+     1. PAGE CANVAS                 body.surface-adm, #app decoration, rails
+     2. CARD FRAME + HUE MAP        the one-hue-per-panel assignment (§2.1)
+     3. LABELS · VALUES · FIELDS    admission density on top of core's §6 field
+     4. RIGHT RAIL — patient card   profile · state chip · e-rx · rx counters
+     5. RIGHT RAIL — rest           date/shift · عملیات پذیرش · launchers ·
+                                    چاپ اسناد · وضعیت اتصال
+     6. CENTRE — forms              مشخصات بیمار · بیمه · پزشک · انجام دهنده ·
+                                    counter strip · lookup dropdowns
+     7. CENTRE — خدمات پذیرش        head tools · the §8.2 inner region · totals
+     8. LEFT RAIL — money           صورتحساب · مبلغ نهایی (hero) · عملیات پذیرش
+     9. RESPONSIVE
+    10. DARK PARITY (§12)
+
+   THE HUE MAP — one hue per panel, assigned by MEANING (§2.1). No panel may
+   show a second hue in its header; separation comes from elevation, border and
+   spacing, never from inventing another colour.
+
+     PANEL                                     HUE      tint    tintEdge base    deep
+     ---------------------------------------------------------------------------------
+     .profile-card   کارت بیمار                indigo   #E7ECFD #BCC8F4 #3550D8 #22349C
+     .patient-card   مشخصات بیمار              indigo   ″       ″       ″       ″
+     .svc-card       خدمات پذیرش               indigo   ″       ″       ″       ″
+     .action-card    عملیات پذیرش (right rail) indigo   ″       ″       ″       ″
+     .payment-card   عملیات پذیرش (left rail)  indigo   ″       ″       ″       ″
+     .ins-card       اطلاعات بیمه و نوع پذیرش  azure    #E3F1FB #AFD4EE #0E7FC0 #0A4A72
+     .perf-card      انجام دهنده               azure    ″       ″       ″       ″
+     .doc-card       پزشک معالج                teal     #DEF1F1 #A7D8D9 #0F8B8D #095A5C
+     .invoice-card   صورتحساب                  emerald  #E1F4EA #A9DCC6 #0E9C77 #075E45
+     .payable-card   مبلغ نهایی (hero)         emerald  ″       ″       ″       ″
+     .print-card     چاپ اسناد                 slate    #E7EDF6 #C0CDE0 #55688A #2C3D5C
+     .datetime-card  تاریخ/شیفت                slate    ″       ″       ″       ″
+     .status-card    وضعیت اتصال               slate    ″       ″       ″       ″
+
+   Semantic colour is still allowed on a VALUE or a STATE inside a neutral
+   body — amber for a waiting queue, emerald for money/paid, red for
+   destructive. That is a state, not a decoration (§2.1 rule 3/4).
+
+   Two things the owner rejected and that must never come back here:
+     · a full-width accent rule across a card top (`inset 0 3px 0 <hue>` or a
+       border-top band). The accent is core's SHORT 26x3px `.card-head:after`
+       and nothing else.
+     · concave / inset / neumorphic fields. Fields are core's crisp flat white
+       plate. No `inset` shadow on any input in this file.
+
+   COLOUR PROVENANCE: every literal below comes from docs/DESIGN_SYSTEM.md,
+   except eight values taken verbatim from core.css so the two layers stay
+   byte-identical where they overlap — the flat pre-gradient fallbacks of the
+   four hue head washes (#EFF3FE indigo, #EDF6FC azure, #EAF6F6 teal,
+   #EBF7F1 emerald, #F0F4FA slate) and four dark neutral steps (#101927,
+   #161F2E, #182131, #1F2A3E). Nothing here is invented.
+   ============================================================================ */
+
+/* ==========================================================================
+   1. PAGE CANVAS  (§1.1, §9)
+   A tinted, lit, three-stop canvas — never a white sheet, never dark. The
+   decoration (two low-alpha glows + a 1px diagonal weave) rides on .app so it
+   sits above the body wash and below every card, with no extra element and no
+   stacking-context surprises.
+   ========================================================================== */
+body.surface-adm{
+  background:#D6E0EF;
+  background:-webkit-linear-gradient(top right,#E6EDF7 0%,#D6E0EF 52%,#C4D2E5 100%);
+  background:linear-gradient(216deg,#E6EDF7 0%,#D6E0EF 52%,#C4D2E5 100%);
+  color:#1D2B42;
+  font-weight:600;
+}
+body.surface-adm .app{
+  background:transparent;
+  background-image:
+    -webkit-radial-gradient(88% 0%, ellipse, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 44%),
+    -webkit-radial-gradient(6% 96%, ellipse, rgba(14,127,192,.14) 0%, rgba(14,127,192,0) 48%),
+    -webkit-repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+  background-image:
+    radial-gradient(ellipse at 88% 0%, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 44%),
+    radial-gradient(ellipse at 6% 96%, rgba(14,127,192,.14) 0%, rgba(14,127,192,0) 48%),
+    repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px);
+}
+/* the workspace itself adds no wash and no stray hairline: the canvas above is
+   the only page colour, so nothing can visually collide with it. */
+body.surface-adm .body{
+  background:transparent;
+  border-top:0;
+  padding:12px;
+}
+/* THE THREE RAILS ARE FRAMELESS. v1.90 stacked three translucent trays over
+   the page gradient (body → .body → .col-*), which muddied every surface under
+   it and cost the labels their contrast. The cards are the objects now; the
+   rails only group and scroll them. */
+body.surface-adm .col-action,
+body.surface-adm .col-left,
+body.surface-adm .col-center{
+  background:transparent;
+  background-image:none;
+  border:0;
+  border-radius:0;
+  padding:0;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .col-center{margin-right:12px;margin-left:12px;}
+/* keyboard/mouse focus is signalled by the field's indigo focus ring alone
+   (§6: one focus colour keyboard-wide) — no zone-sized outline any more. */
+body.surface-adm .col.is-active{
+  border:0;
+  background:transparent;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+/* Other surfaces' full-page panels live in the same document; on the admission
+   surface they must stay out of the way. */
+body.surface-adm .tools-panel,
+body.surface-adm .dash-panel{display:none;}
+body.surface-adm .hidden-fields{display:none;}
+
+/* ==========================================================================
+   2. CARD FRAME + THE PER-PANEL HUE MAP  (§8.1, §4, §2.1)
+   core.css owns .card, .card-head, .card-title, .ct-ico and the 26x3px mini
+   accent line (drawn as .card-head:after at right:47px/bottom:7px). It also
+   ships .hue-* head variants — but this DOM carries no .hue-* class, so the
+   assignment is written out below against the real card classes.
+   ========================================================================== */
+body.surface-adm .card{
+  border:1px solid #C6D2E4;
+  border-radius:12px;
+  margin-bottom:12px;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+  box-shadow:0 1px 2px rgba(16,32,58,.06),0 3px 8px rgba(16,32,58,.07);
+}
+body.surface-adm .col > .card:last-child{margin-bottom:0;}
+/* Neutral head + NO full-width bar. This one rule also retires every leftover
+   `inset 0 Npx 0 <blue>` keyline from the structure layer and from the
+   theme-calm / theme-warm palettes, because it outranks all of them. */
+body.surface-adm .card-head{
+  position:relative;
+  min-height:44px;
+  padding:9px 13px 13px;
+  border-bottom:1px solid #E1E8F2;
+  background:#F3F7FD;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EFF4FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EFF4FC 100%);
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .card-head:after{
+  content:"";
+  position:absolute;
+  right:47px;                    /* 13px pad + 26px chip + 8px chip margin */
+  bottom:7px;
+  width:26px;
+  height:3px;
+  border-radius:2px;
+  background:#55688A;
+}
+body.surface-adm .card-title{
+  font-size:13.5px;
+  font-weight:800;
+  letter-spacing:.1px;
+  color:#2C3D5C;
+}
+body.surface-adm .ct-ico{
+  width:26px;height:26px;
+  margin-left:8px;
+  padding:5px;
+  border-radius:8px;
+  background:#E7EDF6;
+  border:1px solid #C0CDE0;
+  color:#55688A;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-adm .card-body{padding:12px;}
+body.surface-adm .card-body.no-pad{padding:0;}
+
+/* ---- 2.1 INDIGO — مشخصات بیمار · خدمات پذیرش · عملیات پذیرش ------------- */
+body.surface-adm .patient-card .card-head,
+body.surface-adm .svc-card .card-head,
+body.surface-adm .payment-card .card-head{
+  background:#EFF3FE;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+  border-bottom:1px solid #BCC8F4;
+}
+body.surface-adm .patient-card .card-head .card-title,
+body.surface-adm .svc-card .card-head .card-title,
+body.surface-adm .payment-card .card-head .card-title{color:#22349C;}
+body.surface-adm .patient-card .card-head .ct-ico,
+body.surface-adm .svc-card .card-head .ct-ico,
+body.surface-adm .payment-card .card-head .ct-ico{
+  background:#E7ECFD;border-color:#BCC8F4;color:#3550D8;
+}
+body.surface-adm .patient-card .card-head:after,
+body.surface-adm .svc-card .card-head:after,
+body.surface-adm .payment-card .card-head:after{
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+
+/* ---- 2.2 AZURE — اطلاعات بیمه و نوع پذیرش · انجام دهنده ----------------- */
+body.surface-adm .ins-card .card-head,
+body.surface-adm .perf-card .card-head{
+  background:#EDF6FC;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E3F1FB 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E3F1FB 100%);
+  border-bottom:1px solid #AFD4EE;
+}
+body.surface-adm .ins-card .card-head .card-title,
+body.surface-adm .perf-card .card-head .card-title{color:#0A4A72;}
+body.surface-adm .ins-card .card-head .ct-ico,
+body.surface-adm .perf-card .card-head .ct-ico{
+  background:#E3F1FB;border-color:#AFD4EE;color:#0E7FC0;
+}
+body.surface-adm .ins-card .card-head:after,
+body.surface-adm .perf-card .card-head:after{
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(right,#0E7FC0 0%,#0A4A72 100%);
+  background:linear-gradient(270deg,#0E7FC0 0%,#0A4A72 100%);
+}
+
+/* ---- 2.3 TEAL — پزشک معالج (clinical actor) ----------------------------- */
+body.surface-adm .doc-card .card-head{
+  background:#EAF6F6;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#DEF1F1 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#DEF1F1 100%);
+  border-bottom:1px solid #A7D8D9;
+}
+body.surface-adm .doc-card .card-head .card-title{color:#095A5C;}
+body.surface-adm .doc-card .card-head .ct-ico{
+  background:#DEF1F1;border-color:#A7D8D9;color:#0F8B8D;
+}
+body.surface-adm .doc-card .card-head:after{
+  background:#0F8B8D;
+  background:-webkit-linear-gradient(right,#0F8B8D 0%,#095A5C 100%);
+  background:linear-gradient(270deg,#0F8B8D 0%,#095A5C 100%);
+}
+
+/* ---- 2.4 EMERALD — صورتحساب (money) ------------------------------------- */
+body.surface-adm .invoice-card .card-head{
+  background:#EBF7F1;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E1F4EA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E1F4EA 100%);
+  border-bottom:1px solid #A9DCC6;
+}
+body.surface-adm .invoice-card .card-head .card-title{color:#075E45;}
+body.surface-adm .invoice-card .card-head .ct-ico{
+  background:#E1F4EA;border-color:#A9DCC6;color:#0E9C77;
+}
+body.surface-adm .invoice-card .card-head:after{
+  background:#0E9C77;
+  background:-webkit-linear-gradient(right,#0E9C77 0%,#075E45 100%);
+  background:linear-gradient(270deg,#0E9C77 0%,#075E45 100%);
+}
+
+/* ---- 2.5 SLATE — چاپ اسناد (no semantic meaning) ------------------------ */
+body.surface-adm .print-card .card-head{
+  background:#F0F4FA;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7EDF6 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7EDF6 100%);
+  border-bottom:1px solid #C0CDE0;
+}
+body.surface-adm .print-card .card-head .card-title{color:#2C3D5C;}
+body.surface-adm .print-card .card-head .ct-ico{
+  background:#E7EDF6;border-color:#C0CDE0;color:#55688A;
+}
+body.surface-adm .print-card .card-head:after{
+  background:#55688A;
+  background:-webkit-linear-gradient(right,#55688A 0%,#2C3D5C 100%);
+  background:linear-gradient(270deg,#55688A 0%,#2C3D5C 100%);
+}
+
+/* ==========================================================================
+   3. LABELS · VALUES · FIELD DENSITY  (§6, §7)
+   core.css owns the field recipe (flat white plate, real edge, heavier base
+   border, indigo focus ring). Everything here is either admission density or
+   a correction of a leftover from the structure layer — never a new field
+   style, and never an inset/concave well.
+   ========================================================================== */
+body.surface-adm .fld > span,
+body.surface-adm .fld > label > span{
+  font-size:12.5px;
+  font-weight:700;
+  color:#3B4C69;                 /* ink-label — legible, not washed out */
+  letter-spacing:0;
+  margin-bottom:5px;
+}
+body.surface-adm .req{color:#D24343;font-style:normal;font-weight:800;}
+body.surface-adm .inp,
+body.surface-adm select.inp,
+body.surface-adm textarea.inp{
+  height:36px;
+  padding:0 11px;
+  font-size:14px;
+  font-weight:600;
+  color:#1D2B42;                 /* ink-body — values read as values */
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  border-radius:8px;
+  -webkit-box-shadow:0 1px 1px rgba(16,32,58,.05);
+  box-shadow:0 1px 1px rgba(16,32,58,.05);
+}
+body.surface-adm .inp:hover{border-color:#7B90B4;background:#FFFFFF;}
+/* 1px border in every state so a field never nudges its neighbours on focus */
+body.surface-adm .inp:focus,
+body.surface-adm select.inp:focus,
+body.surface-adm textarea.inp:focus{
+  border-width:1px;
+  border-color:#3550D8;
+  font-weight:600;
+  background:#FFFFFF;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+body.surface-adm .inp[readonly],
+body.surface-adm .inp[disabled],
+body.surface-adm select.inp[disabled]{
+  background:#F2F6FC;
+  color:#3B4C69;
+  border-color:#C6D2E4;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .inp-sm{height:32px;font-size:13px;}
+/* trailing icon: RTL keeps it on the LEFT so it never covers the caret, and it
+   stays optically centred at any field height. */
+body.surface-adm .with-ico .in-ico{
+  top:50%;left:10px;right:auto;
+  -webkit-transform:translateY(-50%);
+  transform:translateY(-50%);
+  color:#67768F;
+}
+body.surface-adm .with-ico .inp{padding-left:32px;}
+body.surface-adm .chk,
+body.surface-adm .chk-block{color:#3B4C69;font-weight:700;}
+body.surface-adm .chk-block{
+  background:#F2F6FC;
+  border:1px solid #C6D2E4;
+  border-radius:9px;
+}
+
+/* ==========================================================================
+   4. RIGHT RAIL — کارت بیمار (the patient profile card)  ·  INDIGO
+   The identity block the operator meets first in RTL, so it is the strongest
+   card on the page: sh-2 elevation, an indigo identity strip, a ringed indigo
+   avatar badge, crisp name typography and a legible state chip.
+   Emphasis comes from ELEVATION, not from a second colour (§2.1 rule 2).
+   ========================================================================== */
+body.surface-adm .profile-card{
+  border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+/* the identity strip doubles as this card's section header (it owns the panel's
+   kicker + mini line), so the card needs no separate .card-head */
+body.surface-adm .profile-card .profile-top{
+  padding:11px 13px 12px;
+  border-bottom:1px solid #BCC8F4;
+  background:#EFF3FE;
+  background:-webkit-linear-gradient(top,#F5F8FD 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#F5F8FD 0%,#E7ECFD 100%);
+}
+body.surface-adm .profile-card .avatar{
+  width:50px;height:50px;
+  border-radius:14px;
+  margin-left:11px;
+  color:#FFFFFF;
+  background:#3550D8;
+  background:-webkit-linear-gradient(top,#5A72E6 0%,#3550D8 60%,#22349C 100%);
+  background:linear-gradient(180deg,#5A72E6 0%,#3550D8 60%,#22349C 100%);
+  -webkit-box-shadow:0 0 0 3px rgba(255,255,255,.92),0 5px 12px rgba(34,52,156,.26),inset 0 1px 1px rgba(255,255,255,.42);
+  box-shadow:0 0 0 3px rgba(255,255,255,.92),0 5px 12px rgba(34,52,156,.26),inset 0 1px 1px rgba(255,255,255,.42);
+}
+/* panel kicker + THE MINI LINE (§4) — short, indigo, never full width */
+body.surface-adm .profile-kicker{
+  display:block;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.3px;
+  color:#3B4C69;
+}
+body.surface-adm .profile-kicker:after{
+  content:"";
+  display:block;
+  width:26px;height:3px;
+  border-radius:2px;
+  margin:4px 0 5px;
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+body.surface-adm .profile-card .pf-name{
+  font-size:16px;
+  font-weight:800;
+  color:#10203A;
+  line-height:1.25;
+  margin-bottom:2px;
+}
+body.surface-adm .profile-card .pf-file{
+  font-size:11.5px;
+  font-weight:700;
+  color:#3B4C69;
+}
+body.surface-adm .profile-card .pf-file b{
+  font-size:12.5px;
+  font-weight:800;
+  color:#10203A;
+}
+/* state chip — the panel's own hue, so the card can never clash with itself */
+body.surface-adm .profile-state{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:start;justify-content:flex-start;
+  margin:11px 13px 0;
+  padding:6px 10px;
+  border-radius:9px;
+  background:#E7ECFD;
+  border:1px solid #BCC8F4;
+  color:#22349C;
+  font-size:11.5px;
+  font-weight:800;
+  line-height:1.35;
+}
+body.surface-adm .profile-state .dot{
+  display:inline-block;
+  width:8px;height:8px;
+  border-radius:50%;
+  margin-left:7px;
+  -ms-flex:0 0 8px;flex:0 0 8px;
+  background:#3550D8;
+}
+/* «نسخه الکترونیک» is a SECONDARY action → neutral outline (§8.3). Keeping it
+   off the panel's hue stops it from reading like a second state chip. */
+body.surface-adm .btn-erx{
+  height:36px;
+  margin:11px 13px 0;
+  border-radius:9px;
+  color:#1D2B42;
+  border:1px solid #9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
+  box-shadow:0 1px 2px rgba(16,32,58,.06);
+}
+body.surface-adm .btn-erx:hover{
+  color:#22349C;
+  border-color:#7B90B4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+}
+/* the two prescription counters — neutral surface-2 wells, dark ink */
+body.surface-adm .profile-card .rx-row{padding:11px 13px 13px;}
+body.surface-adm .profile-card .rx-box{
+  padding:7px 9px;
+  border-radius:9px;
+  background:#F2F6FC;
+  border:1px solid #C6D2E4;
+}
+body.surface-adm .profile-card .rx-lbl{
+  font-size:11px;
+  font-weight:700;
+  color:#3B4C69;
+  margin-bottom:2px;
+}
+body.surface-adm .profile-card .rx-val{
+  font-size:15px;
+  font-weight:800;
+  color:#10203A;
+}
+
+/* ==========================================================================
+   5. RIGHT RAIL — the rest of the rail
+   Order: profile (4) → تاریخ/شیفت → عملیات پذیرش → launchers → چاپ اسناد →
+   وضعیت اتصال.
+   ========================================================================== */
+
+/* ---- 5.1 تاریخ پذیرش / شیفت — SLATE (no semantic meaning) --------------- */
+body.surface-adm .datetime-card{
+  padding:12px 13px;
+  border:1px solid #C6D2E4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+}
+body.surface-adm .datetime-card .dt-ico{
+  width:38px;height:38px;
+  border-radius:10px;
+  background:#E7EDF6;
+  border:1px solid #C0CDE0;
+  color:#55688A;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-adm .datetime-card .dt-fld > span{
+  font-size:12px;
+  font-weight:700;
+  color:#3B4C69;
+  margin-bottom:4px;
+}
+/* both controls are non-editable here; they must still READ clearly */
+body.surface-adm .datetime-card .inp{
+  background:#F2F6FC;
+  background-image:none;
+  border:1px solid #C6D2E4;
+  border-style:solid;
+  color:#1D2B42;
+  font-weight:700;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+
+/* ---- 5.2 عملیات پذیرش (right rail action card) — INDIGO end to end ------ */
+body.surface-adm .action-card{
+  padding:12px;
+  border:1px solid #C6D2E4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+}
+/* this card has no .card-head, so the kicker IS the section header: same
+   recipe — indigo tint wash, tintEdge bottom border, -deep ink, 26px mini
+   line. Bled to the card edges with negative margins so it reads as a head. */
+body.surface-adm .action-kicker{
+  position:relative;
+  margin:-12px -12px 12px;
+  padding:9px 13px 13px;
+  border-bottom:1px solid #BCC8F4;
+  background:#EFF3FE;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+  color:#22349C;
+  font-size:13.5px;
+  font-weight:800;
+  letter-spacing:.1px;
+}
+body.surface-adm .action-kicker:after{
+  content:"";
+  position:absolute;
+  right:13px;
+  bottom:7px;
+  width:26px;height:3px;
+  border-radius:2px;
+  background:#3550D8;
+  background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
+  background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
+}
+/* «ثبت قبض و صدور» — the one strongest control on the screen. INDIGO primary,
+   never green (it is an action, not a success state). */
+body.surface-adm .action-card .btn-submit,
+body.surface-adm .action-card .btn-submit.btn-block{
+  height:42px;
+  margin-bottom:9px;
+  border-radius:10px;
+  font-size:14.5px;
+  font-weight:800;
+  letter-spacing:.1px;
+  text-shadow:none;
+  color:#FFFFFF;
+  border:1px solid #22349C;
+  background:#3550D8;
+  background:-webkit-linear-gradient(top,#3550D8 0%,#2A41B8 100%);
+  background:linear-gradient(180deg,#3550D8 0%,#2A41B8 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),0 4px 10px rgba(34,52,156,.24),inset 0 1px 0 rgba(255,255,255,.28);
+  box-shadow:0 1px 2px rgba(16,32,58,.10),0 4px 10px rgba(34,52,156,.24),inset 0 1px 0 rgba(255,255,255,.28);
+}
+body.surface-adm .action-card .btn-submit:hover,
+body.surface-adm .action-card .btn-submit.btn-block:hover{
+  color:#FFFFFF;
+  border-color:#22349C;
+  background:#4A62E6;
+  background:-webkit-linear-gradient(top,#4A62E6 0%,#3550D8 100%);
+  background:linear-gradient(180deg,#4A62E6 0%,#3550D8 100%);
+}
+/* «پاک کردن» — destructive, so red; soft red, because it must not compete
+   with the submit for attention. Red is the single allowed exception and it
+   lives on the button only (never on the head, chip or line). */
+body.surface-adm .action-card .btn-danger,
+body.surface-adm .action-card .btn-danger.btn-block{
+  height:36px;
+  margin-bottom:0;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+  background:#FBE8E8;
+  background-image:none;
+  border:1px solid #EEBDBD;
+  color:#8B2020;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .action-card .btn-danger:hover,
+body.surface-adm .action-card .btn-danger.btn-block:hover{
+  background:#FBE8E8;
+  background-image:none;
+  border-color:#D24343;
+  color:#8B2020;
+}
+
+/* ---- 5.3 the two standalone rail launchers (neutral outline) ------------ */
+/* ORDER GUARD: the rail is ordered profile(1) → date/shift(2) → عملیات(3) →
+   صندوق/صف(4) → ابزارها(5) → چاپ(5) → وضعیت(6). #toolsBtn carries no order of
+   its own in the structure layer, and an unordered flex item defaults to 0,
+   which parks «ابزارها» above the patient card. Pin it back into place. */
+body.surface-adm .tools-launch{-ms-flex-order:5;order:5;}
+body.surface-adm .queue-hub-btn,
+body.surface-adm .tools-launch{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  width:100%;
+  height:38px;
+  margin-bottom:12px;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+  color:#1D2B42;
+  border:1px solid #9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
+  box-shadow:0 1px 2px rgba(16,32,58,.06);
+}
+body.surface-adm .queue-hub-btn:hover,
+body.surface-adm .tools-launch:hover{
+  color:#22349C;
+  border-color:#7B90B4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+}
+body.surface-adm .queue-hub-btn .i,
+body.surface-adm .tools-launch-ico{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  margin-left:7px;
+  color:#55688A;
+}
+
+/* ---- 5.4 چاپ اسناد — SLATE (a utility panel, not a semantic one) -------- */
+body.surface-adm .print-card .card-body{padding:12px;}
+body.surface-adm .print-grid .btn-print{
+  height:36px;
+  margin-bottom:8px;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+  color:#1D2B42;
+  border:1px solid #9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
+  box-shadow:0 1px 2px rgba(16,32,58,.06);
+}
+body.surface-adm .print-grid .btn-print:last-child{margin-bottom:0;}
+body.surface-adm .print-grid .btn-print:hover{
+  color:#2C3D5C;
+  border-color:#7B90B4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+}
+/* «چاپ آخرین قبض» is this panel's primary → the panel's own hue, SOFT. It is
+   deliberately quieter than «ثبت قبض و صدور»: only one control on this screen
+   may read as the strongest, and that one is the indigo submit. */
+body.surface-adm .print-grid .btn-print-primary{
+  color:#2C3D5C;
+  border:1px solid #C0CDE0;
+  background:#E7EDF6;
+  background-image:none;
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-adm .print-grid .btn-print-primary:hover{
+  color:#2C3D5C;
+  border-color:#55688A;
+  background:#E7EDF6;
+  background-image:none;
+}
+
+/* ---- 5.5 وضعیت اتصال — SLATE panel, semantic dot -------------------------
+   The panel is neutral; only the STATE is coloured (amber = connecting,
+   emerald = connected, red = failed). That is a state, not a decoration. */
+body.surface-adm .status-card .card-body{padding:10px 12px;}
+body.surface-adm .sync-badge{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:start;justify-content:flex-start;
+  height:28px;
+  padding:0 11px;
+  border-radius:999px;
+  background:#FBF1DB;
+  border:1px solid #E6CE93;
+  color:#6D4A05;
+  font-size:11.5px;
+  font-weight:800;
+}
+body.surface-adm .sync-badge .dot{
+  width:8px;height:8px;
+  border-radius:50%;
+  margin-left:8px;
+  -ms-flex:0 0 8px;flex:0 0 8px;
+  background:#C4890F;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .sync-badge.ok{background:#E1F4EA;border-color:#A9DCC6;color:#075E45;}
+body.surface-adm .sync-badge.ok .dot{background:#0E9C77;-webkit-box-shadow:none;box-shadow:none;}
+body.surface-adm .sync-badge.err{background:#FBE8E8;border-color:#EEBDBD;color:#8B2020;}
+body.surface-adm .sync-badge.err .dot{background:#D24343;-webkit-box-shadow:none;box-shadow:none;}
+
+/* ==========================================================================
+   6. CENTRE — the form cards, the counter strip and the lookup dropdowns
+   The trio مشخصات بیمار (indigo) → بیمه (azure) · پزشک (teal) · انجام دهنده
+   (azure) gets its colour from §2 above; only body-level ink and the shared
+   lookup chrome live here. A card body is always neutral (§2.1 rule 3).
+   ========================================================================== */
+body.surface-adm .patient-card .card-body,
+body.surface-adm .ins-card .card-body,
+body.surface-adm .doc-card .card-body,
+body.surface-adm .perf-card .card-body{background:transparent;}
+/* density (§6): field→field 8px so three form rows plus the trio and the
+   services table all fit one 900px-tall workspace without a scroll */
+body.surface-adm .pt-grid{margin:-8px;}
+body.surface-adm .pt-grid > .fld{padding:8px;}
+body.surface-adm .doc-body .fld{margin-bottom:8px;}
+body.surface-adm .doc-body .fld:last-child{margin-bottom:0;}
+
+/* the middle trio is separated by spacing and elevation, never by a wash */
+body.surface-adm .row-3 > .card{
+  border:1px solid #C6D2E4;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+}
+/* the selected doctor / performer are VALUES — never placeholder-grey */
+body.surface-adm #doc2name,
+body.surface-adm #perfname{color:#1D2B42;font-weight:700;}
+
+/* ---- 6.1 doctor lookup results + the doctor preview well ---------------- */
+body.surface-adm .doc-results{
+  margin-top:8px;
+  max-height:150px;
+  overflow:auto;
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+/* an empty result list must not leave an empty bordered box behind */
+body.surface-adm .doc-results:empty{
+  display:none;
+  border:0;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .doc-results .row{border-bottom:1px solid #E1E8F2;}
+body.surface-adm .doc-results .row:last-child{border-bottom:0;}
+body.surface-adm .doc-results .row:hover{background:#EDF3FC;}
+body.surface-adm .doc-results .r-name{color:#1D2B42;font-weight:700;}
+body.surface-adm .doc-results .row:hover .r-name{color:#095A5C;}
+body.surface-adm .doc-results .r-sub{color:#67768F;font-size:12px;font-weight:700;}
+/* the medical-council ID badge on each suggestion row (§8.6 pill): the panel's
+   own teal, so the dropdown cannot introduce a second hue into the پزشک card.
+   `.mini-list .row` is a space-between flex row, so with name · specialty · code
+   the badge lands on the RTL end (left) on its own. */
+body.surface-adm .doc-results .r-code{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:20px;line-height:18px;padding:0 9px;
+  border-radius:999px;
+  font-size:11px;font-weight:800;
+  direction:ltr;white-space:nowrap;
+  background:#DEF1F1;
+  border:1px solid #A7D8D9;
+  color:#095A5C;
+}
+/* the doctor name is a MIRROR of the picked suggestion, not an editable field:
+   a read-only surface-2 plate with value ink and a default cursor, so it never
+   invites typing (the operator types into #doc2code / the search box). Core's
+   §6 indigo focus ring is left alone — the field is still in the Enter/Tab nav
+   order and the caret has to be visible when it lands here. */
+body.surface-adm .inp.doc-name-display{
+  background:#F2F6FC;
+  background-image:none;
+  color:#1D2B42;
+  font-weight:700;
+  border:1px solid #C6D2E4;
+  cursor:default;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.surface-adm .inp.doc-name-display::-webkit-input-placeholder{
+  color:#8C99AC;font-weight:600;}
+body.surface-adm .inp.doc-name-display:-ms-input-placeholder{
+  color:#8C99AC;font-weight:600;}
+body.surface-adm .doctor-preview{
+  background:#F2F6FC;
+  border-top:1px solid #E1E8F2;
+  color:#1D2B42;
+}
+
+/* ---- 6.2 the P/S + turn-preview counter strip --------------------------- */
+/* A surface-3 strip (§1.2): neutral plate, dark ink, and the only colour is
+   the semantic key chip — P (پرداختی) emerald, S (صندوق) amber. */
+body.surface-adm .counter-strip{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:start;justify-content:flex-start;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 12px;
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid #C6D2E4;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  -webkit-box-shadow:inset 0 1px 0 #FFFFFF;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+}
+body.surface-adm .cs-item{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  height:26px;
+  padding:0 9px;
+  margin-left:8px;
+  border-radius:8px;
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  font-size:11.5px;
+  font-weight:700;
+  color:#3B4C69;
+  white-space:nowrap;
+}
+body.surface-adm .cs-key{
+  display:inline-block;
+  min-width:18px;height:18px;
+  line-height:16px;
+  margin-left:6px;
+  padding:0 3px;
+  border-radius:5px;
+  text-align:center;
+  font-size:10.5px;
+  font-weight:800;
+}
+body.surface-adm .cs-key-p{background:#E1F4EA;border:1px solid #A9DCC6;color:#075E45;}
+body.surface-adm .cs-key-s{background:#FBF1DB;border:1px solid #E6CE93;color:#6D4A05;}
+body.surface-adm .cs-cap{font-size:11.5px;font-weight:700;color:#3B4C69;}
+body.surface-adm .cs-val{
+  margin-right:6px;
+  font-size:13px;
+  font-weight:800;
+  color:#10203A;
+}
+body.surface-adm .cs-reg .cs-val{color:#075E45;}   /* ثبت‌شده — done */
+body.surface-adm .cs-wait .cs-val{color:#6D4A05;}  /* در انتظار — pending */
+body.surface-adm .cs-sep{
+  display:inline-block;
+  width:1px;height:20px;
+  margin:0 6px 0 10px;
+  background:#C6D2E4;
+}
+
+/* ==========================================================================
+   7. CENTRE — خدمات پذیرش
+   The one working table of the screen. Per §8.2 the bordered region is an
+   EVEN 10px inset from all four corners and it FLEXES, so the rows grow and
+   scroll inside it instead of leaving dead space at the bottom. The totals
+   foot is the closing strip of that same region, not a detached bar.
+   ========================================================================== */
+body.surface-adm .col-center > .svc-card{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:230px;
+  margin-bottom:0;
+  border:1px solid #C6D2E4;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+body.surface-adm .svc-card > .card-body{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;
+  padding:0;
+  background:transparent;
+}
+/* ---- 7.1 head tools ----------------------------------------------------- */
+body.surface-adm .svc-count{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  height:20px;
+  padding:0 8px;
+  margin-right:8px;
+  border-radius:999px;
+  background:#E7ECFD;
+  border:1px solid #BCC8F4;
+  color:#22349C;
+  font-size:11px;
+  font-weight:800;
+}
+body.surface-adm .svc-search-wrap .inp{height:30px;font-size:12.5px;}
+body.surface-adm .svc-search-wrap .in-ico{color:#67768F;}
+body.surface-adm #svcAddBtn{height:30px;font-size:12.5px;}
+body.surface-adm #svcToggle{
+  width:30px;height:30px;
+  border-radius:8px;
+  color:#3B4C69;
+  border:1px solid #9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F2F6FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F2F6FC 100%);
+}
+body.surface-adm #svcToggle:hover{border-color:#7B90B4;color:#22349C;}
+
+/* ---- 7.2 service search suggestions ------------------------------------ */
+body.surface-adm .svc-suggest{
+  background:#FFFFFF;
+  border:1px solid #C6D2E4;
+  border-top:0;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+body.surface-adm .svc-suggest .s-row{
+  border-bottom:1px solid #E1E8F2;
+  color:#1D2B42;
+  font-weight:600;
+}
+body.surface-adm .svc-suggest .s-row:hover,
+body.surface-adm .svc-suggest .s-row.sel{background:#EDF3FC;}
+body.surface-adm .svc-suggest .s-code{
+  background:#E7ECFD;
+  border:1px solid #BCC8F4;
+  border-radius:6px;
+  color:#22349C;
+  font-weight:800;
+}
+body.surface-adm .svc-suggest .s-name{color:#1D2B42;font-weight:600;}
+body.surface-adm .svc-suggest .s-price{color:#10203A;font-weight:800;}
+body.surface-adm .svc-suggest .s-price i{color:#075E45;font-weight:800;}
+body.surface-adm .svc-suggest .empty-row{
+  background:#DFE7F3;
+  color:#67768F;
+  font-weight:700;
+}
+
+/* ---- 7.3 THE INNER BORDERED REGION (§8.2) ------------------------------- */
+/* #svcTblWrap and #svcFoot together form ONE bordered region: 10px in from
+   every corner, rounded top on the wrap and rounded bottom on the foot, with
+   no double edge between them. The wrap flexes, so the region always reaches
+   the bottom of the card — there is no fixed bottom gap any more. */
+body.surface-adm #svcTblWrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;
+  max-height:none;
+  margin:10px 10px 0;
+  overflow:auto;
+  background:#F7FAFE;
+  border:1px solid #C6D2E4;
+  border-bottom:0;
+  border-radius:10px 10px 0 0;
+}
+body.surface-adm #svcTblWrap.collapsed,
+body.surface-adm #svcTblWrap.expanded{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  max-height:none;
+  min-height:0;
+}
+body.surface-adm .svc-tbl{background:transparent;}
+body.surface-adm .svc-tbl thead th{
+  padding:7px 8px;
+  font-size:12px;
+  font-weight:800;
+  color:#3B4C69;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;
+  border-left:1px solid #C6D2E4;
+}
+body.surface-adm .svc-tbl thead th:last-child{border-left:0;}
+body.surface-adm .svc-tbl tbody td{
+  padding:6px 8px;
+  font-size:13px;
+  font-weight:600;
+  color:#1D2B42;
+  border-bottom:1px solid #E1E8F2;
+  border-left:1px solid #E1E8F2;
+}
+body.surface-adm .svc-tbl tbody td:last-child{border-left:0;}
+body.surface-adm .svc-tbl tbody td.td-name{color:#1D2B42;font-weight:700;}
+body.surface-adm .svc-tbl tbody tr:nth-child(even){background:#F2F6FC;}
+body.surface-adm .svc-tbl tbody tr:hover{
+  background:#EDF3FC;
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+/* compact table-embedded inputs (§6 density: 30px / 13px) — crisp and flat,
+   never a well */
+body.surface-adm .svc-tbl .qty-inp,
+body.surface-adm .svc-tbl .disc-inp,
+body.surface-adm .svc-tbl .free-inp,
+body.surface-adm .svc-tbl .desc-inp{
+  height:30px;
+  padding:0 7px;
+  font-size:13px;
+  font-weight:600;
+  color:#1D2B42;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  border-radius:7px;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .svc-tbl .qty-inp,
+body.surface-adm .svc-tbl .disc-inp,
+body.surface-adm .svc-tbl .free-inp{text-align:center;}
+body.surface-adm .svc-tbl .qty-inp:focus,
+body.surface-adm .svc-tbl .disc-inp:focus,
+body.surface-adm .svc-tbl .free-inp:focus,
+body.surface-adm .svc-tbl .desc-inp:focus{
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+body.surface-adm .svc-tbl .free-inp[disabled]{
+  background:#F2F6FC;
+  color:#93A0B4;
+  border-color:#C6D2E4;
+}
+body.surface-adm .svc-tbl .free-rate{
+  font-size:11px;
+  font-weight:700;
+  color:#3B4C69;
+}
+/* row actions: edit = indigo (the workspace hue), delete = red (a state) */
+body.surface-adm .svc-tbl .act-btn{
+  width:26px;height:26px;
+  border-radius:7px;
+  border:1px solid transparent;
+  background:transparent;
+}
+body.surface-adm .svc-tbl .act-edit{color:#3550D8;}
+body.surface-adm .svc-tbl .act-edit:hover{background:#E7ECFD;border-color:#BCC8F4;}
+body.surface-adm .svc-tbl .act-del{color:#D24343;}
+body.surface-adm .svc-tbl .act-del:hover{background:#FBE8E8;border-color:#EEBDBD;}
+
+/* designed empty state: a centred surface-sunken plate INSIDE the region, so
+   the region still reads as one continuous plate behind it */
+body.surface-adm .svc-tbl td.svc-empty-cell,
+body.surface-adm .svc-tbl td.empty{
+  background:transparent;
+  border-left:0;
+  border-bottom:0;
+  padding:18px 10px;
+}
+body.surface-adm .svc-empty{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  width:420px;
+  max-width:100%;
+  margin:0 auto;
+  padding:16px 18px 18px;
+  border-radius:12px;
+  background:#DFE7F3;
+  border:1px solid #C6D2E4;
+  text-align:center;
+}
+body.surface-adm .svc-empty .se-ico{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  width:46px;height:46px;
+  margin-bottom:8px;
+  border-radius:14px;
+  background:#E7ECFD;
+  border:1px solid #BCC8F4;
+  color:#3550D8;
+}
+body.surface-adm .svc-empty b{
+  display:block;
+  font-size:13.5px;
+  font-weight:800;
+  color:#10203A;
+}
+body.surface-adm .svc-empty .se-sub{
+  display:block;
+  margin-top:3px;
+  font-size:11.5px;
+  font-weight:700;
+  color:#67768F;
+}
+
+/* ---- 7.4 the totals foot — surface-3 strip, closing the region ---------- */
+body.surface-adm #svcFoot{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  /* width:auto — the structure layer sets width:100%, which together with the
+     10px side margins would push the strip 20px past the card edge */
+  width:auto;
+  margin:0 10px 10px;
+  padding:7px 6px;
+  border:1px solid #C6D2E4;
+  border-top:1px solid #C6D2E4;
+  border-radius:0 0 10px 10px;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+}
+body.surface-adm #svcFoot .sf-cell span{
+  font-size:11px;
+  font-weight:700;
+  color:#3B4C69;
+  margin-bottom:2px;
+}
+body.surface-adm #svcFoot .sf-cell b{
+  font-size:15px;
+  font-weight:800;
+  color:#10203A;
+}
+/* جمع سهم بیمار is the figure the cashier collects → money emerald */
+body.surface-adm #svcFoot .sf-cell:last-child b{color:#075E45;}
+body.surface-adm #svcFoot .sf-cell + .sf-cell{border-right:1px solid #C6D2E4;}
+
+/* ==========================================================================
+   8. LEFT RAIL — the money column
+   صورتحساب (emerald) → مبلغ نهایی (the emerald hero) → عملیات پذیرش (indigo).
+   The v1.90 amber / cream / gold invoice treatment is BANNED: money is
+   emerald in this product, and cream/beige is one of the rejected families.
+   ========================================================================== */
+
+/* ---- 8.1 صورتحساب — EMERALD -------------------------------------------- */
+body.surface-adm .invoice-body{padding:10px 12px 12px;}
+/* collapsed via #invoiceToggle: the head becomes the card's last row, so its
+   hue hairline must go with the body */
+body.surface-adm .invoice-card.collapsed .card-head{border-bottom:0;}
+/* each insurance block is its own quiet surface-2 group, so three groups of
+   numbers can never bleed into one another */
+body.surface-adm .inv-group{
+  padding:7px 9px 8px;
+  margin-bottom:8px;
+  border:1px solid #C6D2E4;
+  border-radius:10px;
+  background:#F7FAFE;
+}
+body.surface-adm .inv-group:last-child{margin-bottom:0;}
+body.surface-adm .inv-gtitle{
+  font-size:12px;
+  font-weight:800;
+  color:#075E45;
+  padding-bottom:5px;
+  margin-bottom:4px;
+  border-bottom:1px solid #E1E8F2;
+}
+/* a 16px emerald tick, so each group is tagged with the panel's hue without a
+   full-width rule anywhere */
+body.surface-adm .inv-gtitle:before{
+  content:"";
+  display:inline-block;
+  width:16px;height:3px;
+  margin-left:7px;
+  border-radius:2px;
+  vertical-align:middle;
+  background:#0E9C77;
+}
+body.surface-adm .inv-line{padding:2px 0;}
+body.surface-adm .inv-line span{
+  font-size:12px;
+  font-weight:700;
+  color:#3B4C69;               /* label ink — clearly a label */
+}
+body.surface-adm .inv-line b{
+  font-size:13.5px;
+  font-weight:800;
+  color:#10203A;               /* value ink — clearly a number */
+}
+/* «مانده قابل پرداخت» — the emphasised close of the invoice, and the bridge to
+   the hero card below it */
+body.surface-adm .inv-remain{
+  margin-top:8px;
+  padding:7px 10px;
+  border:1px solid #A9DCC6;
+  border-top:1px solid #A9DCC6;
+  border-radius:9px;
+  background:#E1F4EA;
+}
+body.surface-adm .inv-remain span{
+  font-size:12px;
+  font-weight:800;
+  color:#075E45;
+}
+body.surface-adm .inv-remain b,
+body.surface-adm #invRemain{
+  font-size:16px;
+  font-weight:900;
+  color:#064E3B;
+}
+
+/* ---- 8.2 مبلغ نهایی — THE HERO ----------------------------------------- */
+/* 34px / 900 / #064E3B on a money-surface body with a 2px money-surface-edge.
+   It must stay the largest number on the screen by at least 12px: the next
+   largest figures here are «مانده قابل پرداخت» (16px) and the totals foot
+   (15px). Do not raise those without lowering this one. */
+body.surface-adm .payable-card{
+  margin-top:0;
+  margin-bottom:12px;
+  padding:11px 13px 12px;
+  text-align:right;
+  border:2px solid #8FD1B4;
+  border-radius:14px;
+  background:#F1FAF5;
+  background:-webkit-linear-gradient(top left,#FFFFFF 0%,#E1F4EA 100%);
+  background:linear-gradient(150deg,#FFFFFF 0%,#E1F4EA 100%);
+  -webkit-box-shadow:0 2px 4px rgba(7,94,69,.08),0 10px 22px rgba(7,94,69,.14),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(7,94,69,.08),0 10px 22px rgba(7,94,69,.14),inset 0 1px 0 #FFFFFF;
+}
+body.surface-adm .payable-caption{
+  font-size:12px;
+  font-weight:800;
+  color:#075E45;
+  line-height:1.4;
+}
+body.surface-adm .payable-caption:before{
+  content:"";
+  display:inline-block;
+  width:22px;height:3px;
+  margin-left:8px;
+  border-radius:2px;
+  vertical-align:middle;
+  background:#0E9C77;
+}
+body.surface-adm .payable-value{
+  margin:5px 0 0;
+  padding-top:6px;
+  border-top:1px solid #A9DCC6;
+  line-height:1.15;
+}
+body.surface-adm .payable-value b,
+body.surface-adm #tcVal{
+  font-size:34px;
+  font-weight:900;
+  color:#064E3B;
+  letter-spacing:-.02em;
+}
+/* «ریال» is a separate, smaller, lighter span — never the weight of the figure */
+body.surface-adm .payable-value span{
+  font-size:13px;
+  font-weight:700;
+  color:#0A6B52;
+  margin-right:6px;
+}
+
+/* ---- 8.3 عملیات پذیرش (left rail) — INDIGO end to end ------------------- */
+body.surface-adm .payment-body{padding:12px;}
+body.surface-adm .queue-action-btns{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex-align:stretch;align-items:stretch;
+}
+/* both queue targets are «not yet at the cashier» work → AMBER (§2.1), a
+   pending STATE on a neutral body. The header, chip and mini line stay indigo,
+   so the panel still owns exactly one hue. */
+body.surface-adm .btn-queue-add,
+body.surface-adm .btn-queue-add2{
+  width:100%;
+  height:36px;
+  margin-bottom:8px;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+  background:#FBF1DB;
+  background-image:none;
+  border:1px solid #E6CE93;
+  color:#6D4A05;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.surface-adm .btn-queue-add:hover,
+body.surface-adm .btn-queue-add2:hover{
+  background:#FBF1DB;
+  background-image:none;
+  border-color:#C4890F;
+  color:#6D4A05;
+}
+body.surface-adm .btn-queue-add2{margin-bottom:0;}
+body.surface-adm .payment-shortcut{
+  margin-top:10px;
+  padding:6px 9px;
+  border-radius:8px;
+  text-align:center;
+  background:#F2F6FC;
+  border:1px solid #C6D2E4;
+  font-size:11.5px;
+  font-weight:700;
+  color:#3B4C69;
+}
+
+/* ==========================================================================
+   9. RESPONSIVE
+   The rails narrow before anything is allowed to overflow; only density
+   changes, never the hue map. Trident ignores @media gracefully and keeps the
+   wide layout, which is the safe default there.
+   ========================================================================== */
+@media (max-width:1500px){
+  body.surface-adm .card-head{padding:8px 11px 12px;min-height:42px;}
+  body.surface-adm .card-head:after{right:45px;bottom:6px;} /* 11 pad + 26 chip + 8 */
+  body.surface-adm .card-body{padding:11px;}
+  body.surface-adm .action-kicker{margin:-12px -12px 11px;padding:8px 11px 12px;}
+  body.surface-adm .action-kicker:after{right:11px;bottom:6px;}
+  body.surface-adm .svc-search-wrap .inp{font-size:12px;}
+  body.surface-adm .payable-value b,
+  body.surface-adm #tcVal{font-size:30px;}
+  body.surface-adm #svcFoot .sf-cell b{font-size:14px;}
+}
+@media (max-width:1120px){
+  body.surface-adm .col-center{margin-right:8px;margin-left:8px;}
+  body.surface-adm .body{padding:8px;}
+  body.surface-adm #svcTblWrap{margin:8px 8px 0;}
+  body.surface-adm #svcFoot{margin:0 8px 8px;}
+  body.surface-adm .payable-value b,
+  body.surface-adm #tcVal{font-size:27px;}
+}
+
+/* ==========================================================================
+   10. DARK PARITY  (§12)
+   Same structure, same hue MAP, swapped tokens. Ink on a dark hue tint uses
+   that hue's light `-deep` value as the text colour.
+   ========================================================================== */
+body.theme-dark.surface-adm{
+  background:#0E1522;
+  background:-webkit-linear-gradient(top right,#121A28 0%,#0E1522 52%,#0A1019 100%);
+  background:linear-gradient(216deg,#121A28 0%,#0E1522 52%,#0A1019 100%);
+  color:#DCE5F2;
+}
+body.theme-dark.surface-adm .app{
+  background:transparent;
+  background-image:
+    -webkit-radial-gradient(88% 0%, ellipse, rgba(106,131,247,.12) 0%, rgba(106,131,247,0) 44%),
+    -webkit-radial-gradient(6% 96%, ellipse, rgba(63,169,230,.10) 0%, rgba(63,169,230,0) 48%);
+  background-image:
+    radial-gradient(ellipse at 88% 0%, rgba(106,131,247,.12) 0%, rgba(106,131,247,0) 44%),
+    radial-gradient(ellipse at 6% 96%, rgba(63,169,230,.10) 0%, rgba(63,169,230,0) 48%);
+}
+body.theme-dark.surface-adm .body,
+body.theme-dark.surface-adm .col-action,
+body.theme-dark.surface-adm .col-left,
+body.theme-dark.surface-adm .col-center{
+  background:transparent;
+  background-image:none;
+  border:0;
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.theme-dark.surface-adm .card{
+  border-color:#33425C;
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+}
+body.theme-dark.surface-adm .card-head{
+  border-bottom-color:#25314A;
+  background:#1B2537;
+  background:-webkit-linear-gradient(top,#1F2A3E 0%,#182131 100%);
+  background:linear-gradient(180deg,#1F2A3E 0%,#182131 100%);
+  -webkit-box-shadow:none;
+  box-shadow:none;
+}
+body.theme-dark.surface-adm .card-head:after{background:#45577A;}
+body.theme-dark.surface-adm .card-title{color:#EEF3FB;}
+body.theme-dark.surface-adm .ct-ico{background:#25314A;border-color:#33425C;color:#B4C2D6;}
+
+/* --- dark hue map (identical assignment, dark tokens) --- */
+body.theme-dark.surface-adm .patient-card .card-head,
+body.theme-dark.surface-adm .svc-card .card-head,
+body.theme-dark.surface-adm .payment-card .card-head{
+  background:#232F55;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .patient-card .card-head .card-title,
+body.theme-dark.surface-adm .svc-card .card-head .card-title,
+body.theme-dark.surface-adm .payment-card .card-head .card-title{color:#A9B8FF;}
+body.theme-dark.surface-adm .patient-card .card-head .ct-ico,
+body.theme-dark.surface-adm .svc-card .card-head .ct-ico,
+body.theme-dark.surface-adm .payment-card .card-head .ct-ico{
+  background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm .patient-card .card-head:after,
+body.theme-dark.surface-adm .svc-card .card-head:after,
+body.theme-dark.surface-adm .payment-card .card-head:after{
+  background:#6A83F7;background-image:none;}
+
+body.theme-dark.surface-adm .ins-card .card-head,
+body.theme-dark.surface-adm .perf-card .card-head{
+  background:#12324A;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .ins-card .card-head .card-title,
+body.theme-dark.surface-adm .perf-card .card-head .card-title{color:#9BD3F5;}
+body.theme-dark.surface-adm .ins-card .card-head .ct-ico,
+body.theme-dark.surface-adm .perf-card .card-head .ct-ico{
+  background:#12324A;border-color:#33425C;color:#9BD3F5;}
+body.theme-dark.surface-adm .ins-card .card-head:after,
+body.theme-dark.surface-adm .perf-card .card-head:after{
+  background:#3FA9E6;background-image:none;}
+
+body.theme-dark.surface-adm .doc-card .card-head{
+  background:#0F3436;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .doc-card .card-head .card-title{color:#93DEDF;}
+body.theme-dark.surface-adm .doc-card .card-head .ct-ico{
+  background:#0F3436;border-color:#33425C;color:#93DEDF;}
+body.theme-dark.surface-adm .doc-card .card-head:after{background:#2FB3B5;background-image:none;}
+
+body.theme-dark.surface-adm .invoice-card .card-head{
+  background:#0F3A2C;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .invoice-card .card-head .card-title{color:#8FE7C4;}
+body.theme-dark.surface-adm .invoice-card .card-head .ct-ico{
+  background:#0F3A2C;border-color:#33425C;color:#8FE7C4;}
+body.theme-dark.surface-adm .invoice-card .card-head:after{background:#2CC191;background-image:none;}
+
+body.theme-dark.surface-adm .print-card .card-head{
+  background:#1B2537;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .print-card .card-head .card-title{color:#B4C2D6;}
+body.theme-dark.surface-adm .print-card .card-head .ct-ico{
+  background:#25314A;border-color:#33425C;color:#B4C2D6;}
+body.theme-dark.surface-adm .print-card .card-head:after{background:#45577A;background-image:none;}
+
+/* --- dark fields, labels, values --- */
+body.theme-dark.surface-adm .fld > span,
+body.theme-dark.surface-adm .fld > label > span,
+body.theme-dark.surface-adm .chk,
+body.theme-dark.surface-adm .chk-block{color:#B4C2D6;}
+body.theme-dark.surface-adm .chk-block{background:#141D2C;border-color:#33425C;}
+body.theme-dark.surface-adm .inp,
+body.theme-dark.surface-adm select.inp,
+body.theme-dark.surface-adm textarea.inp{
+  background:#141D2C;background-image:none;color:#DCE5F2;
+  border-color:#45577A;border-bottom-color:#45577A;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .inp:hover{border-color:#45577A;background:#141D2C;}
+body.theme-dark.surface-adm .inp:focus,
+body.theme-dark.surface-adm select.inp:focus{
+  border-color:#6A83F7;background:#141D2C;
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);
+  box-shadow:0 0 0 3px rgba(106,131,247,.26);}
+body.theme-dark.surface-adm .inp[readonly],
+body.theme-dark.surface-adm .inp[disabled],
+body.theme-dark.surface-adm select.inp[disabled]{
+  background:#101927;color:#8B9BB3;border-color:#33425C;}
+body.theme-dark.surface-adm .with-ico .in-ico{color:#8B9BB3;}
+body.theme-dark.surface-adm #doc2name,
+body.theme-dark.surface-adm #perfname{color:#DCE5F2;}
+
+/* --- dark right rail --- */
+body.theme-dark.surface-adm .profile-card .profile-top{
+  background:#232F55;background-image:none;border-bottom-color:#33425C;}
+body.theme-dark.surface-adm .profile-kicker{color:#B4C2D6;}
+body.theme-dark.surface-adm .profile-kicker:after{background:#6A83F7;background-image:none;}
+body.theme-dark.surface-adm .profile-card .avatar{
+  background:#3550D8;background-image:none;color:#FFFFFF;
+  -webkit-box-shadow:0 0 0 3px rgba(255,255,255,.10),0 5px 12px rgba(0,0,0,.42);
+  box-shadow:0 0 0 3px rgba(255,255,255,.10),0 5px 12px rgba(0,0,0,.42);}
+body.theme-dark.surface-adm .profile-card .pf-name{color:#EEF3FB;}
+body.theme-dark.surface-adm .profile-card .pf-file{color:#B4C2D6;}
+body.theme-dark.surface-adm .profile-card .pf-file b{color:#EEF3FB;}
+body.theme-dark.surface-adm .profile-state{
+  background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm .profile-state .dot{background:#6A83F7;}
+body.theme-dark.surface-adm .btn-erx{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .btn-erx:hover{
+  background:#25314A;background-image:none;border-color:#45577A;color:#EEF3FB;}
+body.theme-dark.surface-adm .profile-card .rx-box{background:#141D2C;border-color:#33425C;}
+body.theme-dark.surface-adm .profile-card .rx-lbl{color:#B4C2D6;}
+body.theme-dark.surface-adm .profile-card .rx-val{color:#EEF3FB;}
+body.theme-dark.surface-adm .datetime-card{
+  background:#182234;background-image:none;border-color:#33425C;}
+body.theme-dark.surface-adm .datetime-card .dt-ico{
+  background:#25314A;border-color:#33425C;color:#B4C2D6;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .datetime-card .dt-fld > span{color:#B4C2D6;}
+body.theme-dark.surface-adm .datetime-card .inp{
+  background:#101927;background-image:none;border-color:#33425C;color:#DCE5F2;}
+body.theme-dark.surface-adm .action-card{
+  background:#182234;background-image:none;border-color:#33425C;}
+body.theme-dark.surface-adm .action-kicker{
+  background:#232F55;background-image:none;border-bottom-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm .action-kicker:after{background:#6A83F7;background-image:none;}
+body.theme-dark.surface-adm .action-card .btn-submit,
+body.theme-dark.surface-adm .action-card .btn-submit.btn-block{
+  background:#3550D8;background-image:none;border-color:#6A83F7;color:#FFFFFF;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .action-card .btn-danger,
+body.theme-dark.surface-adm .action-card .btn-danger.btn-block{
+  background:#3A1C1C;background-image:none;border-color:#45577A;color:#F6B4B4;}
+body.theme-dark.surface-adm .queue-hub-btn,
+body.theme-dark.surface-adm .tools-launch,
+body.theme-dark.surface-adm .print-grid .btn-print{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .queue-hub-btn:hover,
+body.theme-dark.surface-adm .tools-launch:hover,
+body.theme-dark.surface-adm .print-grid .btn-print:hover{
+  background:#25314A;background-image:none;border-color:#45577A;color:#EEF3FB;}
+body.theme-dark.surface-adm .queue-hub-btn .i,
+body.theme-dark.surface-adm .tools-launch-ico{color:#B4C2D6;}
+body.theme-dark.surface-adm .print-grid .btn-print-primary{
+  background:#45577A;background-image:none;border-color:#45577A;color:#EEF3FB;}
+body.theme-dark.surface-adm .print-grid .btn-print-primary:hover{
+  background:#45577A;background-image:none;color:#FFFFFF;}
+body.theme-dark.surface-adm .sync-badge{background:#3A2E12;border-color:#45577A;color:#F4D79A;}
+body.theme-dark.surface-adm .sync-badge .dot{background:#E0A83A;}
+body.theme-dark.surface-adm .sync-badge.ok{background:#0F3A2C;border-color:#45577A;color:#8FE7C4;}
+body.theme-dark.surface-adm .sync-badge.ok .dot{background:#2CC191;}
+body.theme-dark.surface-adm .sync-badge.err{background:#3A1C1C;border-color:#45577A;color:#F6B4B4;}
+body.theme-dark.surface-adm .sync-badge.err .dot{background:#E86A6A;}
+
+/* --- dark centre --- */
+body.theme-dark.surface-adm .row-3 > .card{
+  background:#182234;background-image:none;border-color:#33425C;}
+body.theme-dark.surface-adm .doc-results{
+  background:#182234;border-color:#33425C;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .doc-results .row{border-bottom-color:#25314A;}
+body.theme-dark.surface-adm .doc-results .row:hover{background:#1F2A3E;}
+body.theme-dark.surface-adm .doc-results .r-name{color:#DCE5F2;}
+body.theme-dark.surface-adm .doc-results .row:hover .r-name{color:#93DEDF;}
+body.theme-dark.surface-adm .doc-results .r-sub{color:#8B9BB3;}
+body.theme-dark.surface-adm .doc-results .r-code{
+  background:#0F3436;border-color:#33425C;color:#93DEDF;}
+body.theme-dark.surface-adm .inp.doc-name-display{
+  background:#101927;color:#DCE5F2;border-color:#33425C;}
+body.theme-dark.surface-adm .doctor-preview{
+  background:#141D2C;border-top-color:#25314A;color:#DCE5F2;}
+body.theme-dark.surface-adm .counter-strip{
+  background:#1B2537;background-image:none;border-color:#33425C;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .cs-item{background:#141D2C;border-color:#33425C;color:#B4C2D6;}
+body.theme-dark.surface-adm .cs-cap{color:#B4C2D6;}
+body.theme-dark.surface-adm .cs-val{color:#EEF3FB;}
+body.theme-dark.surface-adm .cs-key-p{background:#0F3A2C;border-color:#33425C;color:#8FE7C4;}
+body.theme-dark.surface-adm .cs-key-s{background:#3A2E12;border-color:#33425C;color:#F4D79A;}
+body.theme-dark.surface-adm .cs-reg .cs-val{color:#8FE7C4;}
+body.theme-dark.surface-adm .cs-wait .cs-val{color:#F4D79A;}
+body.theme-dark.surface-adm .cs-sep{background:#33425C;}
+
+/* --- dark services --- */
+body.theme-dark.surface-adm .svc-count{background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm #svcToggle{
+  background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;}
+body.theme-dark.surface-adm .svc-suggest{
+  background:#182234;border-color:#33425C;
+  -webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .svc-suggest .s-row{border-bottom-color:#25314A;color:#DCE5F2;}
+body.theme-dark.surface-adm .svc-suggest .s-row:hover,
+body.theme-dark.surface-adm .svc-suggest .s-row.sel{background:#1F2A3E;}
+body.theme-dark.surface-adm .svc-suggest .s-code{
+  background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm .svc-suggest .s-name{color:#DCE5F2;}
+body.theme-dark.surface-adm .svc-suggest .s-price{color:#EEF3FB;}
+body.theme-dark.surface-adm .svc-suggest .s-price i{color:#8FE7C4;}
+body.theme-dark.surface-adm .svc-suggest .empty-row{background:#101927;color:#8B9BB3;}
+body.theme-dark.surface-adm #svcTblWrap{background:#141D2C;border-color:#33425C;border-bottom:0;}
+body.theme-dark.surface-adm .svc-tbl thead th{
+  background:#1B2537;background-image:none;color:#B4C2D6;
+  border-bottom-color:#33425C;border-left-color:#33425C;}
+body.theme-dark.surface-adm .svc-tbl tbody td{
+  color:#DCE5F2;border-bottom-color:#25314A;border-left-color:#25314A;}
+body.theme-dark.surface-adm .svc-tbl tbody td.td-name{color:#EEF3FB;}
+body.theme-dark.surface-adm .svc-tbl tbody tr:nth-child(even){background:#161F2E;}
+body.theme-dark.surface-adm .svc-tbl tbody tr:hover{
+  background:#1F2A3E;-webkit-box-shadow:none;box-shadow:none;}
+body.theme-dark.surface-adm .svc-tbl .qty-inp,
+body.theme-dark.surface-adm .svc-tbl .disc-inp,
+body.theme-dark.surface-adm .svc-tbl .free-inp,
+body.theme-dark.surface-adm .svc-tbl .desc-inp{
+  background:#101927;background-image:none;border-color:#45577A;
+  border-bottom-color:#45577A;color:#DCE5F2;}
+body.theme-dark.surface-adm .svc-tbl .free-inp[disabled]{
+  background:#141D2C;border-color:#33425C;color:#67768F;}
+body.theme-dark.surface-adm .svc-tbl .free-rate{color:#B4C2D6;}
+body.theme-dark.surface-adm .svc-tbl .act-edit{color:#A9B8FF;}
+body.theme-dark.surface-adm .svc-tbl .act-edit:hover{background:#232F55;border-color:#33425C;}
+body.theme-dark.surface-adm .svc-tbl .act-del{color:#F6B4B4;}
+body.theme-dark.surface-adm .svc-tbl .act-del:hover{background:#3A1C1C;border-color:#45577A;}
+body.theme-dark.surface-adm .svc-tbl td.svc-empty-cell,
+body.theme-dark.surface-adm .svc-tbl td.empty{background:#101927;}
+body.theme-dark.surface-adm .svc-empty .se-ico{
+  background:#232F55;border-color:#33425C;color:#A9B8FF;}
+body.theme-dark.surface-adm .svc-empty b{color:#EEF3FB;}
+body.theme-dark.surface-adm .svc-empty .se-sub{color:#8B9BB3;}
+body.theme-dark.surface-adm #svcFoot{
+  background:#1B2537;background-image:none;border-color:#33425C;
+  border-top-color:#33425C;}
+body.theme-dark.surface-adm #svcFoot .sf-cell span{color:#B4C2D6;}
+body.theme-dark.surface-adm #svcFoot .sf-cell b{color:#EEF3FB;}
+body.theme-dark.surface-adm #svcFoot .sf-cell:last-child b{color:#8FE7C4;}
+body.theme-dark.surface-adm #svcFoot .sf-cell + .sf-cell{border-right-color:#33425C;}
+
+/* --- dark money column --- */
+body.theme-dark.surface-adm .inv-group{background:#141D2C;border-color:#33425C;}
+body.theme-dark.surface-adm .inv-gtitle{color:#8FE7C4;border-bottom-color:#25314A;}
+body.theme-dark.surface-adm .inv-gtitle:before{background:#2CC191;}
+body.theme-dark.surface-adm .inv-line span{color:#B4C2D6;}
+body.theme-dark.surface-adm .inv-line b{color:#EEF3FB;}
+body.theme-dark.surface-adm .inv-remain{background:#0F3A2C;border-color:#33425C;}
+body.theme-dark.surface-adm .inv-remain span{color:#8FE7C4;}
+body.theme-dark.surface-adm .inv-remain b,
+body.theme-dark.surface-adm #invRemain{color:#8FE7C4;}
+body.theme-dark.surface-adm .payable-card{
+  border-color:#2CC191;
+  background:#0F3A2C;
+  background-image:none;
+  -webkit-box-shadow:0 2px 4px rgba(0,0,0,.24),0 10px 22px rgba(0,0,0,.34);
+  box-shadow:0 2px 4px rgba(0,0,0,.24),0 10px 22px rgba(0,0,0,.34);}
+body.theme-dark.surface-adm .payable-caption{color:#8FE7C4;}
+body.theme-dark.surface-adm .payable-caption:before{background:#2CC191;}
+body.theme-dark.surface-adm .payable-value{border-top-color:#2CC191;}
+body.theme-dark.surface-adm .payable-value b,
+body.theme-dark.surface-adm #tcVal{color:#8FE7C4;}
+body.theme-dark.surface-adm .payable-value span{color:#2CC191;}
+body.theme-dark.surface-adm .btn-queue-add,
+body.theme-dark.surface-adm .btn-queue-add2{
+  background:#3A2E12;background-image:none;border-color:#45577A;color:#F4D79A;}
+body.theme-dark.surface-adm .btn-queue-add:hover,
+body.theme-dark.surface-adm .btn-queue-add2:hover{
+  background:#3A2E12;background-image:none;border-color:#E0A83A;color:#F4D79A;}
+body.theme-dark.surface-adm .payment-shortcut{
+  background:#141D2C;border-color:#33425C;color:#B4C2D6;}

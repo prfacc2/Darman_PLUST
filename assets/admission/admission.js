@@ -49,6 +49,7 @@
     canCashEdit: true,
     cashTab: 0,
     cashQ: '',
+    cashShiftOpen: false,   /* v1.91.0: drives the شروع/پایان شیفت button pair */
     role: 0,
     userName: '',
     todayJalali: '',
@@ -734,14 +735,14 @@
      queue kind so the surface reads as a deliberate page, not a bare table. */
   function updateQueueChrome() {
     var isAdm = state.queueKind === 'admission';
-    setText($('qovSubtitle'),
-      isAdm ? 'بیمارانی که در صف پذیرش منتظر دریافت نوبت هستند'
-            : 'پذیرش‌های ثبت‌شده‌ای که هنوز به صندوق نرفته‌اند');
+    /* v1.91.0: the descriptive subtitle and the "use the buttons on the left"
+       hint were removed on the owner's request — no explanatory sentences under
+       titles anywhere in the product. Only the factual count label remains.
+       The elements are kept (and written to) so the DOM contract holds. */
+    setText($('qovSubtitle'), '');
     setText($('qovSumLbl'),
       isAdm ? 'مورد در صف پذیرش' : 'مورد در صندوق نرفته‌ها');
-    setText($('qovHint'),
-      isAdm ? 'برای صدور نوبت یا حذف هر ردیف از دکمه‌های سمت چپ استفاده کنید'
-            : 'برای بازخوانی یا حذف هر ردیف از دکمه‌های سمت چپ استفاده کنید');
+    setText($('qovHint'), '');
   }
   function renderQueue(rows) {
     state.queue = rows || state.queue || [];
@@ -1578,11 +1579,24 @@
       if (state.surface === 'cashier') Bridge.call('ui.closeTab', { kind: 'cashier' });
     });
     on($('cashSearch'), 'keyup', function () { state.cashQ = this.value; refreshCash(); });
+    /* v1.91.0: a disabled button must not even reach the confirm dialog, and the
+       button pair flips the moment the shift verb answers (both Shift_StatusJson
+       shapes are handled by cashShiftFromStatus). */
     on($('cashShiftStart'), 'click', function () {
-      cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود');
+      if (this.disabled || state.cashShiftOpen) return;
+      cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود',
+        function (r) {
+          var sh = cashShiftFromStatus(r);
+          cashShiftButtons(sh ? !!sh.open : true);
+        });
     });
     on($('cashShiftEnd'), 'click', function () {
-      cashCall('پایان شیفت ثبت شود؟', 'cashier.shift.end', {}, 'شیفت بسته شد', 'پایان شیفت ناموفق بود');
+      if (this.disabled || !state.cashShiftOpen) return;
+      cashCall('پایان شیفت ثبت شود؟', 'cashier.shift.end', {}, 'شیفت بسته شد', 'پایان شیفت ناموفق بود',
+        function (r) {
+          var sh = cashShiftFromStatus(r);
+          cashShiftButtons(sh ? !!sh.open : false);
+        });
     });
     on($('cashManualBtn'), 'click', function () {
       if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
@@ -1605,13 +1619,29 @@
         var box = $('cashManualBox'); if (box) box.style.display = 'none';
       });
     });
+    /* the tab strip lives ABOVE the table now (v1.91.0) — same id, same
+       .cash-tab/data-tab contract, same delegated handler. defer() because the
+       refresh rebuilds the very strip this click is still travelling through. */
     on($('cashTabs'), 'click', function (e) {
       e = e || window.event;
       var tgt = e.target || e.srcElement;
       var btn = findUp(tgt, 'data-tab', $('cashTabs'));
       if (!btn) return;
       state.cashTab = +btn.getAttribute('data-tab') || 0;
-      refreshCash();
+      defer(function () { refreshCash(); });
+    });
+    /* department overview: one row per بخش — clicking a row selects its tab. */
+    on($('cashDeptBody'), 'click', function (e) {
+      e = e || window.event;
+      var tgt = e.target || e.srcElement;
+      var tr = findUp(tgt, 'data-dept', $('cashDeptBody'));
+      if (!tr) return;
+      state.cashTab = +tr.getAttribute('data-dept') || 0;
+      defer(function () { refreshCash(); });
+    });
+    on($('cashUnpaidChip'), 'click', function () {
+      state.cashTab = 0;
+      defer(function () { refreshCash(); });
     });
     on($('cashBody'), 'dblclick', function (e) {
       e = e || window.event;
@@ -1867,7 +1897,10 @@
     cashAsk(msg, function () {
       Bridge.call(verb, payload || {}).then(function (r) {
         if (r && r.ok === false) { toast(r.err || failMsg, 'err'); return; }
-        toast(okMsg, 'ok');
+        /* v1.91.0: «warn» = the operation SUCCEEDED but something needs saying —
+           today only «no open shift, so the income was not attributed». */
+        if (r && r.warn) toast(r.warn, 'warn');
+        else toast(okMsg, 'ok');
         if (afterOk) afterOk(r);
         refreshCash();
       }, function () { toast(failMsg, 'err'); });
@@ -2333,11 +2366,142 @@
     }, function () { toast('بارگذاری صندوق ناموفق بود', 'err'); });
   }
 
+  /* ==========================================================================
+     v1.91.0 CASHIER — shift state + per-department («بخش») overview.
+     · Shift_StatusJson() answers in TWO shapes, so every reader goes through
+       cashShiftFromStatus() first.
+     · Exactly one of «شروع شیفت» / «پایان شیفت» is ever enabled, derived from
+       the real shift state (never from what the user last clicked).
+     · Departments are runtime data from مدیریت: the overview is rendered from
+       d.sections and NEVER from a hard-coded department name.
+     ========================================================================== */
+  function cashShiftFromStatus(r) {
+    /* {"ok":true,"open":false,"income":0}  |  {"ok":true,"shift":{…},"income":N} */
+    if (!r) return null;
+    if (r.shift) return r.shift;
+    if (r.open != null) return { open: !!r.open, income: r.income || 0 };
+    return null;
+  }
+  function cashShiftButtons(open) {
+    state.cashShiftOpen = !!open;
+    var s = $('cashShiftStart'), e = $('cashShiftEnd');
+    if (s) {
+      s.disabled = !!open;
+      s.setAttribute('aria-disabled', open ? 'true' : 'false');
+      s.className = 'btn cash-shift-start cash-act' + (open ? ' is-off' : '');
+    }
+    if (e) {
+      e.disabled = !open;
+      e.setAttribute('aria-disabled', open ? 'false' : 'true');
+      e.className = 'btn cash-shift-end cash-act' + (open ? '' : ' is-off');
+    }
+  }
+  function cashFaOr(v, fallback) {
+    var t = trimStr(v);
+    return t === '' ? fallback : toFa(t);
+  }
+  function cashDeptLabel(sh) {
+    var dept = trimStr(sh && sh.sectionName);
+    var sub = trimStr(sh && sh.subName);
+    if (dept && sub && sub !== dept) return dept + ' / ' + sub;
+    return dept || sub || '—';
+  }
+  /* sh = d.shift (open shape or {"open":false}), last = d.lastShift (closed) */
+  function renderCashShift(sh, last) {
+    sh = sh || {};
+    var open = !!sh.open;
+    var src = open ? sh : (last || null);
+    var closed = !open && !!src;
+    var mode = open ? 'is-open' : (closed ? 'is-closed' : 'is-none');
+    var panel = $('cashShiftPanel');
+    if (panel) panel.className = 'cash-shift ' + mode;
+    var stEl = $('cashShiftState');
+    if (stEl) {
+      setText(stEl, open ? 'شیفت باز' : (closed ? 'شیفت بسته' : 'شیفت شروع‌نشده'));
+      stEl.className = 'state-chip ' + mode;
+    }
+    var sBox = $('cashShiftStartBox'), eBox = $('cashShiftEndBox');
+    if (sBox) sBox.className = 'dt dt-start' + (src ? '' : ' dt-empty');
+    if (eBox) eBox.className = 'dt dt-end' + (closed ? '' : ' dt-empty');
+    setText($('cashShiftStartTime'), cashFaOr(src && src.startTime, '--:--'));
+    setText($('cashShiftStartDate'), cashFaOr(src && src.startJalali, 'ثبت نشده'));
+    setText($('cashShiftEndTime'), cashFaOr(closed ? (src && src.endTime) : '', '--:--'));
+    setText($('cashShiftEndDate'), cashFaOr(closed ? (src && src.endJalali) : '', 'ثبت نشده'));
+    setText($('cashShiftUser'), src && trimStr(src.fullname) ? trimStr(src.fullname) : '—');
+    setText($('cashShiftDept'), src ? cashDeptLabel(src) : '—');
+    setText($('cashShiftIncome'), money(src && src.income != null ? src.income : 0));
+    /* #cashShiftMeta stays alive as the panel's one-line summary. */
+    var meta = 'شیفتی باز نیست — برای ثبت درآمد، شیفت را شروع کنید';
+    if (open) {
+      meta = 'باز از ' + cashFaOr(src.startJalali, '—') + ' ساعت ' + cashFaOr(src.startTime, '—');
+    } else if (closed) {
+      meta = 'آخرین شیفت: ' + cashFaOr(src.startJalali, '—') + ' ' + cashFaOr(src.startTime, '—') +
+             ' تا ' + cashFaOr(src.endJalali, '—') + ' ' + cashFaOr(src.endTime, '—');
+    }
+    setText($('cashShiftMeta'), meta);
+    cashShiftButtons(open);
+  }
+
+  /* One ROW per department in a scrolling table with a sticky head and a totals
+     foot — the only layout that reads the same with 2 or 20+ departments.
+     Clicking a row selects that department's tab. */
+  function renderCashDepts(secs, tot) {
+    secs = secs || [];
+    var i, sc, cls, unpaid, h = '';
+    var tP = 0, tUC = 0, tUS = 0, tPC = 0, tPS = 0, hot = 0;
+    if (tot) {
+      tP = +tot.patients || 0;
+      tUC = +tot.unpaidCount || 0; tUS = +tot.unpaidSum || 0;
+      tPC = +tot.paidCount || 0; tPS = +tot.paidSum || 0;
+    }
+    for (i = 0; i < secs.length; i++) {
+      sc = secs[i] || {};
+      unpaid = (+sc.unpaidCount || 0) > 0;
+      if (unpaid) hot++;
+      cls = 'cd-row' + ((+sc.id === +(state.cashTab || 0)) ? ' is-active' : '') +
+            (unpaid ? ' has-unpaid' : '');
+      if (!tot) {
+        tP += +sc.patients || 0;
+        tUC += +sc.unpaidCount || 0; tUS += +sc.unpaidSum || 0;
+        tPC += +sc.paidCount || 0; tPS += +sc.paidSum || 0;
+      }
+      h += '<tr class="' + cls + '" data-dept="' + esc(sc.id) + '" title="نمایش زبانه ' + esc(sc.name || '') + '">' +
+        '<td class="cd-c-name"><i class="cd-dot" aria-hidden="true"></i><b>' + esc(sc.name || '—') + '</b>' +
+          (trimStr(sc.code) ? '<small>' + esc(sc.code) + '</small>' : '') + '</td>' +
+        '<td class="cd-c-n">' + toFa(+sc.patients || 0) + '</td>' +
+        '<td class="cd-c-n"><span class="cd-pill' + (unpaid ? ' is-hot' : '') + '">' +
+          toFa(+sc.unpaidCount || 0) + '</span></td>' +
+        '<td class="cd-c-m' + (unpaid ? ' is-warn' : '') + '">' + money(sc.unpaidSum) + '</td>' +
+        '<td class="cd-c-n">' + toFa(+sc.paidCount || 0) + '</td>' +
+        '<td class="cd-c-m is-money">' + money(sc.paidSum) + '</td>' +
+        '</tr>';
+    }
+    if (!secs.length) h = '<tr><td colspan="6" class="empty">بخشی در مدیریت تعریف نشده است</td></tr>';
+    var body = $('cashDeptBody');
+    if (body) body.innerHTML = h;
+    setText($('cashDeptCount'), toFa(secs.length) + ' بخش');
+    setText($('cashDeptTotP'), toFa(tP));
+    setText($('cashDeptTotUC'), toFa(tUC));
+    setText($('cashDeptTotUS'), money(tUS));
+    setText($('cashDeptTotPC'), toFa(tPC));
+    setText($('cashDeptTotPS'), money(tPS));
+    /* «صندوق نرفته‌ها» — out of the header, right above the table. */
+    setText($('cashUnpaidN'), toFa(tUC));
+    setText($('cashUnpaidSum'), money(tUS));
+    setText($('cashUnpaidDepts'), toFa(hot));
+    var bar = $('cashUnpaidBar');
+    if (bar) {
+      bar.className = 'unpaid-bar' + (tUC > 0 ? ' has' : '') +
+        (+(state.cashTab || 0) === 0 ? ' is-active' : '');
+    }
+  }
+
   function renderCash(d) {
     var tabs = d.tabs || [];
     var host = $('cashTabs');
+    var i;
     if (host) {
-      var h = '', i, t, on;
+      var h = '', t, on;
       for (i = 0; i < tabs.length; i++) {
         t = tabs[i];
         on = (+t.id === +state.cashTab) ? ' active' : '';
@@ -2354,15 +2518,8 @@
     setText($('cashStatPaid'), toFa(st.paid || 0));
     setText($('cashStatUnpaid'), toFa(st.unpaid || 0));
     setText($('cashStatQ'), toFa(st.queue || 0));
-    var sh = d.shift || {};
-    var meta = 'شیفت شروع نشده';
-    if (sh.open) {
-      meta = 'شیفت باز از ' + toFa(sh.startTime || '') +
-             (sh.startJalali ? ' — ' + toFa(sh.startJalali) : '');
-    } else if (sh.startTime) {
-      meta = 'شروع ' + toFa(sh.startTime || '') + ' / پایان ' + toFa(sh.endTime || '');
-    }
-    setText($('cashShiftMeta'), meta);
+    renderCashShift(d.shift, d.lastShift);
+    renderCashDepts(d.sections, d.totals);
 
     var rows = d.rows || [];
     var body = $('cashBody');

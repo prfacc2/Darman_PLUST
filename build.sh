@@ -12,6 +12,24 @@ RES=i686-w64-mingw32-windres
 
 mkdir -p build obj
 
+# ----------------------------------------------------------------------------
+#  v1.91.0: UI CONTRACT GUARD — runs BEFORE the compiler.
+#  This program has many screens and is developed one release at a time, so
+#  releases used to silently delete or break other screens' elements. The
+#  contract is now executable: scripts/check_ui_contract.py asserts the embedded
+#  asset registry agrees across app.rc / the inliner / index.html, that every
+#  surface still has the element ids its JavaScript needs, that the stylesheets
+#  stay renderable on BOTH engines (WebView2 + MSHTML/Trident), that the theme
+#  layering is not restacked, and that the rejected colour families stay out.
+#  A red contract is a red build — see AGENTS.md.
+# ----------------------------------------------------------------------------
+echo "[0/3] Checking UI contract..."
+if command -v python3 >/dev/null 2>&1; then
+    python3 scripts/check_ui_contract.py
+else
+    echo "[0/3] python3 not available — UI contract NOT verified." >&2
+fi
+
 echo "[1/3] Compiling resources..."
 $RES -O coff -i src/app.rc -o obj/app.res
 

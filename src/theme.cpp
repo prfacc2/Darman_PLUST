@@ -41,8 +41,11 @@ void applyTheme(bool dark){
         g_theme.hover       = RGB(34, 40, 50);
         g_theme.headerTop   = RGB(14, 17, 22);
         g_theme.headerBot   = RGB(6, 8, 11);
-        g_infoAccent  = RGB(150, 120, 245);   // bright violet (stands out, not red)
-        g_infoAccent2 = RGB(120, 92, 225);
+        // v1.91.0: violet is FORBIDDEN on BOTH themes (DESIGN_SYSTEM §2), so the
+        // dark attention accent is the dark-theme azure pair from §12
+        // (base #3FA9E6 over the azure tint #12324A).
+        g_infoAccent  = RGB(0x3F, 0xA9, 0xE6);   // azure base (dark)
+        g_infoAccent2 = RGB(0x12, 0x32, 0x4A);   // azure tint (dark) — gradient end
     } else {
         // ---- Premium light palette (v1.10.0 §C): a genuinely LAYERED light
         //      theme, not a washed-out white sheet. Five clearly distinct
@@ -64,38 +67,42 @@ void applyTheme(bool dark){
         //  bg #F5F8FD · surface #FFFFFF · surface2 #EAF4FF · border #DCE6F2
         //  text #233042 · muted #6B7A90 · accent #1976F3 · hover #2D8CFF
         //  success #16C47F · warning #F4B740 · danger #E24C4B.
-        // v1.85.0: soften the light palette toward a neumorphic/claymorphic base
-        // and unify the accent with the embedded admission page (refined indigo).
-        // The page sits a touch deeper so the near-white clay cards extrude,
-        // borders stay soft, and the header reads as a frosted band.
-        g_theme.bg          = RGB(0xD4, 0xDE, 0xEC); // #D4DEEC deeper clay page
-        g_theme.bg2         = RGB(0xC5, 0xD2, 0xE4); // page gradient bottom
+        // v1.91.0 «Clinical Slate»: the light palette is now a literal port of
+        // docs/DESIGN_SYSTEM.md §11 — ONE authoritative design system shared by
+        // the native GDI screens and the embedded HTML surfaces. Canvas stays
+        // tinted and lit, ink goes near-black, the accent is the product indigo
+        // and the non-red attention accent moves off VIOLET (banned by §2) to
+        // azure. Do not hand-tune these values: edit §11 and re-port.
+        g_theme.bg          = RGB(0xD6, 0xE0, 0xEF); // #D6E0EF tinted page
+        g_theme.bg2         = RGB(0xC4, 0xD2, 0xE5); // #C4D2E5 page gradient bottom
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
-        g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
-        g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
-        g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
-        g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
-        g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
-        g_theme.labelInk    = RGB(0x3A, 0x4A, 0x66); // readable labels
-        g_theme.sectionInk  = RGB(0x15, 0x22, 0x38); // strong titles
-        // v1.88.0: deeper royal BLUE (less violet) — white button text sits on
-        // a properly dark brand colour and the whole theme reads less purple.
-        g_theme.accent      = RGB(0x35, 0x50, 0xD8); // #3550D8 royal blue
-        g_theme.accent2     = RGB(0x54, 0x6E, 0xEE); // #546EEE gradient end / hover
-        g_theme.accentHover = RGB(0x54, 0x6E, 0xEE); // #546EEE hover
+        g_theme.surfaceTop  = RGB(0xF5, 0xF8, 0xFD); // #F5F8FD card top-light
+        g_theme.surface2    = RGB(0xE8, 0xEF, 0xF9); // #E8EFF9 wells / bars
+        g_theme.border      = RGB(0xC6, 0xD2, 0xE4); // #C6D2E4 hairline
+        g_theme.text        = RGB(0x1D, 0x2B, 0x42); // #1D2B42 primary ink
+        g_theme.textDim     = RGB(0x67, 0x76, 0x8F); // #67768F muted
+        g_theme.labelInk    = RGB(0x3B, 0x4C, 0x69); // #3B4C69 field labels
+        g_theme.sectionInk  = RGB(0x10, 0x20, 0x3A); // #10203A strong titles
+        g_theme.accent      = RGB(0x35, 0x50, 0xD8); // #3550D8 indigo (primary)
+        g_theme.accent2     = RGB(0x4A, 0x62, 0xE6); // #4A62E6 indigo-light
+        g_theme.accentHover = RGB(0x4A, 0x62, 0xE6); // #4A62E6 hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
-        g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
-        g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
-        g_theme.success     = RGB(0x15, 0xB5, 0x81); // #15B581
-        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C warning
-        g_theme.inputBg     = RGB(0xF3, 0xF6, 0xFC); // tinted well
-        g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
-        g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
-        // frosted header band with real depth
-        g_theme.headerTop   = RGB(0xE8, 0xEE, 0xF8);
-        g_theme.headerBot   = RGB(0xC8, 0xD6, 0xE8);
-        g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
-        g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
+        g_theme.danger      = RGB(0xD2, 0x43, 0x43); // #D24343
+        g_theme.dangerHover = RGB(0xE0, 0x5B, 0x5B); // #E05B5B
+        g_theme.success     = RGB(0x0E, 0x9C, 0x77); // #0E9C77 emerald
+        g_theme.warn        = RGB(0xC4, 0x89, 0x0F); // #C4890F amber
+        g_theme.inputBg     = RGB(0xFF, 0xFF, 0xFF); // §6: flat white field
+        g_theme.inputText   = RGB(0x1D, 0x2B, 0x42);
+        g_theme.hover       = RGB(0xEA, 0xF0, 0xFA); // #EAF0FA soft wash on hover
+        // §11.1: the header band is LIGHTER than v1.90 (the owner reported the
+        // old #E8EEF8 → #C8D6E8 strip read as "very dark").
+        g_theme.headerTop   = RGB(0xF2, 0xF6, 0xFD); // #F2F6FD
+        g_theme.headerBot   = RGB(0xD8, 0xE2, 0xF1); // #D8E2F1
+        // §2 / §11: violet is FORBIDDEN product-wide — the non-red attention
+        // accent is azure (info hue). It is also the «حساب مدیریت» icon hue and
+        // the third stop of the header/hero ribbon, so this recolours those too.
+        g_infoAccent  = RGB(0x0E, 0x7F, 0xC0);    // #0E7FC0 azure base
+        g_infoAccent2 = RGB(0x0A, 0x4A, 0x72);    // #0A4A72 azure deep
         // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now
         // ships exactly two themes, light (روشن) and dark (مشکی). The former
         // theme.palette setting is no longer consulted here, so any stale calm/

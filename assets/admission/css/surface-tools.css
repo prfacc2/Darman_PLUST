@@ -1,0 +1,1623 @@
+/* ============================================================================
+   surface-tools.css — tools + receipt search
+   ----------------------------------------------------------------------------
+   Part of the v1.91.0 ordered theme layer. Load order is fixed in index.html:
+     common.css → admission.css (structure) → css/core.css → css/surface-*.css
+   This file owns its layer EXCLUSIVELY. Never restyle another layer's
+   selectors from here, and never append a dated "polish pass" block.
+
+   DUAL-ENGINE CONTRACT (WebView2 Chromium + MSHTML/Trident): no var(), no
+   grid, no flex gap, no backdrop-filter, no CSS logical properties, literal
+   hex colours only, every flex declaration paired with its -ms- equivalent.
+   Palette values come from docs/DESIGN_SYSTEM.md — no ad-hoc colours.
+   ----------------------------------------------------------------------------
+   WHAT THIS FILE OWNS
+     · body.surface-tools  — the ابزارها screen (#toolsPanel / #toolsHome)
+     · body.surface-rc     — the جستجوی قبض screen (#toolsReceiptsView), which
+                             also renders inside surface-tools as
+                             .tools-receipts.show
+   Everything here is scoped to one of those two body classes.
+
+   WHY IT LOOKS NOTHING LIKE THE DASHBOARD (DESIGN_SYSTEM §9 + owner request)
+   The owner asked, twice, for tools NOT to read as a second dashboard. The
+   difference is STRUCTURAL, never "warmer":
+     canvas      cool steel canvas-tools-* + glow-teal + glow-indigo + weave
+     header      full-bleed FLAT bar docked to the top edge, radius 0, 1px
+                 #9FB1CD bottom edge, sh-2   (dashboard: floating glass pill,
+                 inset 14px, radius 16, sh-3)
+     navigation  right-docked category rail + dense LIST rows
+                 (dashboard: centred hero search + two big app icons in a tray)
+     rhythm      dense, list-first, right-aligned rows in one vessel
+     corners      12–14px radii — squarer than the dashboard's 16–24px
+
+   BANNED HERE FOREVER: the v1.90 warm clay/sand palette (#C9BBA8, #D4C4AE,
+   #E8DCC8, #B7A58E) the owner rejected as "pinkish-cream", plus violet/purple,
+   magenta, pink and cream/beige in any form. Differentiation comes from
+   structure and elevation — never from warmth.
+   ============================================================================ */
+
+/* ==========================================================================
+   1. CANVAS — cool steel, lit from the top-right (RTL), never white
+   canvas-tools-hi/mid/lo (#D2DBE6 / #BCC8D8 / #A8B7CB) with glow-teal at the
+   bottom-left, glow-indigo at the top-right and the 1px diagonal weave. The
+   flat hex lands first so Trident keeps a sane fill if it drops the gradients.
+   ========================================================================== */
+body.surface-tools,
+body.surface-rc{
+  background:#BCC8D8;
+  background-image:
+    -webkit-radial-gradient(8% 92%, ellipse, rgba(15,139,141,.14) 0%, rgba(15,139,141,0) 62%),
+    -webkit-radial-gradient(93% 5%, ellipse, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 56%),
+    -webkit-repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px),
+    -webkit-linear-gradient(top right, #D2DBE6 0%, #BCC8D8 48%, #A8B7CB 100%);
+  background-image:
+    radial-gradient(ellipse at 8% 92%, rgba(15,139,141,.14) 0%, rgba(15,139,141,0) 62%),
+    radial-gradient(ellipse at 93% 5%, rgba(53,80,216,.16) 0%, rgba(53,80,216,0) 56%),
+    repeating-linear-gradient(135deg, rgba(19,38,72,.045) 0px, rgba(19,38,72,.045) 1px, rgba(19,38,72,0) 1px, rgba(19,38,72,0) 13px),
+    linear-gradient(216deg, #D2DBE6 0%, #BCC8D8 48%, #A8B7CB 100%);
+  background-repeat:no-repeat,no-repeat,repeat,no-repeat;
+  background-attachment:fixed,fixed,fixed,fixed;
+}
+body.surface-tools .tools-panel,
+body.surface-rc .tools-panel{
+  padding:0;
+  background:transparent;
+  overflow:hidden;
+}
+/* the home view is the scroll host for its vessel, not for itself: the docked
+   header must never scroll away and the inline search is anchored to it. */
+body.surface-tools .tools-home{
+  position:relative;
+  padding:0;
+  overflow:hidden;
+}
+
+/* ==========================================================================
+   2. DOCKED FLAT HEADER BAR  (§9 — the dashboard's opposite)
+   Full-bleed, radius 0, docked hard to the top edge, one 1px #9FB1CD bottom
+   edge and sh-2. No floating pill, no rounded corners, no inset margin.
+   RTL: burger + «ابزارها» on the RIGHT, بازگشت on the LEFT.
+   ========================================================================== */
+body.surface-tools .tools-topbar{
+  position:relative;
+  z-index:3;
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:58px;
+  margin:0;
+  padding:0 16px;
+  border-radius:0;
+  border-bottom:1px solid #9FB1CD;
+  background:#F1F5FB;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+}
+body.surface-tools .tools-topbar-side{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  min-width:0;
+}
+/* burger — square-ish 12px chip, deliberately not the dashboard's round glass */
+body.surface-tools .tools-burger{
+  display:-ms-inline-flexbox;display:inline-flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 36px;flex:0 0 36px;
+  width:36px;height:36px;
+  margin:0 0 0 11px;
+  padding:0;
+  border:1px solid #9FB1CD;
+  border-radius:10px;
+  cursor:pointer;
+  color:#2C3D5C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EFF4FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EFF4FC 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-tools .tools-burger:hover{
+  border-color:#3550D8;
+  color:#22349C;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E7ECFD 100%);
+}
+body.surface-tools .tools-burger svg{width:19px;height:19px;vertical-align:middle;}
+body.surface-tools .tools-topbar-titles{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  min-width:0;
+  padding-bottom:2px;
+}
+/* screen title + the ONE mini accent line, teal (§4, §7). Tools is the tool
+   shell, so its shell accent is teal; each tool row still owns its own hue. */
+body.surface-tools .tools-topbar .tools-title{
+  display:block;
+  margin:0;
+  font-size:20px;
+  font-weight:800;
+  line-height:1.15;
+  color:#10203A;
+  white-space:nowrap;
+}
+body.surface-tools .tools-topbar-titles:after{
+  content:"";
+  display:block;
+  width:28px;
+  height:3px;
+  margin:3px 0 0 auto;
+  border-radius:2px;
+  background:#0F8B8D;
+  background:-webkit-linear-gradient(right,#0F8B8D 0%,#095A5C 100%);
+  background:linear-gradient(270deg,#0F8B8D 0%,#095A5C 100%);
+}
+body.surface-tools .tools-topbar #toolsBack{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0;
+}
+
+/* ==========================================================================
+   3. HEADER SEARCH — inline in the docked bar, NOT a centred hero field
+   The markup keeps .tools-searchbar as a sibling of .tools-topbar, so it is
+   parked inside the bar's band from CSS. Crisp flat white plate with an indigo
+   focus ring (§6) — no inset, no concave well.
+   ========================================================================== */
+body.surface-tools .tools-searchbar{
+  position:absolute;
+  top:11px;
+  left:124px;
+  z-index:4;
+  width:32%;
+  min-width:190px;
+  max-width:420px;
+  margin:0;
+  padding:0;
+}
+body.surface-tools .tools-search-wrap{display:block;position:relative;}
+body.surface-tools .tools-search-wrap .inp{
+  display:block;
+  width:100%;
+  height:36px;
+  padding:0 34px 0 12px;
+  font-size:13px;
+  font-weight:600;
+  text-align:right;
+  color:#1D2B42;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  border-radius:10px;
+  -webkit-box-shadow:0 1px 1px rgba(16,32,58,.05);
+  box-shadow:0 1px 1px rgba(16,32,58,.05);
+}
+body.surface-tools .tools-search-wrap .inp:hover{border-color:#7B90B4;}
+body.surface-tools .tools-search-wrap .inp:focus{
+  outline:none;
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+/* RTL search field: the magnifier leads on the RIGHT, the caret starts after it */
+body.surface-tools .tools-search-wrap .in-ico{
+  position:absolute;
+  top:10px;               /* (36px field - 15px glyph) / 2 — engine-independent */
+  right:11px;
+  left:auto;
+  height:15px;
+  line-height:0;
+  color:#67768F;
+  pointer-events:none;
+}
+body.surface-tools .tools-search-wrap .in-ico svg{display:block;width:15px;height:15px;}
+/* Below ~880px the bar has no room for an inline field, so it drops to its own
+   flat sub-band — still docked, still full-bleed, still radius 0. */
+@media (max-width:880px){
+  body.surface-tools .tools-searchbar{
+    position:static;
+    width:auto;
+    max-width:none;
+    padding:9px 16px;
+    border-bottom:1px solid #9FB1CD;
+    background:#EFF4FC;
+    background:-webkit-linear-gradient(top,#F7FAFE 0%,#E8EFF9 100%);
+    background:linear-gradient(180deg,#F7FAFE 0%,#E8EFF9 100%);
+  }
+}
+
+/* ==========================================================================
+   4. TOOL ROWS — one surface-2 vessel holding dense list rows
+   #toolsGrid used to be a wide clay panel of centred 224px tiles. The owner
+   rejected that colour and that shape, so the same markup is re-laid out as a
+   single tinted vessel (a real edge, canvas visible around it) whose children
+   are full-width rows: hued icon chip on the RIGHT, name, chevron on the LEFT.
+   ========================================================================== */
+body.surface-tools .tools-grid{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex-wrap:nowrap;flex-wrap:nowrap;
+  -ms-flex-align:stretch;align-items:stretch;
+  -ms-flex:0 1 auto;flex:0 1 auto;   /* hugs its rows — the steel canvas below
+                                        it is the point: the tools page must
+                                        not read as one big white sheet */
+  min-height:0;
+  margin:16px 18px 18px;
+  padding:11px;
+  overflow:auto;
+  border:1px solid #9FB1CD;
+  border-radius:14px;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#EEF3FB 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#EEF3FB 100%);
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 rgba(255,255,255,.95);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 rgba(255,255,255,.95);
+}
+body.surface-tools .tools-tile{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:start;justify-content:flex-start;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  width:100%;
+  height:54px;
+  margin:0 0 8px;
+  padding:0 12px;
+  font:inherit;
+  text-align:right;
+  cursor:pointer;
+  border:1px solid #C6D2E4;
+  border-right:3px solid #C6D2E4;   /* RTL leading marker — hued on hover */
+  border-radius:12px;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
+  box-shadow:0 1px 2px rgba(16,32,58,.06);
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-tools .tools-tile:last-child{margin-bottom:0;}
+body.surface-tools .tools-tile:hover{
+  border-color:#9FB1CD;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EDF3FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EDF3FC 100%);
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+body.surface-tools .tools-tile:focus{
+  outline:none;
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+/* the "open" affordance is a drawn chevron, never another sentence of text */
+body.surface-tools .tools-tile:after{
+  content:"";
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  width:7px;height:7px;
+  margin:0 10px 0 4px;
+  border-left:2px solid #8C99AC;
+  border-bottom:2px solid #8C99AC;
+  -webkit-transform:rotate(45deg);
+  -ms-transform:rotate(45deg);
+  transform:rotate(45deg);
+}
+body.surface-tools .tools-tile:hover:after{border-left-color:#22349C;border-bottom-color:#22349C;}
+body.surface-tools .tools-tile-name{
+  display:block;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;
+  font-size:13.5px;
+  font-weight:800;
+  color:#10203A;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+/* ---- 4.1 icon chip: squircle 38px, RTL leading edge of the row ----------- */
+body.surface-tools .tools-appico{
+  display:block;
+  -ms-flex:0 0 38px;flex:0 0 38px;
+  width:38px;height:38px;
+  line-height:38px;
+  margin:0 0 0 12px;
+  text-align:center;
+  border-radius:11px;
+  color:#FFFFFF;
+  -webkit-box-shadow:0 5px 12px rgba(16,32,58,.22),inset 0 1px 1px rgba(255,255,255,.45),inset 0 -2px 4px rgba(0,0,0,.14);
+  box-shadow:0 5px 12px rgba(16,32,58,.22),inset 0 1px 1px rgba(255,255,255,.45),inset 0 -2px 4px rgba(0,0,0,.14);
+}
+body.surface-tools .tools-appico svg{
+  width:20px;height:20px;
+  vertical-align:middle;
+}
+/* ---- 4.2 one hue per tool (§2.1) ---------------------------------------- */
+/* جستجوی قبض → azure  ·  صندوق → emerald  ·  صف/صندوق نرفته‌ها → amber */
+body.surface-tools .tools-appico-search{
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(top,#45A9E0 0%,#0E7FC0 58%,#0A4A72 100%);
+  background:linear-gradient(180deg,#45A9E0 0%,#0E7FC0 58%,#0A4A72 100%);
+}
+body.surface-tools .tools-appico-cash{
+  background:#0E9C77;
+  background:-webkit-linear-gradient(top,#3ECBA1 0%,#0E9C77 58%,#075E45 100%);
+  background:linear-gradient(180deg,#3ECBA1 0%,#0E9C77 58%,#075E45 100%);
+}
+body.surface-tools .tools-appico-queue{
+  background:#C4890F;
+  background:-webkit-linear-gradient(top,#E4AE3C 0%,#C4890F 58%,#6D4A05 100%);
+  background:linear-gradient(180deg,#E4AE3C 0%,#C4890F 58%,#6D4A05 100%);
+}
+/* the row's leading marker picks up the tool's own hue on hover/focus only —
+   resting rows stay neutral so three rows never read as a rainbow (§2.1). */
+body.surface-tools #toolsReceipts:hover,
+body.surface-tools #toolsReceipts:focus{border-right-color:#0E7FC0;}
+body.surface-tools #toolsCash:hover,
+body.surface-tools #toolsCash:focus{border-right-color:#0E9C77;}
+body.surface-tools #toolsQueue:hover,
+body.surface-tools #toolsQueue:focus{border-right-color:#C4890F;}
+
+/* ==========================================================================
+   5. EMPTY STATE — a surface-sunken plate, not a bare sentence on the canvas
+   ========================================================================== */
+body.surface-tools .tools-empty{
+  margin:0 18px 18px;
+  padding:34px 16px;
+  text-align:center;
+  font-size:13px;
+  font-weight:700;
+  color:#67768F;
+  background:#DFE7F3;
+  border:1px solid #C6D2E4;
+  border-radius:14px;
+}
+
+/* ==========================================================================
+   6. NO HELPER SUBTITLES — the owner asked for these sentences to be gone
+   («همه ابزارهای پذیرش، یک‌جا و دسته‌بندی‌شده», «فیلتر پیشرفته، چاپ مجدد و
+   خروجی اکسل», the per-tile and per-drawer-item descriptions). They are hidden
+   here as well as removed from the markup, so they can never come back.
+   ========================================================================== */
+body.surface-tools .tools-subtitle,
+body.surface-tools .tools-tile-sub,
+body.surface-tools .tools-dri-tx small,
+body.surface-tools .rc-head-sub,
+body.surface-rc .rc-head-sub,
+body.surface-rc .tools-subtitle{display:none;}
+
+/* ==========================================================================
+   7. CATEGORY RAIL — the right-docked drawer (#toolsDrawer)
+   This is the tools shell's navigation: a dense rail of categorised rows,
+   docked to the right edge with a flat 1px seam. Squarer than the dashboard
+   drawer, and its rows echo the tool rows exactly.
+   ========================================================================== */
+body.surface-tools .tools-drawer-bk{
+  position:fixed;
+  top:0;right:0;bottom:0;left:0;
+  z-index:2300;
+  background:rgba(16,32,58,.40);
+  opacity:0;
+  visibility:hidden;
+  -webkit-transition:opacity .20s ease;
+  transition:opacity .20s ease;
+}
+body.surface-tools .tools-drawer-bk.open{opacity:1;visibility:visible;}
+body.surface-tools .tools-drawer{
+  position:fixed;
+  top:0;bottom:0;right:0;
+  z-index:2400;
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  width:268px;
+  border-left:1px solid #9FB1CD;
+  border-radius:0;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#EAF0FA 100%);
+  -webkit-box-shadow:-14px 0 34px rgba(16,32,58,.20);
+  box-shadow:-14px 0 34px rgba(16,32,58,.20);
+  -webkit-transform:translateX(105%);
+  -ms-transform:translateX(105%);
+  transform:translateX(105%);
+  -webkit-transition:-webkit-transform .22s ease;
+  transition:transform .22s ease;
+}
+body.surface-tools .tools-drawer.open{
+  -webkit-transform:translateX(0);
+  -ms-transform:translateX(0);
+  transform:translateX(0);
+}
+body.surface-tools .tools-drawer-head{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:58px;
+  padding:0 12px;
+  border-bottom:1px solid #9FB1CD;
+  background:#EFF4FC;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#E8EFF9 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#E8EFF9 100%);
+}
+body.surface-tools .tools-drawer-title{
+  font-size:13.5px;
+  font-weight:800;
+  color:#10203A;
+}
+body.surface-tools .tools-drawer-title svg{
+  width:16px;height:16px;
+  margin-left:7px;
+  vertical-align:-3px;
+  color:#0F8B8D;
+}
+body.surface-tools #toolsDrawerClose{
+  width:32px;
+  height:32px;
+  padding:0;
+  font-size:19px;
+  font-weight:800;
+  line-height:1;
+  border-radius:9px;
+}
+body.surface-tools .tools-drawer-search{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  padding:10px 12px;
+  border-bottom:1px solid #C6D2E4;
+  background:transparent;
+}
+body.surface-tools .tools-drawer-search .with-ico{display:block;position:relative;}
+body.surface-tools .tools-drawer-search .inp{
+  width:100%;
+  height:32px;
+  padding:0 30px 0 10px;
+  font-size:12.5px;
+  border-radius:9px;
+  background:#FFFFFF;
+  background-image:none;
+}
+body.surface-tools .tools-drawer-search .in-ico{
+  position:absolute;
+  top:9px;                /* (32px field - 14px glyph) / 2 */
+  right:10px;
+  left:auto;
+  height:14px;
+  line-height:0;
+  color:#67768F;
+  pointer-events:none;
+}
+body.surface-tools .tools-drawer-search .in-ico svg{display:block;width:14px;height:14px;}
+body.surface-tools .tools-drawer-body{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;
+  padding:8px 11px 14px;
+  overflow-y:auto;
+}
+/* category kicker (§7: 11px/800, letter-spacing .3px) */
+body.surface-tools .tools-cat{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  margin:14px 2px 6px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.3px;
+  color:#67768F;
+}
+body.surface-tools .tools-cat:first-child{margin-top:4px;}
+/* The category dots take their fill from an INLINE hex in index.html. Those
+   inline values are now registered design-system tokens (indigo #3550D8 ·
+   emerald #0E9C77 · amber #C4890F, matching the tool rows underneath each
+   heading), so the `!important` re-hueing this rule used to carry — and the
+   three positional overrides that went with it — were dropped in v1.91.1. The
+   slate fill below stays as a plain default: a future category with no inline
+   colour degrades to neutral instead of inheriting the wrong hue. */
+body.surface-tools .tools-cat-dot{
+  display:inline-block;
+  width:9px;height:9px;
+  margin-left:8px;
+  border-radius:50%;
+  background:#55688A;
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55);
+}
+/* rail rows — same recipe as the tool rows, one step denser */
+body.surface-tools .tools-drawer-item{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:start;justify-content:flex-start;
+  width:100%;
+  height:46px;
+  margin:0 0 7px;
+  padding:0 10px;
+  font:inherit;
+  text-align:right;
+  cursor:pointer;
+  border:1px solid #C6D2E4;
+  border-right:3px solid #C6D2E4;
+  border-radius:12px;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.05);
+  box-shadow:0 1px 2px rgba(16,32,58,.05);
+  -webkit-transition:border-color .14s,background .14s;
+  transition:border-color .14s,background .14s;
+}
+body.surface-tools .tools-drawer-item:hover{
+  border-color:#9FB1CD;
+  border-right-color:#3550D8;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EDF3FC 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EDF3FC 100%);
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+body.surface-tools .tools-drico{
+  display:block;
+  -ms-flex:0 0 32px;flex:0 0 32px;
+  width:32px;height:32px;
+  line-height:32px;
+  margin:0 0 0 10px;
+  text-align:center;
+  border-radius:10px;
+  color:#FFFFFF;
+  -webkit-box-shadow:0 4px 10px rgba(16,32,58,.20),inset 0 1px 1px rgba(255,255,255,.42),inset 0 -2px 3px rgba(0,0,0,.12);
+  box-shadow:0 4px 10px rgba(16,32,58,.20),inset 0 1px 1px rgba(255,255,255,.42),inset 0 -2px 3px rgba(0,0,0,.12);
+}
+body.surface-tools .tools-drico svg{width:17px;height:17px;vertical-align:middle;}
+body.surface-tools .tools-dri-tx{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;
+}
+body.surface-tools .tools-dri-tx b{
+  display:block;
+  font-size:12.5px;
+  font-weight:800;
+  color:#10203A;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* ==========================================================================
+   8. RECEIPT SEARCH «جستجوی قبض» — docked header (azure identity)
+   Reachable two ways, so every rule below is written for both:
+     body.surface-rc      → its own C++ tab, full page
+     body.surface-tools   → .tools-receipts.show inside the tools panel
+   Same shell language as tools: a full-bleed FLAT bar docked to the top edge,
+   radius 0, 1px #9FB1CD bottom edge, sh-2. «جستجوی قبض» is an AZURE panel
+   (§2.1), so the mini accent line and the head chip are azure — and nothing
+   else in the header carries a second hue.
+   ========================================================================== */
+body.surface-rc .tools-receipts,
+body.surface-tools .tools-receipts.show{padding:0;}
+body.surface-rc .rc-header,
+body.surface-tools .rc-header{
+  position:relative;
+  z-index:3;
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:58px;
+  margin:0;
+  padding:0 16px;
+  border-radius:0;
+  border:0;
+  border-bottom:1px solid #9FB1CD;
+  background:#F1F5FB;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 #FFFFFF;
+}
+body.surface-rc .rc-head-side,
+body.surface-tools .rc-head-side{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;
+}
+/* RTL reading order inside the header, independent of DOM order:
+   title (rightmost) → colour-guide → بازگشت */
+body.surface-rc .rc-head-side,
+body.surface-tools .rc-head-side{
+  -ms-flex-pack:start;justify-content:flex-start;
+}
+body.surface-rc .rc-head-titles,
+body.surface-tools .rc-head-titles{-ms-flex-order:1;order:1;}
+body.surface-rc .rc-help,
+body.surface-tools .rc-help{-ms-flex-order:2;order:2;}
+body.surface-rc .rc-header #rcBack,
+body.surface-tools .rc-header #rcBack{-ms-flex-order:3;order:3;}
+body.surface-rc .rc-head-titles,
+body.surface-tools .rc-head-titles{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 0 0 14px;
+  padding-bottom:2px;
+}
+body.surface-rc .rc-head-titles .tools-title,
+body.surface-tools .rc-head-titles .tools-title{
+  display:block;
+  margin:0;
+  font-size:19px;
+  font-weight:800;
+  line-height:1.15;
+  color:#10203A;
+  white-space:nowrap;
+}
+body.surface-rc .rc-head-titles:after,
+body.surface-tools .rc-head-titles:after{
+  content:"";
+  display:block;
+  width:28px;
+  height:3px;
+  margin:3px 0 0 auto;
+  border-radius:2px;
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(right,#0E7FC0 0%,#0A4A72 100%);
+  background:linear-gradient(270deg,#0E7FC0 0%,#0A4A72 100%);
+}
+body.surface-rc .rc-head-acts,
+body.surface-tools .rc-head-acts{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+}
+body.surface-rc .rc-head-acts .btn,
+body.surface-tools .rc-head-acts .btn{margin:0 8px 0 0;}
+body.surface-rc .rc-head-acts .btn:first-child,
+body.surface-tools .rc-head-acts .btn:first-child{margin-right:0;}
+body.surface-rc .rc-head-acts .btn svg,
+body.surface-tools .rc-head-acts .btn svg{margin-left:6px;vertical-align:-3px;}
+body.surface-rc .rc-header #rcBack,
+body.surface-tools .rc-header #rcBack{-ms-flex:0 0 auto;flex:0 0 auto;margin:0;}
+
+/* ---- 8.1 the row-colour guide (#rcHelp) --------------------------------- */
+/* Was a rainbow wheel that included violet. It is now a plain azure «؟» disc:
+   one hue, no rainbow, and the legend itself still carries the colours. */
+body.surface-rc .rc-help,
+body.surface-tools .rc-help{
+  position:relative;
+  display:inline-block;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0 12px 0 0;
+  cursor:help;
+}
+body.surface-rc .rc-help-wheel,
+body.surface-tools .rc-help-wheel{
+  display:block;
+  width:26px;height:26px;
+  line-height:24px;
+  text-align:center;
+  border-radius:50%;
+  background:#E3F1FB;
+  border:1px solid #AFD4EE;
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.10),inset 0 1px 0 #FFFFFF;
+}
+body.surface-rc .rc-help-wheel:after,
+body.surface-tools .rc-help-wheel:after{
+  content:"\061F";                 /* Arabic question mark, RTL-correct */
+  font-size:13px;
+  font-weight:800;
+  color:#0A4A72;
+}
+body.surface-rc .rc-help:hover .rc-help-wheel,
+body.surface-tools .rc-help:hover .rc-help-wheel{border-color:#0E7FC0;}
+/* .rc-help-hdr — the guide lives IN the receipt-search header strip (v1.88), so
+   the variant carries only what being in that strip implies: it never grows or
+   shrinks with the flex row, it aligns to the 26px wheel instead of the header's
+   line-height, it stays chrome-less next to the real buttons, and it is
+   keyboard-reachable (tabindex="0" in index.html opens the popover on :focus),
+   so the focus ring belongs on the wheel and not on the invisible span. */
+body.surface-rc .rc-help-hdr,
+body.surface-tools .rc-help-hdr{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:26px;line-height:0;
+  background:transparent;
+  border:0;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.surface-rc .rc-help-hdr:focus,
+body.surface-tools .rc-help-hdr:focus{outline:none;}
+body.surface-rc .rc-help-hdr:focus .rc-help-wheel,
+body.surface-tools .rc-help-hdr:focus .rc-help-wheel{
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+/* the popover hangs under the header strip and is pinned to the RTL start, so
+   it can never spill off the right edge of the window */
+body.surface-rc .rc-help-hdr .rc-help-pop,
+body.surface-tools .rc-help-hdr .rc-help-pop{top:136%;bottom:auto;right:0;left:auto;}
+body.surface-rc .rc-help-pop,
+body.surface-tools .rc-help-pop{
+  display:none;
+  position:absolute;
+  top:130%;
+  right:0;
+  left:auto;
+  bottom:auto;
+  z-index:2600;
+  width:244px;
+  padding:11px 13px 8px;
+  text-align:right;
+  font-size:11.5px;
+  line-height:1.7;
+  color:#1D2B42;
+  background:#FFFFFF;
+  background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
+  background:linear-gradient(180deg,#FFFFFF 0%,#F5F8FD 100%);
+  border:1px solid #C6D2E4;
+  border-radius:12px;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16);
+  box-shadow:0 3px 6px rgba(16,32,58,.08),0 20px 40px rgba(16,32,58,.16);
+}
+body.surface-rc .rc-help:hover .rc-help-pop,
+body.surface-rc .rc-help:focus .rc-help-pop,
+body.surface-tools .rc-help:hover .rc-help-pop,
+body.surface-tools .rc-help:focus .rc-help-pop{display:block;}
+body.surface-rc .rc-help-pop b,
+body.surface-tools .rc-help-pop b{
+  display:block;
+  margin:0 0 7px;
+  font-size:12px;
+  font-weight:800;
+  color:#10203A;
+}
+body.surface-rc .rc-help-row,
+body.surface-tools .rc-help-row{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  margin:0 0 5px;
+}
+/* the legend is a PURE COLOUR DOT plus a text chip that must stay readable on
+   its own fill — the fills come from the markup, the shape and the weight from
+   here, and a dark hairline keeps every chip bounded whatever its fill is. */
+body.surface-rc .lg-dot,
+body.surface-tools .lg-dot{
+  display:inline-block;
+  -ms-flex:0 0 13px;flex:0 0 13px;
+  width:13px;height:13px;
+  margin:0 0 0 8px;
+  border-radius:50%;
+  border:1px solid rgba(16,32,58,.22);
+  -webkit-box-shadow:inset 0 1px 1px rgba(255,255,255,.55);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.55);
+}
+body.surface-rc .rc-help-chip,
+body.surface-tools .rc-help-chip{
+  display:inline-block;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  height:20px;
+  line-height:18px;
+  padding:0 9px;
+  border-radius:999px;
+  border:1px solid rgba(16,32,58,.18);
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+/* ==========================================================================
+   9. RECEIPT SEARCH — right-docked filter rail (surface-2, crisp fields)
+   ========================================================================== */
+body.surface-rc .rc-body,
+body.surface-tools .rc-body{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:stretch;align-items:stretch;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;
+  padding:14px 16px 16px;
+}
+body.surface-rc .rc-side,
+body.surface-tools .rc-side{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex:0 0 300px;flex:0 0 300px;
+  width:300px;
+  min-height:0;
+  margin:0 0 0 14px;
+  padding:12px;
+  overflow-y:auto;
+  border:1px solid #9FB1CD;
+  border-radius:14px;
+  background:#F2F6FC;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#EEF3FB 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#EEF3FB 100%);
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 rgba(255,255,255,.95);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12),inset 0 1px 0 rgba(255,255,255,.95);
+}
+body.surface-rc .rc-side-title,
+body.surface-tools .rc-side-title{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  position:relative;
+  margin:0 0 13px;
+  padding:0 0 7px;
+  font-size:12.5px;
+  font-weight:800;
+  color:#0A4A72;
+}
+body.surface-rc .rc-side-title svg,
+body.surface-tools .rc-side-title svg{
+  width:14px;height:14px;
+  margin-left:7px;
+  vertical-align:-2px;
+  color:#0E7FC0;
+}
+body.surface-rc .rc-side-title:after,
+body.surface-tools .rc-side-title:after{
+  content:"";
+  position:absolute;
+  right:0;
+  bottom:0;
+  width:26px;
+  height:3px;
+  border-radius:2px;
+  background:#0E7FC0;
+  background:-webkit-linear-gradient(right,#0E7FC0 0%,#0A4A72 100%);
+  background:linear-gradient(270deg,#0E7FC0 0%,#0A4A72 100%);
+}
+body.surface-rc .rc-filters,
+body.surface-tools .rc-filters{
+  display:block;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:0;
+}
+body.surface-rc .rc-filters > .fld,
+body.surface-tools .rc-filters > .fld{
+  display:block;
+  width:auto;
+  min-width:0;
+  margin:0 0 10px;
+  padding:0;
+}
+body.surface-rc .rc-duo,
+body.surface-tools .rc-duo{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:start;align-items:flex-start;
+  margin:0 -5px 10px;
+}
+body.surface-rc .rc-duo > .fld,
+body.surface-tools .rc-duo > .fld{
+  display:block;
+  -ms-flex:1 1 0px;flex:1 1 0px;
+  width:auto;
+  min-width:0;
+  margin:0;
+  padding:0 5px;
+}
+body.surface-rc .rc-side .fld > span,
+body.surface-tools .rc-side .fld > span{
+  display:block;
+  margin:0 0 4px;
+  font-size:11.5px;
+  font-weight:700;
+  color:#3B4C69;
+  text-align:right;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+/* §6 field: crisp flat white plate, real edge, heavier base — never concave */
+body.surface-rc .rc-side .inp,
+body.surface-tools .rc-side .inp{
+  display:block;
+  width:100%;
+  height:32px;
+  padding:0 9px;
+  font-size:12.5px;
+  font-weight:600;
+  color:#1D2B42;
+  text-align:right;
+  background:#FFFFFF;
+  background-image:none;
+  border:1px solid #9FB1CD;
+  border-bottom-color:#8699B8;
+  border-radius:8px;
+  -webkit-box-shadow:0 1px 1px rgba(16,32,58,.05);
+  box-shadow:0 1px 1px rgba(16,32,58,.05);
+}
+body.surface-rc .rc-side select.inp,
+body.surface-tools .rc-side select.inp{padding-left:24px;}
+body.surface-rc .rc-side .inp:hover,
+body.surface-tools .rc-side .inp:hover{border-color:#7B90B4;}
+body.surface-rc .rc-side .inp:focus,
+body.surface-tools .rc-side .inp:focus{
+  outline:none;
+  border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+body.surface-rc .rc-ticks,
+body.surface-tools .rc-ticks{
+  margin:2px 0 0;
+  padding:9px 0 0;
+  border-top:1px solid #C6D2E4;
+}
+body.surface-rc .rc-ticks .chk,
+body.surface-tools .rc-ticks .chk{
+  display:block;
+  margin:0 0 6px;
+  font-size:12px;
+  font-weight:700;
+  color:#3B4C69;
+}
+body.surface-rc .rc-ticks .chk input,
+body.surface-tools .rc-ticks .chk input{margin:0 0 0 5px;vertical-align:-2px;}
+/* the search action is the rail's own primary — indigo (§2.1 rule 4) */
+body.surface-rc .rc-search-btn,
+body.surface-tools .rc-search-btn{
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  width:100%;
+  height:38px;
+  margin:12px 0 0;
+}
+body.surface-rc .rc-search-btn svg,
+body.surface-tools .rc-search-btn svg{margin-left:7px;vertical-align:-3px;}
+
+/* ==========================================================================
+   10. RECEIPT SEARCH — results workbench
+   surface-2 wrapper, surface-3 sticky head, zebra rows, sh-row-hover, numeric
+   runs LTR inside a right-aligned RTL cell (§7, §8.5). The th[data-col] set is
+   load-bearing: column widths are persisted off it, so nothing here hides,
+   reorders or fixes the width of a data column.
+   ========================================================================== */
+body.surface-rc .rc-main,
+body.surface-tools .rc-main{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:column;flex-direction:column;
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-width:0;
+  min-height:0;
+}
+body.surface-rc .rc-tbl-wrap,
+body.surface-tools .rc-tbl-wrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;
+  min-height:0;
+  max-height:none;      /* the structure layer caps .tbl-wrap at 150px for the
+                           services mini-table; the receipts grid fills its rail */
+  overflow:auto;
+  border:1px solid #9FB1CD;
+  border-radius:12px;
+  background:#F2F6FC;
+  -webkit-box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+  box-shadow:0 2px 4px rgba(16,32,58,.07),0 10px 22px rgba(16,32,58,.12);
+}
+body.surface-rc .rc-tbl thead th,
+body.surface-tools .rc-tbl thead th{
+  position:-webkit-sticky;
+  position:sticky;
+  top:0;
+  z-index:2;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:800;
+  color:#3B4C69;
+  text-align:right;
+  white-space:nowrap;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#EEF4FC 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#EEF4FC 0%,#E2EAF6 100%);
+  border-bottom:1px solid #C6D2E4;
+}
+body.surface-rc .rc-tbl thead th + th,
+body.surface-tools .rc-tbl thead th + th{border-right:1px solid #E1E8F2;}
+body.surface-rc .rc-col-resizer,
+body.surface-tools .rc-col-resizer{
+  position:absolute;
+  top:0;left:0;
+  width:6px;height:100%;
+  cursor:col-resize;
+  background:transparent;
+}
+body.surface-rc .rc-col-resizer:hover,
+body.surface-tools .rc-col-resizer:hover{background:rgba(53,80,216,.20);}
+body.surface-rc .rc-tbl tbody td,
+body.surface-tools .rc-tbl tbody td{
+  padding:7px 10px;
+  font-size:13px;
+  font-weight:600;
+  color:#1D2B42;
+  border-bottom:1px solid #E1E8F2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+body.surface-rc .rc-tbl tbody tr:nth-child(even) td,
+body.surface-tools .rc-tbl tbody tr:nth-child(even) td{background:#F7FAFE;}
+body.surface-rc .rc-tbl tbody tr:hover td,
+body.surface-tools .rc-tbl tbody tr:hover td{background:#EDF3FC;}
+body.surface-rc .rc-tbl tbody tr:hover,
+body.surface-tools .rc-tbl tbody tr:hover{
+  -webkit-box-shadow:0 2px 6px rgba(16,32,58,.10);
+  box-shadow:0 2px 6px rgba(16,32,58,.10);
+}
+/* checkbox gutter — the only column with no data-col, so it is safe to size */
+body.surface-rc .rc-tbl .c-chk,
+body.surface-tools .rc-tbl .c-chk{
+  width:32px;
+  padding:0;
+  text-align:center;
+}
+/* numeric / reference columns: right-aligned in RTL, digit run forced LTR so
+   Persian numerals never reorder (barcode · file · national id · receipt no ·
+   dates · turn — columns 2,3,4,8,9,10,11) */
+body.surface-rc .rc-tbl tbody td:nth-child(2),
+body.surface-rc .rc-tbl tbody td:nth-child(3),
+body.surface-rc .rc-tbl tbody td:nth-child(4),
+body.surface-rc .rc-tbl tbody td:nth-child(8),
+body.surface-rc .rc-tbl tbody td:nth-child(9),
+body.surface-rc .rc-tbl tbody td:nth-child(10),
+body.surface-rc .rc-tbl tbody td:nth-child(11),
+body.surface-tools .rc-tbl tbody td:nth-child(2),
+body.surface-tools .rc-tbl tbody td:nth-child(3),
+body.surface-tools .rc-tbl tbody td:nth-child(4),
+body.surface-tools .rc-tbl tbody td:nth-child(8),
+body.surface-tools .rc-tbl tbody td:nth-child(9),
+body.surface-tools .rc-tbl tbody td:nth-child(10),
+body.surface-tools .rc-tbl tbody td:nth-child(11){
+  direction:ltr;
+  text-align:right;
+  font-size:13.5px;
+  font-weight:800;
+  color:#10203A;
+}
+body.surface-rc .rc-tbl tbody td.empty,
+body.surface-tools .rc-tbl tbody td.empty{
+  padding:26px 10px;
+  text-align:center;
+  font-size:13px;
+  font-weight:700;
+  color:#67768F;
+  background:#DFE7F3;
+  direction:rtl;
+}
+body.surface-rc .rc-hit,
+body.surface-tools .rc-hit{
+  padding:0 2px;
+  border-radius:3px;
+  font-weight:800;
+  color:#22349C;
+  background:#E7ECFD;
+}
+body.surface-rc .rc-tickmark,
+body.surface-tools .rc-tickmark{
+  margin-left:4px;
+  font-weight:800;
+  color:#0E9C77;
+}
+
+/* ---- 10.1 row states -----------------------------------------------------
+   One approved hue per state: the wash is the hue's -tint, the ink its -deep,
+   and a 3px RTL-leading marker in the hue's -base carries it at a glance.
+   NOTE on .rc-purple («بدهکار»): the class name is historical — the state used
+   to be painted violet (#EDD9FF/#C586FF), which is banned. It is neutralised
+   to SLATE here, the design system's explicit "no semantic colour" hue. Do not
+   re-hue it back to violet.
+   -------------------------------------------------------------------------- */
+/* «پرداخت شده» is the NORMAL case — the colour guide lists only the seven
+   exception states — so a settled row keeps the neutral zebra and is marked by
+   its emerald leading edge alone. Washing the majority of rows would drown the
+   exceptions that the guide exists to make findable. */
+body.surface-rc .rc-tbl tbody tr.rc-paid td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-paid td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #0E9C77;
+  box-shadow:inset -3px 0 0 #0E9C77;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-green td,
+body.surface-tools .rc-tbl tbody tr.rc-green td{background:#E1F4EA;color:#075E45;}
+body.surface-rc .rc-tbl tbody tr.rc-green td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-green td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #075E45;
+  box-shadow:inset -3px 0 0 #075E45;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-soap td,
+body.surface-tools .rc-tbl tbody tr.rc-soap td{background:#DEF1F1;color:#095A5C;}
+body.surface-rc .rc-tbl tbody tr.rc-soap td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-soap td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #0F8B8D;
+  box-shadow:inset -3px 0 0 #0F8B8D;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-blue td,
+body.surface-tools .rc-tbl tbody tr.rc-blue td{background:#E3F1FB;color:#0A4A72;}
+body.surface-rc .rc-tbl tbody tr.rc-blue td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-blue td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #0E7FC0;
+  box-shadow:inset -3px 0 0 #0E7FC0;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-yellow td,
+body.surface-tools .rc-tbl tbody tr.rc-yellow td{background:#FBF1DB;color:#6D4A05;}
+body.surface-rc .rc-tbl tbody tr.rc-yellow td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-yellow td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #C4890F;
+  box-shadow:inset -3px 0 0 #C4890F;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-orange td,
+body.surface-tools .rc-tbl tbody tr.rc-orange td{background:#FBF1DB;color:#6D4A05;}
+body.surface-rc .rc-tbl tbody tr.rc-orange td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-orange td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #6D4A05;
+  box-shadow:inset -3px 0 0 #6D4A05;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-red td,
+body.surface-tools .rc-tbl tbody tr.rc-red td{background:#FBE8E8;color:#8B2020;}
+body.surface-rc .rc-tbl tbody tr.rc-red td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-red td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #8B2020;
+  box-shadow:inset -3px 0 0 #8B2020;
+}
+
+body.surface-rc .rc-tbl tbody tr.rc-purple td,
+body.surface-tools .rc-tbl tbody tr.rc-purple td{background:#E7EDF6;color:#2C3D5C;}
+body.surface-rc .rc-tbl tbody tr.rc-purple td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-purple td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #55688A;
+  box-shadow:inset -3px 0 0 #55688A;
+}
+
+/* A state row is inked ENTIRELY in its hue's -deep value — numeric columns
+   included. §7's #10203A numeric ink applies to un-flagged rows, where it is
+   the darkest available ink; on a tinted state row the hue ink is both darker
+   in feel and unambiguous, and one row never mixes two inks. */
+
+/* selection is INDIGO everywhere in the product — one focus/selection colour */
+body.surface-rc .rc-tbl tbody tr.rc-sel td,
+body.surface-tools .rc-tbl tbody tr.rc-sel td{
+  background:#E7ECFD;
+  color:#22349C;
+  border-top:1px solid #3550D8;
+  border-bottom:1px solid #3550D8;
+}
+body.surface-rc .rc-tbl tbody tr.rc-sel td:first-child,
+body.surface-tools .rc-tbl tbody tr.rc-sel td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #3550D8;
+  box-shadow:inset -3px 0 0 #3550D8;
+}
+
+/* ==========================================================================
+   11. RECEIPT SEARCH — pager strip (surface-3 counter bar)
+   ========================================================================== */
+body.surface-rc .rc-pager,
+body.surface-tools .rc-pager{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-align:center;align-items:center;
+  -ms-flex-pack:center;justify-content:center;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  margin:10px auto 0;
+  padding:5px 10px;
+  border:1px solid #9FB1CD;
+  border-radius:12px;
+  background:#E8EFF9;
+  background:-webkit-linear-gradient(top,#F7FAFE 0%,#E2EAF6 100%);
+  background:linear-gradient(180deg,#F7FAFE 0%,#E2EAF6 100%);
+  -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+  box-shadow:0 1px 2px rgba(16,32,58,.06),inset 0 1px 0 #FFFFFF;
+}
+body.surface-rc .rc-pager .btn,
+body.surface-tools .rc-pager .btn{margin:0 7px;}
+body.surface-rc .rc-page-lbl,
+body.surface-tools .rc-page-lbl{
+  font-size:12px;
+  font-weight:800;
+  color:#3B4C69;
+}
+
+/* ==========================================================================
+   12. DARK-THEME PARITY (§12) — identical structure, tokens swapped
+   The docked flat bar stays docked and square, the rail stays a rail, the rows
+   stay rows. Only the tokens change. No hue is introduced that light does not
+   already have.
+   ========================================================================== */
+body.theme-dark.surface-tools,
+body.theme-dark.surface-rc{
+  background:#0E1522;
+  background-image:
+    -webkit-radial-gradient(8% 92%, ellipse, rgba(47,179,181,.16) 0%, rgba(47,179,181,0) 62%),
+    -webkit-radial-gradient(93% 5%, ellipse, rgba(106,131,247,.16) 0%, rgba(106,131,247,0) 56%),
+    -webkit-repeating-linear-gradient(135deg, rgba(238,243,251,.035) 0px, rgba(238,243,251,.035) 1px, rgba(238,243,251,0) 1px, rgba(238,243,251,0) 13px),
+    -webkit-linear-gradient(top right, #121A28 0%, #0E1522 48%, #0A1019 100%);
+  background-image:
+    radial-gradient(ellipse at 8% 92%, rgba(47,179,181,.16) 0%, rgba(47,179,181,0) 62%),
+    radial-gradient(ellipse at 93% 5%, rgba(106,131,247,.16) 0%, rgba(106,131,247,0) 56%),
+    repeating-linear-gradient(135deg, rgba(238,243,251,.035) 0px, rgba(238,243,251,.035) 1px, rgba(238,243,251,0) 1px, rgba(238,243,251,0) 13px),
+    linear-gradient(216deg, #121A28 0%, #0E1522 48%, #0A1019 100%);
+}
+/* ---- 12.1 docked bars ---------------------------------------------------- */
+body.theme-dark.surface-tools .tools-topbar,
+body.theme-dark.surface-rc .rc-header,
+body.theme-dark.surface-tools .rc-header{
+  border-bottom-color:#45577A;
+  background:#1B2537;
+  background:-webkit-linear-gradient(top,#1F2A3E 0%,#182131 100%);
+  background:linear-gradient(180deg,#1F2A3E 0%,#182131 100%);
+  -webkit-box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.10);
+  box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.10);
+}
+body.theme-dark.surface-tools .tools-burger{
+  border-color:#45577A;
+  color:#B4C2D6;
+  background:#1B2537;
+  background-image:none;
+  -webkit-box-shadow:0 1px 2px rgba(0,0,0,.32);
+  box-shadow:0 1px 2px rgba(0,0,0,.32);
+}
+body.theme-dark.surface-tools .tools-burger:hover{
+  border-color:#6A83F7;
+  color:#A9B8FF;
+  background:#232F55;
+  background-image:none;
+}
+body.theme-dark.surface-tools .tools-topbar .tools-title,
+body.theme-dark.surface-rc .rc-head-titles .tools-title,
+body.theme-dark.surface-tools .rc-head-titles .tools-title{color:#EEF3FB;}
+body.theme-dark.surface-tools .tools-topbar-titles:after{
+  background:#2FB3B5;
+  background:-webkit-linear-gradient(right,#2FB3B5 0%,#93DEDF 100%);
+  background:linear-gradient(270deg,#2FB3B5 0%,#93DEDF 100%);
+}
+body.theme-dark.surface-rc .rc-head-titles:after,
+body.theme-dark.surface-tools .rc-head-titles:after{
+  background:#3FA9E6;
+  background:-webkit-linear-gradient(right,#3FA9E6 0%,#9BD3F5 100%);
+  background:linear-gradient(270deg,#3FA9E6 0%,#9BD3F5 100%);
+}
+/* ---- 12.2 fields --------------------------------------------------------- */
+body.theme-dark.surface-tools .tools-search-wrap .inp,
+body.theme-dark.surface-tools .tools-drawer-search .inp,
+body.theme-dark.surface-rc .rc-side .inp,
+body.theme-dark.surface-tools .rc-side .inp{
+  color:#DCE5F2;
+  background:#141D2C;
+  background-image:none;
+  border-color:#45577A;
+  border-bottom-color:#45577A;
+}
+body.theme-dark.surface-tools .tools-search-wrap .inp:hover,
+body.theme-dark.surface-tools .tools-drawer-search .inp:hover,
+body.theme-dark.surface-rc .rc-side .inp:hover,
+body.theme-dark.surface-tools .rc-side .inp:hover{border-color:#6A83F7;}
+body.theme-dark.surface-tools .tools-search-wrap .inp:focus,
+body.theme-dark.surface-rc .rc-side .inp:focus,
+body.theme-dark.surface-tools .rc-side .inp:focus{
+  border-color:#6A83F7;
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);
+  box-shadow:0 0 0 3px rgba(106,131,247,.26);
+}
+body.theme-dark.surface-tools .tools-search-wrap .in-ico,
+body.theme-dark.surface-tools .tools-drawer-search .in-ico{color:#8B9BB3;}
+@media (max-width:880px){
+  body.theme-dark.surface-tools .tools-searchbar{
+    border-bottom-color:#45577A;
+    background:#1B2537;
+    background-image:none;
+  }
+}
+/* ---- 12.3 tool rows ------------------------------------------------------ */
+body.theme-dark.surface-tools .tools-grid{
+  border-color:#45577A;
+  background:#141D2C;
+  background-image:none;
+  -webkit-box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+  box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+}
+body.theme-dark.surface-tools .tools-tile,
+body.theme-dark.surface-tools .tools-drawer-item{
+  border-color:#33425C;
+  border-right-color:#33425C;
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  -webkit-box-shadow:0 1px 2px rgba(0,0,0,.30);
+  box-shadow:0 1px 2px rgba(0,0,0,.30);
+}
+body.theme-dark.surface-tools .tools-tile:hover,
+body.theme-dark.surface-tools .tools-drawer-item:hover{
+  border-color:#45577A;
+  background:#1F2A3E;
+  background-image:none;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.40);
+  box-shadow:0 2px 6px rgba(0,0,0,.40);
+}
+body.theme-dark.surface-tools .tools-drawer-item:hover{border-right-color:#6A83F7;}
+body.theme-dark.surface-tools .tools-tile-name,
+body.theme-dark.surface-tools .tools-dri-tx b{color:#EEF3FB;}
+body.theme-dark.surface-tools .tools-tile:after{border-left-color:#8B9BB3;border-bottom-color:#8B9BB3;}
+body.theme-dark.surface-tools .tools-tile:hover:after{border-left-color:#A9B8FF;border-bottom-color:#A9B8FF;}
+body.theme-dark.surface-tools #toolsReceipts:hover,
+body.theme-dark.surface-tools #toolsReceipts:focus{border-right-color:#3FA9E6;}
+body.theme-dark.surface-tools #toolsCash:hover,
+body.theme-dark.surface-tools #toolsCash:focus{border-right-color:#2CC191;}
+body.theme-dark.surface-tools #toolsQueue:hover,
+body.theme-dark.surface-tools #toolsQueue:focus{border-right-color:#E0A83A;}
+body.theme-dark.surface-tools .tools-appico,
+body.theme-dark.surface-tools .tools-drico{
+  -webkit-box-shadow:0 5px 12px rgba(0,0,0,.46),inset 0 1px 1px rgba(255,255,255,.28);
+  box-shadow:0 5px 12px rgba(0,0,0,.46),inset 0 1px 1px rgba(255,255,255,.28);
+}
+body.theme-dark.surface-tools .tools-empty{
+  color:#8B9BB3;
+  background:#101927;
+  border-color:#33425C;
+}
+/* ---- 12.4 category rail -------------------------------------------------- */
+body.theme-dark.surface-tools .tools-drawer{
+  border-left-color:#45577A;
+  background:#141D2C;
+  background:-webkit-linear-gradient(top,#182234 0%,#101927 100%);
+  background:linear-gradient(180deg,#182234 0%,#101927 100%);
+  -webkit-box-shadow:-14px 0 34px rgba(0,0,0,.52);
+  box-shadow:-14px 0 34px rgba(0,0,0,.52);
+}
+body.theme-dark.surface-tools .tools-drawer-bk{background:rgba(4,8,16,.62);}
+body.theme-dark.surface-tools .tools-drawer-head{
+  border-bottom-color:#45577A;
+  background:#1B2537;
+  background-image:none;
+}
+body.theme-dark.surface-tools .tools-drawer-title{color:#EEF3FB;}
+body.theme-dark.surface-tools .tools-drawer-title svg{color:#2FB3B5;}
+body.theme-dark.surface-tools .tools-drawer-search{border-bottom-color:#33425C;}
+body.theme-dark.surface-tools .tools-cat{color:#8B9BB3;}
+/* dark parity for the category dots. The light `!important` overrides are gone
+   (the markup's inline hexes are registered light tokens now — §11 above), but
+   swapping them for the §12 dark values still has an inline style to beat, so
+   these four keep theirs. The first dark hue is azure, matching the drawer's
+   own first row group. */
+body.theme-dark.surface-tools .tools-cat-dot{background:#45577A !important;}
+body.theme-dark.surface-tools .tools-drawer-body > div:nth-of-type(1) .tools-cat-dot{background:#3FA9E6 !important;}
+body.theme-dark.surface-tools .tools-drawer-body > div:nth-of-type(2) .tools-cat-dot{background:#2CC191 !important;}
+body.theme-dark.surface-tools .tools-drawer-body > div:nth-of-type(3) .tools-cat-dot{background:#E0A83A !important;}
+/* ---- 12.5 receipt search ------------------------------------------------- */
+body.theme-dark.surface-rc .rc-help-wheel,
+body.theme-dark.surface-tools .rc-help-wheel{
+  background:#12324A;
+  border-color:#33425C;
+  -webkit-box-shadow:0 1px 2px rgba(0,0,0,.34);
+  box-shadow:0 1px 2px rgba(0,0,0,.34);
+}
+body.theme-dark.surface-rc .rc-help-wheel:after,
+body.theme-dark.surface-tools .rc-help-wheel:after{color:#9BD3F5;}
+body.theme-dark.surface-rc .rc-help:hover .rc-help-wheel,
+body.theme-dark.surface-tools .rc-help:hover .rc-help-wheel{border-color:#3FA9E6;}
+body.theme-dark.surface-rc .rc-help-pop,
+body.theme-dark.surface-tools .rc-help-pop{
+  color:#DCE5F2;
+  border-color:#33425C;
+  background:#182234;
+  background:-webkit-linear-gradient(top,#1C2739 0%,#151F2F 100%);
+  background:linear-gradient(180deg,#1C2739 0%,#151F2F 100%);
+  -webkit-box-shadow:0 3px 6px rgba(0,0,0,.40),0 20px 40px rgba(0,0,0,.54);
+  box-shadow:0 3px 6px rgba(0,0,0,.40),0 20px 40px rgba(0,0,0,.54);
+}
+body.theme-dark.surface-rc .rc-help-pop b,
+body.theme-dark.surface-tools .rc-help-pop b{color:#EEF3FB;}
+/* the legend chips keep their own light fills + dark ink from the markup, so
+   they stay readable on dark too; only their hairline needs inverting */
+body.theme-dark.surface-rc .lg-dot,
+body.theme-dark.surface-tools .lg-dot,
+body.theme-dark.surface-rc .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-chip{border-color:rgba(255,255,255,.22);}
+body.theme-dark.surface-rc .rc-side,
+body.theme-dark.surface-tools .rc-side{
+  border-color:#45577A;
+  background:#1B2537;
+  background:-webkit-linear-gradient(top,#1F2A3E 0%,#182131 100%);
+  background:linear-gradient(180deg,#1F2A3E 0%,#182131 100%);
+  -webkit-box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+  box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+}
+body.theme-dark.surface-rc .rc-side-title,
+body.theme-dark.surface-tools .rc-side-title{color:#9BD3F5;}
+body.theme-dark.surface-rc .rc-side-title svg,
+body.theme-dark.surface-tools .rc-side-title svg{color:#3FA9E6;}
+body.theme-dark.surface-rc .rc-side-title:after,
+body.theme-dark.surface-tools .rc-side-title:after{
+  background:#3FA9E6;
+  background:-webkit-linear-gradient(right,#3FA9E6 0%,#9BD3F5 100%);
+  background:linear-gradient(270deg,#3FA9E6 0%,#9BD3F5 100%);
+}
+body.theme-dark.surface-rc .rc-side .fld > span,
+body.theme-dark.surface-tools .rc-side .fld > span,
+body.theme-dark.surface-rc .rc-ticks .chk,
+body.theme-dark.surface-tools .rc-ticks .chk{color:#B4C2D6;}
+body.theme-dark.surface-rc .rc-ticks,
+body.theme-dark.surface-tools .rc-ticks{border-top-color:#33425C;}
+body.theme-dark.surface-rc .rc-tbl-wrap,
+body.theme-dark.surface-tools .rc-tbl-wrap{
+  border-color:#45577A;
+  background:#141D2C;
+  -webkit-box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+  box-shadow:0 2px 4px rgba(0,0,0,.34),0 10px 22px rgba(0,0,0,.42);
+}
+body.theme-dark.surface-rc .rc-tbl thead th,
+body.theme-dark.surface-tools .rc-tbl thead th{
+  color:#B4C2D6;
+  border-bottom-color:#33425C;
+  background:#1B2537;
+  background-image:none;
+}
+body.theme-dark.surface-rc .rc-tbl thead th + th,
+body.theme-dark.surface-tools .rc-tbl thead th + th{border-right-color:#25314A;}
+body.theme-dark.surface-rc .rc-col-resizer:hover,
+body.theme-dark.surface-tools .rc-col-resizer:hover{background:rgba(106,131,247,.30);}
+body.theme-dark.surface-rc .rc-tbl tbody td,
+body.theme-dark.surface-tools .rc-tbl tbody td{color:#DCE5F2;border-bottom-color:#25314A;}
+body.theme-dark.surface-rc .rc-tbl tbody tr:nth-child(even) td,
+body.theme-dark.surface-tools .rc-tbl tbody tr:nth-child(even) td{background:#161F2E;}
+body.theme-dark.surface-rc .rc-tbl tbody tr:hover td,
+body.theme-dark.surface-tools .rc-tbl tbody tr:hover td{background:#1F2A3E;}
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(2),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(3),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(4),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(8),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(9),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(10),
+body.theme-dark.surface-rc .rc-tbl tbody td:nth-child(11),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(2),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(3),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(4),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(8),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(9),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(10),
+body.theme-dark.surface-tools .rc-tbl tbody td:nth-child(11){color:#EEF3FB;}
+body.theme-dark.surface-rc .rc-tbl tbody td.empty,
+body.theme-dark.surface-tools .rc-tbl tbody td.empty{background:#101927;color:#8B9BB3;}
+body.theme-dark.surface-rc .rc-hit,
+body.theme-dark.surface-tools .rc-hit{background:#232F55;color:#A9B8FF;}
+body.theme-dark.surface-rc .rc-tickmark,
+body.theme-dark.surface-tools .rc-tickmark{color:#2CC191;}
+/* row states — §12 tints, hue ink, marker in the hue's dark base */
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-green td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-green td{background:#0F3A2C;color:#8FE7C4;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-paid td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-paid td:first-child,
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-green td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-green td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #2CC191;
+  box-shadow:inset -3px 0 0 #2CC191;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-soap td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-soap td{background:#0F3436;color:#93DEDF;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-soap td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-soap td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #2FB3B5;
+  box-shadow:inset -3px 0 0 #2FB3B5;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-blue td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-blue td{background:#12324A;color:#9BD3F5;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-blue td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-blue td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #3FA9E6;
+  box-shadow:inset -3px 0 0 #3FA9E6;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-yellow td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-yellow td,
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-orange td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-orange td{background:#3A2E12;color:#F4D79A;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-yellow td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-yellow td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #E0A83A;
+  box-shadow:inset -3px 0 0 #E0A83A;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-orange td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-orange td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #F4D79A;
+  box-shadow:inset -3px 0 0 #F4D79A;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-red td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-red td{background:#3A1C1C;color:#E86A6A;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-red td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-red td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #E86A6A;
+  box-shadow:inset -3px 0 0 #E86A6A;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-purple td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-purple td{background:#25314A;color:#B4C2D6;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-purple td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-purple td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #45577A;
+  box-shadow:inset -3px 0 0 #45577A;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-sel td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-sel td{
+  background:#232F55;
+  color:#A9B8FF;
+  border-top-color:#6A83F7;
+  border-bottom-color:#6A83F7;
+}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-sel td:first-child,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-sel td:first-child{
+  -webkit-box-shadow:inset -3px 0 0 #6A83F7;
+  box-shadow:inset -3px 0 0 #6A83F7;
+}
+body.theme-dark.surface-rc .rc-pager,
+body.theme-dark.surface-tools .rc-pager{
+  border-color:#45577A;
+  background:#1B2537;
+  background-image:none;
+  -webkit-box-shadow:0 1px 2px rgba(0,0,0,.32);
+  box-shadow:0 1px 2px rgba(0,0,0,.32);
+}
+body.theme-dark.surface-rc .rc-page-lbl,
+body.theme-dark.surface-tools .rc-page-lbl{color:#B4C2D6;}
+
+/* ==========================================================================
+   13. COLOUR GUIDE ↔ ROW STATE MAPPING (dark parity only)
+   The colour guide must MATCH the row states owned by §10.1 / §12.5.
+   --------------------------------------------------------------------------
+   index.html paints the legend dots and chips with an INLINE hex. Those inline
+   values used to be the pre-v1.91 palette — including a violet «بدهکار» chip
+   (#EDD9FF/#6B1FA8) — and this section overrode all seven rows with
+   `!important`, the only thing that beats an inline style.
+   The markup now carries registered tokens that already agree with the row
+   states, chip for chip:
+       1 پرداخت نکرده  #FBF1DB/#6D4A05  = .rc-yellow   dot amber  #C4890F
+       2 حذف بیمه‌ای    #FBF1DB/#6D4A05  = .rc-orange   dot amber  #C4890F
+       3 استرداد        #FBE8E8/#8B2020  = .rc-red      dot red    #D24343
+       4 بدهکار         #E7EDF6/#2C3D5C  = .rc-purple   dot slate  #55688A
+       5 بستانکار       #DEF1F1/#095A5C  = .rc-soap     dot teal   #0F8B8D
+       6 نوبت از قبل    #E1F4EA/#075E45  = .rc-green    dot emerald #0E9C77
+       7 جوابدهی شده    #E3F1FB/#0A4A72  = .rc-blue     dot azure  #0E7FC0
+   — so the whole LIGHT block was deleted in v1.91.1 and the guide now reads
+   straight from the markup. Only DARK parity is kept below: swapping the light
+   tints for the §12 dark ones still has an inline style to beat, so those rules
+   still need `!important`. Delete them only if the guide is allowed to show
+   light chips inside the dark popover.
+   ------------------------------------------------------------------------- */
+/* dark parity for the guide (§12 tints, -deep ink) */
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(1) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(1) .lg-dot{background:#E0A83A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(1) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(1) .rc-help-chip{background:#3A2E12 !important;color:#F4D79A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(2) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(2) .lg-dot{background:#F4D79A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(2) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(2) .rc-help-chip{background:#3A2E12 !important;color:#F4D79A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(3) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(3) .lg-dot{background:#E86A6A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(3) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(3) .rc-help-chip{background:#3A1C1C !important;color:#E86A6A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(4) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(4) .lg-dot{background:#45577A !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(4) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(4) .rc-help-chip{background:#25314A !important;color:#B4C2D6 !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(5) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(5) .lg-dot{background:#2FB3B5 !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(5) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(5) .rc-help-chip{background:#0F3436 !important;color:#93DEDF !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(6) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(6) .lg-dot{background:#2CC191 !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(6) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(6) .rc-help-chip{background:#0F3A2C !important;color:#8FE7C4 !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(7) .lg-dot,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(7) .lg-dot{background:#3FA9E6 !important;}
+body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(7) .rc-help-chip,
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(7) .rc-help-chip{background:#12324A !important;color:#9BD3F5 !important;}

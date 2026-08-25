@@ -27,3 +27,7 @@ package-lock.json
 test_designer.mjs
 designer_test.png
 build/DarmanPlus_probe.exe
+
+# Python bytecode from the repo scripts
+__pycache__/
+*.pyc

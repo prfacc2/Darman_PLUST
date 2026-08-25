@@ -358,6 +358,17 @@ static CashShift* shiftFindOpen(std::vector<CashShift>& rows, const std::wstring
     for(auto& s:rows) if(s.username==user && s.status==L"open") return &s;
     return nullptr;
 }
+// v1.91.0: the newest CLOSED shift of this operator — the cashier shift panel
+// shows its start AND end date/time once the till is closed.
+static CashShift* shiftFindLastClosed(std::vector<CashShift>& rows, const std::wstring& user){
+    CashShift* best=nullptr; long long bestAt=-1;
+    for(auto& s:rows){
+        if(s.username!=user || s.status==L"open") continue;
+        long long at = s.endEpoch>0 ? s.endEpoch : s.startEpoch;
+        if(!best || at>=bestAt){ best=&s; bestAt=at; }
+    }
+    return best;
+}
 
 bool Shift_Start(std::wstring& err){
     if(!opsNeedCashEdit(err)) return false;
@@ -426,13 +437,17 @@ std::string Shift_StatusJson(){
 }
 
 // Caller MUST already hold g_opsMx.
-static void shiftAddIncome(long long amount){
-    if(amount<=0) return;
+// Returns false ONLY when there was money to attribute but no shift was open —
+// i.e. the income would have been lost silently. The caller surfaces that as a
+// non-fatal warning; the payment itself still stands.
+static bool shiftAddIncome(long long amount){
+    if(amount<=0) return true;
     auto srows=shiftLoad();
     CashShift* cur=shiftFindOpen(srows, g_session.user.username);
-    if(!cur) return;
+    if(!cur) return false;
     cur->income += amount;
     shiftSave(srows);
+    return true;
 }
 
 static CashTicket* cashFind(std::vector<CashTicket>& rows, const std::wstring& id){
@@ -440,7 +455,8 @@ static CashTicket* cashFind(std::vector<CashTicket>& rows, const std::wstring& i
     return nullptr;
 }
 
-bool Cash_Pay(const std::wstring& id, std::wstring& err){
+bool Cash_Pay(const std::wstring& id, std::wstring& err, bool* outNoShift){
+    if(outNoShift) *outNoShift=false;
     if(!opsNeedCashEdit(err)) return false;
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
@@ -453,13 +469,14 @@ bool Cash_Pay(const std::wstring& id, std::wstring& err){
     t->paidUser = g_session.user.username;
     t->status = L"paid";
     if(!cashSave(rows)){ err=L"ذخیره پرداخت ناموفق بود."; return false; }
-    shiftAddIncome(t->paid);
+    if(!shiftAddIncome(t->paid) && outNoShift) *outNoShift=true;
     return true;
 }
 
 bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
                  const std::wstring& last, const std::wstring& doctor,
-                 long long amount, std::wstring& err){
+                 long long amount, std::wstring& err, bool* outNoShift){
+    if(outNoShift) *outNoShift=false;
     if(!opsNeedCashEdit(err)) return false;
     if(amount<=0){ err=L"مبلغ نامعتبر است."; return false; }
     CashTicket t;
@@ -474,7 +491,7 @@ bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
     auto rows=cashLoad();
     rows.push_back(t);
     if(!cashSave(rows)){ err=L"ذخیره سند دستی ناموفق بود."; return false; }
-    shiftAddIncome(amount);
+    if(!shiftAddIncome(amount) && outNoShift) *outNoShift=true;
     return true;
 }
 
@@ -530,6 +547,22 @@ static std::string ticketRowJson(const CashTicket& t, const std::string& extra="
     return o;
 }
 
+// v1.91.0 — per-department («بخش») cashier aggregate. One entry per department
+// the operator is allowed to see; every figure is accumulated in the SAME single
+// pass over the loaded tickets that builds the row list, over the same 24-hour
+// window and the same non-supervisor scope clamp.
+struct OpsDeptAgg {
+    int id;
+    std::wstring name, code;
+    long long patients, unpaidCount, unpaidSum, paidCount, paidSum;
+    OpsDeptAgg():id(0),patients(0),unpaidCount(0),unpaidSum(0),paidCount(0),paidSum(0){}
+};
+static OpsDeptAgg* opsDeptFind(std::vector<OpsDeptAgg>& v, int id){
+    if(id<=0) return nullptr;
+    for(auto& d:v) if(d.id==id) return &d;
+    return nullptr;
+}
+
 std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     CashScope sc=Cash_ResolveScope();
     if(!sc.canView)
@@ -541,18 +574,30 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     long long win=now-24*60;
     std::vector<Section> secs; Sections_All(secs);
 
+    // Tabs and the department list are one and the same visibility decision:
+    // a supervisor sees every ACTIVE TOP-LEVEL section (departments are runtime
+    // data from مدیریت — never hard-coded here); anyone else sees only their own
+    // home department.
     std::string tabs="[{\"id\":0,\"name\":\"\u0635\u0646\u062f\u0648\u0642 \u0646\u0631\u0641\u062a\u0647\u200c\u0647\u0627\",\"kind\":\"unpaid\"}";
+    std::vector<OpsDeptAgg> depts;
     if(sc.supervisor){
         for(const auto& s:secs){
             if(!s.is_active || s.parent_id!=0) continue;
             tabs+=",{\"id\":"+opsJnum(s.id)+",\"name\":"+opsJstr(s.name_fa)+",\"kind\":\"section\"}";
+            OpsDeptAgg d; d.id=s.id; d.name=s.name_fa; d.code=s.code;
+            depts.push_back(d);
         }
     } else if(sc.homeSectionId>0){
         tabs+=",{\"id\":"+opsJnum(sc.homeSectionId)+",\"name\":"+opsJstr(sc.homeSectionName)+",\"kind\":\"section\"}";
+        OpsDeptAgg d; d.id=sc.homeSectionId; d.name=sc.homeSectionName;
+        const Section* hs=opsFind(secs, sc.homeSectionId);
+        if(hs) d.code=hs->code;
+        depts.push_back(d);
     }
     tabs+="]";
 
     int patients=0, paidN=0, unpaidN=0;
+    long long tPatients=0,tUnpaidC=0,tUnpaidS=0,tPaidC=0,tPaidS=0;
     std::string list="[";
     bool first=true;
     for(int i=(int)rows.size()-1;i>=0;--i){
@@ -560,6 +605,18 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
         if(t.epochMin<win) continue;
         if(!sc.supervisor && sc.homeSectionId>0 && t.sectionId!=sc.homeSectionId)
             continue;
+        // ---- department + scope totals (NOT tab-scoped: they describe the
+        //      whole visible 24h window, which is what the overview shows) ----
+        tPatients++;
+        if(t.paid>0){ tPaidC++; tPaidS+=t.paid; }
+        else { tUnpaidC++; tUnpaidS+=t.payable; }
+        OpsDeptAgg* d=opsDeptFind(depts, t.sectionId);
+        if(d){
+            d->patients++;
+            if(t.paid>0){ d->paidCount++; d->paidSum+=t.paid; }
+            else { d->unpaidCount++; d->unpaidSum+=t.payable; }
+        }
+        // ---- active tab rows ------------------------------------------------
         bool inTab=false;
         if(tabSectionId<=0) inTab=(t.paid==0);
         else inTab=(t.sectionId==tabSectionId);
@@ -573,6 +630,21 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     }
     list+="]";
 
+    std::string secList="[";
+    for(size_t i=0;i<depts.size();++i){
+        const OpsDeptAgg& d=depts[i];
+        if(i) secList+=",";
+        secList+="{\"id\":"+opsJnum(d.id)+
+                 ",\"name\":"+opsJstr(d.name)+
+                 ",\"code\":"+opsJstr(d.code)+
+                 ",\"patients\":"+opsJnum(d.patients)+
+                 ",\"unpaidCount\":"+opsJnum(d.unpaidCount)+
+                 ",\"unpaidSum\":"+opsJnum(d.unpaidSum)+
+                 ",\"paidCount\":"+opsJnum(d.paidCount)+
+                 ",\"paidSum\":"+opsJnum(d.paidSum)+"}";
+    }
+    secList+="]";
+
     auto srows=shiftLoad();
     CashShift* cur=shiftFindOpen(srows, g_session.user.username);
     std::string shiftPart = cur ? shiftJson(*cur,true) : "{\"open\":false,\"income\":0}";
@@ -581,12 +653,24 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     std::string o="{\"ok\":true,";
     o+="\"tabs\":"+tabs+",";
     o+="\"shift\":"+shiftPart+",";
+    if(!cur){
+        CashShift* last=shiftFindLastClosed(srows, g_session.user.username);
+        if(last) o+="\"lastShift\":"+shiftJson(*last,false)+",";
+    }
     o+="\"income\":"+opsJnum(income)+",";
     o+="\"stats\":{";
     o+="\"patients\":"+opsJnum(patients)+",";
     o+="\"paid\":"+opsJnum(paidN)+",";
     o+="\"unpaid\":"+opsJnum(unpaidN)+",";
     o+="\"queue\":"+opsJnum(cashQueueCount());
+    o+="},";
+    o+="\"sections\":"+secList+",";
+    o+="\"totals\":{";
+    o+="\"patients\":"+opsJnum(tPatients)+",";
+    o+="\"unpaidCount\":"+opsJnum(tUnpaidC)+",";
+    o+="\"unpaidSum\":"+opsJnum(tUnpaidS)+",";
+    o+="\"paidCount\":"+opsJnum(tPaidC)+",";
+    o+="\"paidSum\":"+opsJnum(tPaidS);
     o+="},";
     o+="\"rows\":"+list;
     o+="}";

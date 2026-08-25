@@ -12,6 +12,16 @@
        page-specific admission sheet so the page can still override anything. -->
   <link rel="stylesheet" href="common.css" />
   <link rel="stylesheet" href="admission.css" />
+  <!-- v1.91.0 ORDERED THEME LAYER — admission.css above carries structure and
+       layout only; these files carry the design system. Load order is part of
+       the contract (core first, then one exclusively-owned file per surface)
+       and is mirrored in src/app.rc (ids 420..424) and in
+       src/web_admission_embed.inc. See docs/DESIGN_SYSTEM.md. -->
+  <link rel="stylesheet" href="css/core.css" />
+  <link rel="stylesheet" href="css/surface-dash.css" />
+  <link rel="stylesheet" href="css/surface-tools.css" />
+  <link rel="stylesheet" href="css/surface-admission.css" />
+  <link rel="stylesheet" href="css/surface-cashier.css" />
 </head>
 <body>
   <!-- Full-screen loader until the C++ bridge connects and the first data pull
@@ -163,7 +173,7 @@
              field was removed with the نوبت‌دهی workflow, so the caption was
              stale — it now says plainly what it holds. -->
         <div class="row-3">
-          <section class="card">
+          <section class="card ins-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 1L3 5v6c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V5l-9-4z"/></svg>
               اطلاعات بیمه و نوع پذیرش</span></div>
@@ -175,7 +185,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section class="card doc-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 2a3 3 0 013 3v2h2a3 3 0 013 3v8a3 3 0 01-3 3H7a3 3 0 01-3-3v-8a3 3 0 013-3h2V5a3 3 0 013-3zm1 8h-2v2H9v2h2v2h2v-2h2v-2h-2v-2z"/></svg>
               پزشک معالج</span></div>
@@ -193,7 +203,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section class="card perf-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M9 11a4 4 0 100-8 4 4 0 000 8zm6 2c1.7 0 3-1.3 3-3s-1.3-3-3-3v6zM9 13c-3 0-7 1.5-7 4.5V20h14v-2.5C16 14.5 12 13 9 13z"/></svg>
               انجام دهنده</span></div>
@@ -414,21 +424,21 @@
           </div>
         </div>
         <nav class="tools-drawer-body" id="toolsDrawerBody">
-          <div class="tools-cat"><span class="tools-cat-dot" style="background:#3b82f6"></span>اسناد و قبض‌ها</div>
+          <div class="tools-cat"><span class="tools-cat-dot" style="background:#3550D8"></span>اسناد و قبض‌ها</div>
           <button type="button" class="tools-drawer-item" data-tool="toolsReceipts">
             <span class="tools-drico tools-appico-search" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
             </span>
             <span class="tools-dri-tx"><b>جستجوی قبض</b></span>
           </button>
-          <div class="tools-cat"><span class="tools-cat-dot" style="background:#14b8a6"></span>مالی</div>
+          <div class="tools-cat"><span class="tools-cat-dot" style="background:#0E9C77"></span>مالی</div>
           <button type="button" class="tools-drawer-item" data-tool="toolsCash">
             <span class="tools-drico tools-appico-cash" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
             </span>
             <span class="tools-dri-tx"><b>صندوق</b></span>
           </button>
-          <div class="tools-cat"><span class="tools-cat-dot" style="background:#8b5cf6"></span>پذیرش</div>
+          <div class="tools-cat"><span class="tools-cat-dot" style="background:#C4890F"></span>پذیرش</div>
           <button type="button" class="tools-drawer-item" data-tool="toolsQueue">
             <span class="tools-drico tools-appico-queue" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
@@ -455,13 +465,13 @@
               <span class="rc-help-wheel" aria-hidden="true"></span>
               <div class="rc-help-pop" role="tooltip">
                 <b>راهنمای رنگ ردیف‌ها</b>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#f5d90a"></i><span class="rc-help-chip" style="background:#fff4c2;color:#7a5c00">پرداخت نکرده</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#ff9f43"></i><span class="rc-help-chip" style="background:#ffe0c2;color:#8a4a00">حذف بیمه‌ای</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#ff6b6b"></i><span class="rc-help-chip" style="background:#ffd6d6;color:#a01825">استرداد</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#c586ff"></i><span class="rc-help-chip" style="background:#edd9ff;color:#6b1fa8">بدهکار</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#7fd8d8"></i><span class="rc-help-chip" style="background:#d9f3f3;color:#0c5c60">بستانکار</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#9ae6a0"></i><span class="rc-help-chip" style="background:#e3f8e3;color:#166b33">نوبت از قبل</span></div>
-                <div class="rc-help-row"><i class="lg-dot" style="background:#8fbbff"></i><span class="rc-help-chip" style="background:#dcebff;color:#1e4fae">جوابدهی شده</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#C4890F"></i><span class="rc-help-chip" style="background:#FBF1DB;color:#6D4A05">پرداخت نکرده</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#C4890F"></i><span class="rc-help-chip" style="background:#FBF1DB;color:#6D4A05">حذف بیمه‌ای</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#D24343"></i><span class="rc-help-chip" style="background:#FBE8E8;color:#8B2020">استرداد</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#55688A"></i><span class="rc-help-chip" style="background:#E7EDF6;color:#2C3D5C">بدهکار</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#0F8B8D"></i><span class="rc-help-chip" style="background:#DEF1F1;color:#095A5C">بستانکار</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#0E9C77"></i><span class="rc-help-chip" style="background:#E1F4EA;color:#075E45">نوبت از قبل</span></div>
+                <div class="rc-help-row"><i class="lg-dot" style="background:#0E7FC0"></i><span class="rc-help-chip" style="background:#E3F1FB;color:#0A4A72">جوابدهی شده</span></div>
               </div>
             </span>
           </div>
@@ -609,7 +619,7 @@
         <input type="text" id="dashDrawerQ" class="inp" placeholder="جستجو…" />
       </div>
       <nav class="dash-drawer-body" id="dashDrawerBody">
-        <div class="dash-cat"><span class="dash-cat-dot" style="background:#3550d8"></span>پذیرش</div>
+        <div class="dash-cat"><span class="dash-cat-dot" style="background:#3550D8"></span>پذیرش</div>
         <button type="button" class="dash-drawer-item" data-app="dashNewPat">
           <span class="dash-drico dash-appico-adm" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 4a3.5 3.5 0 110 7 3.5 3.5 0 010-7zM2.5 19c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5v1h-13v-1zM18 8h2v3h3v2h-3v3h-2v-3h-3v-2h3V8z"/></svg></span>
           <span class="dash-dri-tx"><b>پذیرش بیمار</b><small>ثبت قبض و صدور</small></span>
@@ -618,7 +628,7 @@
           <span class="dash-drico dash-appico-tab" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 5a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H6a1 1 0 110-2h5V6a1 1 0 011-1z"/></svg></span>
           <span class="dash-dri-tx"><b>تب جدید</b><small>یک تب خالی تازه</small></span>
         </button>
-        <div class="dash-cat"><span class="dash-cat-dot" style="background:#7c56e4"></span>پیام‌رسانی</div>
+        <div class="dash-cat"><span class="dash-cat-dot" style="background:#0F8B8D"></span>پیام‌رسانی</div>
         <button type="button" class="dash-drawer-item" data-app="dashPortal">
           <span class="dash-drico dash-appico-mail" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2.4V17h16V7.4l-8 5.2-8-5.2z"/></svg></span>
           <span class="dash-dri-tx"><b>کارتابل پیام</b><small>پیام‌های مدیریت</small></span>
@@ -636,7 +646,7 @@
         <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
         <span class="qov-title-stack">
           <span class="qov-title-main">صندوق نرفته‌ها و صف پذیرش</span>
-          <span class="qov-subtitle" id="qovSubtitle">پذیرش‌های ثبت‌شده‌ای که هنوز به صندوق نرفته‌اند</span>
+          <span class="qov-subtitle" id="qovSubtitle"></span>
         </span>
       </div>
       <div class="tabs" id="queueTabs">
@@ -659,7 +669,7 @@
     <div class="queue-overlay-body">
       <div class="qov-summary" id="qovSummary">
         <div class="qov-sum-card qov-sum-total"><span class="qov-sum-num" id="qCountSum">۰</span><span class="qov-sum-lbl" id="qovSumLbl">مورد در صندوق</span></div>
-        <div class="qov-sum-hint" id="qovHint">برای بازخوانی یا حذف هر ردیف از دکمه‌های سمت چپ استفاده کنید</div>
+        <div class="qov-sum-hint" id="qovHint"></div>
       </div>
       <div class="tbl-wrap" id="queueWrap">
         <table class="tbl q-tbl">
@@ -676,7 +686,16 @@
     </div>
   </section>
 
-  <!-- v1.82.0: full-screen cashier overlay (section tabs + shift + 24h tickets) -->
+  <!-- v1.91.0: full-screen cashier surface («صندوق»).
+       · the tab strip left the header and now sits DIRECTLY ABOVE the tickets
+         table (owner request); «صندوق نرفته‌ها» is still its first tab.
+       · departments (بخش) are runtime data defined in مدیریت — never hard-coded
+         here — and are presented as ONE ROW PER DEPARTMENT inside a scrolling
+         table with a sticky head and a totals foot, so two or twenty-plus
+         departments read exactly the same and can never collide.
+       · the cramped one-line shift hint became a designed shift panel (state
+         chip + start/end date-time blocks + operator + department + income);
+         #cashShiftMeta lives on as its footer line. -->
   <div class="queue-backdrop" id="cashBackdrop"></div>
   <section class="queue-overlay cash-overlay" id="cashPanel" aria-hidden="true">
     <div class="queue-overlay-head cash-overlay-head">
@@ -684,10 +703,9 @@
         <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
         <span class="qov-title-stack">
           <span class="qov-title-main">صندوق</span>
-          <span class="qov-subtitle" id="cashSubtitle">۲۴ ساعت اخیر — جستجو فقط در زبانه فعال</span>
+          <span class="qov-subtitle" id="cashSubtitle">۲۴ ساعت اخیر</span>
         </span>
       </div>
-      <div class="tabs cash-tabs" id="cashTabs"></div>
       <div class="cash-income" id="cashIncome"><b>۰</b> <span class="cash-cur">ریال</span></div>
     </div>
     <div class="cash-subbar">
@@ -695,23 +713,82 @@
         <input type="text" id="cashSearch" class="inp inp-sm" placeholder="جستجوی بارکد، نام، پزشک، بخش…" />
         <span class="in-ico"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 2a8 8 0 105 14.3l5.3 5.4 1.4-1.4-5.4-5.3A8 8 0 0010 2z"/></svg></span>
       </div>
+      <div class="qov-summary cash-summary" id="cashSummary">
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatP">۰</span><span class="qov-sum-lbl">بیمار</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatPaid">۰</span><span class="qov-sum-lbl">صندوق‌شده</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatUnpaid">۰</span><span class="qov-sum-lbl">پرداخت‌نشده</span></div>
+        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatQ">۰</span><span class="qov-sum-lbl">صف پذیرش</span></div>
+      </div>
       <button type="button" id="cashClose" class="btn btn-icon qov-close">×</button>
     </div>
     <div class="queue-overlay-body">
-      <div class="cash-actions">
-        <button type="button" class="btn cash-shift-start cash-act" id="cashShiftStart">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-          شروع شیفت
-        </button>
-        <button type="button" class="btn cash-shift-end cash-act" id="cashShiftEnd">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
-          پایان شیفت
-        </button>
-        <button type="button" class="btn btn-primary cash-act" id="cashManualBtn">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M11 5v6H5v2h6v6h2v-6h6v-2h-6V5z"/></svg>
-          ثبت سند دستی
-        </button>
-      </div>
+      <!-- shift panel — ONE row: state · start/end date-time · operator ·
+             income · the شروع/پایان pair (exactly one enabled). Mirrors
+             /code/.plans/designs/mock-cashier.html. -->
+        <section class="cash-shift is-none" id="cashShiftPanel">
+          <div class="sh-block sh-state">
+            <span class="sh-stack">
+              <span class="sh-title">وضعیت شیفت صندوق</span>
+              <i class="sh-line" aria-hidden="true"></i>
+              <span class="state-chip is-none" id="cashShiftState">شیفت شروع‌نشده</span>
+              <span class="sh-meta" id="cashShiftMeta">شیفت شروع نشده</span>
+            </span>
+          </div>
+          <div class="sh-block sh-when">
+            <div class="dt dt-start dt-empty" id="cashShiftStartBox">
+              <div class="dt-lbl">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                شروع شیفت
+              </div>
+              <div class="dt-val">
+                <span class="dt-time" id="cashShiftStartTime">--:--</span>
+                <span class="dt-date" id="cashShiftStartDate">ثبت نشده</span>
+              </div>
+            </div>
+            <div class="dt dt-end dt-empty" id="cashShiftEndBox">
+              <div class="dt-lbl">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
+                پایان شیفت
+              </div>
+              <div class="dt-val">
+                <span class="dt-time" id="cashShiftEndTime">--:--</span>
+                <span class="dt-date" id="cashShiftEndDate">ثبت نشده</span>
+              </div>
+            </div>
+            <div class="dt dt-who">
+              <div class="dt-lbl">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 4.5V20h14v-1.5C19 16 16 14 12 14z"/></svg>
+                متصدی و بخش
+              </div>
+              <div class="dt-val dt-val-stack">
+                <span class="dt-user" id="cashShiftUser">—</span>
+                <span class="dt-dept" id="cashShiftDept">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="sh-block sh-end">
+            <div class="sh-money">
+              <span>درآمد شیفت</span>
+              <b id="cashShiftIncome">۰</b><i>ریال</i>
+            </div>
+            <div class="cash-actions">
+              <!-- exactly one of the pair is ever enabled; renderCash() re-derives
+                   this from the real shift state on every refresh. -->
+              <button type="button" class="btn cash-shift-start cash-act" id="cashShiftStart" aria-disabled="false">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                شروع شیفت
+              </button>
+              <button type="button" class="btn cash-shift-end cash-act is-off" id="cashShiftEnd" disabled aria-disabled="true">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 6h12v12H6z"/></svg>
+                پایان شیفت
+              </button>
+              <button type="button" class="btn btn-primary cash-act" id="cashManualBtn">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M11 5v6H5v2h6v6h2v-6h6v-2h-6V5z"/></svg>
+                ثبت سند دستی
+              </button>
+            </div>
+          </div>
+        </section>
       <div class="cash-manual" id="cashManualBox" style="display:none">
         <div class="cash-manual-grid">
           <input class="inp" id="cmNid" placeholder="کد ملی" />
@@ -723,12 +800,60 @@
           <button type="button" class="btn btn-outline" id="cmCancel">انصراف</button>
         </div>
       </div>
-      <div class="qov-summary cash-summary" id="cashSummary">
-        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatP">۰</span><span class="qov-sum-lbl">بیمار</span></div>
-        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatPaid">۰</span><span class="qov-sum-lbl">صندوق‌شده</span></div>
-        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatUnpaid">۰</span><span class="qov-sum-lbl">پرداخت‌نشده</span></div>
-        <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatQ">۰</span><span class="qov-sum-lbl">صف پذیرش</span></div>
-        <div class="qov-sum-hint" id="cashShiftMeta">شیفت شروع نشده</div>
+      <section class="cash-depts" id="cashDepts">
+        <div class="cd-head">
+          <span class="cd-head-side">
+            <span class="cd-chip"><svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M4 3h7v7H4V3zm9 0h7v4h-7V3zM4 12h7v9H4v-9zm9 3h7v6h-7v-6zm0-6h7v4h-7V9z"/></svg></span>
+            <span class="cd-stack">
+              <span class="cd-title">بخش‌ها</span>
+              <i class="cd-line" aria-hidden="true"></i>
+            </span>
+          </span>
+          <span class="cd-count" id="cashDeptCount">۰ بخش</span>
+        </div>
+        <div class="cd-wrap">
+          <table class="cd-tbl">
+            <thead><tr>
+              <th class="cd-c-name">بخش</th>
+              <th class="cd-c-n">بیمار</th>
+              <th class="cd-c-n">پرداخت‌نشده</th>
+              <th class="cd-c-m">مبلغ پرداخت‌نشده</th>
+              <th class="cd-c-n">صندوق‌شده</th>
+              <th class="cd-c-m">مبلغ صندوق‌شده</th>
+            </tr></thead>
+            <tbody id="cashDeptBody"><tr><td colspan="6" class="empty">بخشی در مدیریت تعریف نشده است</td></tr></tbody>
+            <tfoot><tr>
+              <td class="cd-c-name">جمع همه بخش‌ها</td>
+              <td class="cd-c-n" id="cashDeptTotP">۰</td>
+              <td class="cd-c-n" id="cashDeptTotUC">۰</td>
+              <td class="cd-c-m" id="cashDeptTotUS">۰</td>
+              <td class="cd-c-n" id="cashDeptTotPC">۰</td>
+              <td class="cd-c-m" id="cashDeptTotPS">۰</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </section>
+      <!-- «صندوق نرفته‌ها» left the header (owner request) and is now an amber
+           summary strip immediately above the table, with the tab strip under
+           it. Tab 0 is still the unpaid tab. -->
+      <section class="unpaid-bar" id="cashUnpaidBar">
+        <div class="ub-side">
+          <span class="ub-chip" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2L1 21h22L12 2zm0 6l6.5 11h-13L12 8zm-1 3v4h2v-4h-2zm0 5v2h2v-2h-2z"/></svg>
+          </span>
+          <span class="ub-stack">
+            <span class="ub-t">صندوق نرفته‌ها</span>
+                      </span>
+        </div>
+        <div class="ub-side">
+          <span class="ub-stat"><span>تعداد</span><b id="cashUnpaidN">۰</b></span>
+          <span class="ub-stat ub-stat-money"><span>مانده کل (ریال)</span><b id="cashUnpaidSum">۰</b></span>
+          <span class="ub-stat"><span>بخش‌های درگیر</span><b id="cashUnpaidDepts">۰</b></span>
+          <button type="button" class="btn btn-amber ub-btn" id="cashUnpaidChip">نمایش لیست</button>
+        </div>
+      </section>
+      <div class="cash-tabbar">
+        <div class="tabs cash-tabs" id="cashTabs"></div>
       </div>
       <div class="tbl-wrap" id="cashWrap">
         <table class="tbl q-tbl cash-tbl">
