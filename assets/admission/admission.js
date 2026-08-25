@@ -2785,8 +2785,14 @@
         for (var ii = 0; ii < items.length; ii++) {
           (function (it) {
             on(it, 'click', function () {
-              var t = $(it.getAttribute('data-app'));
+              var id = it.getAttribute('data-app');
               closeD();
+              if (id === 'dashPortal') {
+                var mail = $('dashMail');
+                if (mail && mail.style.display !== 'none') mail.click();
+                return;
+              }
+              var t = $(id);
               if (t && t.style.display !== 'none') t.click();
             });
           })(items[ii]);
@@ -2839,33 +2845,44 @@
 
     loaderText('در حال همگام‌سازی با برنامه…');
     Bridge.call('init', {}).then(function (r) {
-      if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
-      if (r.supp) { state.supp = r.supp; fillSelect($('insSupp'), r.supp); }
+      /* v1.90: dash/tools skip the admission form fill (selects, performers,
+         queue, services, zoom) — those surfaces hide #appBody and the extra
+         work was the main reason they hung on open. Theme/user/perms stay. */
+      var light = (state.surface === 'dash' || state.surface === 'tools');
+      if (!light) {
+        if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
+        if (r.supp) { state.supp = r.supp; fillSelect($('insSupp'), r.supp); }
+      }
       if (r.date) setText($('tbDate'), toFa(r.date));
       if (r.time) setText($('tbClock'), toFa(r.time));
-      if (r.patient) fillPatient(r.patient);
-      if (r.services) {
-        state.services = [];
-        for (var ri = 0; ri < r.services.length; ri++) addServiceRow(r.services[ri]);
+      if (!light) {
+        if (r.patient) fillPatient(r.patient);
+        if (r.services) {
+          state.services = [];
+          for (var ri = 0; ri < r.services.length; ri++) addServiceRow(r.services[ri]);
+        }
+        if (r.ps) updatePS(r.ps);
+        applyMode(r.mode || 'simple');
+        if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
       }
-      if (r.ps) updatePS(r.ps);
-      applyMode(r.mode || 'simple');
-      if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
       document.body.className = String(document.body.className || '')
         .replace(/\btheme-(dark|calm|warm)\b/g, '').replace(/\s+/g, ' ');
       if (r.theme === 'dark') document.body.className += ' theme-dark';
       else applyPalette(r.palette || 'blue');
-      if ($('apptDate')) $('apptDate').value = toFa(r.date || '');
-      if ($('rxDate') && !$('rxDate').value) $('rxDate').value = toFa(r.date || '');
-      if ($('apptShift') && r.shift) { var si; for(si=0;si<$('apptShift').options.length;si++) if($('apptShift').options[si].text===r.shift){$('apptShift').selectedIndex=si;break;} }
+      if (!light) {
+        if ($('apptDate')) $('apptDate').value = toFa(r.date || '');
+        if ($('rxDate') && !$('rxDate').value) $('rxDate').value = toFa(r.date || '');
+        if ($('apptShift') && r.shift) { var si; for(si=0;si<$('apptShift').options.length;si++) if($('apptShift').options[si].text===r.shift){$('apptShift').selectedIndex=si;break;} }
+      }
       state.todayJalali = r.date || '';
       state.role = Number(r.role) || 0;
       state.userName = r.user || r.username || '';
       if (state.role >= 1 && $('rcDelete')) $('rcDelete').style.display = '';
-      /* invoice starts at ZERO until a service is added */
-      renderServices(); recompute();
-      /* v1.78.0: load the «انجام دهنده» combo (performer-flagged doctors). */
-      fillPerformers();
+      if (!light) {
+        /* invoice starts at ZERO until a service is added */
+        renderServices(); recompute();
+        fillPerformers();
+      }
       /* v1.79.0 / v1.82.0: hide launchers when the matching tick is OFF
          (the button must not exist — not merely disabled). */
       if (r.perms && r.perms.cashier === false) {
@@ -2891,9 +2908,11 @@
           if ($(hideIds[hi])) $(hideIds[hi]).style.display = 'none';
         }
       }
-      refreshQueue();
-      wireColResize($('rcTable'), 'az.rc.widths');
-      wireColResize(document.getElementById('cashWrap') ? document.getElementById('cashWrap').getElementsByTagName('table')[0] : null, 'az.cash.widths');
+      if (!light) {
+        refreshQueue();
+        wireColResize($('rcTable'), 'az.rc.widths');
+        wireColResize(document.getElementById('cashWrap') ? document.getElementById('cashWrap').getElementsByTagName('table')[0] : null, 'az.cash.widths');
+      }
       setSync('ok', 'همگام با برنامه');
       state.ready = true;
       hideLoader();
@@ -2901,10 +2920,8 @@
         /* dashboard: greet with the user name; badges sync via portal.unread */
         var du = $('dashUser');
         if (du && r.user) du.textContent = r.user;
-        toast('داشبورد آماده است', 'ok');
       } else if (state.surface === 'tools') {
         showToolsHome();
-        toast('ابزارها آماده است', 'ok');
       } else if (state.surface === 'receipts') {
         state.rcPage = 'receipts';
         showReceiptsPage();

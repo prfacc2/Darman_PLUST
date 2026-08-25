@@ -68,16 +68,16 @@ void applyTheme(bool dark){
         // and unify the accent with the embedded admission page (refined indigo).
         // The page sits a touch deeper so the near-white clay cards extrude,
         // borders stay soft, and the header reads as a frosted band.
-        g_theme.bg          = RGB(0xEC, 0xF1, 0xF8); // #ECF1F8 soft clay page
-        g_theme.bg2         = RGB(0xE1, 0xE9, 0xF4); // page gradient bottom
+        g_theme.bg          = RGB(0xD4, 0xDE, 0xEC); // #D4DEEC deeper clay page
+        g_theme.bg2         = RGB(0xC5, 0xD2, 0xE4); // page gradient bottom
         g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
         g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
         g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
         g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
         g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
         g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
-        g_theme.labelInk    = RGB(0x35, 0x3F, 0x4F); // readable labels
-        g_theme.sectionInk  = RGB(0x1C, 0x26, 0x35); // strong titles
+        g_theme.labelInk    = RGB(0x3A, 0x4A, 0x66); // readable labels
+        g_theme.sectionInk  = RGB(0x15, 0x22, 0x38); // strong titles
         // v1.88.0: deeper royal BLUE (less violet) — white button text sits on
         // a properly dark brand colour and the whole theme reads less purple.
         g_theme.accent      = RGB(0x35, 0x50, 0xD8); // #3550D8 royal blue
@@ -92,8 +92,8 @@ void applyTheme(bool dark){
         g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
         g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
         // frosted header band with real depth
-        g_theme.headerTop   = RGB(0xFB, 0xFC, 0xFE);
-        g_theme.headerBot   = RGB(0xE1, 0xEA, 0xF6);
+        g_theme.headerTop   = RGB(0xE8, 0xEE, 0xF8);
+        g_theme.headerBot   = RGB(0xC8, 0xD6, 0xE8);
         g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
         // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now

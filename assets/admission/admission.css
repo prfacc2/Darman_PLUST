@@ -5749,3 +5749,230 @@ body.theme-dark.surface-dash{background:#0e1524;}
 .theme-dark .dash-drawer-item:hover{border-right-color:#6a83f7;background:#26324a;}
 .theme-dark .dash-dri-tx b{color:#eef3fb;}
 .theme-dark .dash-dri-tx small{color:#94a3bd;}
+
+/* ==========================================================================
+   v1.90.0 — Aurora Clinic dashboard + Workshop Clay tools + admission contrast
+     * dash: cooler periwinkle canvas, glass header, centred concave search,
+       کارتابل only in the header (grid is پذیرش راست / تب جدید چپ);
+     * tools: warm clay canvas distinct from dash; helper subtitles removed;
+     * admission: deeper canvas, tinted cards, concave fields, header top-bar
+       + bottom half-line, high-contrast labels, bolder مبلغ نهایی.
+   Trident-safe: no var(), no gap, no backdrop-filter, no logical props.
+   ========================================================================== */
+
+/* ---- 1. dashboard — Aurora Clinic ----------------------------------------- */
+body.surface-dash{
+  background:#A9BDD8;
+  background:-webkit-linear-gradient(150deg,#9BB0D0 0%,#A9BDD8 42%,#C5D4EA 100%);
+  background:linear-gradient(150deg,#9BB0D0 0%,#A9BDD8 42%,#C5D4EA 100%);
+}
+body.surface-dash .dash-panel{
+  background-image:
+    -webkit-radial-gradient(12% 8%, ellipse, rgba(70,55,180,.20) 0%, transparent 44%),
+    -webkit-radial-gradient(88% 16%, ellipse, rgba(16,130,140,.16) 0%, transparent 48%),
+    repeating-linear-gradient(135deg, rgba(40,55,120,.035) 0px, rgba(40,55,120,.035) 2px, transparent 2px, transparent 14px);
+  background-image:
+    radial-gradient(ellipse at 12% 8%, rgba(70,55,180,.20) 0%, transparent 44%),
+    radial-gradient(ellipse at 88% 16%, rgba(16,130,140,.16) 0%, transparent 48%),
+    repeating-linear-gradient(135deg, rgba(40,55,120,.035) 0px, rgba(40,55,120,.035) 2px, transparent 2px, transparent 14px);
+}
+.dash-topbar{
+  background:-webkit-linear-gradient(180deg,#E4ECFA 0%,#D4DFF5 100%);
+  background:linear-gradient(180deg,#E4ECFA 0%,#D4DFF5 100%);
+  border:1px solid #8FA4C8;
+  -webkit-box-shadow:0 2px 6px rgba(16,32,72,.08), 0 16px 32px rgba(40,55,120,.16), inset 0 1px 0 rgba(255,255,255,.92);
+  box-shadow:0 2px 6px rgba(16,32,72,.08), 0 16px 32px rgba(40,55,120,.16), inset 0 1px 0 rgba(255,255,255,.92);
+}
+.dash-title{color:#152238;}
+.dash-sub{color:#3A4A66;}
+.dash-burger,.dash-mail{
+  background:-webkit-linear-gradient(180deg,#EEF3FC 0%,#D5E0F4 100%);
+  background:linear-gradient(180deg,#EEF3FC 0%,#D5E0F4 100%);
+  border:1px solid #8FA4C8;color:#1E2A4A;
+  -webkit-box-shadow:inset 2px 3px 6px rgba(20,40,72,.14), inset -1px -1px 2px rgba(255,255,255,.85);
+  box-shadow:inset 2px 3px 6px rgba(20,40,72,.14), inset -1px -1px 2px rgba(255,255,255,.85);
+}
+.dash-search{margin:16px 2px 0;text-align:center;}
+.dash-search-wrap{display:inline-block;width:460px;max-width:92%;position:relative;}
+.dash-search-wrap .inp{
+  width:100%;height:44px;border-radius:999px;padding:0 44px 0 18px;font-size:13.5px;
+  background:#D5E0F0;border:1px solid #8FA4C8;color:#152238;
+  -webkit-box-shadow:inset 3px 4px 8px rgba(20,40,72,.16), inset -2px -2px 3px rgba(255,255,255,.78);
+  box-shadow:inset 3px 4px 8px rgba(20,40,72,.16), inset -2px -2px 3px rgba(255,255,255,.78);
+}
+.dash-search-wrap .inp:focus{
+  background:#E8EEF8;border-color:#3550D8;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.18), inset 2px 2px 4px rgba(20,40,72,.10);
+  box-shadow:0 0 0 3px rgba(53,80,216,.18), inset 2px 2px 4px rgba(20,40,72,.10);
+}
+.dash-vessel{
+  background:#E4EEF8;
+  background:-webkit-linear-gradient(160deg,#EDF3FB 0%,#D7E4F4 100%);
+  background:linear-gradient(160deg,#EDF3FB 0%,#D7E4F4 100%);
+  border:1px solid #9BB0D0;
+  outline:1px solid #7E96BA;
+  -webkit-box-shadow:0 4px 8px rgba(16,32,72,.08), 0 22px 44px rgba(40,55,120,.16), inset 0 1px 0 rgba(255,255,255,.9);
+  box-shadow:0 4px 8px rgba(16,32,72,.08), 0 22px 44px rgba(40,55,120,.16), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.dash-vessel-title{color:#1E2A4A;}
+.dash-appname{color:#152238;}
+.dash-foot{color:#3A4A66;}
+.dash-drawer{
+  background:-webkit-linear-gradient(180deg,#DCE6F6 0%,#C9D6EC 100%);
+  background:linear-gradient(180deg,#DCE6F6 0%,#C9D6EC 100%);
+  border-left:1px solid #8FA4C8;
+}
+
+/* ---- 2. tools — Workshop Clay (must not look like dash) ------------------- */
+body.surface-tools,body.surface-tools.surface-rc{
+  background:#C9BBA8;
+  background:-webkit-linear-gradient(150deg,#D4C4AE 0%,#C9BBA8 48%,#B7A58E 100%);
+  background:linear-gradient(150deg,#D4C4AE 0%,#C9BBA8 48%,#B7A58E 100%);
+}
+body.surface-tools .tools-home{
+  background-image:repeating-linear-gradient(135deg, rgba(90,60,30,.04) 0px, rgba(90,60,30,.04) 2px, transparent 2px, transparent 13px);
+}
+body.surface-tools .tools-topbar{
+  margin:6px 6px 0;padding:10px 12px;border-radius:16px;
+  background:-webkit-linear-gradient(180deg,#EFE4D2 0%,#E0D0B8 100%);
+  background:linear-gradient(180deg,#EFE4D2 0%,#E0D0B8 100%);
+  border:1px solid #B59A78;
+  -webkit-box-shadow:0 2px 6px rgba(70,45,20,.10), 0 12px 26px rgba(70,45,20,.14), inset 0 1px 0 rgba(255,248,236,.9);
+  box-shadow:0 2px 6px rgba(70,45,20,.10), 0 12px 26px rgba(70,45,20,.14), inset 0 1px 0 rgba(255,248,236,.9);
+}
+body.surface-tools .tools-topbar .tools-title{color:#3A2A18;}
+.tools-subtitle,.rc-head-sub{display:none;}
+body.surface-tools .tools-burger{
+  background:-webkit-linear-gradient(180deg,#F3E9D8 0%,#DCCBB4 100%);
+  background:linear-gradient(180deg,#F3E9D8 0%,#DCCBB4 100%);
+  border:1px solid #B59A78;color:#3A2A18;
+  -webkit-box-shadow:inset 2px 3px 6px rgba(70,45,20,.14), inset -1px -1px 2px rgba(255,248,236,.8);
+  box-shadow:inset 2px 3px 6px rgba(70,45,20,.14), inset -1px -1px 2px rgba(255,248,236,.8);
+}
+body.surface-tools .tools-searchbar{text-align:center;}
+body.surface-tools .tools-search-wrap{display:inline-block;width:460px;max-width:92%;}
+body.surface-tools .tools-search-wrap .inp{
+  width:100%;background:#E8DCC8;border:1px solid #B59A78;color:#3A2A18;
+  -webkit-box-shadow:inset 3px 4px 8px rgba(70,45,20,.14), inset -2px -2px 3px rgba(255,248,236,.75);
+  box-shadow:inset 3px 4px 8px rgba(70,45,20,.14), inset -2px -2px 3px rgba(255,248,236,.75);
+}
+body.surface-tools .tools-grid{
+  background:#E8DCC8;
+  background:-webkit-linear-gradient(160deg,#F0E6D4 0%,#E0D0B8 100%);
+  background:linear-gradient(160deg,#F0E6D4 0%,#E0D0B8 100%);
+  border:1px solid #C4B094;
+  outline:1px solid #A88868;
+  -webkit-box-shadow:0 4px 8px rgba(70,45,20,.08), 0 20px 40px rgba(70,45,20,.14), inset 0 1px 0 rgba(255,248,236,.9);
+  box-shadow:0 4px 8px rgba(70,45,20,.08), 0 20px 40px rgba(70,45,20,.14), inset 0 1px 0 rgba(255,248,236,.9);
+}
+body.surface-tools .tools-tile-name{color:#3A2A18;}
+body.surface-tools .tools-drawer{
+  background:-webkit-linear-gradient(180deg,#EFE4D2 0%,#DCCBB4 100%);
+  background:linear-gradient(180deg,#EFE4D2 0%,#DCCBB4 100%);
+  border-left:1px solid #B59A78;
+}
+body.surface-tools .tools-dri-tx small{display:none;}
+
+/* ---- 3. admission — contrast, concave fields, designed headers ------------ */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm{
+  background:#C2D0E4;
+  background:-webkit-linear-gradient(150deg,#C9D6E8 0%,#B7C6DC 55%,#A9BBD4 100%);
+  background:linear-gradient(150deg,#C9D6E8 0%,#B7C6DC 55%,#A9BBD4 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .app,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .body{
+  background:#C2D0E4;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .card{
+  background:#E4ECF6;
+  background:-webkit-linear-gradient(180deg,#EEF3FA 0%,#DCE6F2 100%);
+  background:linear-gradient(180deg,#EEF3FA 0%,#DCE6F2 100%);
+  border:1px solid #A8B8D0;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .fld > span,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .chk,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .chk-block{
+  color:#152238;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inp,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm select.inp{
+  background:#D5E0EE;border:1px solid #8FA4C0;color:#152238;
+  -webkit-box-shadow:inset 2px 3px 6px rgba(20,40,72,.16), inset -1px -1px 2px rgba(255,255,255,.72);
+  box-shadow:inset 2px 3px 6px rgba(20,40,72,.16), inset -1px -1px 2px rgba(255,255,255,.72);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inp:hover{
+  background:#DCE6F4;border-color:#7A92B4;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inp:focus{
+  background:#E8EEF8;border-color:#3550D8;color:#152238;
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.18), inset 1px 1px 3px rgba(20,40,72,.10);
+  box-shadow:0 0 0 3px rgba(53,80,216,.18), inset 1px 1px 3px rgba(20,40,72,.10);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .card-head{
+  position:relative;
+  -webkit-box-shadow:inset 0 3px 0 #3550D8, inset -3px 0 0 #3550D8;
+  box-shadow:inset 0 3px 0 #3550D8, inset -3px 0 0 #3550D8;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .card-head:after{
+  content:"";position:absolute;left:16%;right:16%;bottom:0;height:1px;
+  background:#8FA4C0;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .patient-card .card-head{
+  background:#D4E0F6;background:-webkit-linear-gradient(top,#E2EAF8 0%,#C5D4F0 100%);
+  background:linear-gradient(180deg,#E2EAF8 0%,#C5D4F0 100%);
+  -webkit-box-shadow:inset 0 3px 0 #3550D8, inset -3px 0 0 #3550D8;
+  box-shadow:inset 0 3px 0 #3550D8, inset -3px 0 0 #3550D8;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .patient-card .card-title{color:#152238;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .ins-card .card-head{
+  background:#D0EBE0;background:-webkit-linear-gradient(top,#DDF2E8 0%,#BFE0D2 100%);
+  background:linear-gradient(180deg,#DDF2E8 0%,#BFE0D2 100%);
+  -webkit-box-shadow:inset 0 3px 0 #0D9488, inset -3px 0 0 #0D9488;
+  box-shadow:inset 0 3px 0 #0D9488, inset -3px 0 0 #0D9488;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .ins-card .card-title{color:#0A4A3C;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .doc-card .card-head{
+  background:#DDD6F6;background:-webkit-linear-gradient(top,#E8E2FA 0%,#CFC4F0 100%);
+  background:linear-gradient(180deg,#E8E2FA 0%,#CFC4F0 100%);
+  -webkit-box-shadow:inset 0 3px 0 #7C56E4, inset -3px 0 0 #7C56E4;
+  box-shadow:inset 0 3px 0 #7C56E4, inset -3px 0 0 #7C56E4;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .doc-card .card-title{color:#3A1E7A;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .perf-card .card-head{
+  background:#D0E6F6;background:-webkit-linear-gradient(top,#DCEEF8 0%,#BDDCF0 100%);
+  background:linear-gradient(180deg,#DCEEF8 0%,#BDDCF0 100%);
+  -webkit-box-shadow:inset 0 3px 0 #0E7FC0, inset -3px 0 0 #0E7FC0;
+  box-shadow:inset 0 3px 0 #0E7FC0, inset -3px 0 0 #0E7FC0;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .perf-card .card-title{color:#0A4A72;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .invoice-card .card-head{
+  background:#F3EBC8;background:-webkit-linear-gradient(top,#F7F1D6 0%,#E8DCA8 100%);
+  background:linear-gradient(180deg,#F7F1D6 0%,#E8DCA8 100%);
+  -webkit-box-shadow:inset 0 3px 0 #C4960A, inset -3px 0 0 #C4960A;
+  box-shadow:inset 0 3px 0 #C4960A, inset -3px 0 0 #C4960A;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .invoice-card .card-title{color:#5A4408;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inv-line span{color:#3A4A66;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inv-line b{color:#152238;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .inv-gtitle{color:#3A4A66;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .payable-card{
+  border:2px solid #2F9A74;color:#064E3B;
+  background:#D4F0E4;
+  background:-webkit-linear-gradient(160deg,#E6F7EE 0%,#C5EBD8 100%);
+  background:linear-gradient(160deg,#E6F7EE 0%,#C5EBD8 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .payable-caption{color:#0A4A3C;font-weight:900;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .payable-value b{
+  color:#064E3B;font-size:32px;font-weight:900;letter-spacing:-0.02em;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm).surface-adm .payable-value span{color:#0A4A3C;font-weight:800;}
+
+/* dark parity — keep dash/tools readable, no washed labels */
+body.theme-dark.surface-dash{background:#0E1524;}
+body.theme-dark.surface-tools{background:#1A1612;}
+body.theme-dark .dash-search-wrap .inp{background:#1A2434;border-color:#344357;color:#EEF3FB;}
+body.theme-dark.surface-tools .tools-search-wrap .inp{background:#241E18;border-color:#4A3C30;color:#F4EDE4;}
+body.theme-dark.surface-tools .tools-topbar,
+body.theme-dark.surface-tools .tools-grid{
+  background:#241E18;border-color:#4A3C30;
+}
