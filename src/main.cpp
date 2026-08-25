@@ -55,12 +55,9 @@ static ScreenId s_curScreen = SC_HOME;
 // 109 / 110 / 113 were the native bottom-bar print buttons — retired in v1.62.0
 // when printing moved into the embedded admission page. Do not reuse the ids.
 #define TIMER_CLOCK  1
-// v1.87.0: one-shot welcome-screen entrance animation (ribbon shimmer + logo
-// halo bloom). The timer self-kills after ~1.2 s so the idle screen costs
-// ZERO extra repaints (the v1.63.0 FPS lesson: no perpetual full-window
-// invalidation).
-#define TIMER_HOME_ANIM 3
-static int s_homePhase = -1;   // -1 = idle; 0..30 while the entrance plays
+// v1.89.0: the welcome-screen entrance animation was REMOVED on request — the
+// 30-frame repaint burst caused a visible FPS drop/stutter on real machines.
+// No timer, no shimmer; the home screen now repaints ONLY what changed.
 
 // ------------------------------------------------------------------ fonts --
 static HFONT mkFont(int px, int weight){
@@ -153,7 +150,11 @@ static int mainBarH(){ return S(56); }                 // LAYER 1 height
 // mid-animation. The animation is gone: the bar is simply present (compact) on
 // the reception screen and absent everywhere else — applied in a single paint.
 static int actionBarH(){ return S(48); }
-static bool headerHasActionBar(){ return s_curScreen==SC_RECEPTION; }
+// v1.89.0: the LAYER-2 header action bar («پذیرش بیمار» / «تب جدید») is
+// REMOVED — those actions now live as app icons on the new reception
+// dashboard. The function is kept (returns false) so all call sites collapse
+// to the single-layer header cleanly.
+static bool headerHasActionBar(){ return false; }
 static int topBarH(){ return mainBarH() + (headerHasActionBar()?actionBarH():0); }
 static int botBarH(){ return S(40); }
 RECT frameContentRect(){
@@ -391,22 +392,9 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // onto the hero panel's buffer means there are NO background rectangles
         // and NO chipped square corners behind rounded shapes — the exact
         // corner-artefact bug the user reported cannot occur here.
-        // v1.87.0: play the entrance animation once (ribbon shimmer + logo
-        // halo bloom). ~30 frames at 40 ms, then the timer kills itself.
-        s_homePhase = 0;
-        s_appHot = 0;   // v1.88.0: fresh window — no stale hover from a prior home
-        SetTimer(h, TIMER_HOME_ANIM, 40, NULL);
+        s_appHot = 0;   // fresh window — no stale hover from a prior home
         return 0; }
-    case WM_TIMER:
-        if(w==TIMER_HOME_ANIM){
-            s_homePhase++;
-            if(s_homePhase>30){ s_homePhase=-1; KillTimer(h,TIMER_HOME_ANIM); }
-            InvalidateRect(h,NULL,FALSE);
-            return 0;
-        }
-        break;
     case WM_DESTROY:
-        KillTimer(h,TIMER_HOME_ANIM);
         return 0;
     case WM_APP_THEME:
         InvalidateRect(h,NULL,TRUE);
@@ -421,8 +409,19 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
         int hot = PtInRect(&g.cardR,pt) ? 1 : PtInRect(&g.cardL,pt) ? 2 : 0;
         if(hot != s_appHot){
+            // repaint just the affected cells (v1.89.0 — no full-window hit)
+            RECT dirty={0,0,0,0};
+            if(s_appHot==1) dirty=g.cardR; else if(s_appHot==2) dirty=g.cardL;
+            RECT cell = hot==1 ? g.cardR : hot==2 ? g.cardL : dirty;
+            if(dirty.right>dirty.left){
+                RECT u={ dirty.left<cell.left?dirty.left:cell.left,
+                         dirty.top<cell.top?dirty.top:cell.top,
+                         dirty.right>cell.right?dirty.right:cell.right,
+                         dirty.bottom>cell.bottom?dirty.bottom:cell.bottom };
+                cell=u;
+            }
+            if(cell.right>cell.left) InvalidateRect(h,&cell,FALSE);
             s_appHot = hot;
-            InvalidateRect(h,NULL,FALSE);
         }
         SetCursor(LoadCursor(NULL, hot ? IDC_HAND : IDC_ARROW));
         if(hot){
@@ -431,7 +430,13 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         }
         return 0; }
     case WM_MOUSELEAVE:
-        if(s_appHot){ s_appHot=0; InvalidateRect(h,NULL,FALSE); }
+        if(s_appHot){
+            RECT rc; GetClientRect(h,&rc);
+            HomeGeom g = homeGeom(rc.right, rc.bottom);
+            RECT cell = s_appHot==1 ? g.cardR : g.cardL;
+            InvalidateRect(h,&cell,FALSE);   // just the hovered cell (v1.89.0)
+            s_appHot=0;
+        }
         return 0;
     case WM_LBUTTONUP: {
         // v1.88.0: hit-test the message coordinates directly — routing by the
@@ -481,9 +486,19 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
     case WM_PAINT: {
         PAINTSTRUCT ps; HDC dc0=BeginPaint(h,&ps);
         RECT rc; GetClientRect(h,&rc);
+        // v1.89.0 FPS fix: paint ONLY the dirty strip. Hovering an app icon
+        // used to repaint the whole window (artwork + panel + chips) on every
+        // hover-state change — a visible stutter. Now the hover invalidates
+        // just that icon's cell and this paint sizes its buffer to the strip.
+        RECT d=ps.rcPaint;
+        int dw=d.right-d.left, dh=d.bottom-d.top;
+        if(dw<=0||dh<=0){ EndPaint(h,&ps); return 0; }
         HDC dc=CreateCompatibleDC(dc0);
-        HBITMAP bmp=CreateCompatibleBitmap(dc0,rc.right,rc.bottom);
+        HBITMAP bmp=CreateCompatibleBitmap(dc0,dw,dh);
         HGDIOBJ obm=SelectObject(dc,bmp);
+        SetViewportOrgEx(dc,-d.left,-d.top,NULL);
+        HRGN dclip=CreateRectRgn(0,0,dw,dh);
+        SelectClipRgn(dc,dclip);
 
         // ---- 1. artwork -----------------------------------------------------
         // v1.62.0: the light artwork is a soft clinical illustration, so it only
@@ -491,7 +506,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // dark artwork is deeper, so it gets a stronger wash.
         // v1.77: the light scrim was nudged up so the page reads as a calm tinted
         // surface (less flat-white) while the illustration still shows through.
-        if(!gpDrawBackground(dc, rc, g_dark, g_theme.bg, g_dark?96:42)){
+        if(!gpDrawBackground(dc, rc, g_dark, g_theme.bg, g_dark?96:58)){
             RECT full={0,0,rc.right,rc.bottom};
             gpGradRoundRect(dc,full,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
         }
@@ -519,29 +534,15 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // Accent ribbon hugging the panel's top edge. It is inset by the corner
         // radius so it never spills outside the rounded silhouette (drawing it
         // full-width would leave two hard accent squares in the corners).
-        // v1.87.0 gradialism: the ribbon sweeps indigo → sky → violet, and a
-        // soft shimmer glides along it once while the entrance animation plays.
-        // v1.87.0: entrance-animation bell curve, computed once per paint.
-        double animT = -1, animBell = 0;
-        if(s_homePhase>=0){
-            animT = s_homePhase/30.0;
-            animBell = animT<0.5 ? animT*2 : (1-animT)*2;
-        }
+        // v1.89.0: ONE seamless gradialism ribbon (true 3-stop sweep, no
+        // mid-seam, no animation).
         {
             RECT rb = g.ribbon;
             rb.left  += g.radius;
             rb.right -= g.radius;
-            if(rb.right - rb.left > S(40)){
+            if(rb.right - rb.left > S(40))
                 gpGradRibbon3(dc, rb, S(3), g_theme.accent, g_theme.accent2,
                               g_infoAccent);
-                if(animT>=0){
-                    int sx = rb.left + (int)((rb.right-rb.left) * animT);
-                    int sw = S(80);
-                    RECT gz={sx-sw/2, rb.top-S(2), sx+sw/2, rb.bottom+S(2)};
-                    int al = (int)(130 * animBell);
-                    if(al>8) gpFillAlpha(dc, gz, S(4), RGB(255,255,255), al);
-                }
-            }
         }
 
         // ---- 3. brand mark --------------------------------------------------
@@ -552,10 +553,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             int d  = g.logo.right-g.logo.left;
             int rr = d/2;
             RECT halo=g.logo; InflateRect(&halo,S(7),S(7));
-            // v1.87.0: the halo blooms once as the welcome screen enters, then
-            // settles back to its resting glow (driven by s_homePhase).
-            int haloA = g_dark?70:52;
-            if(animT>=0) haloA += (int)(48 * animBell);
+            int haloA = g_dark?70:52;   // resting glow (animation removed v1.89)
             gpFillAlpha(dc, halo, (d+S(14))/2,
                         blendColor(g_theme.accent, pTop, 55), haloA);
             gpShadow(dc, g.logo, rr, S(9), g_dark?110:78);
@@ -649,12 +647,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
                         g_dark?24:95);
             // RTL: پرسنل on the RIGHT cell, مدیریت on the LEFT cell.
+            // v1.89.0: no description lines — just the icon and its name,
+            // exactly like a phone's installed apps.
             paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
-                         L"حساب پرسنل", L"دکتر، پرستار، پذیرشگر، کارآموز",
-                         s_appHot==1);
+                         L"حساب پرسنل", NULL, s_appHot==1);
             paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
-                         L"حساب مدیریت", L"گزارش‌ها، خدمات و مدیریت",
-                         s_appHot==2);
+                         L"حساب مدیریت", NULL, s_appHot==2);
         }
 
         // ---- 6. footer pill -------------------------------------------------
@@ -687,7 +685,9 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 DT_LEFT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
         }
 
-        BitBlt(dc0,0,0,rc.right,rc.bottom,dc,0,0,SRCCOPY);
+        SelectClipRgn(dc,NULL); DeleteObject(dclip);
+        SetViewportOrgEx(dc,0,0,NULL);
+        BitBlt(dc0,d.left,d.top,dw,dh,dc,0,0,SRCCOPY);
         SelectObject(dc,obm); DeleteObject(bmp); DeleteDC(dc);
         EndPaint(h,&ps);
         return 0; }

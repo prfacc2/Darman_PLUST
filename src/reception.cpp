@@ -123,7 +123,8 @@ enum TabKind {
     TK_TOOLS       = 3,   // v1.84: native «ابزارها» web surface
     TK_CASHIER     = 4,   // v1.84: native «صندوق» web surface
     TK_QUEUE       = 5,   // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
-    TK_RECEIPTS    = 6    // v1.88: native «جستجوی قبض» web surface (was in-page)
+    TK_RECEIPTS    = 6,   // v1.88: native «جستجوی قبض» web surface (was in-page)
+    TK_DASH        = 7    // v1.89: native «داشبورد» — the permanent landing tab
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
@@ -555,9 +556,135 @@ static int tabIconFor(int kind){
     if(kind==TK_CASHIER) return ICO_WALLET;
     if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
     if(kind==TK_RECEIPTS) return ICO_RECEIPT; // جستجوی قبض — receipt glyph
+    if(kind==TK_DASH)    return ICO_HOME;     // داشبورد — home glyph
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
+}
+
+// ------------------------------------------------- v1.89: message toast ----
+//  Bottom-right glass toast for incoming کارتابل messages. LEFT click opens
+//  the کارتابل tab (the current tab's state is untouched — tabs are
+//  independent views); RIGHT click offers «محو» to dismiss. Severity colours:
+//  حیاتی = red, فوری = amber, عادی = blue (never green, per request).
+static const wchar_t* AZ_TOAST_CLS = L"AzMsgToast";
+
+static LRESULT CALLBACK toastProc(HWND h, UINT m, WPARAM w, LPARAM l){
+    switch(m){
+    case WM_ERASEBKGND: return 1;
+    case WM_PAINT: {
+        PAINTSTRUCT ps; HDC dc0=BeginPaint(h,&ps);
+        RECT rc; GetClientRect(h,&rc);
+        HDC dc=CreateCompatibleDC(dc0);
+        HBITMAP bmp=CreateCompatibleBitmap(dc0,rc.right,rc.bottom);
+        HGDIOBJ obm=SelectObject(dc,bmp);
+        // corners: fill with the page bg so the rounded silhouette blends
+        HBRUSH bb=CreateSolidBrush(g_theme.bg); FillRect(dc,&rc,bb); DeleteObject(bb);
+        KMsg* msg=(KMsg*)GetWindowLongPtrW(h,GWLP_USERDATA);
+        int type = msg? msg->type : KMSG_NORMAL;
+        COLORREF sev = type==KMSG_CRITICAL ? g_theme.danger
+                     : type==KMSG_URGENT   ? RGB(0xE8,0x9C,0x1C)
+                     :                       g_theme.accent;
+        int rad=S(16);
+        gpShadowColor(dc,rc,rad,S(12),72,sev);
+        gpGradRoundRectBg(dc,rc,rad,g_theme.surfaceTop,g_theme.surface,
+            blendColor(g_theme.border,sev,30),g_theme.bg);
+        { RECT itr=rc; InflateRect(&itr,-S(1),-S(1));
+          gpRoundRect(dc,itr,rad-S(1),CLR_INVALID,RGB(255,255,255),g_dark?30:110); }
+        // severity stripe along the leading (RIGHT in RTL) edge
+        RECT st={rc.right-S(7),rc.top+S(10),rc.right-S(2),rc.bottom-S(10)};
+        gpRoundRect(dc,st,S(2),sev,CLR_INVALID);
+        // envelope badge
+        int isz=S(34);
+        RECT ic={rc.right-S(16)-isz,rc.top+(rc.bottom-rc.top-isz)/2-S(6),
+                 rc.right-S(16),rc.top+(rc.bottom-rc.top-isz)/2-S(6)+isz};
+        gpGradRoundRect(dc,ic,S(11),blendColor(sev,RGB(255,255,255),24),
+                        blendColor(sev,RGB(0,0,0),14),CLR_INVALID);
+        RECT ici=ic; InflateRect(&ici,-S(8),-S(8));
+        drawIcon(dc,ICO_LETTER,ici,RGB(255,255,255),S(2));
+        SetBkMode(dc,TRANSPARENT);
+        int txL=rc.left+S(14), txR=ic.left-S(10);
+        // title row: «پیام جدید» + severity tag
+        SelectObject(dc,g_fUIB);
+        SetTextColor(dc,g_theme.text);
+        RECT tr={txL,rc.top+S(10),txR,rc.top+S(10)+S(20)};
+        std::wstring ttl = type==KMSG_CRITICAL ? L"پیام حیاتی"
+                         : type==KMSG_URGENT   ? L"پیام فوری"
+                         :                       L"پیام جدید";
+        DrawTextW(dc,ttl.c_str(),-1,&tr,
+            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+        // from + snippet
+        SelectObject(dc,g_fSmall);
+        SetTextColor(dc,g_theme.textDim);
+        RECT fr={txL,tr.bottom+S(1),txR,tr.bottom+S(1)+S(16)};
+        std::wstring who = msg? (L"از: "+msg->from) : L"";
+        DrawTextW(dc,who.c_str(),-1,&fr,
+            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX|DT_END_ELLIPSIS);
+        SetTextColor(dc,g_theme.labelInk);
+        RECT sr={txL,fr.bottom+S(1),txR,rc.bottom-S(8)};
+        std::wstring snip = msg? msg->text : L"";
+        DrawTextW(dc,snip.c_str(),-1,&sr,
+            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX|DT_END_ELLIPSIS);
+        BitBlt(dc0,0,0,rc.right,rc.bottom,dc,0,0,SRCCOPY);
+        SelectObject(dc,obm); DeleteObject(bmp); DeleteDC(dc);
+        EndPaint(h,&ps);
+        return 0; }
+    case WM_LBUTTONUP: {
+        ShowWindow(h,SW_HIDE);
+        Reception_OpenPortal();     // open/activate the کارتابل tab
+        return 0; }
+    case WM_RBUTTONUP: {
+        HMENU mnu=CreatePopupMenu();
+        AppendMenuW(mnu,MF_STRING,1,L"محو");
+        POINT pt; GetCursorPos(&pt);
+        // classic Win32 popup gotcha: without foreground focus the menu
+        // auto-dismisses instantly on some systems.
+        SetForegroundWindow(h);
+        int cmd=TrackPopupMenu(mnu,TPM_RETURNCMD|TPM_NONOTIFY|TPM_RIGHTBUTTON,
+                               pt.x,pt.y,0,h,NULL);
+        PostMessage(h,WM_NULL,0,0);
+        DestroyMenu(mnu);
+        if(cmd==1) ShowWindow(h,SW_HIDE);   // محو — dismiss the toast only
+        return 0; }
+    case WM_TIMER:
+        if(w==1){ KillTimer(h,1); ShowWindow(h,SW_HIDE); }
+        return 0;
+    case WM_DESTROY: {
+        KMsg* msg=(KMsg*)GetWindowLongPtrW(h,GWLP_USERDATA);
+        delete msg; SetWindowLongPtrW(h,GWLP_USERDATA,0);
+        return 0; }
+    }
+    return DefWindowProcW(h,m,w,l);
+}
+
+// Show (or update) the toast anchored to the reception screen's bottom-right.
+static void MsgToast_Show(HWND recHwnd, const KMsg& msg, int unseen){
+    static bool reg=false;
+    if(!reg){
+        WNDCLASSW wc={0};
+        wc.lpfnWndProc=toastProc; wc.hInstance=g_hInst;
+        wc.lpszClassName=AZ_TOAST_CLS; wc.hbrBackground=NULL;
+        wc.style=CS_HREDRAW|CS_VREDRAW;
+        RegisterClassW(&wc); reg=true;
+    }
+    HWND t=FindWindowExW(recHwnd,NULL,AZ_TOAST_CLS,NULL);
+    if(!t){
+        t=CreateWindowExW(0,AZ_TOAST_CLS,L"",WS_CHILD,
+                          0,0,10,10,recHwnd,NULL,g_hInst,NULL);
+        if(!t){ logLine(L"toast: CreateWindowEx failed"); return; }
+    }
+    KMsg* old=(KMsg*)GetWindowLongPtrW(t,GWLP_USERDATA);
+    delete old;
+    SetWindowLongPtrW(t,GWLP_USERDATA,(LONG_PTR)new KMsg(msg));
+    (void)unseen;
+    RECT rc; GetClientRect(recHwnd,&rc);
+    int tw=S(350), th=S(88);
+    SetWindowPos(t,HWND_TOP, rc.right-tw-S(14), rc.bottom-th-S(14),
+                 tw,th, SWP_NOACTIVATE|SWP_SHOWWINDOW);
+    KillTimer(t,1);
+    SetTimer(t,1,9000,NULL);   // auto-dismiss after 9 s
+    InvalidateRect(t,NULL,TRUE);
+    UpdateWindow(t);           // paint now, not at the next idle pass
 }
 
 // ---------------------------------------------------------------- billing --
@@ -2623,7 +2750,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
         if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
-           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS)
+           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS && t->kind!=TK_DASH)
             return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
@@ -2644,10 +2771,13 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             else if(t->kind==TK_CASHIER) surf="cashier";
             else if(t->kind==TK_QUEUE) surf="queue";
             else if(t->kind==TK_RECEIPTS) surf="receipts";
+            else if(t->kind==TK_DASH) surf="dash";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
-        if(t->kind!=TK_RECEPTION) return 0;
+        // v1.89: TK_DASH also falls back to the native admission form, so a
+        // machine without WebView2 AND MSHTML still has a working پذیرش path.
+        if(t->kind!=TK_RECEPTION && t->kind!=TK_DASH) return 0;
         // v1.25.0: ES_RIGHT so every textbox is right-aligned (راست‌چین) by
         // default — Persian RTL data entry. Fields with enableAutoDir still flip
         // alignment live based on typed content (Latin vs Persian).
@@ -4626,6 +4756,12 @@ static void recLayoutTabs(HWND h){
             ShowWindow(t->page,SW_SHOW);
         } else ShowWindow(t->page,SW_HIDE);
     }
+    // v1.89.0: keep the message toast above the tab pages. Showing a page
+    // with SW_SHOW raises it to the top of the Z order, which would sink a
+    // live toast behind a full-screen page (invisible + unclickable for the
+    // rest of its 9 s). Re-assert the toast on top after every relayout.
+    if(HWND tw=FindWindowExW(h,NULL,AZ_TOAST_CLS,NULL))
+        if(IsWindowVisible(tw)) BringWindowToTop(tw);
 }
 static void addTabKind(HWND h, int kind, const std::string& extra=""){
     if(!s_rd) return;
@@ -4647,6 +4783,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_CASHIER)   t->title=L"صندوق";
     else if(kind==TK_QUEUE)     t->title=L"صندوق نرفته‌ها و صف پذیرش";
     else if(kind==TK_RECEIPTS)  t->title=L"جستجوی قبض";
+    else if(kind==TK_DASH)      t->title=L"داشبورد";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -4669,6 +4806,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
 static void addTab(HWND h){ addTabKind(h, TK_RECEPTION); }
 static void closeTab(TabPage* t){
     if(!s_rd) return;
+    if(t->kind==TK_DASH) return;   // v1.89: the dashboard tab never closes
     HWND h=recWnd();
     for(size_t i=0;i<s_rd->tabs.size();i++){
         if(s_rd->tabs[i]==t){
@@ -4759,9 +4897,32 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 // repaint the cartable page itself if visible
                 for(auto* tp : s_rd->tabs)
                     if(tp->kind==TK_PORTAL && tp->page) InvalidateRect(tp->page,NULL,FALSE);
+                // v1.89: bottom-right toast for the newest unseen message
+                {
+                    auto msgs=loadMessages(g_session.user.username);
+                    const KMsg* latest=NULL;
+                    for(auto& mm:msgs) if(!mm.seen) latest=&mm;
+                    if(latest) MsgToast_Show(h, *latest, n);
+                }
+            }
+            // v1.89: keep the dashboard's envelope badge in sync (both ways)
+            if(n!=s_rd->lastUnseen){
+                std::string js = std::string("{\"n\":") + std::to_string(n) + "}";
+                WebAdmission_PushEvent("dash.unread", js);
             }
             s_rd->lastUnseen=n;
         }
+        // v1.89.0: the message toast is a transient notification and must stay
+        // above every tab page for its whole 9 s life. Any path that shows or
+        // raises a page (tab switch, web-view re-creation, detach/reattach)
+        // would otherwise sink it behind a full-screen page. The repaint also
+        // keeps it fresh if a page painted over it (seen under Wine).
+        if(HWND tw=FindWindowExW(h,NULL,AZ_TOAST_CLS,NULL))
+            if(IsWindowVisible(tw)){
+                BringWindowToTop(tw);
+                InvalidateRect(tw,NULL,TRUE);
+                UpdateWindow(tw);
+            }
         return 0;
     case WM_NCDESTROY:
         KillTimer(h,77);
@@ -4788,17 +4949,11 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(id==ID_RC_CALC) openCalculator(g_hFrame);
         else if(id==ID_RC_NEWTAB) addTabKind(h, TK_EMPTY);   // new-tab → empty
         else if(id==ID_RC_NEWPAT){
-            // "پذیرش بیمار" (پذیرش بیمار/New Admission) — always open a FRESH
-            // reception tab so a new patient never overwrites the form the
-            // operator is currently filling. If the active tab is an EMPTY
-            // placeholder, reuse it; otherwise add a new reception tab.
-            if(s_rd && s_rd->active>=0 && s_rd->active<(int)s_rd->tabs.size()
-               && s_rd->tabs[s_rd->active]->kind==TK_EMPTY){
-                // turn the empty tab into a reception tab in place
-                addTab(h);
-            } else {
-                addTab(h);   // open a new reception tab
-            }
+            // «پذیرش بیمار» — v1.89.0: routed through the shared helper (the
+            // dashboard app icon + the ui.openTab verb use the same path, so
+            // the reuse-empty-or-fresh behaviour can never drift apart).
+            Reception_OpenAdmissionNew();
+            return 0;
         }
         return 0; }
     case WM_MOUSEMOVE: {
@@ -4850,8 +5005,12 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         int part=0, hit=hitTab(h,pt,&part);
         if(hit>=0 && hit<(int)s_rd->tabs.size()){
             TabPage* t=s_rd->tabs[hit];
-            // the cartable (پرتابل/کارتابل) tab is permanent — never closes
-            if(part==1 && t->kind==TK_PORTAL){
+            // v1.89: the DASHBOARD tab is permanent — it has no close control.
+            // The cartable (کارتابل) is now CLOSABLE; while it carries an
+            // unread badge the badge slot acts as «open + mark seen» instead.
+            if(part==1 && t->kind==TK_DASH){ /* permanent — nothing to close */ }
+            else if(part==1 && t->kind==TK_PORTAL
+                    && unseenMessageCount(g_session.user.username)>0){
                 s_rd->active=hit; markMessagesSeen(g_session.user.username);
                 recLayoutTabs(h); InvalidateRect(h,NULL,FALSE);
             }
@@ -4978,15 +5137,24 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                     gpGradRoundRectBgH(dc,ind2,S(2),g_theme.accent,g_theme.accent2,
                                        CLR_INVALID,CLR_INVALID);
                 } else if(hov){
-                    gpShadow(dc,r,trad,S(5),44);
+                    // v1.89: hover = a lifted frosted chip with a light inner rim
+                    gpShadowColor(dc,r,trad,S(6),52,g_theme.accent);
                     gpGradRoundRect(dc,r,trad,
-                        blendColor(g_theme.surfaceTop,g_theme.hover,40),
-                        g_theme.hover,
-                        blendColor(g_theme.border,g_theme.accent,38));
+                        g_theme.surfaceTop,
+                        blendColor(g_theme.hover,g_theme.surface,35),
+                        blendColor(g_theme.border,g_theme.accent,45));
+                    RECT itr=r; InflateRect(&itr,-S(1),-S(1));
+                    gpRoundRect(dc,itr,trad>S(1)?trad-S(1):trad,CLR_INVALID,
+                                RGB(255,255,255),g_dark?26:85);
                 } else {
+                    // v1.89: resting = a quiet frosted-glass chip (not flat grey)
                     gpGradRoundRect(dc,r,trad,
-                        blendColor(g_theme.surfaceTop,g_theme.surface,55),
-                        g_theme.surface, g_theme.border);
+                        blendColor(g_theme.surfaceTop,RGB(255,255,255),35),
+                        blendColor(g_theme.surface,g_theme.surface2,35),
+                        blendColor(g_theme.border,g_theme.accent,16));
+                    RECT itr=r; InflateRect(&itr,-S(1),-S(1));
+                    gpRoundRect(dc,itr,trad>S(1)?trad-S(1):trad,CLR_INVALID,
+                                RGB(255,255,255),g_dark?18:60);
                 }
                 // icon medallion at the leading (right/RTL) edge — solid accent
                 // on the active tab, a quiet accent tint on the others.
@@ -5018,6 +5186,7 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 RECT tr2={r.left+S(38),r.top,r.right-S(42),r.bottom};
                 DrawTextW(dc,t->title.c_str(),-1,&tr2,
                     DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX|DT_END_ELLIPSIS);
+                if(t->kind==TK_DASH) continue;   // v1.89: permanent, no close slot
                 // unseen badge on the cartable tab (sits in the close slot)
                 if(t->kind==TK_PORTAL){
                     int n=unseenMessageCount(g_session.user.username);
@@ -5034,7 +5203,7 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                         DrawTextW(dc,toFaDigits(nb).c_str(),-1,&bd,
                             DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
                     }
-                    continue;   // cartable: permanent tab, no close control
+                    continue;   // badge covers the close slot while unread
                 }
                 // close ×  (v1.63.0: hover raises a soft glowing danger pill
                 // instead of a flat red square)
@@ -5106,7 +5275,7 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 SetTextColor(dc,g_theme.textDim);
                 RECT sr2={S(20),hr.bottom+S(6),rc.right-S(20),hr.bottom+S(6)+sl};
                 DrawTextW(dc,
-                    L"برای شروع، «پذیرش بیمار» را از نوار بالا انتخاب کنید",
+                    L"برای شروع، از داشبورد «پذیرش بیمار» را انتخاب کنید",
                     -1,&sr2,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
             }
         }
@@ -5198,10 +5367,32 @@ void Reception_OpenReceipts(){
     HWND h=recWnd(); if(!h) return;
     activateKind(h, TK_RECEIPTS);
 }
+// v1.89.0: dashboard app-icon actions — portal / new empty tab / fresh
+// admission (the «پذیرش بیمار» behaviour that used to live in the removed
+// header action bar: reuse an EMPTY tab if focused, else open a fresh one).
+void Reception_OpenPortal(){
+    HWND h=recWnd(); if(!h) return;
+    if(!userHasPerm(g_session.user, L"worklist")) return;   // v1.89: tick gate
+    activateKind(h, TK_PORTAL);
+}
+void Reception_OpenNewTab(){
+    HWND h=recWnd(); if(!h) return;
+    addTabKind(h, TK_EMPTY);
+}
+void Reception_OpenAdmissionNew(){
+    HWND h=recWnd(); if(!h) return;
+    if(!userHasPerm(g_session.user, L"admission")) return;  // v1.89: tick gate
+    if(s_rd && s_rd->active>=0 && s_rd->active<(int)s_rd->tabs.size()
+       && s_rd->tabs[s_rd->active]->kind==TK_EMPTY)
+        addTab(h);          // reuse the empty placeholder
+    else
+        addTab(h);          // fresh reception tab
+}
 void Reception_CloseTools(){ closeActiveKind(TK_TOOLS); }
 void Reception_CloseCashier(){ closeActiveKind(TK_CASHIER); }
 void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
 void Reception_CloseReceipts(){ closeActiveKind(TK_RECEIPTS); }
+void Reception_ClosePortal(){ closeActiveKind(TK_PORTAL); }
 void Reception_ResetZoom(){
     std::wstring user=g_session.user.username;
     std::wstring suffix=user.empty()?L"":L"."+user;
@@ -5223,21 +5414,13 @@ HWND createReceptionScreen(HWND frame){
     HWND h=CreateWindowExW(0,RC_CLASS,L"",
         WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,
         rc.left,rc.top,rc.right-rc.left,rc.bottom-rc.top,frame,NULL,g_hInst,NULL);
-    // v1.8.0 — default tab behaviour:
-    //   On entering reception, NO previously-open tab is auto-restored. The ONLY
-    //   tab opened by default is the message board (کارتابل / TK_PORTAL), which
-    //   is also the FIRST (right-most, index 0) tab so the user immediately sees
-    //   any pending management messages. Reception / appointment tabs are opened
-    //   on demand from the header action buttons.
-    // v1.79.0 — permission gating: the کارتابل tab opens by default only when
-    //   the account holds the «کارتابل» access tick; otherwise the screen lands
-    //   on a friendly empty tab (it never stays blank).
-    if(userHasPerm(g_session.user, L"worklist"))
-        addTabKind(h, TK_PORTAL);
-    else
-        addTabKind(h, TK_EMPTY);
+    // v1.89.0 — the reception account lands on the DASHBOARD (TK_DASH): the
+    // permanent, non-closable first tab. Everything else (کارتابل, پذیرش بیمار,
+    // تب جدید, ابزارها…) opens on demand from the dashboard's app icons. No
+    // previously-open tab is auto-restored.
+    addTabKind(h, TK_DASH);
     if(s_rd){
-        s_rd->active = 0;            // focus the message board tab
+        s_rd->active = 0;            // focus the dashboard tab
         recLayoutTabs(h);
     }
 #ifdef AZ_DEBUG_BUILD

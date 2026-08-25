@@ -60,7 +60,17 @@ static void ssSet(SetupState* s, int pct, const wchar_t* step){
 // detection) runs on EVERY launch inside ssWorker regardless — see RunSetupSplash.
 static bool ssFirstRunForBuild(){
     std::wstring done = getSetting(L"setup_done_version", L"");
-    return done != std::wstring(APP_VERSION_W);
+    if(done != std::wstring(APP_VERSION_W)) return true;
+    // v1.89.0: if the exe was MOVED/copied to a new location, re-run the full
+    // preparation (font install + per-system configuration) before the app
+    // window shows — the user asked for prepare-first behaviour after a
+    // relocation, and this also covers a stale/broken per-machine setup.
+    wchar_t exe[MAX_PATH]={0};
+    if(GetModuleFileNameW(NULL,exe,MAX_PATH)){
+        std::wstring stamped = getSetting(L"setup_exe_path", L"");
+        if(stamped.empty() || stamped != std::wstring(exe)) return true;
+    }
+    return false;
 }
 
 // §1.18.1: detect weak hardware (≤2GB RAM or ≤2 logical CPUs) so the app can
@@ -147,7 +157,12 @@ static DWORD WINAPI ssWorker(LPVOID p){
     setSetting(L"sys_mshtml_configured",s->webOk?L"1":L"0");
 
     ssSet(s, 94, L"تکمیل پیکربندی برای این سیستم…");
-    if(s->firstRun) setSetting(L"setup_done_version", APP_VERSION_W);
+    if(s->firstRun){
+        setSetting(L"setup_done_version", APP_VERSION_W);
+        wchar_t exe[MAX_PATH]={0};
+        if(GetModuleFileNameW(NULL,exe,MAX_PATH))
+            setSetting(L"setup_exe_path", exe);   // v1.89.0 relocation stamp
+    }
 
     ssSet(s, 100, L"آماده است");
     Sleep(s->firstRun ? 300 : 0);   // brief hold on first run only

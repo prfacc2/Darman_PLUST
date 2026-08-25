@@ -5368,3 +5368,384 @@ body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group:last-child{
   background:-webkit-linear-gradient(top,#f4f7fd 0%,#e5ebf9 100%);
   background:linear-gradient(180deg,#f4f7fd 0%,#e5ebf9 100%);
 }
+
+/* ==========================================================================
+   v1.89.0 — RECEPTION DASHBOARD + palette re-balance round
+     * new surface-dash: the permanent landing tab — glass vessel, android-style
+       app icons (badge + name only), concave search, categorised drawer;
+     * tools tiles: NO hover background wash — only the icon scales and the
+       name deepens (iOS behaviour); the grid sits in a frosted vessel;
+     * receipt colour guide rows = pure dot + readable text chip on that colour;
+     * invoice «صورتحساب» → very-light-yellow glass (not bold); «مانده» keeps
+       the same family, just bordered + slightly bolder;
+     * card heads re-paletted (deeper two-tone gradients, glass icon chips).
+   Trident-safe: no var(), no gap, no backdrop-filter, no logical props.
+   ========================================================================== */
+
+/* ---- 1. dashboard surface chrome ------------------------------------------- */
+body.surface-dash #appBody{display:none !important;}
+body.surface-dash{
+  background:#c9d3e4;
+  background:-webkit-linear-gradient(150deg,#dde4f2 0%,#cbd5e8 48%,#bcc8de 100%);
+  background:linear-gradient(150deg,#dde4f2 0%,#cbd5e8 48%,#bcc8de 100%);
+}
+body.surface-dash .dash-panel{
+  display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
+  position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;overflow-y:auto;
+  padding:14px 18px 18px;
+  background-image:repeating-linear-gradient(135deg, rgba(53,80,216,.026) 0px, rgba(53,80,216,.026) 2px, transparent 2px, transparent 13px);
+}
+.dash-panel{display:none;}
+/* glass top bar */
+.dash-topbar{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  padding:11px 14px;border-radius:18px;
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.94) 0%,rgba(232,239,251,.90) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.94) 0%,rgba(232,239,251,.90) 100%);
+  border:1px solid #aabadd;
+  -webkit-box-shadow:0 2px 5px rgba(16,32,64,.06), 0 14px 30px rgba(16,32,64,.12), inset 0 1px 0 #fff;
+  box-shadow:0 2px 5px rgba(16,32,64,.06), 0 14px 30px rgba(16,32,64,.12), inset 0 1px 0 #fff;
+}
+.dash-topbar-side{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex:1 1 auto;flex:1 1 auto;min-width:0;}
+.dash-burger{
+  width:46px;height:46px;-ms-flex:0 0 46px;flex:0 0 46px;margin-left:12px;
+  border:1px solid #a4b8dc;border-radius:15px;cursor:pointer;color:#33477a;
+  background:-webkit-linear-gradient(180deg,#ffffff 0%,#e7eefb 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e7eefb 100%);
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.07), inset 0 -1px 0 #fff, 0 4px 10px rgba(20,40,72,.10);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.07), inset 0 -1px 0 #fff, 0 4px 10px rgba(20,40,72,.10);
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;
+}
+.dash-burger:hover{color:#2f47c4;border-color:#7d97e8;}
+.dash-title{font-size:19px;font-weight:900;color:#16233c;}
+.dash-sub{font-size:12px;color:#54648a;margin-top:2px;font-weight:700;}
+/* کارتابل envelope in the header — grey «۰» at rest, red + count when unread */
+.dash-mail{
+  position:relative;width:46px;height:46px;border-radius:15px;cursor:pointer;
+  border:1px solid #a4b8dc;color:#33477a;
+  background:-webkit-linear-gradient(180deg,#ffffff 0%,#e7eefb 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e7eefb 100%);
+  -webkit-box-shadow:inset 0 2px 3px rgba(20,40,72,.07), inset 0 -1px 0 #fff, 0 4px 10px rgba(20,40,72,.10);
+  box-shadow:inset 0 2px 3px rgba(20,40,72,.07), inset 0 -1px 0 #fff, 0 4px 10px rgba(20,40,72,.10);
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;
+}
+.dash-mail:hover{color:#7c56e4;border-color:#b9a4ef;}
+.dash-mail-badge{
+  position:absolute;top:-7px;left:-7px;min-width:22px;height:22px;padding:0 5px;
+  border-radius:999px;text-align:center;line-height:22px;font-size:11.5px;font-weight:900;
+  color:#5d6d88;background:#e7edf6;border:2px solid #fff;
+  -webkit-box-shadow:0 2px 6px rgba(20,40,72,.18);box-shadow:0 2px 6px rgba(20,40,72,.18);
+}
+.dash-mail-badge.has{
+  color:#fff;border-color:#fff;
+  background:#e05352;
+  background:-webkit-linear-gradient(180deg,#ec6c6b 0%,#d03a39 100%);
+  background:linear-gradient(180deg,#ec6c6b 0%,#d03a39 100%);
+  -webkit-box-shadow:0 3px 9px rgba(208,58,57,.45), inset 0 1px 0 rgba(255,255,255,.35);
+  box-shadow:0 3px 9px rgba(208,58,57,.45), inset 0 1px 0 rgba(255,255,255,.35);
+}
+/* concave search */
+.dash-search{margin:14px 2px 0;}
+.dash-search-wrap{position:relative;display:block;}
+.dash-search-wrap .inp{
+  width:100%;height:46px;border-radius:999px;padding:0 44px 0 18px;font-size:13.5px;
+  background:#eef2fa;border:1px solid #b9c8e2;
+  -webkit-box-shadow:inset 3px 3px 7px rgba(20,40,72,.10), inset -2px -2px 3px rgba(255,255,255,.95);
+  box-shadow:inset 3px 3px 7px rgba(20,40,72,.10), inset -2px -2px 3px rgba(255,255,255,.95);
+}
+.dash-search-wrap .inp:focus{
+  background:#fff;border-color:#5468e4;
+  -webkit-box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+  box-shadow:0 0 0 3px rgba(84,104,228,.16), inset 1px 1px 3px rgba(20,40,72,.05);
+}
+.dash-search-ic{position:absolute;top:13px;right:16px;color:#5468e4;}
+/* the frosted vessel holding the app icons */
+.dash-vessel{
+  margin-top:16px;padding:22px 22px 26px;border-radius:26px;
+  background:rgba(244,247,252,.66);
+  background:-webkit-linear-gradient(160deg,rgba(255,255,255,.78) 0%,rgba(238,243,251,.62) 100%);
+  background:linear-gradient(160deg,rgba(255,255,255,.78) 0%,rgba(238,243,251,.62) 100%);
+  border:1px solid rgba(255,255,255,.85);
+  outline:1px solid #a8badc;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,64,.06), 0 24px 48px rgba(16,32,64,.14), inset 0 1px 0 rgba(255,255,255,.95);
+  box-shadow:0 3px 6px rgba(16,32,64,.06), 0 24px 48px rgba(16,32,64,.14), inset 0 1px 0 rgba(255,255,255,.95);
+}
+.dash-vessel-title{font-size:13px;font-weight:900;color:#3c4c72;margin:0 2px 16px;}
+.dash-grid{
+  display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;
+  -ms-flex-pack:center;justify-content:center;
+}
+/* android-style app icon: badge + name, NO background at rest */
+.dash-app{
+  display:block;width:150px;margin:0 14px 14px;padding:10px 6px 8px;
+  background:transparent;border:none;cursor:pointer;font:inherit;text-align:center;
+}
+.dash-app:focus{outline:none;}
+.dash-appico{
+  position:relative;display:block;width:86px;height:86px;line-height:86px;
+  margin:0 auto 12px;border-radius:26px;color:#fff;
+  -webkit-box-shadow:0 14px 28px rgba(20,40,80,.26), inset 0 2px 3px rgba(255,255,255,.5), inset 0 -4px 7px rgba(0,0,0,.16);
+  box-shadow:0 14px 28px rgba(20,40,80,.26), inset 0 2px 3px rgba(255,255,255,.5), inset 0 -4px 7px rgba(0,0,0,.16);
+  -webkit-transition:transform .16s ease;transition:transform .16s ease;
+}
+.dash-appico:after{
+  content:"";position:absolute;top:3px;left:9%;right:9%;height:44%;
+  border-radius:18px 18px 22px 22px;
+  background:-webkit-linear-gradient(top,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 100%);
+}
+.dash-appico-adm{
+  background:#3550d8;
+  background:-webkit-linear-gradient(top,#7a90f4 0%,#3550d8 60%,#22349c 100%);
+  background:linear-gradient(180deg,#7a90f4 0%,#3550d8 60%,#22349c 100%);
+}
+.dash-appico-tab{
+  background:#0f9480;
+  background:-webkit-linear-gradient(top,#3fd6bb 0%,#0f9480 60%,#0a6b5c 100%);
+  background:linear-gradient(180deg,#3fd6bb 0%,#0f9480 60%,#0a6b5c 100%);
+}
+.dash-appico-mail{
+  background:#7c56e4;
+  background:-webkit-linear-gradient(top,#b79bff 0%,#7c56e4 60%,#4f2bb0 100%);
+  background:linear-gradient(180deg,#b79bff 0%,#7c56e4 60%,#4f2bb0 100%);
+}
+/* hover: NO background — the badge scales and the name deepens, iOS-like */
+.dash-app:hover .dash-appico{
+  -webkit-transform:scale(1.07);-ms-transform:scale(1.07);transform:scale(1.07);
+}
+.dash-appname{display:block;font-size:14px;font-weight:800;color:#25324d;}
+.dash-app:hover .dash-appname{color:#1a2c66;font-weight:900;}
+.dash-app-badge{
+  position:absolute;top:-6px;left:-6px;z-index:2;min-width:22px;height:22px;padding:0 5px;
+  border-radius:999px;text-align:center;line-height:22px;font-size:11px;font-weight:900;
+  color:#5d6d88;background:#e7edf6;border:2px solid #fff;
+  -webkit-box-shadow:0 2px 6px rgba(20,40,72,.20);box-shadow:0 2px 6px rgba(20,40,72,.20);
+}
+.dash-app-badge.has{
+  color:#fff;
+  background:#e05352;
+  background:-webkit-linear-gradient(180deg,#ec6c6b 0%,#d03a39 100%);
+  background:linear-gradient(180deg,#ec6c6b 0%,#d03a39 100%);
+}
+.dash-empty{text-align:center;color:#5d6d88;font-weight:700;padding:30px 0 10px;}
+.dash-foot{text-align:center;color:#66748e;font-size:11.5px;font-weight:700;margin-top:auto;padding-top:18px;}
+/* dashboard drawer — tinted glass, categorised */
+.dash-drawer-bk{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:2300;background:rgba(14,24,44,.36);
+  opacity:0;visibility:hidden;-webkit-transition:opacity .22s ease;transition:opacity .22s ease;
+}
+.dash-drawer-bk.open{opacity:1;visibility:visible;}
+.dash-drawer{
+  position:fixed;top:0;bottom:0;right:0;width:308px;z-index:2400;
+  display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
+  background:-webkit-linear-gradient(180deg,#e9eef9 0%,#d9e2f4 100%);
+  background:linear-gradient(180deg,#e9eef9 0%,#d9e2f4 100%);
+  border-left:1px solid #a4b8dc;
+  -webkit-box-shadow:-18px 0 44px rgba(12,26,54,.26);box-shadow:-18px 0 44px rgba(12,26,54,.26);
+  -webkit-transform:translateX(105%);-ms-transform:translateX(105%);transform:translateX(105%);
+  -webkit-transition:transform .24s ease,-ms-transform .24s ease;
+  transition:transform .24s ease,-ms-transform .24s ease;
+}
+.dash-drawer.open{-webkit-transform:translateX(0);-ms-transform:translateX(0);transform:translateX(0);}
+.dash-drawer-head{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;
+  padding:14px 14px 10px;border-bottom:1px solid #bcc9e4;
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(230,237,250,.70) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.85) 0%,rgba(230,237,250,.70) 100%);
+}
+.dash-drawer-title{font-size:14px;font-weight:900;color:#16233c;}
+.dash-drawer-title svg{vertical-align:-3px;margin-left:6px;color:#3550d8;}
+.dash-drawer-search{padding:10px 14px;border-bottom:1px solid #c9d4e9;}
+.dash-drawer-search .inp{width:100%;}
+.dash-drawer-body{padding:8px 10px 16px;overflow-y:auto;-ms-flex:1 1 auto;flex:1 1 auto;}
+.dash-cat{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  margin:14px 4px 6px;font-size:11.5px;font-weight:900;color:#4a5a80;
+}
+.dash-cat-dot{
+  display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:7px;
+  -webkit-box-shadow:inset 0 1px 1px rgba(255,255,255,.55), 0 1px 2px rgba(20,40,72,.25);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.55), 0 1px 2px rgba(20,40,72,.25);
+}
+.dash-drawer-item{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  width:100%;margin:0 0 8px;padding:10px 12px;text-align:right;cursor:pointer;font:inherit;
+  background:rgba(255,255,255,.72);
+  background:-webkit-linear-gradient(180deg,rgba(255,255,255,.88) 0%,rgba(236,242,251,.72) 100%);
+  background:linear-gradient(180deg,rgba(255,255,255,.88) 0%,rgba(236,242,251,.72) 100%);
+  border:1px solid #bcc9e4;border-right:3px solid #bcc9e4;border-radius:16px;
+  -webkit-box-shadow:0 2px 5px rgba(20,40,72,.06), inset 0 1px 0 #fff;
+  box-shadow:0 2px 5px rgba(20,40,72,.06), inset 0 1px 0 #fff;
+}
+.dash-drawer-item:hover{
+  background:-webkit-linear-gradient(180deg,#ffffff 0%,#e6edfc 100%);
+  background:linear-gradient(180deg,#ffffff 0%,#e6edfc 100%);
+  border-color:#8fa4ef;border-right-color:#3550d8;
+  -webkit-box-shadow:0 6px 14px rgba(53,80,216,.18), inset 0 1px 0 #fff;
+  box-shadow:0 6px 14px rgba(53,80,216,.18), inset 0 1px 0 #fff;
+}
+.dash-drico{
+  display:block;width:38px;height:38px;line-height:38px;text-align:center;
+  -ms-flex:0 0 38px;flex:0 0 38px;margin-left:10px;border-radius:12px;color:#fff;
+  -webkit-box-shadow:0 5px 12px rgba(20,40,80,.20), inset 0 1px 1px rgba(255,255,255,.5), inset 0 -2px 3px rgba(0,0,0,.12);
+  box-shadow:0 5px 12px rgba(20,40,80,.20), inset 0 1px 1px rgba(255,255,255,.5), inset 0 -2px 3px rgba(0,0,0,.12);
+}
+.dash-dri-tx{-ms-flex:1 1 auto;flex:1 1 auto;min-width:0;}
+.dash-dri-tx b{display:block;font-size:13px;color:#1a2942;}
+.dash-dri-tx small{display:block;margin-top:2px;font-size:10.5px;color:#5d6d88;}
+
+/* ---- 2. tools: iOS hover (no wash) + frosted vessel ------------------------- */
+body.surface-tools .tools-tile:hover{
+  background:transparent;border:none;
+  -webkit-box-shadow:none;box-shadow:none;
+  -webkit-transform:none;-ms-transform:none;transform:none;
+}
+/* hover only BOLDS the icon + name, like a long-press preview on a phone */
+body.surface-tools .tools-appico{
+  -webkit-transition:transform .16s ease;transition:transform .16s ease;
+}
+body.surface-tools .tools-tile:hover .tools-appico{
+  -webkit-transform:scale(1.08);-ms-transform:scale(1.08);transform:scale(1.08);
+  -webkit-box-shadow:0 14px 30px rgba(20,40,80,.30), inset 0 2px 2px rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.14);
+  box-shadow:0 14px 30px rgba(20,40,80,.30), inset 0 2px 2px rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.14);
+}
+body.surface-tools .tools-tile:hover .tools-tile-name{color:#1a2c66;font-weight:900;}
+/* the grid lives in a frosted vessel over the deeper backdrop */
+body.surface-tools .tools-grid{
+  margin:16px 8px 8px;padding:26px 22px 14px;border-radius:26px;
+  background:rgba(244,247,252,.62);
+  background:-webkit-linear-gradient(160deg,rgba(255,255,255,.76) 0%,rgba(238,243,251,.60) 100%);
+  background:linear-gradient(160deg,rgba(255,255,255,.76) 0%,rgba(238,243,251,.60) 100%);
+  border:1px solid rgba(255,255,255,.85);
+  outline:1px solid #a8badc;
+  -webkit-box-shadow:0 3px 6px rgba(16,32,64,.05), 0 22px 44px rgba(16,32,64,.12), inset 0 1px 0 rgba(255,255,255,.95);
+  box-shadow:0 3px 6px rgba(16,32,64,.05), 0 22px 44px rgba(16,32,64,.12), inset 0 1px 0 rgba(255,255,255,.95);
+  -ms-flex-pack:center;justify-content:center;
+}
+
+/* ---- 3. receipt colour guide: dot + readable chip on that colour ------------ */
+.rc-help-row{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  margin-bottom:6px;
+}
+.rc-help-chip{
+  display:inline-block;padding:2px 10px;border-radius:8px;
+  font-size:11px;font-weight:800;line-height:1.8;
+  border:1px solid rgba(20,40,72,.14);
+}
+
+/* ---- 4. invoice «صورتحساب» — very-light-yellow glass, not bold -------------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card{border:1px solid #e7dcae;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-head{
+  background:#fdf9e4;background:-webkit-linear-gradient(top,#fefbf0 0%,#f6eecb 100%);
+  background:linear-gradient(180deg,#fefbf0 0%,#f6eecb 100%);
+  border-bottom:1px solid #e7dcae;
+  -webkit-box-shadow:inset -3px 0 0 #d9a70c;box-shadow:inset -3px 0 0 #d9a70c;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .card-title{color:#7a6110;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .ct-ico{color:#b98a0a;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .invoice-card .btn-icon,
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) #invoiceToggle{
+  color:#7a6110;border-color:#e2d198;background:#fdfaf0;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group{
+  border:1px solid #e9dfba;
+  background:rgba(255,253,244,.85);
+  background:-webkit-linear-gradient(180deg,rgba(255,254,248,.92) 0%,rgba(252,247,228,.85) 100%);
+  background:linear-gradient(180deg,rgba(255,254,248,.92) 0%,rgba(252,247,228,.85) 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-group:last-child{
+  border-color:#e2d5a2;
+  background:-webkit-linear-gradient(180deg,rgba(255,252,240,.95) 0%,rgba(250,243,219,.9) 100%);
+  background:linear-gradient(180deg,rgba(255,252,240,.95) 0%,rgba(250,243,219,.9) 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-gtitle{
+  color:#8a6d1f;border-bottom:2px solid #eee3ba;font-weight:800;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-line span{color:#6f6a52;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-line b{color:#3a3524;}
+/* «مانده قابل پرداخت»: same yellow family, just a border + slightly bolder —
+   never a loud panel of its own */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain{
+  margin-top:8px;padding:8px 11px;
+  border:1.5px solid #d9c26a;border-radius:10px;
+  background:rgba(250,243,214,.65);
+  background:-webkit-linear-gradient(180deg,rgba(253,248,225,.8) 0%,rgba(248,240,206,.75) 100%);
+  background:linear-gradient(180deg,rgba(253,248,225,.8) 0%,rgba(248,240,206,.75) 100%);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain span{color:#7a6110;font-weight:800;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .inv-remain b{color:#8a5c00;font-weight:900;font-size:14px;}
+/* the big payable hero stops being a loud emerald wall — quiet glass, deep
+   emerald INK, emerald border: clearly the payable, clearly not a banner */
+/* the old emerald hero used the high-specificity «:not(theme)» selector, so
+   this quiet-glass version must match it (later source order then wins). */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payable-card{
+  border:2px solid #6fc7a4;border-radius:20px;color:#0b6b52;
+  background:rgba(240,250,246,.9);
+  background:-webkit-linear-gradient(160deg,rgba(255,255,255,.95) 0%,rgba(233,247,240,.88) 100%);
+  background:linear-gradient(160deg,rgba(255,255,255,.95) 0%,rgba(233,247,240,.88) 100%);
+  -webkit-box-shadow:0 2px 5px rgba(13,110,84,.06), 0 14px 28px rgba(13,110,84,.12), inset 0 1px 0 rgba(255,255,255,1);
+  box-shadow:0 2px 5px rgba(13,110,84,.06), 0 14px 28px rgba(13,110,84,.12), inset 0 1px 0 rgba(255,255,255,1);
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payable-caption{color:#3c6e5d;font-weight:800;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payable-value b{color:#0b6b52;text-shadow:none;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .payable-value span{color:#3c6e5d;}
+
+/* ---- 5. card heads re-paletted (deeper two-tone + glass icon chip) ----------- */
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .card-head{
+  background:#e2eafc;background:-webkit-linear-gradient(top,#eaf0fd 0%,#cedbf7 100%);
+  background:linear-gradient(180deg,#eaf0fd 0%,#cedbf7 100%);
+  border-bottom:1px solid #b4c6ee;
+  -webkit-box-shadow:inset -3px 0 0 #3550d8;box-shadow:inset -3px 0 0 #3550d8;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .card-title{color:#2440a8;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .patient-card .ct-ico{color:#3550d8;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .ins-card .card-head{
+  background:#e0f4ec;background:-webkit-linear-gradient(top,#e9f8f1 0%,#c9ecdc 100%);
+  background:linear-gradient(180deg,#e9f8f1 0%,#c9ecdc 100%);
+  border-bottom:1px solid #a8d9c4;
+  -webkit-box-shadow:inset -3px 0 0 #0d9488;box-shadow:inset -3px 0 0 #0d9488;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .ins-card .card-title{color:#0b6b57;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .ins-card .ct-ico{color:#0d9488;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .doc-card .card-head{
+  background:#e8e4fc;background:-webkit-linear-gradient(top,#efecfe 0%,#d7cefa 100%);
+  background:linear-gradient(180deg,#efecfe 0%,#d7cefa 100%);
+  border-bottom:1px solid #bfb2ee;
+  -webkit-box-shadow:inset -3px 0 0 #7c56e4;box-shadow:inset -3px 0 0 #7c56e4;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .doc-card .card-title{color:#5b34b8;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .doc-card .ct-ico{color:#7c56e4;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .perf-card .card-head{
+  background:#e0f0fb;background:-webkit-linear-gradient(top,#e8f5fd 0%,#cce7f8 100%);
+  background:linear-gradient(180deg,#e8f5fd 0%,#cce7f8 100%);
+  border-bottom:1px solid #a8d2ee;
+  -webkit-box-shadow:inset -3px 0 0 #0e7fc0;box-shadow:inset -3px 0 0 #0e7fc0;
+}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .perf-card .card-title{color:#0b5f96;}
+body:not(.theme-dark):not(.theme-calm):not(.theme-warm) .perf-card .ct-ico{color:#0e7fc0;}
+
+/* ---- 6. dark parity for the dashboard ---------------------------------------- */
+body.theme-dark.surface-dash{background:#0e1524;}
+.theme-dark .dash-topbar,.theme-dark .dash-vessel{
+  background:-webkit-linear-gradient(180deg,#1f2a3c 0%,#182130 100%);
+  background:linear-gradient(180deg,#1f2a3c 0%,#182130 100%);
+  border-color:#344357;outline-color:#2b3a51;
+}
+.theme-dark .dash-title{color:#eef3fb;}
+.theme-dark .dash-sub,.theme-dark .dash-foot,.theme-dark .dash-empty{color:#8ea0bd;}
+.theme-dark .dash-burger,.theme-dark .dash-mail{background:#1d2735;border-color:#344357;color:#c9d6ea;}
+.theme-dark .dash-mail-badge{background:#26324a;color:#c9d6ea;}
+.theme-dark .dash-mail-badge.has,.theme-dark .dash-app-badge.has{background:#c2283d;color:#fff;}
+.theme-dark .dash-appname{color:#d7e2f2;}
+.theme-dark .dash-app:hover .dash-appname{color:#9db4f8;}
+.theme-dark .dash-vessel-title{color:#b9c6da;}
+.theme-dark .dash-drawer{background:-webkit-linear-gradient(180deg,#1b2534 0%,#141c2a 100%);background:linear-gradient(180deg,#1b2534 0%,#141c2a 100%);border-left-color:#344357;}
+.theme-dark .dash-drawer-head,.theme-dark .dash-drawer-search{border-color:#2b3a51;}
+.theme-dark .dash-drawer-title{color:#eef3fb;}
+.theme-dark .dash-cat{color:#8ea0bd;}
+.theme-dark .dash-drawer-item{background:-webkit-linear-gradient(180deg,#232f42 0%,#1a2434 100%);background:linear-gradient(180deg,#232f42 0%,#1a2434 100%);border-color:#344357;border-right-color:#3b4c68;}
+.theme-dark .dash-drawer-item:hover{border-right-color:#6a83f7;background:#26324a;}
+.theme-dark .dash-dri-tx b{color:#eef3fb;}
+.theme-dark .dash-dri-tx small{color:#94a3bd;}

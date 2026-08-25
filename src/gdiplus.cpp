@@ -107,11 +107,20 @@ void gpFillAlpha(HDC dc, RECT rc, int rad, COLORREF fill, int alpha){
 // ---------------------------------------------------------------------------
 
 void gpGradRibbon3(HDC dc, RECT rc, int rad, COLORREF a, COLORREF b, COLORREF c){
-    int mid=(rc.left+rc.right)/2;
-    RECT rL={rc.left,rc.top,mid,rc.bottom};
-    RECT rR={mid,rc.top,rc.right,rc.bottom};
-    gpGradRoundRectBgH(dc,rL,rad,a,b,CLR_INVALID,CLR_INVALID);
-    gpGradRoundRectBgH(dc,rR,rad,b,c,CLR_INVALID,CLR_INVALID);
+    // v1.89.0: TRUE three-stop horizontal sweep. The old implementation drew
+    // two half-gradients whose antialiased seams met visibly in the middle
+    // (the "ribbon split in two" artefact). One brush, one path, zero seam.
+    if(!s_gdipOK){ fillRoundRect(dc,rc,rad*2,b,CLR_INVALID); return; }
+    Graphics g(dc); g.SetSmoothingMode(SmoothingModeAntiAlias);
+    Rect r(rc.left, rc.top, rc.right-rc.left-1, rc.bottom-rc.top-1);
+    if(r.Width<=0||r.Height<=0) return;
+    GraphicsPath p; roundPath(p,r,rad);
+    Rect br(r.X, r.Y, r.Width+1, r.Height+1);
+    LinearGradientBrush lgb(br, C(a), C(c), LinearGradientModeHorizontal);
+    Color ics[3]={ C(a), C(b), C(c) };
+    REAL  pos[3]={ 0.0f, 0.5f, 1.0f };
+    lgb.SetInterpolationColors(ics, pos, 3);
+    g.FillPath(&lgb, &p);
 }
 
 //  Paint just the 4 corner gaps of a rounded rect with `bg`.

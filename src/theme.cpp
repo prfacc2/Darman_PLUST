@@ -390,6 +390,16 @@ void drawIcon(HDC dc, int icon, RECT rc, COLORREF col, int thick){
         LineTo(dc,cx,cy+h/3);
         LineTo(dc,cx+w,cy-h);
         break; }
+    case ICO_HOME: {       // v1.89.0: house — the داشبورد landing tab
+        int w=(r*85)/100, bh=(r*58)/100;
+        MoveToEx(dc,cx-w,cy+1,0); LineTo(dc,cx,cy-r);   // roof
+        LineTo(dc,cx+w,cy+1);
+        MoveToEx(dc,cx-w+2,cy+1,0); LineTo(dc,cx-w+2,cy+bh);
+        LineTo(dc,cx+w-2,cy+bh); LineTo(dc,cx+w-2,cy+1);
+        MoveToEx(dc,cx-w+2,cy+bh,0); LineTo(dc,cx+w-2,cy+bh); // base
+        int dw=(r*24)/100; if(dw<2) dw=2;               // door
+        Rectangle(dc,cx-dw,cy+bh-(r*40)/100,cx+dw,cy+bh+1);
+        break; }
     case ICO_USER_ADD: {   // v1.87.0: person + plus badge (پذیرش بیمار)
         int hr=(r*40)/100; if(hr<2) hr=2;
         int hx=cx-r/4;                                   // person nudged left

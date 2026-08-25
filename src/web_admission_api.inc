@@ -1063,6 +1063,9 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="cashier")    RunOnUiThread([](){ Reception_OpenCashier(); });
         else if(kind=="queue")      RunOnUiThread([](){ Reception_OpenQueue(); });
         else if(kind=="receipts")   RunOnUiThread([](){ Reception_OpenReceipts(); });
+        else if(kind=="portal")     RunOnUiThread([](){ Reception_OpenPortal(); });
+        else if(kind=="empty")      RunOnUiThread([](){ Reception_OpenNewTab(); });
+        else if(kind=="admission")  RunOnUiThread([](){ Reception_OpenAdmissionNew(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
@@ -1113,12 +1116,19 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         RunOnUiThread([ticket](){ Reception_OpenAdmissionTicket(ticket); });
         return "{\"ok\":true}";
     }
+    // v1.89: the reception dashboard's envelope badge — current unseen count.
+    if(verb=="portal.unread"){
+        int n=unseenMessageCount(g_session.user.username);
+        return "{\"ok\":true,\"n\":"+std::to_string(n)+"}";
+    }
+
     if(verb=="ui.closeTab"){
         std::string kind; jsonGetString(body,"kind",kind);
         if(kind=="cashier")      RunOnUiThread([](){ Reception_CloseCashier(); });
         else if(kind=="tools")   RunOnUiThread([](){ Reception_CloseTools(); });
         else if(kind=="queue")   RunOnUiThread([](){ Reception_CloseQueue(); });
         else if(kind=="receipts") RunOnUiThread([](){ Reception_CloseReceipts(); });
+        else if(kind=="portal")   RunOnUiThread([](){ Reception_ClosePortal(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }
