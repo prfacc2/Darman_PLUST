@@ -366,7 +366,6 @@
             </button>
             <div class="tools-topbar-titles">
               <div class="tools-title">ابزارها</div>
-              <div class="tools-subtitle">همه ابزارهای پذیرش، یک‌جا و دسته‌بندی‌شده</div>
             </div>
           </div>
           <button type="button" class="btn btn-outline" id="toolsBack">بازگشت</button>
@@ -420,21 +419,21 @@
             <span class="tools-drico tools-appico-search" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
             </span>
-            <span class="tools-dri-tx"><b>جستجوی قبض</b><small>فیلتر، چاپ مجدد، خروجی اکسل</small></span>
+            <span class="tools-dri-tx"><b>جستجوی قبض</b></span>
           </button>
           <div class="tools-cat"><span class="tools-cat-dot" style="background:#14b8a6"></span>مالی</div>
           <button type="button" class="tools-drawer-item" data-tool="toolsCash">
             <span class="tools-drico tools-appico-cash" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm2 2h4v2H7v-2zm6 0h4v2h-4v-2z"/></svg>
             </span>
-            <span class="tools-dri-tx"><b>صندوق</b><small>شیفت، پرداخت، سند دستی</small></span>
+            <span class="tools-dri-tx"><b>صندوق</b></span>
           </button>
           <div class="tools-cat"><span class="tools-cat-dot" style="background:#8b5cf6"></span>پذیرش</div>
           <button type="button" class="tools-drawer-item" data-tool="toolsQueue">
             <span class="tools-drico tools-appico-queue" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
             </span>
-            <span class="tools-dri-tx"><b>صندوق نرفته‌ها و صف پذیرش</b><small>بازخوانی، حذف، انتقال به صندوق</small></span>
+            <span class="tools-dri-tx"><b>صندوق نرفته‌ها و صف پذیرش</b></span>
           </button>
         </nav>
       </aside>
@@ -448,7 +447,6 @@
             <button type="button" class="btn btn-outline" id="rcBack">بازگشت به ابزارها</button>
             <div class="rc-head-titles">
               <h2 class="tools-title">جستجوی قبض</h2>
-              <div class="rc-head-sub">فیلتر پیشرفته، چاپ مجدد و خروجی اکسل</div>
             </div>
             <!-- v1.88: the row-colour guide lives HERE now (not in the page):
                  a spectrum circle in the header; hovering it opens the glass
@@ -580,12 +578,11 @@
     <div class="dash-vessel">
       <div class="dash-vessel-title">اقدامات اصلی</div>
       <div class="dash-grid" id="dashGrid">
-        <button type="button" class="dash-app" id="dashPortal" data-name="کارتابل پیام صندوق پیام‌ها مدیریت">
-          <span class="dash-appico dash-appico-mail" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2.4V17h16V7.4l-8 5.2-8-5.2z"/></svg>
-            <span class="dash-app-badge" id="dashTileBadge">۰</span>
+        <button type="button" class="dash-app" id="dashNewPat" data-name="پذیرش بیمار ثبت قبض بیمار جدید">
+          <span class="dash-appico dash-appico-adm" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M9 4a3.5 3.5 0 110 7 3.5 3.5 0 010-7zM2.5 19c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5v1h-13v-1zM18 8h2v3h3v2h-3v3h-2v-3h-3v-2h3V8z"/></svg>
           </span>
-          <span class="dash-appname">کارتابل پیام</span>
+          <span class="dash-appname">پذیرش بیمار</span>
         </button>
         <button type="button" class="dash-app" id="dashNewTab" data-name="تب جدید تب خالی">
           <span class="dash-appico dash-appico-tab" aria-hidden="true">
@@ -593,13 +590,9 @@
           </span>
           <span class="dash-appname">تب جدید</span>
         </button>
-        <button type="button" class="dash-app" id="dashNewPat" data-name="پذیرش بیمار ثبت قبض بیمار جدید">
-          <span class="dash-appico dash-appico-adm" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M9 4a3.5 3.5 0 110 7 3.5 3.5 0 010-7zM2.5 19c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5v1h-13v-1zM18 8h2v3h3v2h-3v3h-2v-3h-3v-2h3V8z"/></svg>
-          </span>
-          <span class="dash-appname">پذیرش بیمار</span>
-        </button>
       </div>
+      <!-- hidden: permission gating + drawer data-app="dashPortal" still resolve -->
+      <button type="button" class="dash-app" id="dashPortal" style="display:none" aria-hidden="true" data-name="کارتابل پیام صندوق پیام‌ها مدیریت"></button>
       <div class="dash-empty" id="dashEmpty" style="display:none">موردی با این نام پیدا نشد</div>
     </div>
     <div class="dash-foot">درمان پلاس · داشبورد حساب پذیرش</div>

@@ -232,6 +232,9 @@ struct RecData {
     int active;
     int hotTab, hotClose;     // hover indices
     int lastUnseen;                      // cartable poll state
+    // v1.90.0: overflow scroll when too many C++ tabs to fit the strip
+    int   tabOff;        // first visible docked-tab index (0 = rightmost)
+    int   hotChevron;    // 0 none, 1 = prev (▶, decrease off), 2 = next (◀)
     // v1.7.0: drag-and-drop tab reordering -----------------------------------
     bool  dragArmed;     // mouse down on a tab body, may become a drag
     bool  dragging;      // a reorder drag is in progress
@@ -240,6 +243,7 @@ struct RecData {
     int   dragX;         // current mouse x (for the floating ghost)
     int   dropIdx;       // computed insertion index (drop target)
     RecData():active(-1),hotTab(-1),hotClose(-1),lastUnseen(0),
+        tabOff(0),hotChevron(0),
         dragArmed(false),dragging(false),dragIdx(-1),dragX(0),dropIdx(-1){
         dragStart.x=dragStart.y=0; }
 };
@@ -545,7 +549,8 @@ static int infoBarH(){ return S(6); }
 // v1.12.0 (§2.C): slightly slimmer tab strip + a touch more breathing room
 // between tabs and from the strip edge, for a cleaner, more modern header.
 static int tabBarH(){ return S(38); }
-static int tabW()    { return S(206); }
+static int tabW()    { return S(206); }   // ideal width; computeTabStrip may shrink
+static int tabMinW() { return S(118); }   // v1.90: floor before overflow chevrons
 static int tabGap()  { return S(8);  }
 // v1.75.0: each tab kind carries a distinct vector glyph so the strip reads as
 // a set of labelled, iconified tabs rather than a row of plain text buttons.
@@ -4710,6 +4715,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
 
 // ============================================================== TAB STRIP ==
 static HWND recWnd(){ return s_rd?FindWindowExW(g_hFrame,NULL,RC_CLASS,NULL):NULL; }
+static void ensureTabVisible(HWND h, int vecIdx);   // v1.90: defined with tabRect
 
 // v1.7.0: persist the user's preferred tab order. We store the sequence of the
 // permanent tab KINDS (پذیرش / کارتابل) as a CSV in the settings
@@ -4747,6 +4753,7 @@ static std::vector<int> loadTabOrder(){
 static void recLayoutTabs(HWND h){
     RECT rc; GetClientRect(h,&rc);
     if(!s_rd) return;
+    if(s_rd->active>=0) ensureTabVisible(h, s_rd->active);
     for(size_t i=0;i<s_rd->tabs.size();i++){
         TabPage* t=s_rd->tabs[i];
         if(t->detached) continue;
@@ -4798,6 +4805,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     if(!pg){ delete t; return; }
     s_rd->tabs.push_back(t);
     s_rd->active=(int)s_rd->tabs.size()-1;
+    ensureTabVisible(h, s_rd->active);
     recLayoutTabs(h);
     InvalidateRect(h,NULL,TRUE);
     if(t->kind==TK_RECEPTION && t->eFirst) SetFocus(t->eFirst);
@@ -4827,30 +4835,151 @@ static void closeTab(TabPage* t){
 }
 
 // tab geometry helpers — plain coords, tabs flow RIGHT → LEFT (RTL)
-static RECT tabRect(HWND h, int i){
+// v1.90.0: docked tabs shrink toward tabMinW(); if they still overflow, a
+// first-visible index + left-side chevron pair scrolls the strip. Detached
+// tabs never take a slot.
+struct TabStripLayout {
+    int  visW;      // width of each currently shown tab
+    int  visN;      // how many tabs currently shown
+    int  dockN;     // non-detached tab count
+    int  off;       // clamped first-visible docked index
+    bool overflow;
+    int  chevW;     // left cluster reserved for chevrons (0 if none)
+};
+static int dockedCount(){
+    if(!s_rd) return 0;
+    int n=0;
+    for(auto* t : s_rd->tabs) if(t && !t->detached) n++;
+    return n;
+}
+static int vecToDocked(int vecIdx){
+    if(!s_rd) return 0;
+    int k=0;
+    int n=(int)s_rd->tabs.size();
+    if(vecIdx>n) vecIdx=n;
+    for(int i=0;i<vecIdx;i++)
+        if(s_rd->tabs[i] && !s_rd->tabs[i]->detached) k++;
+    return k;
+}
+static TabStripLayout computeTabStrip(HWND h){
+    TabStripLayout L={};
+    L.visW = tabW();
+    if(!s_rd) return L;
     RECT rc; GetClientRect(h,&rc);
-    RECT r;
-    r.right = rc.right - S(10) - i*(tabW()+tabGap());
-    r.left  = r.right - tabW();
+    L.dockN = dockedCount();
+    int avail = rc.right - S(10) - S(10);
+    if(avail < S(80)) avail = S(80);
+    int gap = tabGap();
+    int n = L.dockN;
+    int ideal = tabW();
+    int minW = tabMinW();
+    L.off = s_rd->tabOff;
+    if(n<=0){ L.off=0; s_rd->tabOff=0; return L; }
+    int need = n*ideal + (n>0? (n-1)*gap : 0);
+    if(need <= avail){
+        L.visW=ideal; L.visN=n; L.overflow=false; L.off=0;
+        s_rd->tabOff=0;
+        return L;
+    }
+    int w = n>0 ? (avail - (n-1)*gap)/n : ideal;
+    if(w >= minW){
+        L.visW=w; L.visN=n; L.overflow=false; L.off=0;
+        s_rd->tabOff=0;
+        return L;
+    }
+    L.overflow = true;
+    L.chevW = S(32)*2 + S(6) + S(10);
+    int avail2 = avail - L.chevW;
+    if(avail2 < minW) avail2 = minW;
+    L.visN = (avail2 + gap) / (minW + gap);
+    if(L.visN < 1) L.visN = 1;
+    if(L.visN > n) L.visN = n;
+    L.visW = L.visN>0 ? (avail2 - (L.visN-1)*gap)/L.visN : minW;
+    if(L.visW > ideal) L.visW = ideal;
+    if(L.visW < minW) L.visW = minW;
+    int maxOff = n - L.visN;
+    if(maxOff < 0) maxOff = 0;
+    if(L.off > maxOff) L.off = maxOff;
+    if(L.off < 0) L.off = 0;
+    s_rd->tabOff = L.off;
+    return L;
+}
+static int visToVec(int visSlot, const TabStripLayout& L){
+    if(!s_rd || visSlot<0) return -1;
+    int target = L.off + visSlot;
+    int k=0;
+    for(size_t i=0;i<s_rd->tabs.size();i++){
+        if(!s_rd->tabs[i] || s_rd->tabs[i]->detached) continue;
+        if(k==target) return (int)i;
+        k++;
+    }
+    return -1;
+}
+static RECT tabRectVis(HWND h, int visSlot, const TabStripLayout& L){
+    RECT rc; GetClientRect(h,&rc);
+    RECT r={0,0,0,0};
+    r.right = rc.right - S(10) - visSlot*(L.visW + tabGap());
+    r.left  = r.right - L.visW;
     r.top   = infoBarH()+S(3);
     r.bottom= infoBarH()+tabBarH()-S(2);
     return r;
 }
+static RECT tabRect(HWND h, int i){
+    TabStripLayout L = computeTabStrip(h);
+    if(!s_rd || i<0 || i>=(int)s_rd->tabs.size()) return RECT{0,0,0,0};
+    if(!s_rd->tabs[i] || s_rd->tabs[i]->detached) return RECT{0,0,0,0};
+    int visSlot = vecToDocked(i) - L.off;
+    if(visSlot<0 || visSlot>=L.visN) return RECT{0,0,0,0};
+    return tabRectVis(h, visSlot, L);
+}
+static RECT chevronRect(HWND h, int which){
+    // which 1 = prev (right-pointing, decrease off), 2 = next (left-pointing)
+    RECT rc; GetClientRect(h,&rc);
+    RECT r={0,0,0,0};
+    int bw=S(32), bh=tabBarH()-S(8);
+    int y=infoBarH()+S(4);
+    int x0=S(8);
+    if(which==2){ r.left=x0; r.right=x0+bw; }
+    else        { r.left=x0+bw+S(6); r.right=r.left+bw; }
+    r.top=y; r.bottom=y+bh;
+    return r;
+}
+static int hitChevron(HWND h, POINT pt){
+    if(!s_rd) return 0;
+    TabStripLayout L = computeTabStrip(h);
+    if(!L.overflow) return 0;
+    RECT n=chevronRect(h,2);
+    RECT p=chevronRect(h,1);
+    if(PtInRect(&n,pt)) return 2;
+    if(PtInRect(&p,pt)) return 1;
+    return 0;
+}
+static void ensureTabVisible(HWND h, int vecIdx){
+    if(!s_rd) return;
+    TabStripLayout L = computeTabStrip(h);
+    if(!L.overflow){ s_rd->tabOff=0; return; }
+    if(vecIdx<0 || vecIdx>=(int)s_rd->tabs.size()) return;
+    int d = vecToDocked(vecIdx);
+    if(d < L.off) s_rd->tabOff = d;
+    else if(d >= L.off + L.visN) s_rd->tabOff = d - L.visN + 1;
+    if(s_rd->tabOff<0) s_rd->tabOff=0;
+}
 static int hitTab(HWND h, POINT pt, int* part){
     // part: 0=body 1=close
     if(!s_rd) return -1;
-    int vis=0;
-    for(size_t i=0;i<s_rd->tabs.size();i++){
-        RECT r=tabRect(h,(int)i);
+    TabStripLayout L = computeTabStrip(h);
+    for(int v=0; v<L.visN; v++){
+        int i = visToVec(v, L);
+        if(i<0) continue;
+        RECT r=tabRectVis(h,v,L);
         if(PtInRect(&r,pt)){
+            TabPage* t=s_rd->tabs[i];
             RECT cl={r.left+S(8),r.top+S(6),r.left+S(30),r.bottom-S(6)};
-            if(PtInRect(&cl,pt)) *part=1;
+            if(t->kind!=TK_DASH && PtInRect(&cl,pt)) *part=1;
             else *part=0;
-            return (int)i;
+            return i;
         }
-        vis++;
     }
-    (void)vis;
     return -1;
 }
 // v1.7.0: compute the insertion slot for a drag at mouse-x. Tabs flow RTL
@@ -4858,15 +4987,19 @@ static int hitTab(HWND h, POINT pt, int* part){
 // centre is nearest to the cursor. Returns a value in [0, tabCount].
 static int dropIndexForX(HWND h, int mouseX){
     if(!s_rd || s_rd->tabs.empty()) return 0;
-    int n=(int)s_rd->tabs.size();
-    for(int i=0;i<n;i++){
-        RECT r=tabRect(h,i);
+    TabStripLayout L = computeTabStrip(h);
+    for(int v=0; v<L.visN; v++){
+        int i = visToVec(v, L);
+        if(i<0) continue;
+        RECT r=tabRectVis(h,v,L);
         int mid=(r.left+r.right)/2;
         // RTL: if the cursor is to the RIGHT of this tab's centre, it belongs
         // BEFORE it (smaller index sits further right).
         if(mouseX > mid) return i;
     }
-    return n;   // dropped past the left-most tab → end of the list
+    int last = L.visN>0 ? visToVec(L.visN-1, L) : -1;
+    if(last<0) return (int)s_rd->tabs.size();
+    return last+1;   // dropped past the left-most VISIBLE tab
 }
 
 // ------------------------------------------------------------- reception ---
@@ -4959,6 +5092,17 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
     case WM_MOUSEMOVE: {
         if(!s_rd) return 0;
         POINT pt={GET_X_LPARAM(l),GET_Y_LPARAM(l)};
+        int chv=hitChevron(h,pt);
+        if(chv!=s_rd->hotChevron){
+            s_rd->hotChevron=chv;
+            RECT bar={0,infoBarH(),S(2000),infoBarH()+tabBarH()};
+            InvalidateRect(h,&bar,FALSE);
+        }
+        if(chv){
+            SetCursor(LoadCursor(NULL,IDC_HAND));
+            TRACKMOUSEEVENT te={sizeof(te),TME_LEAVE,h,0}; TrackMouseEvent(&te);
+            return 0;
+        }
         // v1.7.0: drag-reorder in progress (or arming) ----------------------
         if(s_rd->dragArmed){
             int dx=pt.x-s_rd->dragStart.x;
@@ -4984,8 +5128,9 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         return 0; }
     case WM_MOUSELEAVE:
         // don't clear hover while a drag (with capture) is active
-        if(s_rd && !s_rd->dragging && s_rd->hotTab!=-1){
+        if(s_rd && !s_rd->dragging && (s_rd->hotTab!=-1 || s_rd->hotChevron)){
             s_rd->hotTab=s_rd->hotClose=-1;
+            s_rd->hotChevron=0;
             RECT bar={0,infoBarH(),S(2000),infoBarH()+tabBarH()};
             InvalidateRect(h,&bar,FALSE);
         }
@@ -5002,6 +5147,19 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
     case WM_LBUTTONDOWN: {
         if(!s_rd) return 0;
         POINT pt={GET_X_LPARAM(l),GET_Y_LPARAM(l)};
+        int chv=hitChevron(h,pt);
+        if(chv){
+            TabStripLayout L=computeTabStrip(h);
+            if(chv==1 && s_rd->tabOff>0) s_rd->tabOff--;
+            else if(chv==2){
+                int maxOff=L.dockN-L.visN;
+                if(maxOff<0) maxOff=0;
+                if(s_rd->tabOff<maxOff) s_rd->tabOff++;
+            }
+            RECT bar={0,infoBarH(),S(2000),infoBarH()+tabBarH()};
+            InvalidateRect(h,&bar,FALSE);
+            return 0;
+        }
         int part=0, hit=hitTab(h,pt,&part);
         if(hit>=0 && hit<(int)s_rd->tabs.size()){
             TabPage* t=s_rd->tabs[hit];
@@ -5057,6 +5215,22 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
             InvalidateRect(h,NULL,FALSE);
         }
         return 0; }
+    case WM_MOUSEWHEEL: {
+        if(!s_rd) return 0;
+        POINT pt={GET_X_LPARAM(l),GET_Y_LPARAM(l)};
+        ScreenToClient(h,&pt);
+        if(pt.y<infoBarH() || pt.y>infoBarH()+tabBarH()) break;
+        TabStripLayout L=computeTabStrip(h);
+        if(!L.overflow) return 0;
+        int delta=GET_WHEEL_DELTA_WPARAM(w);
+        if(delta<0){
+            int maxOff=L.dockN-L.visN;
+            if(maxOff<0) maxOff=0;
+            if(s_rd->tabOff<maxOff) s_rd->tabOff++;
+        } else if(s_rd->tabOff>0) s_rd->tabOff--;
+        RECT bar={0,infoBarH(),S(2000),infoBarH()+tabBarH()};
+        InvalidateRect(h,&bar,FALSE);
+        return 0; }
     case WM_KEYDOWN:
         if(w==VK_F8){ printLastReceipt(h); return 0; }
         break;
@@ -5099,7 +5273,9 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(s_rd){
             for(size_t i=0;i<s_rd->tabs.size();i++){
                 TabPage* t=s_rd->tabs[i];
+                if(t->detached) continue;
                 RECT r=tabRect(h,(int)i);
+                if(r.right<=r.left) continue;   // scrolled out of the strip
                 bool act = ((int)i==s_rd->active);
                 bool hov = ((int)i==s_rd->hotTab);
                 // ------------------------------------------------------
@@ -5202,8 +5378,10 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                         wchar_t nb[8]; swprintf(nb,8,L"%d",n);
                         DrawTextW(dc,toFaDigits(nb).c_str(),-1,&bd,
                             DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
+                        continue;   // badge covers the close slot while unread
                     }
-                    continue;   // badge covers the close slot while unread
+                    // v1.90: when there is no unread count, fall through and
+                    // paint the close × so کارتابل can actually be closed.
                 }
                 // close ×  (v1.63.0: hover raises a soft glowing danger pill
                 // instead of a flat red square)
@@ -5218,6 +5396,40 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 RECT cli={cl.left+S(5),cl.top+S(5),cl.right-S(5),cl.bottom-S(5)};
                 drawIcon(dc,ICO_X,cli,
                     hcl?RGB(255,255,255):g_theme.textDim,S(2));
+            }
+            // v1.90.0: overflow chevrons on the LEFT of the RTL strip
+            {
+                TabStripLayout L = computeTabStrip(h);
+                if(L.overflow){
+                    for(int which=1; which<=2; which++){
+                        RECT cr=chevronRect(h,which);
+                        bool hot = (s_rd->hotChevron==which);
+                        bool en = (which==1) ? (L.off>0)
+                                             : (L.off < L.dockN-L.visN);
+                        gpGradRoundRect(dc,cr,S(8),
+                            hot?blendColor(g_theme.surfaceTop,g_theme.accent,22)
+                               :g_theme.surfaceTop,
+                            hot?blendColor(g_theme.hover,g_theme.surface,30)
+                               :g_theme.surface,
+                            blendColor(g_theme.border,g_theme.accent,hot?50:22));
+                        COLORREF icol = en
+                            ? (hot?g_theme.accent:g_theme.sectionInk)
+                            : g_theme.textDim;
+                        int cx=(cr.left+cr.right)/2, cy=(cr.top+cr.bottom)/2;
+                        int dx=S(5), dy=S(7);
+                        HPEN pn=CreatePen(PS_SOLID, S(2)>1?S(2):2, icol);
+                        HGDIOBJ op=SelectObject(dc,pn);
+                        HGDIOBJ ob=SelectObject(dc,GetStockObject(NULL_BRUSH));
+                        if(which==2){ // next: point left (later tabs live left)
+                            MoveToEx(dc,cx+dx,cy-dy,NULL);
+                            LineTo(dc,cx-dx,cy); LineTo(dc,cx+dx,cy+dy);
+                        } else {      // prev: point right
+                            MoveToEx(dc,cx-dx,cy-dy,NULL);
+                            LineTo(dc,cx+dx,cy); LineTo(dc,cx-dx,cy+dy);
+                        }
+                        SelectObject(dc,ob); SelectObject(dc,op); DeleteObject(pn);
+                    }
+                }
             }
             // v1.7.0: drag-reorder drop indicator — a bright accent bar at the
             // boundary where the tab will be inserted, plus a subtle highlight

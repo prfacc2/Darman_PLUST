@@ -292,9 +292,11 @@ static HomeGeom homeGeom(int W, int H){
     int cl = cx - cardsW/2;
     SetRect(&g.cardR, cl+cardW+cgap, y, cl+cardsW,  y+cardH);   // RTL right
     SetRect(&g.cardL, cl,            y, cl+cardW,   y+cardH);   // RTL left
-    // the frosted glass tray vessel that holds both app icons
-    SetRect(&g.tray, g.cardL.left-S(24), y-S(16),
-            g.cardR.right+S(24), y+cardH+S(14));
+    // v1.90.0: the glass tray matches the hero panel's width (inset S(28)),
+    // not just the two compact icon cells — so the vessel reads as the same
+    // length as the container behind it.
+    SetRect(&g.tray, g.panel.left+S(28), y-S(16),
+            g.panel.right-S(28), y+cardH+S(14));
 
     int fy = g.panel.bottom + footGap;
     SetRect(&g.foot, cx-S(250), fy, cx+S(250), fy+footH);
@@ -309,14 +311,14 @@ static HomeGeom homeGeom(int W, int H){
 // the dark panel keeps its deep slate gradient. The cards live in the lower
 // band of the panel, so homePanelBot() is the colour behind them.
 static COLORREF homePanelTop(){
-    // v1.88.0: a touch deeper + bluer so the page no longer reads all-white.
+    // v1.90.0: one more step off white — a cool periwinkle wash so the hero
+    // no longer reads as a blank sheet on the light theme.
     return g_dark ? RGB(24,29,38)
-                  : blendColor(g_theme.surface, g_theme.accent, 9);
+                  : blendColor(g_theme.surface2, g_theme.accent, 18);
 }
 static COLORREF homePanelBot(){
     return g_dark ? RGB(14,18,25)
-                  : blendColor(g_theme.surface,
-                               blendColor(g_theme.surface2, g_theme.accent, 10), 64);
+                  : blendColor(g_theme.bg2, g_theme.accent, 14);
 }
 
 // v1.88.0: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
@@ -331,13 +333,22 @@ static int s_appHot = 0;
 static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
                          const wchar_t* name, const wchar_t* sub, bool hot){
     int cw = cell.right-cell.left;
-    int bs = S(74);                              // badge size
+    int bs = S(82);                              // v1.90: slightly larger badge
     int bx = cell.left + (cw-bs)/2;
-    int by = cell.top + S(4) - (hot?S(3):0);     // hover: gentle lift
+    int by = cell.top + S(6) - (hot?S(3):0);     // hover: gentle lift
     RECT bd = {bx, by, bx+bs, by+bs};
-    int rad = S(22);                             // squircle corner
+    int rad = S(24);                             // squircle corner
+    // a quiet tinted plate under the badge so the icon reads as a designed
+    // button, not a glyph floating on white (no extra timers — still dirty-rect)
+    {
+        RECT plate={bd.left-S(10), bd.top-S(8), bd.right+S(10), bd.bottom+S(10)};
+        gpGradRoundRect(dc, plate, S(28),
+            blendColor(brand, RGB(255,255,255), g_dark?8:78),
+            blendColor(brand, g_theme.surface2, g_dark?18:22),
+            blendColor(brand, g_theme.border, 28));
+    }
     // tinted ambient shadow (deeper + wider when hovered)
-    gpShadowColor(dc, bd, rad, hot?S(13):S(9), hot?110:70, brand);
+    gpShadowColor(dc, bd, rad, hot?S(14):S(10), hot?120:78, brand);
     // glossy body: light top → deep bottom (convex app-icon)
     gpGradRoundRect(dc, bd, rad,
         blendColor(brand, RGB(255,255,255), 30),
@@ -360,9 +371,9 @@ static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
     int gr = (bs*30)/100;
     RECT grc={bd.left+bs/2-gr, bd.top+bs/2-gr, bd.left+bs/2+gr, bd.top+bs/2+gr};
     drawIcon(dc, icon, grc, RGB(255,255,255), S(2)+1);
-    // account name under the badge — bold ink, brand-tinted on hover
-    int ly = bd.bottom + S(9);
-    SetTextColor(dc, hot ? brand : g_theme.text);
+    // account name under the badge — deep ink, brand-tinted on hover
+    int ly = bd.bottom + S(10);
+    SetTextColor(dc, hot ? brand : (g_dark?g_theme.text:g_theme.sectionInk));
     SelectObject(dc, g_fUIB);
     RECT nr={cell.left, ly, cell.right, ly+S(22)};
     DrawTextW(dc, name, -1, &nr,
@@ -635,20 +646,40 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             }
         }
 
-        // ---- 5b. v1.88.0: glass tray + two app-icon entries ------------------
+        // ---- 5b. v1.88.0 / v1.90.0: glass tray + two app-icon entries --------
         {
             RECT tr=g.tray;
-            gpShadow(dc, tr, S(24), S(13), g_dark?90:40);
-            gpGradRoundRect(dc, tr, S(24),
-                blendColor(homePanelTop(), RGB(255,255,255), g_dark?6:52),
-                blendColor(homePanelBot(), RGB(255,255,255), g_dark?2:26),
-                blendColor(g_theme.border, g_theme.accent, 20));
+            gpShadow(dc, tr, S(24), S(16), g_dark?100:48);
+            gpShadowColor(dc, tr, S(24), S(8), g_dark?70:36, g_theme.accent);
+            COLORREF trayTop = g_dark
+                ? blendColor(homePanelTop(), RGB(255,255,255), 8)
+                : blendColor(RGB(214,226,244), g_theme.accent, 12);
+            COLORREF trayBot = g_dark
+                ? blendColor(homePanelBot(), RGB(255,255,255), 4)
+                : blendColor(RGB(188,206,230), g_theme.accent, 10);
+            gpGradRoundRect(dc, tr, S(24), trayTop, trayBot,
+                blendColor(g_theme.border, g_theme.accent, 28));
             RECT itr=tr; InflateRect(&itr,-S(1),-S(1));
             gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
-                        g_dark?24:95);
+                        g_dark?28:88);
+            // v1.90: a thin faint divider between the two programs
+            {
+                int mx = (g.cardL.right + g.cardR.left)/2;
+                int y1 = tr.top + S(28), y2 = tr.bottom - S(28);
+                COLORREF dc1 = blendColor(g_theme.border, g_theme.accent, 40);
+                gpLine(dc, mx, y1, mx, y2, dc1, 1.0f, 150);
+                // tiny accent diamonds at both ends so it reads as designed
+                HBRUSH db=CreateSolidBrush(blendColor(g_theme.accent, trayTop, 35));
+                HGDIOBJ ob2=SelectObject(dc,db);
+                HGDIOBJ op2=SelectObject(dc,GetStockObject(NULL_PEN));
+                int ds=S(3);
+                POINT pt[4]={{mx,y1-ds},{mx+ds,y1},{mx,y1+ds},{mx-ds,y1}};
+                Polygon(dc,pt,4);
+                POINT pb[4]={{mx,y2-ds},{mx+ds,y2},{mx,y2+ds},{mx-ds,y2}};
+                Polygon(dc,pb,4);
+                SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
+            }
             // RTL: پرسنل on the RIGHT cell, مدیریت on the LEFT cell.
-            // v1.89.0: no description lines — just the icon and its name,
-            // exactly like a phone's installed apps.
             paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
                          L"حساب پرسنل", NULL, s_appHot==1);
             paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
@@ -1104,16 +1135,15 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 Polygon(dc,pl,4); Polygon(dc,pr2,4);
                 SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
-            // clock (centred, bold Vazirmatn) — v1.88.0: swapped the fixed-pitch
-            // mono face for the bold UI cut in a deep blue ink; Persian digits
-            // read softer and more designed.
-            SetTextColor(dc, blendColor(g_theme.accent, g_theme.text, 30));
+            // clock (centred, bold Vazirmatn) — v1.90.0: deep navy / sectionInk
+            // so the time no longer blends into the frosted header. Date is a
+            // distinct muted ink (not the same accent as the clock).
+            SetTextColor(dc, g_dark ? RGB(240,246,252) : g_theme.sectionInk);
             SelectObject(dc,g_fTitle);
             RECT ck={zL,S(3),zR,S(3)+S(30)};
             DrawTextW(dc,clkStr.c_str(),-1,&ck,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
-            // date (centred, just below) — accent instead of grey
-            SetTextColor(dc,g_theme.accent);
+            SetTextColor(dc, g_dark ? RGB(168,180,197) : g_theme.labelInk);
             SelectObject(dc,g_fSmall);
             RECT dr={zL,S(3)+S(29),zR,mainBarH()-S(2)};
             DrawTextW(dc,dateStr.c_str(),-1,&dr,
@@ -1124,7 +1154,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // v1.70.0: shift labels removed per user request. Only the product tag
         // (name + version) remains on the right side.
         // bottom-right: small product tag
-        SetTextColor(dc,g_theme.textDim);
+        SetTextColor(dc, g_dark ? g_theme.textDim : g_theme.labelInk);
         RECT pr={rc.right-S(360),rc.bottom-botBarH(),rc.right-S(16),rc.bottom};
         std::wstring tag=std::wstring(APP_NAME_W)+L"  نسخه "+toFaDigits(APP_VERSION_W);
         DrawTextW(dc,tag.c_str(),-1,&pr,
