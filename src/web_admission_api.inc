@@ -1210,6 +1210,25 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
         return Shift_StatusJson();
     }
+    //  v1.92.0: front-end error bridge. JS reports uncaught errors / load
+    //  failures here so they land in the DEDICATED HTML error log (not the
+    //  general activity log). Only real bugs/crashes/load failures — never
+    //  normal events like "user logged in" or "page opened".
+    if(verb=="client.error"){
+        std::string msgU,srcU,stkU; double ln=0,col=0;
+        jsonGetString(body,"message",msgU);
+        jsonGetString(body,"source",srcU);
+        jsonGetNumber(body,"line",ln);
+        jsonGetNumber(body,"column",col);
+        jsonGetString(body,"stack",stkU);
+        wchar_t lnB[24], colB[24];
+        swprintf(lnB,24,L"%d",(int)ln);
+        swprintf(colB,24,L"%d",(int)col);
+        std::wstring m = L"JS Error: " + u82w(msgU) + L" at " + u82w(srcU) +
+                         L":" + lnB + L":" + colB + L" stack: " + u82w(stkU);
+        logHtmlError(m);
+        return "{\"ok\":true}";
+    }
 
     return "{\"ok\":false,\"err\":\"verb ناشناخته\"}";
 }

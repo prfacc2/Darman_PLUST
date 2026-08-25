@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.90.0"
+#define APP_VERSION_W   L"1.92.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -276,6 +276,9 @@ void         writeSchemaVersion();   // §I: stamp data\.schema_version (informa
 void         logLine(const std::wstring& s);
 // v1.82.0: real failures only (not gated by AZ_DEBUG_LOGS). Writes logs\errors.log.
 void         logError(const std::wstring& s);
+// v1.92.0: dedicated HTML/CSS/JS error log — only front-end bugs/crashes/load
+// failures, never normal activity. Writes logs\html errors\errors.log.
+void         logHtmlError(const std::wstring& msg);
 // §J: record a flow breadcrumb (last 32 are dumped into the crash report).
 void         Breadcrumb(const wchar_t* what);
 std::wstring formatMoney(long long v);                   // 1,234,567

@@ -134,6 +134,22 @@ void logError(const std::wstring& s){
         st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond);
     writeFileUtf8(logsDir()+L"\\errors.log", std::wstring(pre)+s+L"\r\n", true);
 }
+//  v1.92.0 — dedicated HTML/CSS/JS error log. Only real bugs/crashes/JS errors/
+//  CSS errors/load failures/file-path issues are ever written here — NEVER
+//  normal activity ("user logged in", "page opened" etc.). Mirrors logError()'s
+//  file handling + UTF-8 encoding, but targets its own logs\html errors\ folder
+//  (auto-created) so front-end faults are isolated from the general error log.
+void logHtmlError(const std::wstring& msg){
+    // Only errors/crashes/load failures — never normal activity.
+    // Writes to logs\html errors\ (folder auto-created).
+    std::wstring dir = ensureDir(logsDir()+L"\\html errors");
+    std::wstring path = dir + L"\\errors.log";
+    SYSTEMTIME st = iranNow();
+    wchar_t pre[64];
+    swprintf(pre,64,L"[%04d-%02d-%02d %02d:%02d:%02d] ",
+        st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond);
+    writeFileUtf8(path, std::wstring(pre)+msg+L"\r\n", true);
+}
 
 // --------------------------------------------------------------- settings --
 //  simple key=value store: data\settings.ini

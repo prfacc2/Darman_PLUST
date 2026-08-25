@@ -549,9 +549,9 @@ static int infoBarH(){ return S(6); }
 // v1.12.0 (§2.C): slightly slimmer tab strip + a touch more breathing room
 // between tabs and from the strip edge, for a cleaner, more modern header.
 static int tabBarH(){ return S(38); }
-static int tabW()    { return S(206); }   // ideal width; computeTabStrip may shrink
-static int tabMinW() { return S(118); }   // v1.90: floor before overflow chevrons
-static int tabGap()  { return S(8);  }
+static int tabW()    { return S(188); }   // v1.92: slimmer ideal width for more tabs
+static int tabMinW() { return S(84);  }   // v1.92: lower floor so more tabs fit before overflow
+static int tabGap()  { return S(6);  }   // v1.92: tighter gap for responsiveness
 // v1.75.0: each tab kind carries a distinct vector glyph so the strip reads as
 // a set of labelled, iconified tabs rather than a row of plain text buttons.
 static int tabIconFor(int kind){
@@ -5166,12 +5166,10 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // v1.89: the DASHBOARD tab is permanent — it has no close control.
             // The cartable (کارتابل) is now CLOSABLE; while it carries an
             // unread badge the badge slot acts as «open + mark seen» instead.
+            // v1.92: the کارتابل (TK_PORTAL) tab is always closable via its
+            // close × — even when it carries an unread badge. The badge moved
+            // to the title area so the close slot is never obscured.
             if(part==1 && t->kind==TK_DASH){ /* permanent — nothing to close */ }
-            else if(part==1 && t->kind==TK_PORTAL
-                    && unseenMessageCount(g_session.user.username)>0){
-                s_rd->active=hit; markMessagesSeen(g_session.user.username);
-                recLayoutTabs(h); InvalidateRect(h,NULL,FALSE);
-            }
             else if(part==1) closeTab(t);
             else {
                 s_rd->active=hit; recLayoutTabs(h);
@@ -5367,21 +5365,27 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 if(t->kind==TK_PORTAL){
                     int n=unseenMessageCount(g_session.user.username);
                     if(n>0){
-                        RECT bd={r.left+S(8),r.top+S(7),r.left+S(30),r.bottom-S(7)};
-                        // v1.63.0: the counter pill now glows and carries a
-                        // gradient so an unread cartable actually draws the eye.
-                        gpShadowColor(dc,bd,S(9),S(6),110,g_theme.danger);
-                        gpGradRoundRect(dc,bd,S(9),
+                        // v1.92: unread badge sits on the title area (left of
+                        // the close slot) so the close × stays available even
+                        // when there are unread messages. The user must always
+                        // be able to close the کارتابل tab.
+                        wchar_t nb[8]; swprintf(nb,8,L"%d",n);
+                        std::wstring fa=toFaDigits(nb);
+                        SelectObject(dc,g_fSmall);
+                        SIZE sz={0,0};
+                        GetTextExtentPoint32W(dc,fa.c_str(),(int)fa.size(),&sz);
+                        int bw=sz.cx+S(14);
+                        RECT bd={r.right-S(44)-bw, r.top+S(8),
+                                 r.right-S(44), r.bottom-S(8)};
+                        gpShadowColor(dc,bd,S(8),S(4),80,g_theme.danger);
+                        gpGradRoundRect(dc,bd,S(8),
                             blendColor(g_theme.danger,RGB(255,255,255),24),
                             g_theme.danger,CLR_INVALID);
                         SetTextColor(dc,RGB(255,255,255)); SelectObject(dc,g_fSmall);
-                        wchar_t nb[8]; swprintf(nb,8,L"%d",n);
-                        DrawTextW(dc,toFaDigits(nb).c_str(),-1,&bd,
+                        DrawTextW(dc,fa.c_str(),-1,&bd,
                             DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
-                        continue;   // badge covers the close slot while unread
+                        // fall through — close × is always painted below
                     }
-                    // v1.90: when there is no unread count, fall through and
-                    // paint the close × so کارتابل can actually be closed.
                 }
                 // close ×  (v1.63.0: hover raises a soft glowing danger pill
                 // instead of a flat red square)

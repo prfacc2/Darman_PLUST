@@ -11,96 +11,96 @@ HBRUSH  g_brBg=0, g_brSurface=0, g_brSurface2=0, g_brInput=0;
 COLORREF g_infoAccent  = RGB(124, 92, 230);
 COLORREF g_infoAccent2 = RGB(98, 70, 210);
 
+// ============================================================================
+//  v1.92.0 STANDARDIZED DESIGN PALETTE — "DarmanPlus Medical Glass"
+//  Two themes: Light (روشن) and Dark (مشکی). The calm/warm palettes were
+//  retired in v1.77. This palette is the SINGLE source of truth for the C++
+//  native UI; the embedded HTML surfaces (assets/admission/admission.css)
+//  mirror these exact hex values. When you change a colour here, update the
+//  matching token in admission.css AND docs/DESIGN_SYSTEM.md.
+//
+//  LIGHT elevation ladder (V = relative lightness, 0-255):
+//    bg2   181  #B5C1D4  page bottom (deepest — gives the page body)
+//    bg    195  #C3CDDD  page
+//    surface2 221  #DDE4EF  wells / bars / list backgrounds
+//    border 172  #A8B5CC  crisp hairline (CLEARLY visible, not invisible)
+//    inputBg 226  #E2E8F2  input wells (recessed, darker than surface)
+//    surface 241  #F1F4F9  cards (off-white, NOT pure #FFF → glassmorphism depth)
+//    surfaceTop 247  #F7F9FC  soft top-light on cards
+//    header 208-199  #D0D9E8→#BAC6D8  frosted header band
+//
+//  Design rules (see docs/DESIGN_SYSTEM.md):
+//    • surface is NEVER pure white — off-white #F1F4F9 gives glass depth.
+//    • border is always ≥40 lightness points from surface → visible hairline.
+//    • text is ≥140 lightness points from surface → high contrast (WCAG AA+).
+//    • accent is royal blue #2B48CC; never use purple/violet for admission cards.
+//    • success/danger/warn are the ONLY semantic colours; use them consistently.
+// ============================================================================
 void applyTheme(bool dark){
     g_dark = dark;
     if(dark){
-        // ---- True-black dark palette. The page background is (near) pure black
-        //      as requested so card edges & button corners no longer glow white;
-        //      surfaces step up in lightness only slightly so the UI has depth
-        //      without bright halos. Labels/text are deliberately bright. ----
-        g_theme.bg          = RGB(0, 0, 0);       // pure black page
-        g_theme.bg2         = RGB(8, 10, 14);
-        g_theme.surface     = RGB(20, 24, 30);    // card
-        g_theme.surfaceTop  = RGB(28, 33, 41);    // card gradient top
-        g_theme.surface2    = RGB(12, 14, 18);    // bars
-        g_theme.border      = RGB(54, 62, 76);    // clearly visible separators
-        g_theme.text        = RGB(238, 243, 249);
-        g_theme.textDim     = RGB(170, 182, 198); // brighter dim text (legible)
-        g_theme.labelInk    = RGB(205, 214, 226); // dark theme: light-gray labels
-        g_theme.sectionInk  = RGB(238, 243, 249); // dark theme: bright titles
-        g_theme.accent      = RGB(56, 170, 255);  // bright sky-blue
-        g_theme.accent2     = RGB(30, 120, 220);  // gradient end
-        g_theme.accentHover = RGB(96, 190, 255);
-        g_theme.accentText  = RGB(255, 255, 255);
-        g_theme.danger      = RGB(240, 100, 100);
-        g_theme.dangerHover = RGB(250, 128, 128);
-        g_theme.success     = RGB(74, 210, 148);
-        g_theme.warn        = RGB(245, 184, 84);
-        g_theme.inputBg     = RGB(26, 31, 39);    // distinctly lighter than card
-        g_theme.inputText   = RGB(240, 245, 250);
-        g_theme.hover       = RGB(34, 40, 50);
-        g_theme.headerTop   = RGB(14, 17, 22);
-        g_theme.headerBot   = RGB(6, 8, 11);
-        g_infoAccent  = RGB(150, 120, 245);   // bright violet (stands out, not red)
-        g_infoAccent2 = RGB(120, 92, 225);
-    } else {
-        // ---- Premium light palette (v1.10.0 §C): a genuinely LAYERED light
-        //      theme, not a washed-out white sheet. Five clearly distinct
-        //      elevation tones — page → wells/bars → cards → card-top highlight
-        //      → header — give real depth. Borders are crisp, text is high
-        //      contrast (near-WCAG-AAA on white), the accent is a richer, more
-        //      saturated indigo→sky, and hover/focus/active/disabled states are
-        //      visually separated so every control reads clearly.
-        //
-        //  Elevation ladder (lightness):
-        //      bg2  214 ── page bottom (deepest)
-        //      bg   222 ── page
-        //      surface2 234 ── wells / bars / list backgrounds
-        //      border 196 ── crisp hairline between layers
-        //      surface 255 ── cards (clean white, pops off the tinted page)
-        //      surfaceTop 250 ── soft top-light on cards
-        // ---- v1.19.0: premium "DarmanPlus 2026" light palette — matches the
-        //  reference reception design exactly.
-        //  bg #F5F8FD · surface #FFFFFF · surface2 #EAF4FF · border #DCE6F2
-        //  text #233042 · muted #6B7A90 · accent #1976F3 · hover #2D8CFF
-        //  success #16C47F · warning #F4B740 · danger #E24C4B.
-        // v1.85.0: soften the light palette toward a neumorphic/claymorphic base
-        // and unify the accent with the embedded admission page (refined indigo).
-        // The page sits a touch deeper so the near-white clay cards extrude,
-        // borders stay soft, and the header reads as a frosted band.
-        g_theme.bg          = RGB(0xD4, 0xDE, 0xEC); // #D4DEEC deeper clay page
-        g_theme.bg2         = RGB(0xC5, 0xD2, 0xE4); // page gradient bottom
-        g_theme.surface     = RGB(0xFF, 0xFF, 0xFF); // #FFFFFF cards / sheets
-        g_theme.surfaceTop  = RGB(0xFC, 0xFD, 0xFF); // card top-light
-        g_theme.surface2    = RGB(0xE7, 0xEE, 0xF9); // #E7EEF9 wells / bars
-        g_theme.border      = RGB(0xD2, 0xDD, 0xEB); // #D2DDEB soft neumorphic edge
-        g_theme.text        = RGB(0x1E, 0x2A, 0x3C); // #1E2A3C primary ink
-        g_theme.textDim     = RGB(0x67, 0x73, 0x8A); // #67738A muted
-        g_theme.labelInk    = RGB(0x3A, 0x4A, 0x66); // readable labels
-        g_theme.sectionInk  = RGB(0x15, 0x22, 0x38); // strong titles
-        // v1.88.0: deeper royal BLUE (less violet) — white button text sits on
-        // a properly dark brand colour and the whole theme reads less purple.
-        g_theme.accent      = RGB(0x35, 0x50, 0xD8); // #3550D8 royal blue
-        g_theme.accent2     = RGB(0x54, 0x6E, 0xEE); // #546EEE gradient end / hover
-        g_theme.accentHover = RGB(0x54, 0x6E, 0xEE); // #546EEE hover
+        // ---- Deep-charcoal dark palette. Near-black page with layered surfaces
+        //      that step up in lightness for real depth. Borders are clearly
+        //      visible. Labels/text are bright. Accent is a vivid blue. ----
+        g_theme.bg          = RGB(0x0B, 0x0F, 0x15); // #0B0F15 near-black page
+        g_theme.bg2         = RGB(0x0E, 0x13, 0x1B); // page gradient bottom
+        g_theme.surface     = RGB(0x15, 0x1B, 0x25); // #151B25 card (off-black)
+        g_theme.surfaceTop  = RGB(0x1D, 0x25, 0x31); // card gradient top
+        g_theme.surface2    = RGB(0x0D, 0x12, 0x18); // bars / wells
+        g_theme.border      = RGB(0x2C, 0x36, 0x45); // #2C3645 visible separators
+        g_theme.text        = RGB(0xE8, 0xEE, 0xF6); // bright primary text
+        g_theme.textDim     = RGB(0x95, 0xA3, 0xB8); // readable dim text
+        g_theme.labelInk    = RGB(0xC2, 0xCC, 0xDC); // light-gray labels
+        g_theme.sectionInk  = RGB(0xE8, 0xEE, 0xF6); // bright section titles
+        g_theme.accent      = RGB(0x3B, 0x82, 0xF6); // #3B82F6 vivid blue
+        g_theme.accent2     = RGB(0x25, 0x63, 0xEB); // gradient end
+        g_theme.accentHover = RGB(0x60, 0xA5, 0xFA);
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
-        g_theme.danger      = RGB(0xE0, 0x53, 0x52); // #E05352
-        g_theme.dangerHover = RGB(0xEC, 0x6C, 0x6B);
-        g_theme.success     = RGB(0x15, 0xB5, 0x81); // #15B581
-        g_theme.warn        = RGB(0xF0, 0xB4, 0x3C); // #F0B43C warning
-        g_theme.inputBg     = RGB(0xF3, 0xF6, 0xFC); // tinted well
-        g_theme.inputText   = RGB(0x1E, 0x2A, 0x3C);
-        g_theme.hover       = RGB(0xE8, 0xEE, 0xFC); // #E8EEFC soft accent wash on hover
-        // frosted header band with real depth
-        g_theme.headerTop   = RGB(0xE8, 0xEE, 0xF8);
-        g_theme.headerBot   = RGB(0xC8, 0xD6, 0xE8);
-        g_infoAccent  = RGB(0x7C, 0x56, 0xE4);    // violet (distinct, non-red)
-        g_infoAccent2 = RGB(0x5E, 0x42, 0xD0);
-        // v1.77: the calm/warm eye-comfort palettes were RETIRED — the app now
-        // ships exactly two themes, light (روشن) and dark (مشکی). The former
-        // theme.palette setting is no longer consulted here, so any stale calm/
-        // warm value silently falls back to the standard medical-white light
-        // theme (and applyThemeByName() rewrites it to "blue" on the next pick).
+        g_theme.danger      = RGB(0xF8, 0x71, 0x71);
+        g_theme.dangerHover = RGB(0xFC, 0xA5, 0xA5);
+        g_theme.success     = RGB(0x34, 0xD3, 0x99);
+        g_theme.warn        = RGB(0xFB, 0xBF, 0x24);
+        g_theme.inputBg     = RGB(0x18, 0x1F, 0x28); // distinctly lighter than card
+        g_theme.inputText   = RGB(0xE8, 0xEE, 0xF6);
+        g_theme.hover       = RGB(0x1C, 0x24, 0x30);
+        g_theme.headerTop   = RGB(0x0D, 0x13, 0x1C);
+        g_theme.headerBot   = RGB(0x07, 0x0A, 0x0F);
+        g_infoAccent  = RGB(0xA5, 0x8A, 0xF0);   // soft violet (distinct, non-red)
+        g_infoAccent2 = RGB(0x8B, 0x6E, 0xE0);
+    } else {
+        // ---- Premium LIGHT palette "DarmanPlus Medical Glass" (v1.92.0):
+        //      A genuinely LAYERED light theme — NOT a washed-out white sheet.
+        //      The page sits deep (#C3CDDD) so off-white cards (#F1F4F9) extrude
+        //      with real depth and crisp borders (#A8B5CC) are clearly visible.
+        //      Glassmorphism: surface is off-white (never pure #FFF), borders
+        //      are always visible, and the accent is a saturated royal blue.
+        //      Text contrast is high (near-WCAG-AAA on card surface). ----
+        g_theme.bg          = RGB(0xC3, 0xCD, 0xDD); // #C3CDDD deep blue-gray page
+        g_theme.bg2         = RGB(0xB5, 0xC1, 0xD4); // #B5C1D4 page gradient bottom
+        g_theme.surface     = RGB(0xF1, 0xF4, 0xF9); // #F1F4F9 off-white cards (glass)
+        g_theme.surfaceTop  = RGB(0xF7, 0xF9, 0xFC); // soft top-light on cards
+        g_theme.surface2    = RGB(0xDD, 0xE4, 0xEF); // #DDE4EF wells / bars
+        g_theme.border      = RGB(0xA8, 0xB5, 0xCC); // #A8B5CC CRISP visible edge
+        g_theme.text        = RGB(0x1A, 0x24, 0x35); // #1A2435 primary ink (high contrast)
+        g_theme.textDim     = RGB(0x5C, 0x6B, 0x7E); // #5C6B7E muted
+        g_theme.labelInk    = RGB(0x2E, 0x3D, 0x52); // #2E3D52 readable labels
+        g_theme.sectionInk  = RGB(0x0D, 0x17, 0x26); // #0D1726 strong titles
+        g_theme.accent      = RGB(0x2B, 0x48, 0xCC); // #2B48CC royal blue
+        g_theme.accent2     = RGB(0x42, 0x63, 0xE8); // #4263E8 gradient end / hover
+        g_theme.accentHover = RGB(0x42, 0x63, 0xE8); // hover
+        g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
+        g_theme.danger      = RGB(0xDC, 0x26, 0x26); // #DC2626
+        g_theme.dangerHover = RGB(0xEF, 0x44, 0x44);
+        g_theme.success     = RGB(0x05, 0x96, 0x69); // #059669
+        g_theme.warn        = RGB(0xD9, 0x77, 0x06); // #D97706 warning
+        g_theme.inputBg     = RGB(0xE2, 0xE8, 0xF2); // #E2E8F2 tinted well (recessed)
+        g_theme.inputText   = RGB(0x1A, 0x24, 0x35);
+        g_theme.hover       = RGB(0xD6, 0xDE, 0xF0); // soft accent wash on hover
+        // frosted header band with real depth (not white)
+        g_theme.headerTop   = RGB(0xD0, 0xD9, 0xE8); // #D0D9E8 frosted top
+        g_theme.headerBot   = RGB(0xBA, 0xC6, 0xD8); // #BAC6D8 frosted bottom
+        g_infoAccent  = RGB(0x6D, 0x4D, 0xD6);    // #6D4DD6 violet (distinct, non-red)
+        g_infoAccent2 = RGB(0x5A, 0x3C, 0xC4);
     }
     if(g_brBg)       DeleteObject(g_brBg);
     if(g_brSurface)  DeleteObject(g_brSurface);

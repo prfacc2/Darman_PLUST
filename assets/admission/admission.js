@@ -29,6 +29,51 @@
 
   function $(id) { return document.getElementById(id); }
 
+  /* ==========================================================================
+     v1.92.0 — global front-end error reporting. Uncaught JS errors (and the
+     caught ones below) are forwarded to C++ via the 'client.error' bridge verb
+     so they land in the DEDICATED HTML error log (logs\html errors\errors.log)
+     — NOT the normal activity log. Only real bugs/crashes/load failures are
+     ever reported; normal info/debug logs are never sent here.
+     A re-entrancy guard (_errReporting) makes sure an error thrown inside the
+     reporter itself can never loop forever. window.onerror returns false so the
+     engine's own default handler still runs. ========================================================================== */
+  var _errReporting = false;
+  function reportJsError(e, ctx) {
+    if (_errReporting) return;
+    _errReporting = true;
+    try {
+      if (window.Bridge && typeof window.Bridge.call === 'function') {
+        window.Bridge.call('client.error', {
+          message: String((e && e.message) ? e.message : e).substring(0, 300),
+          source: String(ctx || ''),
+          line: 0,
+          column: 0,
+          stack: (e && e.stack) ? String(e.stack).substring(0, 500) : ''
+        });
+      }
+    } catch (x) { /* never let the reporter throw again */ }
+    _errReporting = false;
+  }
+  window.onerror = function (msg, src, line, col, err) {
+    if (_errReporting) return false;
+    _errReporting = true;
+    try {
+      var stack = (err && err.stack) ? String(err.stack).substring(0, 500) : '';
+      if (window.Bridge && typeof window.Bridge.call === 'function') {
+        window.Bridge.call('client.error', {
+          message: String(msg).substring(0, 300),
+          source: String(src || ''),
+          line: line || 0,
+          column: col || 0,
+          stack: stack
+        });
+      }
+    } catch (e2) { /* prevent infinite loop */ }
+    _errReporting = false;
+    return false; /* let the default handler also run */
+  };
+
   var state = {
     services: [],          /* current admission service rows */
     insurances: [],        /* {name,pct} base list */
@@ -110,7 +155,7 @@
      fully unwound. ========================================================================== */
   function defer(fn) {
     setTimeout(function () {
-      try { fn(); } catch (e) { if (window.console) console.error(e); }
+      try { fn(); } catch (e) { if (window.console) console.error(e); reportJsError(e, 'defer'); }
     }, 0);
   }
 
@@ -349,8 +394,8 @@
     if (_renderTimer) return;             /* coalesce bursts into one render */
     _renderTimer = setTimeout(function () {
       _renderTimer = null;
-      try { renderServices(); } catch (e) { if (window.console) console.error(e); }
-      try { recompute(); } catch (e2) { if (window.console) console.error(e2); }
+      try { renderServices(); } catch (e) { if (window.console) console.error(e); reportJsError(e, 'renderServices'); }
+      try { recompute(); } catch (e2) { if (window.console) console.error(e2); reportJsError(e2, 'recompute'); }
     }, 0);
   }
 
@@ -2335,17 +2380,40 @@
 
   function renderCash(d) {
     var tabs = d.tabs || [];
-    var host = $('cashTabs');
-    if (host) {
-      var h = '', i, t, on;
-      for (i = 0; i < tabs.length; i++) {
-        t = tabs[i];
-        on = (+t.id === +state.cashTab) ? ' active' : '';
-        h += '<button type="button" class="cash-tab' + on + '" data-tab="' + esc(t.id) + '">' +
-             esc(t.name || '') + '</button>';
-      }
-      host.innerHTML = h;
+    /* Build the section tab buttons once. The same markup is mirrored into a
+       container ABOVE the table (#cashTabsAbove) so «صندوق نرفته‌ها» and the
+       section tabs sit right above the rows instead of inside the overlay
+       header. The original header #cashTabs is hidden — the tabs now live
+       above the table. (loop var renamed `on`->`act` so the on() event helper
+       stays callable for the delegated handler bound below.) */
+    var h = '', i, t, act;
+    for (i = 0; i < tabs.length; i++) {
+      t = tabs[i];
+      act = (+t.id === +state.cashTab) ? ' active' : '';
+      h += '<button type="button" class="cash-tab' + act + '" data-tab="' + esc(t.id) + '">' +
+           esc(t.name || '') + '</button>';
     }
+    var head = $('cashTabs');
+    if (head) { head.innerHTML = h; head.style.display = 'none'; }
+    var above = $('cashTabsAbove');
+    if (!above) {
+      above = document.createElement('div');
+      above.id = 'cashTabsAbove';
+      above.className = 'tabs cash-tabs';
+      var wrap = $('cashWrap');
+      if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(above, wrap);
+      /* delegated tab handler — wired ONCE (same pattern as #cashTabs in
+         wire()) so re-renders never double-bind. */
+      on(above, 'click', function (e) {
+        e = e || window.event;
+        var tgt = e.target || e.srcElement;
+        var btn = findUp(tgt, 'data-tab', above);
+        if (!btn) return;
+        state.cashTab = +btn.getAttribute('data-tab') || 0;
+        refreshCash();
+      });
+    }
+    if (above) above.innerHTML = h;
     var inc = (d.shift && d.shift.income != null) ? d.shift.income : (d.income || 0);
     var incEl = $('cashIncome');
     if (incEl) incEl.innerHTML = '<b>' + money(inc) + '</b> <span class="cash-cur">ریال</span>';
@@ -2363,6 +2431,20 @@
       meta = 'شروع ' + toFa(sh.startTime || '') + ' / پایان ' + toFa(sh.endTime || '');
     }
     setText($('cashShiftMeta'), meta);
+
+    /* Shift button enable/disable: when a shift is OPEN the start button is
+       disabled and the end button enabled, and vice-versa when CLOSED. Only
+       touch the buttons when the user has cashier_edit (the no-permission case
+       hides them via hideIds in init — display:none — so we must NOT re-enable
+       them here; detect that by checking the start button is still visible). */
+    var ssBtn = $('cashShiftStart'), seBtn = $('cashShiftEnd');
+    if (ssBtn && seBtn) {
+      var canEdit = !ssBtn.style.display || ssBtn.style.display !== 'none';
+      if (canEdit) {
+        ssBtn.disabled = !!sh.open;
+        seBtn.disabled = !sh.open;
+      }
+    }
 
     var rows = d.rows || [];
     var body = $('cashBody');
@@ -2742,6 +2824,13 @@
 
   function boot() {
     applySurfaceClass();
+    /* v1.92.0: load-failure detection. boot() runs after DOM ready, so the app
+       shell (document.body + #app) MUST exist by now. If either is missing the
+       HTML/CSS bundle failed to load or parse — report it as an HTML error
+       (never a normal activity log) so it lands in the dedicated error log. */
+    if (!document.body || !$('app')) {
+      reportJsError(new Error('admission shell missing: body or #app not found at boot'), 'boot');
+    }
     /* v1.89: reception DASHBOARD — app-icon actions, envelope unread badge,
        drawer with categories + search. Wired ONLY on the dash surface so the
        broadcast «dash.unread» event never touches other surfaces. */
@@ -2953,6 +3042,7 @@
       renderServices(); recompute();
       hideLoader();
       if (window.console) console.error('init failed', err);
+      reportJsError(err, 'init');
     });
   }
 

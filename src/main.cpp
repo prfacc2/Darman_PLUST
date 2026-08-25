@@ -25,6 +25,7 @@ Session   g_session;
 HFONT g_fUI=0, g_fUIB=0, g_fSmall=0, g_fTitle=0, g_fBig=0, g_fHuge=0, g_fMono=0;
 HFONT g_fLabel=0, g_fSection=0;   // v1.27.0 UI redesign fonts
 HFONT g_fCode=0;   // §G: fixed-pitch code font (Consolas → Courier New)
+HFONT g_fClock=0, g_fDate=0;      // v1.92: dedicated header clock / date fonts
 
 // frame children
 //  v1.4.0: the header now carries ONLY the exit button (right) and the gear
@@ -91,6 +92,8 @@ static void buildFonts(){
     if(g_fCode) DeleteObject(g_fCode);
     if(g_fLabel)  DeleteObject(g_fLabel);
     if(g_fSection)DeleteObject(g_fSection);
+    if(g_fClock)  DeleteObject(g_fClock);
+    if(g_fDate)   DeleteObject(g_fDate);
     g_fUI    = mkFont(15, FW_NORMAL);
     g_fUIB   = mkFont(15, FW_BOLD);
     g_fSmall = mkFont(12, FW_NORMAL);
@@ -104,6 +107,11 @@ static void buildFonts(){
     // the label the requested weight without looking bold.
     g_fLabel   = mkFont(13, FW_SEMIBOLD);
     g_fSection = mkFont(16, FW_BOLD);
+    // v1.92: a dedicated, larger clock font (22 bold) and a clearer date font
+    // (14) so the header time / Jalali date read as deliberate typography
+    // instead of the 19/12px faces reused from the rest of the UI.
+    g_fClock = mkFont(22, FW_BOLD);
+    g_fDate  = mkFont(14, FW_NORMAL);
 }
 
 // v1.31.0 RESPONSIVE-LABEL FIX — a tiny cache of fonts whose logical height is
@@ -141,9 +149,12 @@ HFONT fitFont(int px, int weight, double f){
 //  screens keep the original clean single-layer header.
 // §2.B (1.12.0): the LAYER-1 header was slightly reduced from S(64) to S(56)
 // for a more compact, modern look. The clock (top) + Jalali date (below) still
-// fit comfortably because the clock band is S(6)+S(30) and the date S(30)→S(54)
+// fit comfortably because the clock band is S(3)+S(34) and the date S(36)→S(58)
 // — both recalculated against this height in the paint code below.
-static int mainBarH(){ return S(56); }                 // LAYER 1 height
+// v1.92.0: the header grew from S(56) to S(60) to host the larger dedicated
+// clock (g_fClock, 22 bold) + date (g_fDate, 14) with comfortable breathing
+// room. All header children (exit / gear / calc) re-centre on this height.
+static int mainBarH(){ return S(60); }                 // LAYER 1 height
 // §B (v1.10.0): the action bar has a FIXED compact height. The old code scaled
 // it by an animated collapse factor (S(50)*factor) which produced the
 // frame-by-frame slide, the one-frame "stuck" artifact and an empty header row
@@ -292,11 +303,11 @@ static HomeGeom homeGeom(int W, int H){
     int cl = cx - cardsW/2;
     SetRect(&g.cardR, cl+cardW+cgap, y, cl+cardsW,  y+cardH);   // RTL right
     SetRect(&g.cardL, cl,            y, cl+cardW,   y+cardH);   // RTL left
-    // v1.90.0: the glass tray matches the hero panel's width (inset S(28)),
-    // not just the two compact icon cells — so the vessel reads as the same
-    // length as the container behind it.
-    SetRect(&g.tray, g.panel.left+S(28), y-S(16),
-            g.panel.right-S(28), y+cardH+S(14));
+    // v1.92.0: the glass tray now nearly matches the hero panel's width
+    // (inset S(14) — down from S(28)) so the inner container holding the two
+    // account icons reads as the same width as the outer panel behind it.
+    SetRect(&g.tray, g.panel.left+S(14), y-S(16),
+            g.panel.right-S(14), y+cardH+S(14));
 
     int fy = g.panel.bottom + footGap;
     SetRect(&g.foot, cx-S(250), fy, cx+S(250), fy+footH);
@@ -347,8 +358,11 @@ static void paintAppIcon(HDC dc, RECT cell, int icon, COLORREF brand,
             blendColor(brand, g_theme.surface2, g_dark?18:22),
             blendColor(brand, g_theme.border, 28));
     }
-    // tinted ambient shadow (deeper + wider when hovered)
-    gpShadowColor(dc, bd, rad, hot?S(14):S(10), hot?120:78, brand);
+    // v1.92.0: the coloured brand glow halo was REMOVED — the icon is now just
+    // the badge itself (no coloured halo). A quiet NEUTRAL drop shadow, deeper
+    // + wider on hover, gives depth without the brand tint that clashed with
+    // the lighter background artwork.
+    gpShadow(dc, bd, rad, hot?S(12):S(6), hot?100:46);
     // glossy body: light top → deep bottom (convex app-icon)
     gpGradRoundRect(dc, bd, rad,
         blendColor(brand, RGB(255,255,255), 30),
@@ -517,7 +531,10 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // dark artwork is deeper, so it gets a stronger wash.
         // v1.77: the light scrim was nudged up so the page reads as a calm tinted
         // surface (less flat-white) while the illustration still shows through.
-        if(!gpDrawBackground(dc, rc, g_dark, g_theme.bg, g_dark?96:58)){
+        // v1.92.0: the light scrim was eased back (58→44) now that g_theme.bg is a
+        // lighter #C3CDDD — the first-page background no longer clashes with / sits
+        // too dark over the artwork, so a thinner wash keeps it clean and bright.
+        if(!gpDrawBackground(dc, rc, g_dark, g_theme.bg, g_dark?96:44)){
             RECT full={0,0,rc.right,rc.bottom};
             gpGradRoundRect(dc,full,0,g_theme.bg,g_theme.bg2,CLR_INVALID);
         }
@@ -661,7 +678,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 blendColor(g_theme.border, g_theme.accent, 28));
             RECT itr=tr; InflateRect(&itr,-S(1),-S(1));
             gpRoundRect(dc, itr, S(24)-S(1), CLR_INVALID, RGB(255,255,255),
-                        g_dark?28:88);
+                        g_dark?32:108);
+            // v1.92.0: a subtle white-ish top highlight so the lighter, cleaner
+            // background (thinner scrim) still reads the tray as a raised vessel
+            // — light catching the top rim is the depth cue.
+            gpLine(dc, tr.left+S(24), tr.top+S(1), tr.right-S(24), tr.top+S(1),
+                   RGB(255,255,255), 1.0f, g_dark?34:120);
             // v1.90: a thin faint divider between the two programs
             {
                 int mx = (g.cardL.right + g.cardR.left)/2;
@@ -1138,14 +1160,17 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // clock (centred, bold Vazirmatn) — v1.90.0: deep navy / sectionInk
             // so the time no longer blends into the frosted header. Date is a
             // distinct muted ink (not the same accent as the clock).
+            // v1.92.0: dedicated larger fonts — g_fClock (22 bold) for the time,
+            // g_fDate (14) for the date — and a taller clock band (S(34)) so the
+            // bigger glyphs sit comfortably centred in the S(60) header.
             SetTextColor(dc, g_dark ? RGB(240,246,252) : g_theme.sectionInk);
-            SelectObject(dc,g_fTitle);
-            RECT ck={zL,S(3),zR,S(3)+S(30)};
+            SelectObject(dc,g_fClock);
+            RECT ck={zL,S(3),zR,S(3)+S(34)};
             DrawTextW(dc,clkStr.c_str(),-1,&ck,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
             SetTextColor(dc, g_dark ? RGB(168,180,197) : g_theme.labelInk);
-            SelectObject(dc,g_fSmall);
-            RECT dr={zL,S(3)+S(29),zR,mainBarH()-S(2)};
+            SelectObject(dc,g_fDate);
+            RECT dr={zL,S(3)+S(33),zR,mainBarH()-S(2)};
             DrawTextW(dc,dateStr.c_str(),-1,&dr,
                 DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
         }

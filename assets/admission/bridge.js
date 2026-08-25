@@ -52,7 +52,7 @@
     this._ok = []; this._err = [];
   };
   Deferred.prototype._safe = function (fn, v) {
-    try { fn(v); } catch (ex) { if (global.console) console.error(ex); }
+    try { fn(v); } catch (ex) { if (global.console) console.error(ex); reportSelf(ex, 'deferred.then'); }
   };
   /* returns a thenable object */
   Deferred.prototype.promise = function () {
@@ -85,12 +85,35 @@
   var isReady = false;
   var allowHttp = global.__AZADI_DEV_ALLOW_HTTP__ === true;
 
+  /* v1.92.0: forward caught callback errors to C++ via 'client.error' so they
+     reach the DEDICATED HTML error log (logs\html errors\), not the normal
+     activity log. Re-entrancy guarded so a fault inside the reporter itself can
+     never loop forever. `Bridge` (assigned below) is in scope by the time any
+     callback catch ever runs. */
+  var _bridgeErrGuard = false;
+  function reportSelf(ex, where) {
+    if (_bridgeErrGuard) return;
+    _bridgeErrGuard = true;
+    try {
+      if (Bridge && typeof Bridge.call === 'function') {
+        Bridge.call('client.error', {
+          message: String((ex && ex.message) ? ex.message : ex).substring(0, 300),
+          source: String(where || ''),
+          line: 0,
+          column: 0,
+          stack: (ex && ex.stack) ? String(ex.stack).substring(0, 500) : ''
+        });
+      }
+    } catch (x) { /* never let the reporter throw again */ }
+    _bridgeErrGuard = false;
+  }
+
   function fireReady() {
     if (isReady) return;
     isReady = true;
     var i;
     for (i = 0; i < readyCbs.length; i++) {
-      try { readyCbs[i](); } catch (e) { if (global.console) console.error(e); }
+      try { readyCbs[i](); } catch (e) { if (global.console) console.error(e); reportSelf(e, 'bridge.ready'); }
     }
     readyCbs = [];
   }
@@ -100,7 +123,7 @@
     if (!hs) return;
     var i;
     for (i = 0; i < hs.length; i++) {
-      try { hs[i](data); } catch (e) { if (global.console) console.error(e); }
+      try { hs[i](data); } catch (e) { if (global.console) console.error(e); reportSelf(e, 'bridge.event:' + name); }
     }
   }
 

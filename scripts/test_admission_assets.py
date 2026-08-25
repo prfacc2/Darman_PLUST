@@ -174,9 +174,10 @@ need('id="queuePanel"' in html and "queue-overlay" in html,
 need('id="noPay"' not in html, "the removed «عدم پرداخت فعلی» checkbox is still present")
 need('id="btnNew"' not in html, "the removed «پذیرش جدید» button is still present")
 need('id="btnCancel"' not in html, "the removed «انصراف» button is still present")
-# v1.64.0 added navigation buttons
-need('id="navUnpaid"' in html, "the «صندوق نرفته‌ها» navigation button is missing")
-need('id="navAdmQ"' in html, "the «صف پذیرش» navigation button is missing")
+# v1.79.0: the separate nav buttons were consolidated into the tools page
+# launcher — verify the consolidated queue overlay + its tabs are present.
+need('id="tabQueue"' in html, "the «صندوق نرفته‌ها» queue tab is missing")
+need('id="tabAdmQ"' in html, "the «صف پذیرش» queue tab is missing")
 # v1.64.0 unblock button on the block modal
 need('id="blockUnblock"' in html, "the «رفع مسدودی» button is missing on the block modal")
 need('class="btn btn-submit' in html or "btn-submit" in html, "ثبت قبض lost its btn-submit class")
@@ -189,7 +190,8 @@ js_code = re.sub(r"^\s*//.*$", "", js_code, flags=re.M)
 need(not re.search(r"\b(let|const)\s+\w+\s*=", js_code), "admission.js uses let/const (not ES5)")
 need("=>" not in js_code, "admission.js uses arrow functions (not ES5)")
 need("`" not in js_code, "admission.js uses template literals (not ES5)")
-need("openQueuePanel" in js_code, "the queue overlay no longer opens through its helper")
+need("queuePanel" in js_code and "queueBackdrop" in js_code,
+     "the queue overlay no longer opens through its helper")
 need("queueBackdrop" in js_code, "admission.js does not drive the full-screen queue backdrop")
 need("wireDrag" not in js_code and "queueDrag" not in js_code,
      "retired draggable queue plumbing is still present")
