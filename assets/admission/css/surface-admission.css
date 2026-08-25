@@ -121,6 +121,74 @@ body.surface-adm .col.is-active{
   -webkit-box-shadow:none;
   box-shadow:none;
 }
+/* ---- 1.1 RAIL SCROLL AFFORDANCE (the three columns) ----------------------
+   THE DEFECT THIS FIXES (v1.91.1): the three columns scroll
+   (`.col{overflow:auto}`, admission.css) but the page ALSO hides every
+   scrollbar globally — `*::-webkit-scrollbar{display:none;width:0 !important}`
+   plus `*{scrollbar-width:none}` and the inherited `html{scrollbar-*-color}`
+   Trident trick. A rail whose content is taller than the viewport therefore
+   showed no bar, no fade and no hint of any kind: «رسید بیمه» and the whole
+   وضعیت اتصال card were simply INVISIBLE on a 900px-tall screen, and they still
+   are on a 1366x768 laptop panel, which no padding budget can fix — rail height
+   depends on RUNTIME DATA (a long patient name wraps, a status message runs to
+   three lines), so a fixed budget can always be blown by real clinic data.
+   Density was trimmed (§4/§5) *and* the rails get a real affordance here: if
+   anything ever does not fit, the operator can SEE that it does not fit.
+
+   The global hide stays exactly as it is for the rest of the page (dropdowns,
+   mini lists, suggestion popovers): this block only re-arms the bar on the
+   three scrolling columns, and it is the one place in this layer that needs
+   `!important` — the global rule declares `width:0 !important`, and an
+   important declaration can only be beaten by a more specific important one.
+
+   THREE ENGINES, THREE MECHANISMS, one look (thin slate thumb in a sunken
+   gutter — §1.2 `surface-sunken` is the registered "scroll gutter" token):
+     · older WebView2 / Chromium → the ::-webkit-scrollbar pseudo-elements
+     · current WebView2 / Chromium + Firefox → scrollbar-width/scrollbar-color
+       (Chromium ignores the -webkit- pseudos once these are set, so both paths
+       are declared with the same two colours and cannot disagree)
+     · MSHTML/Trident → honours NEITHER, so it falls back to the platform
+       scrollbar. That is the affordance we want, so nothing here may suppress
+       it: the inherited `html{scrollbar-face-color:#eaf1fb;…}` camouflage is
+       overridden with real colours, and `-ms-overflow-style:scrollbar` keeps
+       the bar permanently visible instead of auto-hiding.
+   A bar only appears when the column actually overflows, so it can never steal
+   width (and re-introduce wrapping) on a rail that already fits. */
+body.surface-adm .col{
+  scrollbar-width:thin;
+  scrollbar-color:#9FB1CD #DFE7F3;
+  -ms-overflow-style:scrollbar;
+  scrollbar-face-color:#9FB1CD;
+  scrollbar-track-color:#DFE7F3;
+  scrollbar-arrow-color:#3B4C69;
+  scrollbar-highlight-color:#FFFFFF;
+  scrollbar-3dlight-color:#E1E8F2;
+  scrollbar-shadow-color:#C6D2E4;
+  scrollbar-darkshadow-color:#9FB1CD;
+}
+body.surface-adm .col::-webkit-scrollbar{
+  display:block;
+  width:8px !important;
+  height:8px !important;
+  -webkit-appearance:none;appearance:none;
+  background:#DFE7F3;
+}
+body.surface-adm .col::-webkit-scrollbar-track{
+  display:block;
+  background:#DFE7F3;
+  border-radius:999px;
+}
+body.surface-adm .col::-webkit-scrollbar-thumb{
+  display:block;
+  background:#9FB1CD;
+  border:2px solid #DFE7F3;      /* insets the thumb into a 4px pill */
+  border-radius:999px;
+}
+body.surface-adm .col::-webkit-scrollbar-thumb:hover{background:#7B90B4;}
+body.surface-adm .col::-webkit-scrollbar-corner{
+  display:block;
+  background:#DFE7F3;
+}
 /* Other surfaces' full-page panels live in the same document; on the admission
    surface they must stay out of the way. */
 body.surface-adm .tools-panel,
@@ -369,7 +437,7 @@ body.surface-adm .profile-card{
 /* the identity strip doubles as this card's section header (it owns the panel's
    kicker + mini line), so the card needs no separate .card-head */
 body.surface-adm .profile-card .profile-top{
-  padding:11px 13px 12px;
+  padding:8px 12px 9px;
   border-bottom:1px solid #BCC8F4;
   background:#EFF3FE;
   background:-webkit-linear-gradient(top,#F5F8FD 0%,#E7ECFD 100%);
@@ -399,21 +467,22 @@ body.surface-adm .profile-kicker:after{
   display:block;
   width:26px;height:3px;
   border-radius:2px;
-  margin:4px 0 5px;
+  margin:3px 0 4px;
   background:#3550D8;
   background:-webkit-linear-gradient(right,#3550D8 0%,#22349C 100%);
   background:linear-gradient(270deg,#3550D8 0%,#22349C 100%);
 }
 body.surface-adm .profile-card .pf-name{
-  font-size:16px;
+  font-size:15px;
   font-weight:800;
   color:#10203A;
-  line-height:1.25;
-  margin-bottom:2px;
+  line-height:1.22;
+  margin-bottom:1px;
 }
 body.surface-adm .profile-card .pf-file{
   font-size:11.5px;
   font-weight:700;
+  line-height:1.35;
   color:#3B4C69;
 }
 body.surface-adm .profile-card .pf-file b{
@@ -426,15 +495,15 @@ body.surface-adm .profile-state{
   display:-ms-flexbox;display:flex;
   -ms-flex-align:center;align-items:center;
   -ms-flex-pack:start;justify-content:flex-start;
-  margin:11px 13px 0;
-  padding:6px 10px;
+  margin:8px 12px 0;
+  padding:5px 9px;
   border-radius:9px;
   background:#E7ECFD;
   border:1px solid #BCC8F4;
   color:#22349C;
   font-size:11.5px;
   font-weight:800;
-  line-height:1.35;
+  line-height:1.3;
 }
 body.surface-adm .profile-state .dot{
   display:inline-block;
@@ -447,8 +516,8 @@ body.surface-adm .profile-state .dot{
 /* «نسخه الکترونیک» is a SECONDARY action → neutral outline (§8.3). Keeping it
    off the panel's hue stops it from reading like a second state chip. */
 body.surface-adm .btn-erx{
-  height:36px;
-  margin:11px 13px 0;
+  height:34px;
+  margin:8px 12px 0;
   border-radius:9px;
   color:#1D2B42;
   border:1px solid #9FB1CD;
@@ -466,9 +535,9 @@ body.surface-adm .btn-erx:hover{
   background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
 }
 /* the two prescription counters — neutral surface-2 wells, dark ink */
-body.surface-adm .profile-card .rx-row{padding:11px 13px 13px;}
+body.surface-adm .profile-card .rx-row{padding:7px 11px 9px;}
 body.surface-adm .profile-card .rx-box{
-  padding:7px 9px;
+  padding:5px 8px;
   border-radius:9px;
   background:#F2F6FC;
   border:1px solid #C6D2E4;
@@ -477,10 +546,10 @@ body.surface-adm .profile-card .rx-lbl{
   font-size:11px;
   font-weight:700;
   color:#3B4C69;
-  margin-bottom:2px;
+  margin-bottom:1px;
 }
 body.surface-adm .profile-card .rx-val{
-  font-size:15px;
+  font-size:14px;
   font-weight:800;
   color:#10203A;
 }
@@ -489,11 +558,24 @@ body.surface-adm .profile-card .rx-val{
    5. RIGHT RAIL — the rest of the rail
    Order: profile (4) → تاریخ/شیفت → عملیات پذیرش → launchers → چاپ اسناد →
    وضعیت اتصال.
-   ========================================================================== */
 
-/* ---- 5.1 تاریخ پذیرش / شیفت — SLATE (no semantic meaning) --------------- */
+   RAIL RHYTHM (v1.91 overflow fix): the rail stacks SEVEN items and must still
+   fit a 900px-tall screen — 1440x900 and 1600x900 are ordinary clinic desks,
+   and every scrollbar on this page is hidden (admission.css), so anything that
+   does not fit is not merely unscrolled, it is INVISIBLE. The rail therefore
+   runs a 10px rhythm instead of §8.1's 12px card gap; the centre and left
+   columns keep 12px.
+   ========================================================================== */
+body.surface-adm .col-action > .card{margin-bottom:10px;}
+body.surface-adm .col-action > .status-card{margin-top:10px;}
+
+/* ---- 5.1 تاریخ پذیرش / شیفت — SLATE (no semantic meaning) ---------------
+   RAIL BUDGET (v1.91 overflow fix): the rail must fit a 900px-tall screen at
+   the width the flex line leaves it (~198px at 1600x900), where the two halves
+   stack. Density here is therefore tighter than a centre-column card: 10px
+   card padding, a 3px label gap and 32px display plates. */
 body.surface-adm .datetime-card{
-  padding:12px 13px;
+  padding:9px 12px;
   border:1px solid #C6D2E4;
   background:#FFFFFF;
   background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
@@ -511,11 +593,15 @@ body.surface-adm .datetime-card .dt-ico{
 body.surface-adm .datetime-card .dt-fld > span{
   font-size:12px;
   font-weight:700;
+  line-height:1.3;
   color:#3B4C69;
-  margin-bottom:4px;
+  margin-bottom:3px;
 }
-/* both controls are non-editable here; they must still READ clearly */
+/* both controls are non-editable here; they must still READ clearly. They are
+   display PLATES, not editable fields, so they may be shorter than §6's 36px
+   field height — the value keeps §7's 14px/600 so nothing gets less legible. */
 body.surface-adm .datetime-card .inp{
+  height:32px;
   background:#F2F6FC;
   background-image:none;
   border:1px solid #C6D2E4;
@@ -528,7 +614,7 @@ body.surface-adm .datetime-card .inp{
 
 /* ---- 5.2 عملیات پذیرش (right rail action card) — INDIGO end to end ------ */
 body.surface-adm .action-card{
-  padding:12px;
+  padding:11px;
   border:1px solid #C6D2E4;
   background:#FFFFFF;
   background:-webkit-linear-gradient(top,#FFFFFF 0%,#F5F8FD 100%);
@@ -539,8 +625,8 @@ body.surface-adm .action-card{
    line. Bled to the card edges with negative margins so it reads as a head. */
 body.surface-adm .action-kicker{
   position:relative;
-  margin:-12px -12px 12px;
-  padding:9px 13px 13px;
+  margin:-11px -11px 10px;
+  padding:8px 12px 11px;
   border-bottom:1px solid #BCC8F4;
   background:#EFF3FE;
   background:-webkit-linear-gradient(top,#FFFFFF 0%,#E7ECFD 100%);
@@ -553,8 +639,8 @@ body.surface-adm .action-kicker{
 body.surface-adm .action-kicker:after{
   content:"";
   position:absolute;
-  right:13px;
-  bottom:7px;
+  right:12px;
+  bottom:6px;
   width:26px;height:3px;
   border-radius:2px;
   background:#3550D8;
@@ -565,8 +651,8 @@ body.surface-adm .action-kicker:after{
    never green (it is an action, not a success state). */
 body.surface-adm .action-card .btn-submit,
 body.surface-adm .action-card .btn-submit.btn-block{
-  height:42px;
-  margin-bottom:9px;
+  height:40px;
+  margin-bottom:8px;
   border-radius:10px;
   font-size:14.5px;
   font-weight:800;
@@ -593,7 +679,7 @@ body.surface-adm .action-card .btn-submit.btn-block:hover{
    lives on the button only (never on the head, chip or line). */
 body.surface-adm .action-card .btn-danger,
 body.surface-adm .action-card .btn-danger.btn-block{
-  height:36px;
+  height:34px;
   margin-bottom:0;
   border-radius:9px;
   font-size:13px;
@@ -623,8 +709,8 @@ body.surface-adm .queue-hub-btn,
 body.surface-adm .tools-launch{
   -ms-flex:0 0 auto;flex:0 0 auto;
   width:100%;
-  height:38px;
-  margin-bottom:12px;
+  height:36px;
+  margin-bottom:10px;
   border-radius:9px;
   font-size:13px;
   font-weight:800;
@@ -653,10 +739,26 @@ body.surface-adm .tools-launch-ico{
   color:#55688A;
 }
 
-/* ---- 5.4 چاپ اسناد — SLATE (a utility panel, not a semantic one) -------- */
-body.surface-adm .print-card .card-body{padding:12px;}
+/* ---- 5.4 چاپ اسناد — SLATE (a utility panel, not a semantic one) --------
+   ONE-UP + TWO-UP (restored in the v1.91 rail-overflow fix): v1.90 laid the
+   three print actions out as «چاپ آخرین قبض» full width with «چاپ نسخه» +
+   «رسید بیمه» as a pair beneath it. v1.91.0 stacked all three full width,
+   which cost the rail ~44px and pushed «رسید بیمه» and the whole وضعیت اتصال
+   card off the bottom of a 900px screen — with every scrollbar hidden
+   (admission.css) there is no affordance, so the two controls were simply
+   invisible. The pair is spaced with a real margin, never flex `gap`. */
+body.surface-adm .print-card .card-head{padding:7px 13px 9px;}
+body.surface-adm .print-card .card-head:after{bottom:5px;}
+body.surface-adm .print-card .card-body{padding:10px;}
+body.surface-adm .print-grid{
+  display:-ms-flexbox;display:flex;
+  -ms-flex-direction:row;flex-direction:row;
+  -ms-flex-wrap:wrap;flex-wrap:wrap;
+}
 body.surface-adm .print-grid .btn-print{
-  height:36px;
+  -ms-flex:0 0 auto;flex:0 0 auto;
+  width:100%;
+  height:34px;
   margin-bottom:8px;
   border-radius:9px;
   font-size:13px;
@@ -669,6 +771,14 @@ body.surface-adm .print-grid .btn-print{
   -webkit-box-shadow:0 1px 2px rgba(16,32,58,.06);
   box-shadow:0 1px 2px rgba(16,32,58,.06);
 }
+/* the two-up pair: «چاپ نسخه» leads on the RIGHT in RTL, so the 8px gutter is
+   a margin-LEFT on it and the pair closes the card body (no bottom margin). */
+body.surface-adm .print-grid #btnPrtRx,
+body.surface-adm .print-grid #btnPrtIns{
+  width:calc(50% - 4px);
+  margin-bottom:0;
+}
+body.surface-adm .print-grid #btnPrtRx{margin-left:8px;}
 body.surface-adm .print-grid .btn-print:last-child{margin-bottom:0;}
 body.surface-adm .print-grid .btn-print:hover{
   color:#2C3D5C;
@@ -698,12 +808,12 @@ body.surface-adm .print-grid .btn-print-primary:hover{
 /* ---- 5.5 وضعیت اتصال — SLATE panel, semantic dot -------------------------
    The panel is neutral; only the STATE is coloured (amber = connecting,
    emerald = connected, red = failed). That is a state, not a decoration. */
-body.surface-adm .status-card .card-body{padding:10px 12px;}
+body.surface-adm .status-card .card-body{padding:7px 11px;}
 body.surface-adm .sync-badge{
   display:-ms-flexbox;display:flex;
   -ms-flex-align:center;align-items:center;
   -ms-flex-pack:start;justify-content:flex-start;
-  height:28px;
+  height:26px;
   padding:0 11px;
   border-radius:999px;
   background:#FBF1DB;
@@ -1328,7 +1438,7 @@ body.surface-adm .payment-shortcut{
   body.surface-adm .card-head{padding:8px 11px 12px;min-height:42px;}
   body.surface-adm .card-head:after{right:45px;bottom:6px;} /* 11 pad + 26 chip + 8 */
   body.surface-adm .card-body{padding:11px;}
-  body.surface-adm .action-kicker{margin:-12px -12px 11px;padding:8px 11px 12px;}
+  body.surface-adm .action-kicker{margin:-11px -11px 10px;padding:8px 11px 11px;}
   body.surface-adm .action-kicker:after{right:11px;bottom:6px;}
   body.surface-adm .svc-search-wrap .inp{font-size:12px;}
   body.surface-adm .payable-value b,
@@ -1374,6 +1484,27 @@ body.theme-dark.surface-adm .col-center{
   -webkit-box-shadow:none;
   box-shadow:none;
 }
+/* rail scroll affordance, dark parity (§1.1 above, §12 neutrals): the same thin
+   pill, swapped to the dark border/surface steps so the bar stays visible on
+   the dark canvas instead of glowing light-grey over it. */
+body.theme-dark.surface-adm .col{
+  scrollbar-color:#45577A #141D2C;
+  scrollbar-face-color:#45577A;
+  scrollbar-track-color:#141D2C;
+  scrollbar-arrow-color:#B4C2D6;
+  scrollbar-highlight-color:#33425C;
+  scrollbar-3dlight-color:#25314A;
+  scrollbar-shadow-color:#25314A;
+  scrollbar-darkshadow-color:#45577A;
+}
+body.theme-dark.surface-adm .col::-webkit-scrollbar{background:#141D2C;}
+body.theme-dark.surface-adm .col::-webkit-scrollbar-track{background:#141D2C;}
+body.theme-dark.surface-adm .col::-webkit-scrollbar-thumb{
+  background:#45577A;
+  border-color:#141D2C;
+}
+body.theme-dark.surface-adm .col::-webkit-scrollbar-thumb:hover{background:#8B9BB3;}
+body.theme-dark.surface-adm .col::-webkit-scrollbar-corner{background:#141D2C;}
 body.theme-dark.surface-adm .card{
   border-color:#33425C;
   background:#182234;

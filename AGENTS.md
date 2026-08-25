@@ -85,23 +85,41 @@ The structure is now fixed:
 
 | File | Owns |
 |---|---|
-| `assets/admission/admission.css` | structure and layout **only** — no theme colour |
+| `assets/admission/admission.css` | structure and layout. See the honest caveat below. |
 | `assets/admission/css/core.css` | shared design system: cards, section heads + mini line, fields, buttons, tables, chrome, dark parity |
 | `assets/admission/css/surface-dash.css` | the staff dashboard (`body.surface-dash`) |
 | `assets/admission/css/surface-tools.css` | tools + receipt search (`body.surface-tools`, `body.surface-rc`) |
 | `assets/admission/css/surface-admission.css` | the admission form (`body.surface-adm`) |
 | `assets/admission/css/surface-cashier.css` | the cashier «صندوق» (`body.surface-cash`, `body.surface-queue`) |
 
+**Honest caveat about `admission.css`.** Its *job* is structure and layout, and no
+new theme colour may be added to it. But it predates the design system and still
+carries several hundred legacy colour declarations that the theme layer paints
+over. That is known, tracked debt — not a licence to add more. When you touch a
+component whose colour still comes from `admission.css`, move that colour into
+the layer that owns it rather than editing it in place. Because of this, the
+palette check deliberately scopes itself to `css/` plus `index.html`'s inline
+swatches; do not "fix" a palette failure by moving a colour into
+`admission.css` to hide it from the guard.
+
 Rules:
 - **Edit the one layer that owns the thing you are changing.** Never append a
   dated override block anywhere.
 - A surface layer may only style its own surface. The guard enforces this.
+- **Cross-surface structure belongs in `admission.css`**, not in a surface file —
+  the `SURFACE GATING` block near its end decides which subtree is on screen and
+  is the reason six screens can share one document. It went missing once and
+  every non-admission surface rendered the admission form underneath itself.
 - Every stylesheet must be registered in **three** places that must stay in
   sync: `src/app.rc` (RCDATA id), the `kAdThemeLayers` table in
   `src/web_admission_embed.inc`, and the `<link>` order in `index.html`. The
   guard enforces all three.
 - An **empty** layer is a hard runtime failure: the inliner refuses to build the
   page and the customer sees a blank screen. The guard catches it first.
+- Deleting a component's CSS is as damaging as deleting the component, and much
+  easier to miss — the markup still looks fine in a diff. The guard's
+  component-coverage check exists because exactly that happened to the queue
+  screen's rows during the v1.91 restructure.
 
 ## 5. The dual-engine CSS contract (this is why the odd restrictions exist)
 

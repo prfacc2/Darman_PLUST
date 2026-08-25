@@ -286,6 +286,7 @@ DOM_CONTRACT = {
         "queueBackdrop", "queuePanel", "qovSubtitle", "queueTabs", "tabQueue",
         "tabAdmQ", "qMinutes", "qSearch", "queueToggle", "queueClose",
         "qCountSum", "qCount", "queueWrap", "queueBody",
+        "qovHint", "qovSumLbl",
     ],
     "cashier": [
         "cashBackdrop", "cashPanel", "cashSubtitle", "cashTabs", "cashIncome",
@@ -294,6 +295,19 @@ DOM_CONTRACT = {
         "cmDoc", "cmAmt", "cmSave", "cmCancel", "cashSummary",
         "cashStatP", "cashStatPaid", "cashStatUnpaid", "cashStatQ",
         "cashShiftMeta", "cashWrap", "cashBody",
+        # v1.91.0 — the designed shift panel. renderCashShift() resolves every
+        # one of these, so they belong in the contract like anything else.
+        "cashShiftPanel", "cashShiftState", "cashShiftStartBox",
+        "cashShiftEndBox", "cashShiftStartTime", "cashShiftStartDate",
+        "cashShiftEndTime", "cashShiftEndDate", "cashShiftUser",
+        "cashShiftDept", "cashShiftIncome",
+        # v1.91.0 — the per-department («بخش») table and its totals foot,
+        # resolved by renderCashDepts().
+        "cashDeptBody", "cashDeptCount", "cashDeptTotP", "cashDeptTotPC",
+        "cashDeptTotPS", "cashDeptTotUC", "cashDeptTotUS",
+        # v1.91.0 — the «صندوق نرفته‌ها» strip that moved out of the header.
+        "cashUnpaidBar", "cashUnpaidChip", "cashUnpaidN", "cashUnpaidSum",
+        "cashUnpaidDepts",
     ],
 }
 
@@ -469,7 +483,11 @@ for surface, comps in sorted(COMPONENT_COVERAGE.items()):
 # 5. DUAL-ENGINE CSS CONTRACT
 # ===========================================================================
 FLEX_TWINS = [
-    (r"display\s*:\s*flex", "display:-ms-flexbox"),
+    # `display:inline-flex` needs -ms-inline-flexbox, which is a DIFFERENT
+    # keyword from -ms-flexbox — matching only `display:flex` silently skipped
+    # every inline-flex rule.
+    (r"display\s*:\s*flex\b", "display:-ms-flexbox"),
+    (r"display\s*:\s*inline-flex\b", "display:-ms-inline-flexbox"),
     (r"flex-direction\s*:", "-ms-flex-direction:"),
     (r"align-items\s*:", "-ms-flex-align:"),
     (r"justify-content\s*:", "-ms-flex-pack:"),
@@ -491,8 +509,9 @@ for path in css_files:
          "%s uses CSS grid — Trident has no modern grid support" % rel)
     need(not re.search(r"grid-template", body),
          "%s uses grid-template-* — not supported on Trident" % rel)
-    need(not re.search(r"(^|[;{\s])(grid-)?gap\s*:", body),
-         "%s uses flex/grid gap — use real margins instead" % rel)
+    need(not re.search(r"(^|[;{\s])(grid-|row-|column-)?gap\s*:", body),
+         "%s uses flex/grid gap (incl. row-gap/column-gap) — use real margins "
+         "instead" % rel)
     need("backdrop-filter" not in body,
          "%s uses backdrop-filter — Trident ignores it, so 'glass' must be "
          "faked with layered gradients (docs/DESIGN_SYSTEM.md §5)" % rel)
@@ -506,7 +525,6 @@ for path in css_files:
                              "Trident needs the -ms- prefix in the same rule: "
                              "%s" % (rel, pattern, twin,
                                      " ".join(rule.split())[:120]))
-                break
         if re.search(r"(^|[;\s])flex\s*:", rule) and "-ms-flex:" not in rule:
             fails.append("%s: a rule uses 'flex:' without '-ms-flex:' — %s"
                          % (rel, " ".join(rule.split())[:120]))
@@ -528,6 +546,20 @@ for path in css_files:
 # explicitly rejected (violet/purple/magenta/pink and cream/beige/clay). That
 # keeps the guard from second-guessing the approved amber and red hues while
 # still stopping the rejected families from creeping back in.
+#
+# CRITICAL: the design doc also spells the FORBIDDEN hues out as literals, so
+# harvesting every hex from it would whitelist the exact colours this check
+# exists to ban. REJECTED below is subtracted from the harvested set afterwards,
+# and it is deliberately an explicit list rather than a doc-parsing heuristic so
+# that reformatting the document can never silently re-open the hole.
+REJECTED = {
+    # violet / purple — the v1.90 g_infoAccent and its relatives
+    "7C56E4", "5E42D0", "8B5CF6", "9678F5", "785CE1", "C586FF", "EDD9FF",
+    "6B1FA8", "A020F0",
+    # cream / beige / clay — the rejected v1.90 tools palette
+    "F5D90A", "E8DCC8", "D4C4AE", "C9BBA8", "B7A58E", "FFF4C2", "FFE0C2",
+    "F6E7C2",
+}
 DESIGN_DOC = ROOT / "docs" / "DESIGN_SYSTEM.md"
 need(DESIGN_DOC.exists(),
      "docs/DESIGN_SYSTEM.md is missing — it is the palette registry this "
@@ -537,11 +569,14 @@ if DESIGN_DOC.exists():
     for h in re.findall(r"#([0-9A-Fa-f]{6})\b",
                         DESIGN_DOC.read_text(encoding="utf-8")):
         approved.add(h.upper())
+approved -= REJECTED
 
 
 def rgb_of(h):
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
+    if len(h) == 4:                      # #RGBA — drop the alpha nibble
+        h = "".join(c * 2 for c in h[:3])
     if len(h) == 8:
         h = h[:6]
     if len(h) != 6:
@@ -572,7 +607,9 @@ def banned_family(h, s, v):
     """The exact families the product owner rejected."""
     if s < 0.10:
         return None                      # neutral grey — always fine
-    if 255 <= h <= 340 and s >= 0.14:
+    # Approved indigo peaks at h≈231 (#22349C), so 245 is a safe lower bound
+    # that still closes the 240-255 window where plain violets live.
+    if 245 <= h <= 340 and s >= 0.14:
         return "violet/purple/magenta/pink"
     if 340 < h <= 360 or 0 <= h < 12:
         if s >= 0.18 and v >= 0.82:
@@ -582,27 +619,79 @@ def banned_family(h, s, v):
     return None
 
 
+def scan_colours(label, text, out):
+    """Collect rejected-family colours from a blob of declarations/attributes.
+
+    Scans `#hex` literals AND `rgb()`/`rgba()` triples, because a rejected hue
+    expressed as rgba() is exactly as visible to the operator as a hex one.
+    """
+    for hexlit in re.findall(r"#([0-9A-Fa-f]{3,8})\b", text):
+        norm = hexlit.upper()
+        if len(norm) == 3:
+            norm = "".join(c * 2 for c in norm)
+        if norm[:6] in REJECTED:
+            # An explicitly-banned literal is rejected outright, whatever the
+            # hue heuristics think of it: a vivid yellow like #F5D90A is not a
+            # "cream" by saturation, but it is one of the exact colours the
+            # owner rejected, so the named list wins.
+            out.setdefault("explicitly rejected", set()).add("#" + norm[:6])
+            continue
+        if norm[:6] in approved:
+            continue
+        rgbv = rgb_of(hexlit)
+        if not rgbv:
+            continue
+        fam = banned_family(*hsv_of(*rgbv))
+        if fam:
+            out.setdefault(fam, set()).add("#" + hexlit.upper())
+    for m in re.finditer(r"rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,"
+                         r"\s*(\d{1,3})\s*[,)]", text):
+        rgbv = tuple(int(g) for g in m.groups())
+        if any(c > 255 for c in rgbv):
+            continue
+        as_hex = "%02X%02X%02X" % rgbv
+        if as_hex in REJECTED:
+            out.setdefault("explicitly rejected", set()).add(m.group(0).rstrip(",)") + ")")
+            continue
+        if as_hex in approved:
+            continue
+        fam = banned_family(*hsv_of(*rgbv))
+        if fam:
+            out.setdefault(fam, set()).add(m.group(0).rstrip(",)") + ")")
+
+
+# Scope: the THEME LAYER plus index.html's inline swatches — i.e. everywhere the
+# design system actually governs colour.
+#
+# admission.css is deliberately excluded. It is the pre-design-system structure
+# layer and still carries several hundred legacy colour declarations that the
+# theme layer overrides; scanning it would report that historical debt on every
+# build without telling anyone anything new. It is protected instead by the
+# layer-discipline check above (no APPENDED override layer) — and the honest
+# statement of the remaining debt lives in AGENTS.md §4.
+#
+# index.html IS scanned, because it carries inline `style="…"` swatches for the
+# drawer category dots and the receipt-search colour guide, and an inline hue is
+# exactly as visible to the operator as a rule — and exactly as easy to miss.
 for path in sorted(CSSDIR.glob("*.css")):
-    body = strip_css_comments(path.read_text(encoding="utf-8"))
     seen = {}
-    for value in declaration_values(body):
-        for hexlit in re.findall(r"#([0-9A-Fa-f]{3,8})\b", value):
-            norm = hexlit.upper()
-            if len(norm) == 3:
-                norm = "".join(c * 2 for c in norm)
-            if norm[:6] in approved:
-                continue                 # registered in DESIGN_SYSTEM.md
-            rgbv = rgb_of(hexlit)
-            if not rgbv:
-                continue
-            fam = banned_family(*hsv_of(*rgbv))
-            if fam:
-                seen.setdefault(fam, set()).add("#" + hexlit.upper())
+    scan_colours(path.name,
+                 " ".join(declaration_values(
+                     strip_css_comments(path.read_text(encoding="utf-8")))),
+                 seen)
     for fam, cols in sorted(seen.items()):
-        fails.append("assets/admission/css/%s introduces an unregistered "
-                     "colour from the rejected %s family: %s — use an approved "
-                     "hue from docs/DESIGN_SYSTEM.md §2"
-                     % (path.name, fam, ", ".join(sorted(cols))))
+        fails.append("%s introduces an unregistered colour from the rejected "
+                     "%s family: %s — use an approved hue from "
+                     "docs/DESIGN_SYSTEM.md §2"
+                     % (path.relative_to(ROOT), fam, ", ".join(sorted(cols))))
+
+seen = {}
+scan_colours("index.html",
+             " ".join(re.findall(r'style="([^"]*)"', html)), seen)
+for fam, cols in sorted(seen.items()):
+    fails.append("assets/admission/index.html carries an inline colour from the "
+                 "rejected %s family: %s — inline swatches must use an approved "
+                 "hue from docs/DESIGN_SYSTEM.md §2" % (fam, ", ".join(sorted(cols))))
 
 # ===========================================================================
 # 7. ES5-ONLY JAVASCRIPT

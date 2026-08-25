@@ -1158,8 +1158,17 @@ body.surface-tools .rc-tbl tbody tr.rc-yellow td:first-child{
   box-shadow:inset -3px 0 0 #C4890F;
 }
 
+/* «حذف بیمه‌ای» is a SECOND amber state, so it needs a SECOND amber step.
+   v1.90 did keep the two apart, but with two cream-family tints that the
+   palette guard now bans, so neither may come back; v1.91.0 then collapsed
+   both states onto the amber -tint and made this row, and its legend chip,
+   pixel-identical to «پرداخت نکرده» — on a screen whose entire purpose is a
+   colour legend.
+   v1.91.1 gives it the amber -tintEdge (§2) — one step deeper than the tint,
+   same hue, same -deep ink, -deep leading edge — so the pair is tellable apart
+   without inventing a hue the palette guard would reject. */
 body.surface-rc .rc-tbl tbody tr.rc-orange td,
-body.surface-tools .rc-tbl tbody tr.rc-orange td{background:#FBF1DB;color:#6D4A05;}
+body.surface-tools .rc-tbl tbody tr.rc-orange td{background:#E6CE93;color:#6D4A05;}
 body.surface-rc .rc-tbl tbody tr.rc-orange td:first-child,
 body.surface-tools .rc-tbl tbody tr.rc-orange td:first-child{
   -webkit-box-shadow:inset -3px 0 0 #6D4A05;
@@ -1519,9 +1528,12 @@ body.theme-dark.surface-tools .rc-tbl tbody tr.rc-blue td:first-child{
   box-shadow:inset -3px 0 0 #3FA9E6;
 }
 body.theme-dark.surface-rc .rc-tbl tbody tr.rc-yellow td,
-body.theme-dark.surface-tools .rc-tbl tbody tr.rc-yellow td,
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-yellow td{background:#3A2E12;color:#F4D79A;}
+/* the dark half of the same two-step split: «حذف بیمه‌ای» sits one amber step
+   deeper than «پرداخت نکرده» here too (§12 dark tint → the amber -deep step),
+   so the two states never merge in either theme. */
 body.theme-dark.surface-rc .rc-tbl tbody tr.rc-orange td,
-body.theme-dark.surface-tools .rc-tbl tbody tr.rc-orange td{background:#3A2E12;color:#F4D79A;}
+body.theme-dark.surface-tools .rc-tbl tbody tr.rc-orange td{background:#6D4A05;color:#F4D79A;}
 body.theme-dark.surface-rc .rc-tbl tbody tr.rc-yellow td:first-child,
 body.theme-dark.surface-tools .rc-tbl tbody tr.rc-yellow td:first-child{
   -webkit-box-shadow:inset -3px 0 0 #E0A83A;
@@ -1580,7 +1592,7 @@ body.theme-dark.surface-tools .rc-page-lbl{color:#B4C2D6;}
    The markup now carries registered tokens that already agree with the row
    states, chip for chip:
        1 پرداخت نکرده  #FBF1DB/#6D4A05  = .rc-yellow   dot amber  #C4890F
-       2 حذف بیمه‌ای    #FBF1DB/#6D4A05  = .rc-orange   dot amber  #C4890F
+       2 حذف بیمه‌ای    #E6CE93/#6D4A05  = .rc-orange   dot amber  #6D4A05
        3 استرداد        #FBE8E8/#8B2020  = .rc-red      dot red    #D24343
        4 بدهکار         #E7EDF6/#2C3D5C  = .rc-purple   dot slate  #55688A
        5 بستانکار       #DEF1F1/#095A5C  = .rc-soap     dot teal   #0F8B8D
@@ -1600,7 +1612,7 @@ body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(1) .rc-help-chip{ba
 body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(2) .lg-dot,
 body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(2) .lg-dot{background:#F4D79A !important;}
 body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(2) .rc-help-chip,
-body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(2) .rc-help-chip{background:#3A2E12 !important;color:#F4D79A !important;}
+body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(2) .rc-help-chip{background:#6D4A05 !important;color:#F4D79A !important;}
 body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(3) .lg-dot,
 body.theme-dark.surface-tools .rc-help-pop > div:nth-of-type(3) .lg-dot{background:#E86A6A !important;}
 body.theme-dark.surface-rc .rc-help-pop > div:nth-of-type(3) .rc-help-chip,

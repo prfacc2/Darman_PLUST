@@ -562,6 +562,21 @@ static OpsDeptAgg* opsDeptFind(std::vector<OpsDeptAgg>& v, int id){
     for(auto& d:v) if(d.id==id) return &d;
     return nullptr;
 }
+// v1.91.0 fix — the reserved id of the synthetic «سایر» («other») department row.
+// WHY: a ticket inside the 24-hour window can belong to a section that is no
+// longer a LISTED department (it was deactivated, re-parented under another
+// department, or removed in مدیریت after the ticket was issued). Those tickets
+// were still counted in `totals` but credited to no row, so the footer
+// «جمع همه بخش‌ها» did not equal the column it foots, and — much worse on a money
+// screen — that money had no home anywhere on the page. They are now collected
+// into ONE extra row with this id, so the footer is always exactly the sum of
+// the visible rows and no money can go missing.
+// The id must never collide with a real section id (section ids are positive)
+// and must not be 0, because 0 is already the «صندوق نرفته‌ها» tab; -1 satisfies
+// both, and Cash_PageJson answers it as a REAL selectable tab (see `inTab`
+// below), so clicking the row genuinely filters the table to those tickets
+// instead of pretending to select a tab that does not exist.
+static const int kCashOtherDeptId=-1;
 
 std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     CashScope sc=Cash_ResolveScope();
@@ -594,7 +609,12 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
         if(hs) d.code=hs->code;
         depts.push_back(d);
     }
-    tabs+="]";
+    // «سایر» is only OFFERED — as a row AND as a tab — when the window really
+    // holds tickets with no listed department, so a clinic whose sections are
+    // all live never sees it. The tab list is therefore closed after the single
+    // pass below, not here. `code` stays empty on purpose: the page renders it
+    // in the section-code slot and this bucket is not a real section.
+    OpsDeptAgg other; other.id=kCashOtherDeptId; other.name=L"سایر";
 
     int patients=0, paidN=0, unpaidN=0;
     long long tPatients=0,tUnpaidC=0,tUnpaidS=0,tPaidC=0,tPaidS=0;
@@ -611,14 +631,18 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
         if(t.paid>0){ tPaidC++; tPaidS+=t.paid; }
         else { tUnpaidC++; tUnpaidS+=t.payable; }
         OpsDeptAgg* d=opsDeptFind(depts, t.sectionId);
-        if(d){
-            d->patients++;
-            if(t.paid>0){ d->paidCount++; d->paidSum+=t.paid; }
-            else { d->unpaidCount++; d->unpaidSum+=t.payable; }
-        }
+        // No listed department for this ticket (deactivated / re-parented /
+        // deleted section, or no section at all) → «سایر», never dropped, so
+        // `sections[]` always adds up to `totals` (kCashOtherDeptId).
+        const bool isOther=(d==nullptr);
+        if(isOther) d=&other;
+        d->patients++;
+        if(t.paid>0){ d->paidCount++; d->paidSum+=t.paid; }
+        else { d->unpaidCount++; d->unpaidSum+=t.payable; }
         // ---- active tab rows ------------------------------------------------
         bool inTab=false;
-        if(tabSectionId<=0) inTab=(t.paid==0);
+        if(tabSectionId==kCashOtherDeptId) inTab=isOther;
+        else if(tabSectionId<=0) inTab=(t.paid==0);
         else inTab=(t.sectionId==tabSectionId);
         if(!inTab) continue;
         patients++;
@@ -629,6 +653,16 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
         list+=ticketRowJson(t);
     }
     list+="]";
+
+    // The «سایر» row is appended LAST so the real departments keep their مدیریت
+    // order, and its tab is offered only in the same case — a page with no
+    // orphan money looks and behaves exactly as before.
+    if(other.patients>0){
+        depts.push_back(other);
+        tabs+=",{\"id\":"+opsJnum(kCashOtherDeptId)+
+              ",\"name\":"+opsJstr(other.name)+",\"kind\":\"section\"}";
+    }
+    tabs+="]";
 
     std::string secList="[";
     for(size_t i=0;i<depts.size();++i){

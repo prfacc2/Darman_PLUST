@@ -24,11 +24,13 @@ mkdir -p build obj
 #  A red contract is a red build — see AGENTS.md.
 # ----------------------------------------------------------------------------
 echo "[0/3] Checking UI contract..."
-if command -v python3 >/dev/null 2>&1; then
-    python3 scripts/check_ui_contract.py
-else
-    echo "[0/3] python3 not available — UI contract NOT verified." >&2
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "[0/3] FAILED: python3 is required to verify the UI contract." >&2
+    echo "      A build that verified nothing is worse than a red build —" >&2
+    echo "      install python3 rather than shipping unverified. See AGENTS.md." >&2
+    exit 1
 fi
+python3 scripts/check_ui_contract.py
 
 echo "[1/3] Compiling resources..."
 $RES -O coff -i src/app.rc -o obj/app.res

@@ -272,6 +272,28 @@ select.inp{padding-left:26px;}
   background:-webkit-linear-gradient(top,#FFFFFF 0%,#EAF0FA 100%);
   background:linear-gradient(180deg,#FFFFFF 0%,#EAF0FA 100%);
 }
+/* Focus + press live HERE because core.css owns .btn, so every button on all six
+   surfaces gets them at once. This desk is keyboard-first: the ring is the
+   design system's ONE focus colour (indigo `sh-focus`, §3/§6) on every hue of
+   button, and `outline` is deliberately NOT suppressed — the browser's own ring
+   stays as the engine-level fallback. `:active` is the 1px press nudge the
+   legacy layer had (§0 allows transitioning transform).
+   The three `:not()`s do double duty. They keep a `:disabled` / `.is-off` /
+   `aria-disabled="true"` button inert — core paints those flat and that must
+   win — and they lift the ring above the per-surface RESTING box-shadows in
+   `css/surface-*.css`, which load after core.css and otherwise swallowed it on
+   eight of the admission form's buttons and on the cashier's shift/amber
+   buttons. Trident runs this page in IE11 document mode (`IE=edge`), which
+   parses `:not()`; on an engine that did not, only this one rule would drop and
+   the browser outline above still marks focus. */
+.btn:focus:not(:disabled):not(.is-off):not([aria-disabled="true"]){
+  -webkit-box-shadow:0 0 0 3px rgba(53,80,216,.22);
+  box-shadow:0 0 0 3px rgba(53,80,216,.22);
+}
+.btn:active{
+  -webkit-transform:translateY(1px);
+  transform:translateY(1px);
+}
 .btn .i,.btn svg{margin-left:7px;vertical-align:middle;}
 .btn-sm{height:30px;padding:0 11px;font-size:12.5px;}
 .btn-block{width:100%;height:38px;}
@@ -361,6 +383,14 @@ select.inp{padding-left:26px;}
   border-color:#CBD5E5;
   background:#EDF1F8;
   background-image:none;
+}
+/* ...and it must stay inert under the mouse press too: an inert control that
+   nudges reads as clickable. (The keyboard side is already handled — the
+   `:not()`s on .btn:focus exclude it, and the flat rule above zeroes its
+   shadow.) */
+.btn:disabled:active,.btn.is-off:active,.btn[aria-disabled="true"]:active{
+  -webkit-transform:none;
+  transform:none;
 }
 
 /* ==========================================================================
@@ -601,6 +631,13 @@ body.theme-dark .inp[readonly],body.theme-dark .inp:disabled{
 body.theme-dark .btn{
   background:#1B2537;background-image:none;border-color:#45577A;color:#DCE5F2;}
 body.theme-dark .btn:hover{background:#25314A;color:#EEF3FB;border-color:#45577A;}
+/* the dark focus ring twin — same recipe, the dark indigo #6A83F7 exactly like
+   body.theme-dark .inp:focus above, so focus is one colour keyboard-wide in
+   both themes. It repeats the light rule's `:not()`s (and adds body.theme-dark)
+   so it outranks BOTH the light ring and the dark per-surface resting shadows.
+   `.btn:active` needs no twin: the press nudge is geometry, not colour. */
+body.theme-dark .btn:focus:not(:disabled):not(.is-off):not([aria-disabled="true"]){
+  -webkit-box-shadow:0 0 0 3px rgba(106,131,247,.26);box-shadow:0 0 0 3px rgba(106,131,247,.26);}
 body.theme-dark .btn-primary,body.theme-dark .btn-submit{
   background:#3550D8;background-image:none;border-color:#6A83F7;color:#FFFFFF;}
 body.theme-dark .btn-danger{background:#B62F2F;background-image:none;border-color:#E86A6A;color:#FFFFFF;}

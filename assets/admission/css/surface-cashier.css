@@ -534,10 +534,9 @@ body.surface-cash .ub-chip{
 }
 body.surface-cash .ub-stack{display:block;min-width:0;}
 body.surface-cash .ub-t{display:block;font-size:13px;font-weight:800;color:#6D4A05;}
-body.surface-cash .ub-s{
-  display:block;font-size:11px;font-weight:700;color:#67768F;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
+/* v1.91.0: the `.ub-s` subtitle span under «صندوق نرفته‌ها» is gone from the
+   markup (no explanatory sentences under titles), so its rule — and its dark
+   twin further down — were dead weight and have been removed with it. */
 body.surface-cash .ub-stat{display:block;margin-left:20px;text-align:center;}
 body.surface-cash .ub-stat span{display:block;font-size:11px;font-weight:700;color:#67768F;}
 body.surface-cash .ub-stat b{display:block;font-size:17px;font-weight:900;color:#6D4A05;direction:ltr;}
@@ -855,6 +854,13 @@ body.surface-queue #queuePanel .queue-overlay-head{
   border:1px dashed #C6D2E4;
   color:#67768F;font-size:11.5px;font-weight:700;
 }
+/* v1.91.0: the owner asked for no explanatory sentence under the titles, so the
+   JS now writes '' into #qovHint. The element MUST stay in the DOM (the UI
+   contract requires the id and the JS keeps writing to it), but an empty plate
+   still measured ~18px tall with a background and a border — a stray bordered
+   bar across the queue screen. Empty means gone; the moment the JS writes text
+   again the plate comes back on its own. */
+#queuePanel .qov-sum-hint:empty{display:none;}
 
 /* ---- 14.4 the table ------------------------------------------------------- */
 /* max-height:none is load-bearing: the generic `.tbl-wrap{max-height:150px}` in
@@ -1003,6 +1009,90 @@ body.surface-queue #queuePanel .queue-overlay-head{
   #queuePanel .queue-overlay-body{padding:9px 12px 10px;}
   #queuePanel .qov-summary .qov-sum-card{padding:4px 14px 5px;}
   #queuePanel .qov-summary .qov-sum-num{font-size:19px;}
+}
+
+/* ==========================================================================
+   SCROLL AFFORDANCE — every capped scroller on BOTH cashier surfaces
+   ==========================================================================
+   admission.css hides EVERY scrollbar page-wide (`*::-webkit-scrollbar{display:
+   none;width:0 !important}` + `*{scrollbar-width:none}` + the legacy Trident
+   `scrollbar-*-color` camouflage on `html`). On a form that is meant to fit the
+   screen that is a deliberate choice, and it stays untouched for the rest of the
+   page. On THIS surface it hid real, correct, already-styled content: «بخش‌ها»
+   is capped at 170px = three department rows, so a clinic with four or more
+   departments — or any window that produced the synthetic «سایر» bucket — had a
+   row that existed, was reachable, and gave the operator no hint whatsoever.
+   Department count is runtime data from مدیریت, so no fixed cap can ever be
+   "enough"; the bar is the fix, not a taller cap.
+
+   These five containers are every scroller this layer owns: the department
+   table, the cashier panel body, both ticket tables and the horizontal tab
+   strip. Each gets a thin 8px bar in neutral tokens (track `surface-2` #F2F6FC,
+   thumb `border-strong` #9FB1CD, hover #7B90B4 — the same ink the field and
+   button borders use on hover).
+
+   Three engines, three mechanisms, all three end up with an affordance:
+     · WebView2 / Chromium → the ::-webkit-scrollbar pseudo-elements below.
+       `width`/`height` carry !important ONLY because the global rule they must
+       beat is itself !important — specificity alone cannot win against it.
+     · Firefox / Chromium 121+ → the standard scrollbar-width / scrollbar-color.
+     · MSHTML / Trident → neither of the above; it draws the platform bar, which
+       IS the affordance we want. Nothing here suppresses it, and the legacy
+       scrollbar-*-color values are re-stated so the older Trident builds that
+       do honour them paint a visible bar instead of the inherited camouflage. */
+body.surface-cash .cd-wrap,
+body.surface-cash .queue-overlay-body,
+body.surface-cash #cashWrap,
+body.surface-cash .cash-tabs,
+#queuePanel .queue-overlay-body .tbl-wrap{
+  scrollbar-width:thin;
+  scrollbar-color:#9FB1CD #F2F6FC;
+  scrollbar-face-color:#9FB1CD;
+  scrollbar-track-color:#F2F6FC;
+  scrollbar-arrow-color:#3B4C69;
+  scrollbar-highlight-color:#FFFFFF;
+  scrollbar-3dlight-color:#E1E8F2;
+  scrollbar-shadow-color:#C6D2E4;
+  scrollbar-darkshadow-color:#9FB1CD;
+}
+body.surface-cash .cd-wrap::-webkit-scrollbar,
+body.surface-cash .queue-overlay-body::-webkit-scrollbar,
+body.surface-cash #cashWrap::-webkit-scrollbar,
+body.surface-cash .cash-tabs::-webkit-scrollbar,
+#queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar{
+  display:block;
+  width:8px !important;
+  height:8px !important;
+  -webkit-appearance:none;appearance:none;
+  background:#F2F6FC;
+}
+body.surface-cash .cd-wrap::-webkit-scrollbar-track,
+body.surface-cash .queue-overlay-body::-webkit-scrollbar-track,
+body.surface-cash #cashWrap::-webkit-scrollbar-track,
+body.surface-cash .cash-tabs::-webkit-scrollbar-track,
+#queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-track{
+  display:block;background:#F2F6FC;border-radius:999px;
+}
+body.surface-cash .cd-wrap::-webkit-scrollbar-thumb,
+body.surface-cash .queue-overlay-body::-webkit-scrollbar-thumb,
+body.surface-cash #cashWrap::-webkit-scrollbar-thumb,
+body.surface-cash .cash-tabs::-webkit-scrollbar-thumb,
+#queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-thumb{
+  display:block;background:#9FB1CD;border-radius:999px;
+}
+body.surface-cash .cd-wrap::-webkit-scrollbar-thumb:hover,
+body.surface-cash .queue-overlay-body::-webkit-scrollbar-thumb:hover,
+body.surface-cash #cashWrap::-webkit-scrollbar-thumb:hover,
+body.surface-cash .cash-tabs::-webkit-scrollbar-thumb:hover,
+#queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-thumb:hover{
+  background:#7B90B4;
+}
+body.surface-cash .cd-wrap::-webkit-scrollbar-corner,
+body.surface-cash .queue-overlay-body::-webkit-scrollbar-corner,
+body.surface-cash #cashWrap::-webkit-scrollbar-corner,
+body.surface-cash .cash-tabs::-webkit-scrollbar-corner,
+#queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-corner{
+  display:block;background:#F2F6FC;
 }
 
 /* ------------------------------------------------------- 15. DARK PARITY */
@@ -1169,7 +1259,6 @@ body.surface-cash.theme-dark .ub-chip{
   background:#C4890F;background-image:none;color:#3A2E12;
 }
 body.surface-cash.theme-dark .ub-t{color:#F4D79A;}
-body.surface-cash.theme-dark .ub-s{color:#8B9BB3;}
 body.surface-cash.theme-dark .ub-stat span{color:#8B9BB3;}
 body.surface-cash.theme-dark .ub-stat b{color:#F4D79A;}
 body.surface-cash.theme-dark .unpaid-bar .ub-btn{
@@ -1328,3 +1417,60 @@ body.theme-dark #queuePanel .q-tbl .q-remove:hover{background:#3A1C1C;color:#F6B
 body.theme-dark #queuePanel .queue-overlay-body .queue-foot{border-top-color:#25314A;}
 body.theme-dark #queuePanel .q-count{color:#8B9BB3;}
 body.theme-dark #queuePanel .q-count b{color:#EEF3FB;}
+
+/* dark twins of the scroll affordance above — same 8px geometry, dark tokens
+   (track #1B2537 = the dark strip tier, thumb #45577A = the dark border-strong,
+   hover #8B9BB3). The !important on width/height is inherited from the light
+   rule's reason: the global hide it overrides is itself !important. */
+body.surface-cash.theme-dark .cd-wrap,
+body.surface-cash.theme-dark .queue-overlay-body,
+body.surface-cash.theme-dark #cashWrap,
+body.surface-cash.theme-dark .cash-tabs,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap{
+  scrollbar-color:#45577A #1B2537;
+  scrollbar-face-color:#45577A;
+  scrollbar-track-color:#1B2537;
+  scrollbar-arrow-color:#B4C2D6;
+  scrollbar-highlight-color:#33425C;
+  scrollbar-3dlight-color:#25314A;
+  scrollbar-shadow-color:#25314A;
+  scrollbar-darkshadow-color:#141D2C;
+}
+body.surface-cash.theme-dark .cd-wrap::-webkit-scrollbar,
+body.surface-cash.theme-dark .queue-overlay-body::-webkit-scrollbar,
+body.surface-cash.theme-dark #cashWrap::-webkit-scrollbar,
+body.surface-cash.theme-dark .cash-tabs::-webkit-scrollbar,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar{
+  display:block;
+  width:8px !important;
+  height:8px !important;
+  background:#1B2537;
+}
+body.surface-cash.theme-dark .cd-wrap::-webkit-scrollbar-track,
+body.surface-cash.theme-dark .queue-overlay-body::-webkit-scrollbar-track,
+body.surface-cash.theme-dark #cashWrap::-webkit-scrollbar-track,
+body.surface-cash.theme-dark .cash-tabs::-webkit-scrollbar-track,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-track{
+  display:block;background:#1B2537;border-radius:999px;
+}
+body.surface-cash.theme-dark .cd-wrap::-webkit-scrollbar-thumb,
+body.surface-cash.theme-dark .queue-overlay-body::-webkit-scrollbar-thumb,
+body.surface-cash.theme-dark #cashWrap::-webkit-scrollbar-thumb,
+body.surface-cash.theme-dark .cash-tabs::-webkit-scrollbar-thumb,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-thumb{
+  display:block;background:#45577A;border-radius:999px;
+}
+body.surface-cash.theme-dark .cd-wrap::-webkit-scrollbar-thumb:hover,
+body.surface-cash.theme-dark .queue-overlay-body::-webkit-scrollbar-thumb:hover,
+body.surface-cash.theme-dark #cashWrap::-webkit-scrollbar-thumb:hover,
+body.surface-cash.theme-dark .cash-tabs::-webkit-scrollbar-thumb:hover,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-thumb:hover{
+  background:#8B9BB3;
+}
+body.surface-cash.theme-dark .cd-wrap::-webkit-scrollbar-corner,
+body.surface-cash.theme-dark .queue-overlay-body::-webkit-scrollbar-corner,
+body.surface-cash.theme-dark #cashWrap::-webkit-scrollbar-corner,
+body.surface-cash.theme-dark .cash-tabs::-webkit-scrollbar-corner,
+body.theme-dark #queuePanel .queue-overlay-body .tbl-wrap::-webkit-scrollbar-corner{
+  display:block;background:#1B2537;
+}

@@ -127,7 +127,7 @@ sudo apt-get install -y g++-mingw-w64-i686 binutils-mingw-w64-i686
 cd /home/user/webapp
 ./build.sh                                     # باید Build OK بدهد
 strings build/DarmanPlus.exe | grep 1.63.0       # تأیید نسخه در باینری
-python3 scripts/test_admission_assets.py       # 7/7 PASS
+python3 scripts/check_ui_contract.py           # UI contract OK
 python3 scripts/test_builtin_templates.py      # all PASS
 node --check assets/admission/admission.js     # OK
 ```

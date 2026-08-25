@@ -2479,7 +2479,14 @@
     if (!secs.length) h = '<tr><td colspan="6" class="empty">بخشی در مدیریت تعریف نشده است</td></tr>';
     var body = $('cashDeptBody');
     if (body) body.innerHTML = h;
-    setText($('cashDeptCount'), toFa(secs.length) + ' بخش');
+    /* v1.91.0: count only REAL departments. Cash_PageJson appends a synthetic
+       «سایر» bucket (id -1) for tickets whose section was deactivated, so that
+       their money stays visible and the footer still equals the sum of the
+       rows — but it is not a department the clinic defined, and counting it
+       would overstate «N بخش» by one. */
+    var nReal = 0;
+    for (i = 0; i < secs.length; i++) { if ((+secs[i].id || 0) > 0) nReal++; }
+    setText($('cashDeptCount'), toFa(nReal) + ' بخش');
     setText($('cashDeptTotP'), toFa(tP));
     setText($('cashDeptTotUC'), toFa(tUC));
     setText($('cashDeptTotUS'), money(tUS));
