@@ -83,6 +83,7 @@
     queue: [],             /* active صندوق/پذیرش queue rows */
     queueKind: 'unpaid',   /* independent file-backed queue selected by tabs */
     doctors: [],
+    doctorList: [],        /* v1.98: full پزشک معالج combo (like performers) */
     performers: [],        /* v1.78.0: cached «انجام دهنده» list (isPerformer doctors) */
     ps: { P: 0, S: 0 },
     mode: 'simple',
@@ -261,24 +262,43 @@
     return clampPct((state.supp[idx] && state.supp[idx].pct) || 0);
   }
 
+  function firstPositivePrice(vals) {
+    var i, n;
+    for (i = 0; i < vals.length; i++) {
+      n = Number(vals[i]);
+      if (n > 0) return n;
+    }
+    return 0;
+  }
+  function parseMultiplier(raw) {
+    var mul = parseFloat(toEn(String(raw == null ? '' : raw)).replace(/,/g, '.'));
+    if (isNaN(mul) || mul <= 0) return 0;
+    return mul;
+  }
+  /* v1.98: catalog unit with tariff fallback + optional multiplier. */
+  function effectiveUnitPrice(s) {
+    var unitPrice;
+    if (!s) return 0;
+    if (s.freeRate) {
+      unitPrice = Number(s.freePrice) || 0;
+    } else if (hasIns()) {
+      unitPrice = firstPositivePrice([s.priceIns, s.priceInsNew, s.priceGov, s.priceFree, s.price]);
+    } else {
+      unitPrice = firstPositivePrice([s.priceFree, s.priceFreeNew, s.priceGov, s.priceIns, s.price]);
+    }
+    var mul = parseMultiplier(s.multiplier);
+    if (mul > 0) unitPrice = unitPrice * mul;
+    if (unitPrice < 0) unitPrice = 0;
+    return unitPrice;
+  }
+
   /* per-row computation using current insurance selection */
   function computeRow(s) {
     var qty = Number(s.qty) || 1;
     if (qty < 1) qty = 1; else if (qty > 999) qty = 999;
-    /* v1.75.0: pick unit price based on insurance type, matching the C++
-     * adCatalogPrice logic. freeRate rows use freePrice. Otherwise:
-     *   hasIns → priceIns (insurance tariff), else → priceFree (free tariff).
-     * Falls back to s.price (legacy base) if the tariff field is 0. */
-    var unitPrice;
-    if (s.freeRate) {
-      unitPrice = Number(s.freePrice) || 0;
-    } else if (hasIns() && Number(s.priceIns) > 0) {
-      unitPrice = Number(s.priceIns);
-    } else if (!hasIns() && Number(s.priceFree) > 0) {
-      unitPrice = Number(s.priceFree);
-    } else {
-      unitPrice = Number(s.price) || 0;
-    }
+    /* v1.98: freeRate → freePrice; hasIns → priceIns||priceInsNew||priceGov||priceFree||price;
+       else priceFree||priceFreeNew||priceGov||priceIns||price. Then multiplier if >0. */
+    var unitPrice = effectiveUnitPrice(s);
     if (unitPrice < 0) unitPrice = 0;
     var gross = unitPrice * qty;
     var disc = Number(s.discount) || 0;
@@ -426,9 +446,35 @@
   }
 
   function serviceEffectiveUnit(svc) {
-    var unit = Number(svc && svc.freeRate ? svc.freePrice : svc && svc.price) || 0;
+    /* Self-contained (no hasIns): used for identity/sort AND the node harness. */
+    if (!svc) return 0;
+    var unit = 0;
+    if (svc.freeRate) unit = Number(svc.freePrice) || 0;
+    else {
+      unit = Number(svc.priceIns) || 0;
+      if (!unit) unit = Number(svc.priceInsNew) || 0;
+      if (!unit) unit = Number(svc.priceGov) || 0;
+      if (!unit) unit = Number(svc.priceFree) || 0;
+      if (!unit) unit = Number(svc.priceFreeNew) || 0;
+      if (!unit) unit = Number(svc.price) || 0;
+    }
+    var mul = Number(svc.multiplier);
+    if (!isFinite(mul) || mul <= 0) mul = 1;
+    unit = unit * mul;
     if (unit < 0) unit = 0;
     return Math.round(unit);
+  }
+  function copyServicePrices(row, svc) {
+    if (!row || !svc) return;
+    row.price = Number(svc.price) || 0;
+    row.priceFree = Number(svc.priceFree) || 0;
+    row.priceGov = Number(svc.priceGov) || 0;
+    row.priceIns = Number(svc.priceIns) || 0;
+    row.priceFreeNew = Number(svc.priceFreeNew) || 0;
+    row.priceGovNew = Number(svc.priceGovNew) || 0;
+    row.priceInsNew = Number(svc.priceInsNew) || 0;
+    if (svc.multiplier != null && svc.multiplier !== '') row.multiplier = svc.multiplier;
+    if (svc.freePrice != null) row.freePrice = Number(svc.freePrice) || 0;
   }
 
   function sameServiceVariant(code, name, svc, rowCode, rowName, row) {
@@ -483,7 +529,7 @@
           row.name = svc.name || row.name;
           row.desc = svc.desc || '';
           row.category = svc.category || '';
-          row.price = Number(svc.price) || 0;
+          copyServicePrices(row, svc);
         } else if (rowCode && !code) {
           /* Keep the coded/catalogue variant authoritative. */
         } else {
@@ -491,7 +537,7 @@
           row.name = preferredServiceText(row.name, svc.name);
           row.desc = preferredServiceText(row.desc, svc.desc);
           row.category = preferredServiceText(row.category, svc.category);
-          if (bothCoded) row.price = Number(svc.price) || 0;
+          if (bothCoded) copyServicePrices(row, svc);
         }
         sortServiceVariants();
         scheduleRender();
@@ -501,7 +547,14 @@
     state.services.push({
       code: svc.code || '', name: svc.name || '', desc: svc.desc || '', category: svc.category || '',
       qty: incomingQty, price: Number(svc.price) || 0, discount: Number(svc.discount) || 0,
-      freeRate: !!svc.freeRate, freePrice: Number(svc.freePrice) || 0
+      freeRate: !!svc.freeRate, freePrice: Number(svc.freePrice) || 0,
+      priceFree: Number(svc.priceFree) || 0,
+      priceGov: Number(svc.priceGov) || 0,
+      priceIns: Number(svc.priceIns) || 0,
+      priceFreeNew: Number(svc.priceFreeNew) || 0,
+      priceGovNew: Number(svc.priceGovNew) || 0,
+      priceInsNew: Number(svc.priceInsNew) || 0,
+      multiplier: svc.multiplier || ''
     });
     sortServiceVariants();
     scheduleRender();
@@ -609,7 +662,7 @@
     var full = trimStr((p.first || '') + ' ' + (p.last || ''));
     setText($('pfName'), full || 'بیمار جدید');
     setText($('pfFile'), toFa(p.file || p.nid || '----'));
-    setText($('profileStateText'), full ? 'اطلاعات بیمار کامل و آماده پذیرش است' : 'برای شروع، مشخصات بیمار را وارد کنید');
+    if ($('profileState')) $('profileState').style.display = 'none';
 
     /* B2: auto-select the supplementary insurance when we recall one */
     if (p.suppIdx != null && p.suppIdx >= 0 && $('insSupp') &&
@@ -670,13 +723,115 @@
     }
     box.innerHTML = html;   /* delegated click — wired once in wire() */
   }
+  function closeDocSuggest() {
+    var box = $('docResults');
+    if (box) box.innerHTML = '';
+  }
+  function collapseDoctorSelect() {
+    var sel = $('doc2name');
+    if (sel) sel.size = 1;
+  }
+  function doctorOptionLabel(doc) {
+    var nm = (doc && doc.name) || '';
+    return nm + (doc && doc.specialty ? ' — ' + doc.specialty : '');
+  }
+  function ensureDoctorOption(sel, doc) {
+    if (!sel || !doc) return;
+    var nm = doc.name || '', i;
+    for (i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === nm) return;
+    }
+    var opt = document.createElement('option');
+    opt.value = nm;
+    opt.text = doctorOptionLabel(doc);
+    try { sel.appendChild(opt); } catch (e) { sel.options[sel.options.length] = opt; }
+  }
+  function applyDoctorRows(sel, rows, keepEmpty) {
+    var h = '<option value="">— انتخاب —</option>', i, d, nm;
+    rows = rows || [];
+    for (i = 0; i < rows.length; i++) {
+      d = rows[i] || {};
+      nm = d.name || '';
+      h += '<option value="' + esc(nm) + '">' + esc(doctorOptionLabel(d)) + '</option>';
+    }
+    if (sel) sel.innerHTML = h;
+    if (keepEmpty && sel) sel.selectedIndex = 0;
+  }
+  function fillDoctors(rows) {
+    var sel = $('doc2name'); if (!sel) return;
+    function applyRows(rs) {
+      state.doctorList = rs || [];
+      applyDoctorRows(sel, state.doctorList, true);
+      sel.size = 1;
+    }
+    if (rows) { applyRows(rows); return; }
+    try {
+      Bridge.call('doctor.search', {}).then(function (r) {
+        applyRows((r && (r.rows || r.doctors)) || []);
+      });
+    } catch (e) { /* ignore — combo stays empty */ }
+  }
+  function filterDoctorSelect(q) {
+    var sel = $('doc2name'); if (!sel) return;
+    var list = state.doctorList || [];
+    var qn = trimStr(q || '');
+    var en = toEn(qn).replace(/\s+/g, '');
+    var hits = [], i, d, nm, spec, code, mid, hit;
+    if (!qn) {
+      applyDoctorRows(sel, list, true);
+      sel.size = 1;
+      return;
+    }
+    for (i = 0; i < list.length; i++) {
+      d = list[i] || {};
+      nm = d.name || '';
+      spec = d.specialty || '';
+      code = toEn(d.code || '');
+      mid = toEn(d.medicalId || '');
+      hit = (nm.indexOf(qn) >= 0) || (spec.indexOf(qn) >= 0);
+      if (en && (code.indexOf(en) >= 0 || mid.indexOf(en) >= 0)) hit = true;
+      if (hit) hits.push(d);
+    }
+    applyDoctorRows(sel, hits, true);
+    if (hits.length) sel.size = hits.length > 8 ? 8 : (hits.length < 2 ? 2 : hits.length);
+    else sel.size = 1;
+  }
   function selectDoctor(doc, ix) {
-    /* v1.71.0: the <select id="doc2name"> dropdown is gone — the doctor name is
-       shown in a read-only display field that mirrors the suggestion pick, and
-       the medical-council ID (#doc2code) is auto-filled from the same row. */
-    if ($('doc2name')) $('doc2name').value = doc.name || '';
-    if ($('doc2code') && doc.code) $('doc2code').value = toFa(doc.code);
+    /* v1.98: #doc2name is a <select> again (like performer). Restore the full
+       list, pick the option, collapse size, and close the suggestion box. */
+    var sel = $('doc2name');
+    if (sel) {
+      applyDoctorRows(sel, state.doctorList || [], false);
+      ensureDoctorOption(sel, doc);
+      sel.value = doc.name || '';
+      sel.size = 1;
+    }
+    if ($('doc2code') && (doc.code || doc.medicalId))
+      $('doc2code').value = toFa(doc.code || doc.medicalId);
+    closeDocSuggest();
     refreshDoctorStats(doc.name || '');
+  }
+  function mirrorDocFromSelect() {
+    var nm = $('doc2name') ? trimStr($('doc2name').value) : '';
+    var box = $('doc2code');
+    if (!nm) {
+      applyDoctorRows($('doc2name'), state.doctorList || [], true);
+      collapseDoctorSelect();
+      closeDocSuggest();
+      return;
+    }
+    var rows = state.doctorList || [], i, d;
+    for (i = 0; i < rows.length; i++) {
+      d = rows[i] || {};
+      if ((d.name || '') === nm) {
+        applyDoctorRows($('doc2name'), rows, false);
+        if ($('doc2name')) $('doc2name').value = nm;
+        if (box) box.value = toFa(d.code || d.medicalId || '');
+        closeDocSuggest();
+        collapseDoctorSelect();
+        return;
+      }
+    }
   }
   function refreshDoctorStats(name) {
     name = name || val('doc2name');
@@ -693,18 +848,20 @@
      defer() so the setTimeout closure never sees a stale loop variable. */
   function autoSelectDoctor(rows, en) {
     if (!rows || !rows.length) return;
-    if (rows.length === 1) {
-      var d0 = rows[0];
-      defer(function () { selectDoctor(d0, 0); });
-      return;
-    }
-    var matched = null, mIdx = -1, i;
-    for (i = 0; i < rows.length; i++) {
-      if (toEn(rows[i].medicalId || '') === en || toEn(rows[i].code || '') === en) {
-        matched = rows[i]; mIdx = i; break;
+    var pick = null, idx = -1, i;
+    if (rows.length === 1) { pick = rows[0]; idx = 0; }
+    else {
+      for (i = 0; i < rows.length; i++) {
+        if (toEn(rows[i].medicalId || '') === en || toEn(rows[i].code || '') === en) {
+          pick = rows[i]; idx = i; break;
+        }
       }
     }
-    if (matched) defer(function () { selectDoctor(matched, mIdx); });
+    if (!pick) return;
+    defer(function () {
+      selectDoctor(pick, idx);
+      closeDocSuggest();
+    });
   }
 
   /* ---------------------------------------------------------------------- *
@@ -802,7 +959,7 @@
       html += '<div class="s-row" data-s="' + i + '">' +
         '<span class="s-code">' + toFa(s.code || '') + '</span>' +
         '<span class="s-name">' + esc(s.name || '') + '</span>' +
-        '<span class="s-price"><i>' + money(s.price) + '</i> ریال</span></div>';
+        '<span class="s-price"><i>' + money(effectiveUnitPrice(s)) + '</i> ریال</span></div>';
     }
     box.innerHTML = html;   /* delegated click — wired once in wire() */
     box.className = 'svc-suggest open';
@@ -1144,7 +1301,8 @@
     function docLiveSearch() {
       if (docTimer) clearTimeout(docTimer);
       var q = $('doc2code') ? trimStr($('doc2code').value) : '';
-      if (!q) { renderDocResults([]); return; }
+      filterDoctorSelect(q);
+      if (!q) { renderDocResults([]); collapseDoctorSelect(); return; }
       var en = toEn(q).replace(/\s+/g, '');
       var byCode = /^[0-9]+$/.test(en);          /* numeric → medical ID search */
       docTimer = setTimeout(function () {
@@ -1430,7 +1588,7 @@
       var ix = +row.getAttribute('data-d');
       var doc = (state.doctors || [])[ix];
       if (!doc) return;
-      defer(function () { selectDoctor(doc, ix); });
+      defer(function () { selectDoctor(doc, ix); closeDocSuggest(); });
     });
 
     /* queue table → recall / remove (delegated, deferred) */
@@ -1488,7 +1646,15 @@
     /* insurance changes → recompute (never blanks patient fields) */
     on($('insMain'), 'change', function () { scheduleRender(); });
     on($('insSupp'), 'change', function () { scheduleRender(); });
-    on($('doc2name'), 'change', function () { refreshDoctorStats(val('doc2name')); });
+    on($('doc2name'), 'change', function () {
+      var nm = val('doc2name');
+      defer(function () {
+        mirrorDocFromSelect();
+        collapseDoctorSelect();
+        closeDocSuggest();
+        refreshDoctorStats(nm);
+      });
+    });
     on($('insSuppPct'), 'input', function () { scheduleRender(); });
     on($('insSuppPct'), 'keyup', function () { scheduleRender(); });
     on($('hasIns'), 'change', function () { scheduleRender(); });
@@ -2091,7 +2257,11 @@
       nid: t.nid, first: t.first, last: t.last, mobile: t.mobile,
       file: t.fileNo
     });
-    if (t.doctor && $('doc2name')) $('doc2name').value = t.doctor;
+    if (t.doctor && $('doc2name')) {
+      ensureDoctorOption($('doc2name'), { name: t.doctor });
+      $('doc2name').value = t.doctor;
+      $('doc2name').size = 1;
+    }
     setSelectText('apptShift', t.shift);
     if (t.apptDate && $('apptDate')) $('apptDate').value = toFa(t.apptDate);
     else if (t.date && $('apptDate')) $('apptDate').value = toFa(t.date);
@@ -2118,6 +2288,7 @@
       id: state.loadedTicketId,
       name: t.name || trimStr((t.first || '') + ' ' + (t.last || '')),
       barcode: t.barcode || '',
+      receiptNo: t.receiptNo || '',
       payable: (t.payable != null) ? t.payable : 0,
       services: t.services || state.services || []
     };
@@ -2626,18 +2797,54 @@
     }, function () { refreshCash(); });
   }
 
-  function barcodeHtml(code) {
-    var s = toEn(String(code || ''));
-    var h = '<span class="bc-quiet"></span>', i, d, w;
-    for (i = 0; i < s.length; i++) {
-      d = s.charCodeAt(i) - 48;
-      if (d < 0 || d > 9) d = (s.charCodeAt(i) % 7) + 1;
-      w = 1 + (d % 4);
-      h += '<span class="bc-bar bc-w' + w + '"></span>';
-      h += '<span class="bc-gap bc-g' + (1 + ((d + 1) % 3)) + '"></span>';
+  /* v1.98: real Code128-B SVG. Encodes ONLY receipt barcode digits — never nid. */
+  var C128_PAT = [
+    '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+    '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+    '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+    '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+    '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+    '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+    '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+    '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+    '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+    '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+    '114131','311141','411131','211412','211214','211232','2331112'
+  ];
+  function receiptBarcodeDigits(src) {
+    return toEn(String(src == null ? '' : src)).replace(/[^0-9]/g, '');
+  }
+  function code128Svg(code) {
+    var raw = receiptBarcodeDigits(code);
+    if (!raw) return '';
+    var values = [104], i, ch, v, sum = 104, pat, j, w, x, parts, unit, h, qz;
+    for (i = 0; i < raw.length; i++) {
+      ch = raw.charCodeAt(i);
+      if (ch < 32 || ch > 126) ch = 32;
+      v = ch - 32;
+      values.push(v);
+      sum += v * (i + 1);
     }
-    h += '<span class="bc-quiet"></span>';
-    return h;
+    values.push(sum % 103);
+    values.push(106);
+    unit = 2; h = 48; qz = 10 * unit; x = qz; parts = [];
+    for (i = 0; i < values.length; i++) {
+      pat = C128_PAT[values[i]] || C128_PAT[0];
+      for (j = 0; j < pat.length; j++) {
+        w = (+pat.charAt(j)) * unit;
+        if (j % 2 === 0) {
+          parts.push('<rect x="' + x + '" y="0" width="' + w + '" height="' + h + '" fill="#0D1B2A"/>');
+        }
+        x += w;
+      }
+    }
+    x += qz;
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + x + '" height="' + h +
+      '" viewBox="0 0 ' + x + ' ' + h + '" role="img" aria-label="Code128">' +
+      parts.join('') + '</svg>';
+  }
+  function barcodeHtml(code) {
+    return code128Svg(code);
   }
 
   function fillMiniServices(tbodyId, services) {
@@ -2675,10 +2882,12 @@
     r = r || {};
     state.ticketMiniId = r.ticketId || r.id || '';
     var name = r.name || trimStr((r.first || '') + ' ' + (r.last || ''));
-    var code = r.barcode || state.ticketMiniId || '';
+    var digits = receiptBarcodeDigits(r.barcode);
+    var rcpt = (r.receiptNo != null && r.receiptNo !== '') ? r.receiptNo : '';
     setText($('ticketMiniName'), name || '—');
-    setText($('ticketMiniCode'), code ? toFa(code) : '—');
-    if ($('ticketMiniBar')) $('ticketMiniBar').innerHTML = barcodeHtml(code);
+    setText($('ticketMiniCode'), digits ? toFa(digits) : '—');
+    setText($('ticketMiniRcpt'), rcpt !== '' ? ('شماره قبض: ' + toFa(rcpt)) : '');
+    if ($('ticketMiniBar')) $('ticketMiniBar').innerHTML = digits ? code128Svg(digits) : '';
     fillMiniServices('ticketMiniSvc', r.services || []);
     setMiniOpen('ticketMini', 'ticketMiniBack', true);
   }
@@ -2687,22 +2896,35 @@
     setMiniOpen('ticketMini', 'ticketMiniBack', false);
   }
 
-  function openPayMini(ctx) {
+  function setPayMiniMain(on) {
+    var panel = $('payMini');
+    if (!panel) return;
+    panel.className = String(panel.className || '').replace(/\s*pay-mini-main\b/g, '') + (on ? ' pay-mini-main' : '');
+  }
+  function openPayMini(ctx, opts) {
     ctx = ctx || {};
+    opts = opts || {};
     var id = ctx.id || ctx.ticketId || state.payTicketId || '';
     if (!id) { toast('بلیت صندوق مشخص نیست', 'err'); return; }
     var name = ctx.name || trimStr((ctx.first || '') + ' ' + (ctx.last || ''));
     if (!name && state.payCtx && state.payCtx.name) name = state.payCtx.name;
     var code = ctx.barcode || (state.payCtx && state.payCtx.barcode) || '';
+    var digits = receiptBarcodeDigits(code);
+    var rcpt = ctx.receiptNo;
+    if (rcpt == null && state.payCtx) rcpt = state.payCtx.receiptNo;
+    if (rcpt == null) rcpt = '';
     var sv = ctx.services || (state.payCtx && state.payCtx.services) || state.services || [];
     var payable = ctx.payable;
     if (payable == null && state.payCtx) payable = state.payCtx.payable;
     if (payable == null) payable = 0;
-    state.payCtx = { id: id, name: name, barcode: code, payable: payable, services: sv };
+    var isMain = !!opts.main || ctx.miniKind === 'mainPay';
+    state.payCtx = { id: id, name: name, barcode: code, receiptNo: rcpt, payable: payable, services: sv, miniKind: isMain ? 'mainPay' : '' };
     state.payTicketId = id;
+    setPayMiniMain(isMain);
     setText($('payMiniName'), name || '—');
-    setText($('payMiniCode'), code ? toFa(code) : '—');
-    if ($('payMiniBar')) $('payMiniBar').innerHTML = barcodeHtml(code);
+    setText($('payMiniCode'), isMain ? (rcpt !== '' ? toFa(rcpt) : '—') : (digits ? toFa(digits) : '—'));
+    setText($('payMiniRcpt'), rcpt !== '' ? ('شماره قبض: ' + toFa(rcpt)) : '');
+    if ($('payMiniBar')) $('payMiniBar').innerHTML = (isMain || !digits) ? '' : code128Svg(digits);
     fillMiniServices('payMiniSvc', sv);
     if ($('payMiniAmt')) $('payMiniAmt').innerHTML = money(payable);
     var box = $('payMiniDiscBox');
@@ -2737,6 +2959,9 @@
     } else if (method === 'free') {
       amount = 0;
       disc = 0;
+    } else if (method === 'test') {
+      amount = payable;
+      disc = 0;
     }
     Bridge.call('cashier.pay', { id: id, method: method, amount: amount, discount: disc }).then(function (r) {
       if (r && r.ok === false) { toast(r.err || 'پرداخت ناموفق بود', 'err'); return; }
@@ -2744,7 +2969,7 @@
       closePayMini();
       state.payTicketId = '';
       state.payCtx = null;
-      refreshCash();
+      if (typeof refreshCash === 'function') refreshCash();
     }, function () { toast('پرداخت ناموفق بود', 'err'); });
   }
 
@@ -2902,12 +3127,27 @@
     Bridge.call('admission.save', rec).then(function (r) {
       if (r && r.blocked) { state.pendingBlockedRecord=rec; showBlock(r.block); setSync('err','بیمار مسدود'); return; }
       if (r && r.ok) {
-        if (r.needsCashier) {
-          /* non-POS: ticket is created unpaid — show mini, do NOT claim printed */
-          toast('پذیرش ثبت شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : ''), 'ok');
+        var kind = r.miniKind || '';
+        var savedMsg = 'پذیرش ثبت شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : '');
+        if (kind === 'mainPay') {
+          toast(savedMsg, 'ok');
+          openPayMini({
+            id: r.ticketId || r.id,
+            ticketId: r.ticketId || r.id,
+            name: r.name,
+            barcode: r.barcode,
+            receiptNo: r.receiptNo,
+            payable: r.payable,
+            services: r.services,
+            miniKind: 'mainPay'
+          }, { main: true });
+        } else if (kind === 'subTicket' || r.needsCashier) {
+          toast(savedMsg, 'ok');
           openTicketMini(r);
-        } else {
+        } else if (r.posHas) {
           toast('پذیرش ثبت و قبض چاپ شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : ''), 'ok');
+        } else {
+          toast(savedMsg, 'ok');
         }
         /* B5: warn when the classic-GDI fallback template was used because no
            print-design is bound to the operator's section. */
@@ -2923,6 +3163,7 @@
           }, 600);
         }
         refreshQueue();
+        if (typeof refreshCash === 'function') refreshCash();
       } else {
         toast('ثبت ناموفق: ' + ((r && r.err) || 'نامشخص'), 'err');
       }
@@ -2971,10 +3212,11 @@
       'svcSearch', 'qsNid', 'qsFile'];
     var i;
     for (i = 0; i < ids.length; i++) { if ($(ids[i])) $(ids[i]).value = ''; }
-    if ($('doc2name')) $('doc2name').value = '';
+    if ($('doc2name')) { $('doc2name').value = ''; $('doc2name').size = 1; }
     /* v1.78.0: refill the performer combo (it was previously left with only the
        placeholder — after one clear it stayed empty for the whole session). */
     fillPerformers();
+    fillDoctors();
     if ($('insSuppPct')) $('insSuppPct').value = '0';
     if ($('insMain')) $('insMain').selectedIndex = 0;
     if ($('insSupp')) $('insSupp').selectedIndex = 0;
@@ -2994,7 +3236,7 @@
     }
     setText($('pfName'), 'بیمار جدید');
     setText($('pfFile'), '----');
-    setText($('profileStateText'), 'برای شروع، مشخصات بیمار را وارد کنید');
+    if ($('profileState')) $('profileState').style.display = 'none';
     if ($('patResults')) $('patResults').innerHTML = '<div class="empty">نتیجه‌ای نیست</div>';
     if ($('docResults')) $('docResults').innerHTML = '';
     renderSvcSuggest([]);
@@ -3038,6 +3280,9 @@
       if (k === 'F4') unlockCashForm();
     });
     Bridge.on('queue.update', function (d) { renderQueue(d.rows || []); updateTurnPreview(); });
+    Bridge.on('cashier.changed', function () {
+      if (typeof refreshCash === 'function') refreshCash();
+    });
     Bridge.on('ps.update', function (d) { updatePS(d); });
     Bridge.on('reception.settings', function (d) {
       if (d && (d.mode === 'full' || d.mode === 'simple')) {
@@ -3749,6 +3994,7 @@
 
   function boot() {
     applySurfaceClass();
+    if ($('profileState')) $('profileState').style.display = 'none';
     /* v1.92.0: load-failure detection. boot() runs after DOM ready, so the app
        shell (document.body + #app) MUST exist by now. If either is missing the
        HTML/CSS bundle failed to load or parse — report it as an HTML error
@@ -3906,6 +4152,8 @@
            standalone call stays as a fallback when the folded data is absent. */
         if (r.performers) fillPerformers(r.performers);
         else fillPerformers();
+        if (r.doctors) fillDoctors(r.doctors);
+        else fillDoctors();
       }
       /* v1.79.0 / v1.82.0: hide launchers when the matching tick is OFF
          (the button must not exist — not merely disabled). */

@@ -200,19 +200,23 @@ static PrintItem mkServices(double x,double y,double w,double h,double pt,
 }
 
 // ===========================================================================
-//  v1.95.0 — THERMAL MEDICAL RECEIPT redesign.
-//  All 30 builtins now share ONE 11-section medical-receipt structure
-//  (clinic header → barcode → title → ruled info box → services table →
-//  financial section → e-prescription → referral → reception/cashier →
-//  ش.ص → print timestamp), drawn with thin BLACK lines only — no shadows,
-//  gradients, rounded corners or coloured backgrounds. The TEN layout
-//  families vary the VISUAL treatment (classic / gray band / dense invoice /
-//  sidebar / line-art / shaded caption bars / patient photo / full financial /
-//  compact tear-off / dual-block totals) while keeping the SAME data fields
-//  in the SAME order. Authored in A4 mm; the print engine's pscale shrinks
-//  them proportionally onto A5 / 58 mm / 80 mm thermal rolls.
-//
-//  One deterministic Code128 barcode per page (section 2) — never two.
+//  v1.98.0 — TEN DISTINCT SECTION ORDERS (the gallery no longer looks like
+//  30 copies of one page). Same field set, same FA_* captions, thin BLACK
+//  lines only. Families now vary LAYOUT, not colour:
+//    0 classic        header, title, info, services, barcode, finance, epres
+//    1 services-high  header, title, services, barcode, info, finance, epres
+//    2 services-low   header, title, info, finance, epres, services, barcode
+//    3 sidebar        logo rail + main column (already distinct)
+//    4 two-column     patient LEFT / visit RIGHT, then services, barcode
+//    5 ruled captions between sections; services still follow info
+//    6 photo header   + info then services
+//    7 finance-first  title, finance, info, services, barcode, epres
+//    8 compact stub   shorter info + tear-off
+//    9 dual-block     finance mode 2; services sit between info and finance
+//  Variants 0/1/2 keep titles قبض پزشک / رسید بیمه / قبض و رسید پزشکی and
+//  still shift svcH (+0/+2/+4), frame, hdrMode and the column preset.
+//  Exactly one Code128 (~72×7 mm) sits near/after the services table.
+//  Authored in A4 mm; pscale shrinks them onto A5 / 58 mm / 80 mm rolls.
 // ===========================================================================
 
 // --- localized captions for the medical receipt ----------------------------
@@ -467,6 +471,87 @@ static double medInfo(std::vector<PrintItem>& v,double x,double y,double w,
     cy+=rH;
     return cy;
 }
+
+// Family 4 — two-column info: patient LEFT / visit RIGHT. Same field set as
+// medInfo; the caller then places services + the single barcode.
+static double medInfoSplit(std::vector<PrintItem>& v,double x,double y,double w,
+                           double rH,double pt,double bw){
+    double gap=3.0, colW=(w-gap)/2.0;
+    double lx=x, rx=x+colW+gap, fh=rH-0.6;
+    const int n=6;
+    for(int i=0;i<n-1;i++){
+        v.push_back(mkHLine(lx, y+(i+1)*rH, colW, bw));
+        v.push_back(mkHLine(rx, y+(i+1)*rH, colW, bw));
+    }
+    v.push_back(mkRect(lx, y, colW, n*rH, bw, 0));
+    v.push_back(mkRect(rx, y, colW, n*rH, bw, 0));
+    auto cell=[&](double cx,int row,const wchar_t* lab,const wchar_t* fld,
+                  bool lb,bool vb,double frac){
+        putLF(v, cx+1.0, y+row*rH+0.3, colW-2.0, fh, lab, fld, pt, lb, vb, frac);
+    };
+    // LEFT — patient
+    cell(lx,0,FA_FULL,    L"P-Name",  true,  false, 0.40);
+    cell(lx,1,FA_AGE,     L"age",     false, false, 0.22);
+    cell(lx,2,FA_NID,     L"nid",     true,  false, 0.42);
+    cell(lx,3,FA_BARCODE, L"barcode", false, false, 0.30);
+    cell(lx,4,FA_BASEINS, L"ins",     false, false, 0.40);
+    { double cw=colW-2.0, xx=lx+1.0, yy=y+5*rH+0.3;
+      double lblW=cw*0.22, g=1.0, rem=cw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField(xx,         yy, f2, fh, L"supp_percent", L"", pt, 0));
+      v.push_back(mkField(xx+f2+g,     yy, f1, fh, L"supp",         L"", pt, 0));
+      v.push_back(mkLabel(xx+cw-lblW,  yy, lblW, fh, FA_SUPP, pt, false, 0)); }
+    // RIGHT — visit
+    { double cw=colW-2.0, xx=rx+1.0, yy=y+0.3;
+      double lblW=cw*0.34, g=1.0, rem=cw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField (xx,         yy, f2, fh, L"appttime", L"", pt, 0));
+      v.push_back(mkFieldB(xx+f2+g,     yy, f1, fh, L"apptdate", L"", pt, 0));
+      v.push_back(mkLabel (xx+cw-lblW,  yy, lblW, fh, FA_APPT, pt, true, 0)); }
+    cell(rx,1,FA_QUEUE,     L"queue",         false, false, 0.26);
+    cell(rx,2,FA_DOCTOR,    L"doctor",        false, false, 0.22);
+    cell(rx,3,FA_DOCCODE,   L"doctorcode",    false, false, 0.50);
+    cell(rx,4,FA_SPECCODE,  L"specialtycode", false, false, 0.30);
+    cell(rx,5,FA_SPECIALTY, L"specialty",     false, false, 0.30);
+    return y + n*rH;
+}
+
+// Family 8 — shorter info (4×3) so the tear-off stub still fits under 289 mm.
+// Same putLF tokens / field set as medInfo.
+static double medInfoCompact(std::vector<PrintItem>& v,double x,double y,double w,
+                             double rH,double pt,double bw){
+    const int cols=3, rows=4;
+    double cw=w/cols, fh=rH-0.6;
+    for(int r=0;r<rows;r++){
+        if(r>0) v.push_back(mkHLine(x, y+r*rH, w, bw));
+        for(int c=1;c<cols;c++)
+            v.push_back(mkVLine(x+c*cw, y+r*rH, rH, bw));
+    }
+    auto cell=[&](int r,int c,const wchar_t* lab,const wchar_t* fld,
+                  bool lb,bool vb,double frac){
+        putLF(v, x+c*cw+0.6, y+r*rH+0.3, cw-1.2, fh, lab, fld, pt, lb, vb, frac);
+    };
+    cell(0,0,FA_FULL, L"P-Name", true,  false, 0.42);
+    cell(0,1,FA_AGE,  L"age",    false, false, 0.28);
+    cell(0,2,FA_NID,  L"nid",    true,  false, 0.42);
+    cell(1,0,FA_QUEUE, L"queue", false, false, 0.30);
+    { double xx=x+1*cw+0.6, yy=y+1*rH+0.3, ww=cw-1.2;
+      double lblW=ww*0.38, g=0.6, rem=ww-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField (xx,         yy, f2, fh, L"appttime", L"", pt, 0));
+      v.push_back(mkFieldB(xx+f2+g,     yy, f1, fh, L"apptdate", L"", pt, 0));
+      v.push_back(mkLabel (xx+ww-lblW,  yy, lblW, fh, FA_APPT, pt, true, 0)); }
+    cell(1,2,FA_BARCODE, L"barcode", false, false, 0.34);
+    cell(2,0,FA_BASEINS, L"ins", false, false, 0.42);
+    { double xx=x+1*cw+0.6, yy=y+2*rH+0.3, ww=cw-1.2;
+      double lblW=ww*0.26, g=0.6, rem=ww-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField(xx,         yy, f2, fh, L"supp_percent", L"", pt, 0));
+      v.push_back(mkField(xx+f2+g,     yy, f1, fh, L"supp",         L"", pt, 0));
+      v.push_back(mkLabel(xx+ww-lblW,  yy, lblW, fh, FA_SUPP, pt, false, 0)); }
+    cell(2,2,FA_DOCTOR, L"doctor", false, false, 0.28);
+    cell(3,0,FA_DOCCODE,   L"doctorcode",    false, false, 0.56);
+    cell(3,1,FA_SPECCODE,  L"specialtycode", false, false, 0.42);
+    cell(3,2,FA_SPECIALTY, L"specialty",     false, false, 0.42);
+    return y + rows*rH;
+}
+
 // Section 6 — financial section. v1.96.0: split label/value items, line-art only.
 // mode 0: 4 rows (a 2col, b 2col, c 1col, d 2col); mode 1: full (adds سهم بیمار /
 // مبلغ نهایی / سهم بیمه پایه); mode 2: dual-block — two side-by-side sub-boxes
@@ -610,6 +695,9 @@ static void renderSidebar(PrintDesign& d,const TplSpec& sp,double pt,double rH,
 
 // ===========================================================================
 //  renderReceipt — build one medical receipt for TPL[idx] (non-sidebar path).
+//  v1.98.0: each family uses a DISTINCT section order so the 30 gallery
+//  cards are not clones. The single Code128 always sits next to / after
+//  the services table.
 // ===========================================================================
 static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     std::vector<PrintItem>& v = d.items;
@@ -620,8 +708,7 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     double bw   = sp.bw;
     double svcH = (fam==2||fam==7)?40.0 : (fam==3)?38.0 : (fam==8)?30.0
                 : (fam==5)?32.0 : 34.0;
-    // v1.95: variants within each family get distinct service-table heights so the
-    // gallery looks visually different (not just a colour swap).
+    // variants within each family get distinct service-table heights
     if(sp.variant==1) svcH += 2.0;
     else if(sp.variant==2) svcH += 4.0;
     int    finMode = (fam==7)?1 : (fam==9)?2 : 0;
@@ -632,7 +719,7 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     unsigned svcHdr = sp.headFill; if(fam==4) svcHdr=0;
     int    base = (fam==1||fam==5)?1 : (fam==2)?2 : 0;
     int    hdrMode = (base + sp.variant) % 3;
-    if(fam==4) hdrMode=0;                       // line-art: plain header, hairline
+    if(fam==4) hdrMode=0;                       // two-col: plain header, hairline
     if(photo && hdrMode==1) hdrMode=2;          // never an emphasis band over the photo
 
     const std::wstring title = (sp.variant==0)? FA_DOC_REC
@@ -643,46 +730,68 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     double x=R_M, w=R_CW, boxTop=R_M, y=boxTop+1.2;
     if(sp.frame) d.items.push_back(mkFrame(PG_W,PG_H,FR_M,R_INK,0.3));
 
-    // v1.96.0 — a ruled section caption: bold centered label sitting on its own
-    // thin rule (pure line-art, replacing the old gray shaded band).
+    // ruled section caption (family 5)
     auto caption=[&](const wchar_t* txt){
         v.push_back(mkHLine(x, y, w, 0.3));
         v.push_back(mkLabel(x+1, y+0.3, w-2, 4.4, txt, pt-1.0, true, 1));
         v.push_back(mkHLine(x, y+4.9, w, 0.3));
         y += 5.4;
     };
+    auto emitSvc=[&](){
+        v.push_back(mkServices(x, y, w, svcH, pt-0.5, sp.svc, svcHdr, bw, rH-1.0, rH-0.8));
+        y += svcH;
+    };
+    auto emitBc=[&](){
+        y = medBarcode(v, x, y, w, pt);
+    };
 
-    // 1 clinic header
     y = medHeader(v, x, y, w, pt, hdrMode, photo);
-    // 2 document title (barcode moves BELOW the services table — v1.97)
     y = medTitle(v, x, y, w, pt, title);
 
-    // optional ruled section captions (card family)
-    if(capBars) caption(L"مشخصات بیمار");
-    // 3 ruled info box
-    y = medInfo(v, x, y, w, rH, pt, bw);
+    if(fam==1){
+        // services-high: services + barcode, then info / finance / epres
+        emitSvc(); emitBc();
+        y = medInfo(v, x, y, w, rH, pt, bw);
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+    } else if(fam==2){
+        // services-low: info / finance / epres, then services + barcode
+        y = medInfo(v, x, y, w, rH, pt, bw);
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+        emitSvc(); emitBc();
+    } else if(fam==4){
+        // two-column info (patient left / visit right) then services + barcode
+        y = medInfoSplit(v, x, y, w, rH, pt, bw);
+        emitSvc(); emitBc();
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+    } else if(fam==5){
+        // ruled captions between sections; services still follow info
+        if(capBars) caption(L"مشخصات بیمار");
+        y = medInfo(v, x, y, w, rH, pt, bw);
+        if(capBars) caption(FA_SVCLIST);
+        emitSvc(); emitBc();
+        if(capBars) caption(L"مالی و پرداخت");
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+    } else if(fam==7){
+        // finance-first after title, then info, then services, barcode, epres
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medInfo(v, x, y, w, rH, pt, bw);
+        emitSvc(); emitBc();
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+    } else {
+        // 0 classic / 6 photo header / 8 compact tear-off / 9 dual-block
+        if(tearoff) y = medInfoCompact(v, x, y, w, rH, pt, bw);
+        else        y = medInfo(v, x, y, w, rH, pt, bw);
+        emitSvc(); emitBc();
+        y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
+        y = medEpresReferral(v, x, y, w, rH, pt, bw);
+    }
 
-    if(capBars) caption(FA_SVCLIST);
-    // 4 services table (dynamic, PIT_SERVICES)
-    v.push_back(mkServices(x, y, w, svcH, pt-0.5, sp.svc, svcHdr, bw, rH-1.0, rH-0.8));
-    y += svcH;
-    // 5 exactly one thin Code128 barcode, BELOW the services table (~72×7 mm)
-    y = medBarcode(v, x, y, w, pt);
-
-    if(capBars) caption(L"مالی و پرداخت");
-    // 6 financial section
-    y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
-    // 7 e-prescription  +  8 referral
-    y = medEpresReferral(v, x, y, w, rH, pt, bw);
-
-    // the ONE bordered box around the whole receipt body (drawn last; content
-    // is inset from every edge so the outline never crosses the text)
     v.push_back(mkRect(x, boxTop, w, y-boxTop, bw, 0));
-
-    // 9 / 10 / 11 below the box
     y = medBelow(v, x, y+2.0, w, pt);
-
-    // compact tear-off stub
     if(tearoff) medStub(v, x, y+2.0, w, pt);
 }
 
@@ -718,6 +827,7 @@ void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
     const int N = 30;
     auto stamp=[](){
+        setSetting(L"tpl_migration_1_98", L"1");
         setSetting(L"tpl_migration_1_97", L"1");
         setSetting(L"tpl_migration_1_67", L"1");
         setSetting(L"tpl_migration_1_66", L"1");
@@ -735,10 +845,9 @@ void Designs_Init(){
         stamp();
         return;
     }
-    // v1.97.0 migration: rebuild all builtins — name/qty/line/desc column
-    // order, barcode below the services table, token fields, 10Y age.
-    // Preserve ids and section bindings.
-    if(getSetting(L"tpl_migration_1_97", L"0") != L"1"){
+    // v1.98.0 migration: rebuild all builtins — ten distinct section orders
+    // so the gallery is not 30 copies of one page. Preserve ids / bindings.
+    if(getSetting(L"tpl_migration_1_98", L"0") != L"1"){
         for(int i=0;i<N;i++){
             PrintDesign fresh=buildTemplate(i);
             if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }

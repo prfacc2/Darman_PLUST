@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural regression checks for the 30 builtin print designs (v1.97.0).
+"""Structural regression checks for the 30 builtin print designs (v1.98.0).
 
 Validates BOTH sides of the ready-made-template contract:
 
@@ -326,7 +326,7 @@ for fam in explicit_fams:
         f"fam=={fam}" in render_body,
         f"renderReceipt() does not handle family {fam} (explicit flag check)",
     )
-# v1.97: every medical receipt carries exactly one barcode BELOW the services table.
+# v1.98: every medical receipt carries exactly one barcode near/after the services table.
 check(
     "medBarcode(" in render_body,
     "renderReceipt() does not emit the medical barcode (medBarcode)",
@@ -342,14 +342,14 @@ check('d.paper=L"A4"' in inc.replace(" ", "").replace('d.paper=L"A4"', 'd.paper=
       "designs are no longer authored against A4")
 
 # --- migration guard ---------------------------------------------------
-check('getSetting(L"tpl_migration_1_97"' in inc, "the v1.97 migration guard is missing")
+check('getSetting(L"tpl_migration_1_98"' in inc, "the v1.98 migration guard is missing")
 init_fn = re.search(r"void Designs_Init\(\)\{(.*?)\n\}", inc, re.S)
 check(init_fn is not None, "Designs_Init() was not found")
 if init_fn:
     init_body = init_fn.group(1)
     check(
         init_body.count("stamp();") == 2,
-        "the migration must be stamped for fresh installs and the v1.97 upgrade "
+        "the migration must be stamped for fresh installs and the v1.98 upgrade "
         f"(found {init_body.count('stamp();')} stamp() calls)",
     )
     check(
@@ -402,6 +402,19 @@ for (var i = 0; i < all.length; i++) {
   if (s) { try { model = JSON.parse(s.text); } catch (e) { model = null; } }
   var rows = 0;
   if (s && s.rowH > 0) rows = Math.floor((s.h - (s.headerH || s.rowH)) / s.rowH);
+  var nameIt = null, paidIt = null, doctorIt = null;
+  var hasPhoto = 0, hasLogo = 0, hasStub = 0, hasCap = 0, hasPayLbl = 0;
+  for (k = 0; k < t.items.length; k++) {
+    var it2 = t.items[k];
+    if (it2.field === "P-Name" && !nameIt) nameIt = it2;
+    if (it2.field === "paid" && !paidIt) paidIt = it2;
+    if (it2.field === "doctor" && !doctorIt) doctorIt = it2;
+    if (it2.type === "photo") hasPhoto++;
+    if (it2.type === "logo") hasLogo++;
+    if (it2.text === "مشخصات بیمار") hasCap++;
+    if (it2.text === "پرداخت‌ها") hasPayLbl++;
+    if (it2.text === "نسخهٔ بیمار" || it2.text === "— — — محل جدا کردن — — —") hasStub++;
+  }
   out.push({
     name: t.name, paper: t.paper, orientation: t.orientation,
     items: t.items.length, svcCount: svc.length, barcodeCount: barcode.length,
@@ -409,7 +422,11 @@ for (var i = 0; i < all.length; i++) {
     headerH: s ? s.headerH : 0, rows: rows,
     barcodeY: bc ? bc.y : -1, barcodeH: bc ? bc.h : 0, barcodeW: bc ? bc.w : 0,
     barcodeBelow: !!(bc && s && bc.y + 0.05 >= s.y + s.h),
-    minX: minX, minY: minY, maxX: maxX, maxY: maxY
+    minX: minX, minY: minY, maxX: maxX, maxY: maxY,
+    nameX: nameIt ? nameIt.x : -1, nameY: nameIt ? nameIt.y : -1,
+    paidY: paidIt ? paidIt.y : -1, doctorX: doctorIt ? doctorIt.x : -1,
+    hasPhoto: hasPhoto, hasLogo: hasLogo, hasStub: hasStub,
+    hasCap: hasCap, hasPayLbl: hasPayLbl
   });
 }
 process.stdout.write(JSON.stringify(out));
@@ -508,6 +525,52 @@ if js_designs:
                     if len(specs) == 30 and specs[i]["family"] == fam)
         check(len(set(hs)) == 3,
               f"family {fam} variants are not layout-distinct (services heights {hs})")
+
+    # v1.98 — families must use DISTINCT section orders, not one shared body.
+    def _order(d):
+        seq = sorted(
+            (("name", d["nameY"]), ("svc", d["y"]), ("paid", d["paidY"]), ("bc", d["barcodeY"])),
+            key=lambda t: t[1],
+        )
+        return tuple(t[0] for t in seq)
+
+    want_order = {
+        0: ("name", "svc", "bc", "paid"),       # classic
+        1: ("svc", "bc", "name", "paid"),       # services-high
+        2: ("name", "paid", "svc", "bc"),       # services-low
+        3: ("name", "svc", "bc", "paid"),       # sidebar (rail + main col)
+        4: ("name", "svc", "bc", "paid"),       # two-col info, then services
+        5: ("name", "svc", "bc", "paid"),       # captions; services after info
+        6: ("name", "svc", "bc", "paid"),       # photo header + info then svc
+        7: ("paid", "name", "svc", "bc"),       # finance-first
+        8: ("name", "svc", "bc", "paid"),       # compact tear-off
+        9: ("name", "svc", "bc", "paid"),       # dual-block; svc between info/fin
+    }
+    for fam in range(10):
+        sample = next((d for i, d in enumerate(js_designs)
+                       if specs[i]["family"] == fam), None)
+        if not sample:
+            continue
+        got = _order(sample)
+        check(got == want_order[fam],
+              f"family {fam} section order {got} != {want_order[fam]} "
+              f"(nameY={sample['nameY']:.1f} svcY={sample['y']:.1f} "
+              f"bcY={sample['barcodeY']:.1f} paidY={sample['paidY']:.1f})")
+        if fam == 3:
+            check(sample["hasLogo"] >= 1, "family 3 (sidebar) has no logo rail")
+        if fam == 4:
+            check(sample["nameX"] < 50.0,
+                  f"family 4 patient column is not on the left (nameX={sample['nameX']:.1f})")
+            check(sample["doctorX"] > 90.0,
+                  f"family 4 visit column is not on the right (doctorX={sample['doctorX']:.1f})")
+        if fam == 5:
+            check(sample["hasCap"] >= 1, "family 5 is missing ruled section captions")
+        if fam == 6:
+            check(sample["hasPhoto"] >= 1, "family 6 (photo header) has no patient photo")
+        if fam == 8:
+            check(sample["hasStub"] >= 1, "family 8 (tear-off) is missing the stub")
+        if fam == 9:
+            check(sample["hasPayLbl"] >= 1, "family 9 (dual-block) is missing پرداخت‌ها")
 
 # ===========================================================================
 # 3. Runtime renderer and admission canonicalization guards
@@ -786,5 +849,5 @@ print("PASS: all 30 designs carry their Persian name (no more blank gallery card
 print("PASS: every family emits exactly one live PIT_SERVICES table + a footer band")
 print("PASS: runtime service rows are compact, wrapped, bounded, and never sample-padded")
 print("PASS: assets/designer/templates.js mirrors the C++ seeder exactly")
-print("PASS: tpl_migration_1_97 guard stamped for fresh installs and upgrades")
+print("PASS: tpl_migration_1_98 guard stamped for fresh installs and upgrades")
 print("PASS: toggled-back normal rows charge 170 in both orders through production canonicalization")

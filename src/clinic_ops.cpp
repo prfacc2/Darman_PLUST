@@ -294,10 +294,21 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashTicket& created){
     CashTicket t;
     t.id=cashNewId();
-    if(!r.insNo.empty()) t.barcode=r.insNo;
-    else if(!r.receiptBarcode.empty()) t.barcode=r.receiptBarcode;
-    else t.barcode=r.nationalId;
     t.nid=r.nationalId; t.first=r.firstName; t.last=r.lastName;
+    if(!r.receiptBarcode.empty()) t.barcode=r.receiptBarcode;
+    else {
+        long long seed = r.receiptNo>0 ? r.receiptNo
+                         : (r.queueNo>0 ? (long long)r.queueNo : 0);
+        if(seed<=0){
+            unsigned h=2166136261u;
+            for(wchar_t c: t.id) h = (h^ (unsigned)c)*16777619u;
+            seed = 100000LL + (long long)(h % 899999LL);
+        }
+        long long v = 100000000000LL + ((seed * 2654435761LL) % 899999999999LL);
+        if(v<0) v=-v;
+        wchar_t bb[24]; swprintf(bb,24,L"%012lld",v);
+        t.barcode=bb;
+    }
     t.doctor=r.treatingDoctor;
     cashFillHome(t);
     // v1.97: POS on the subsection first, then the section. No parent walk.
@@ -313,11 +324,16 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashT
     else t.archiveNo=r.receiptBarcode;
     t.insBase=r.insurance;
     t.insSupp=r.suppInsurance;
-    t.receiptNo=t.barcode;
+    if(r.receiptNo>0){
+        wchar_t rn[24]; swprintf(rn,24,L"%lld",r.receiptNo);
+        t.receiptNo=rn;
+    } else if(r.queueNo>0){
+        wchar_t tb[16]; swprintf(tb,16,L"%d",r.queueNo);
+        t.receiptNo=tb;
+    }
     if(r.queueNo>0){
         wchar_t tb[16]; swprintf(tb,16,L"%d",r.queueNo);
         t.turn=tb;
-        if(t.receiptNo.empty()) t.receiptNo=tb;
     }
     t.shift=r.shift;
     if(t.hasPos){
@@ -507,13 +523,6 @@ static std::wstring opsLowerAscii(const std::wstring& s){
     for(auto& c:o) if(c>=L'A'&&c<=L'Z') c=(wchar_t)(c-L'A'+L'a');
     return o;
 }
-static bool opsTestFail20(){
-    static volatile LONG seq=0;
-    FILETIME ft; GetSystemTimeAsFileTime(&ft);
-    unsigned n=(unsigned)InterlockedIncrement(&seq);
-    return ((n ^ ft.dwLowDateTime) % 5u)==0u;
-}
-
 bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
                 long long amount, long long discount, std::wstring& err){
     if(!opsNeedCashEdit(err)) return false;
@@ -522,9 +531,7 @@ bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
     if(m!=L"cash" && m!=L"pos" && m!=L"free" && m!=L"discount" && m!=L"test"){
         err=L"روش پرداخت نامعتبر است."; return false;
     }
-    if(m==L"test" && opsTestFail20()){
-        err=L"پرداخت آزمایشی ناموفق بود."; return false;
-    }
+    bool asTest = (m==L"test");
     if(m==L"test") m=L"cash";
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
@@ -553,7 +560,8 @@ bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
     } else if(remain>0){
         long long take = amount>0 ? amount : remain;
         if(take>remain) take=remain;
-        if(m==L"pos"){ t->posAmt += take; t->payMethod=L"pos"; }
+        if(asTest){ t->cashAmt += take; t->payMethod=L"test"; }
+        else if(m==L"pos"){ t->posAmt += take; t->payMethod=L"pos"; }
         else { t->cashAmt += take; t->payMethod=L"cash"; }
         t->paid += take;
         took=take;
@@ -661,10 +669,19 @@ static bool cashStatusEq(const CashTicket& t, const std::wstring& want){
     if(want.empty()) return true;
     std::wstring st=opsLowerAscii(t.status);
     if(st==want) return true;
-    if(want==L"refund"   && t.status.find(L"\u0627\u0633\u062a\u0631\u062f\u0627\u062f")!=std::wstring::npos) return true;
-    if(want==L"waiting"  && t.status.find(L"\u0627\u0646\u062a\u0638\u0627\u0631")!=std::wstring::npos) return true;
-    if(want==L"debtor"   && t.status.find(L"\u0628\u062f\u0647\u06a9\u0627\u0631")!=std::wstring::npos) return true;
-    if(want==L"creditor" && t.status.find(L"\u0628\u0633\u062a\u0627\u0646\u06a9\u0627\u0631")!=std::wstring::npos) return true;
+    if(want==L"refund"   && (st==L"cancelled" || t.status.find(L"\u0627\u0633\u062a\u0631\u062f\u0627\u062f")!=std::wstring::npos)) return true;
+    if(want==L"waiting"){
+        if(st==L"waiting" || t.status.find(L"\u0627\u0646\u062a\u0638\u0627\u0631")!=std::wstring::npos) return true;
+        return cashRemain(t)>0 && st!=L"cancelled" && st!=L"paid" && st!=L"refund";
+    }
+    if(want==L"debtor"){
+        if(t.status.find(L"\u0628\u062f\u0647\u06a9\u0627\u0631")!=std::wstring::npos) return true;
+        return t.paid>0 && cashRemain(t)>0;
+    }
+    if(want==L"creditor"){
+        if(t.status.find(L"\u0628\u0633\u062a\u0627\u0646\u06a9\u0627\u0631")!=std::wstring::npos) return true;
+        return t.paid > t.payable && t.payable>=0;
+    }
     return false;
 }
 
@@ -703,15 +720,19 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId,
         if(!sc.supervisor && sc.homeSectionId>0 && t.sectionId!=sc.homeSectionId)
             continue;
         if(t.hasPos) continue;                 // POS-origin never in cashier
-        if(t.status==L"cancelled") continue;
+        if(t.status==L"cancelled" && !statusTab) continue;
         if(cashStatusEq(t,L"refund"))   cRefund++;
         else if(cashStatusEq(t,L"waiting"))  cWait++;
         else if(cashStatusEq(t,L"debtor"))   cDebt++;
         else if(cashStatusEq(t,L"creditor")) cCred++;
         bool inTab=false;
         if(statusTab) inTab=cashStatusEq(t,sf);
-        else if(tabSectionId<=0) inTab=(cashRemain(t)>0 && !cashStatusEq(t,L"refund"));
-        else inTab=(t.sectionId==tabSectionId);
+        else {
+            // صندوق = فقط پرداخت‌نشده‌ها (حتی در تب بخش)
+            if(cashRemain(t)<=0) continue;
+            if(tabSectionId<=0) inTab=true;
+            else inTab=(t.sectionId==tabSectionId);
+        }
         if(!inTab) continue;
         patients++;
         if(cashRemain(t)<=0) paidN++; else unpaidN++;

@@ -7751,3 +7751,64 @@ body.theme-neon.surface-adm .payable-card{
 body.theme-neon.surface-adm .payment-card{
   background:#121828;border-color:#2A3458;
 }
+
+/* ==========================================================================
+   v1.98 — doctor select + Code128 SVG + minis + cashier table fill
+   APPEND ONLY. Trident-safe: no var(), no calc().
+   ========================================================================== */
+
+/* hide the old «اطلاعات بیمار کامل و آماده پذیرش است» row */
+#profileState,.profile-state{display:none;}
+
+/* doctor suggestion overflow so a long list cannot blow the card layout */
+#docResults,.doc-results{
+  max-height:180px;overflow:auto;
+}
+#doc2name[size],#doc2name[size="8"],#doc2name[size="2"],#doc2name[size="3"],
+#doc2name[size="4"],#doc2name[size="5"],#doc2name[size="6"],#doc2name[size="7"]{
+  height:auto;z-index:8;
+}
+
+/* cashier: overlay is a column; table wrap eats remaining height */
+body.surface-cash #cashPanel,
+body.surface-cash .cash-overlay,
+body.surface-cash #cashPanel.queue-overlay{
+  display:-ms-flexbox !important;display:flex !important;
+  -ms-flex-direction:column;flex-direction:column;
+}
+body.surface-cash #cashPanel .queue-overlay-body{
+  -ms-flex:1 1 auto;flex:1 1 auto;min-height:0;overflow:hidden;
+  display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
+}
+body.surface-cash #cashWrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;overflow:auto;min-height:0;
+}
+body.surface-cash .cash-tbl{width:100%;}
+body.surface-cash .cash-tbl th,
+body.surface-cash .cash-tbl td{
+  padding:4px 6px;line-height:1.25;
+  font-family:Vazir,Tahoma,sans-serif;
+}
+body.surface-cash .cash-st{
+  font-family:Vazirmatn,Vazir,Tahoma,sans-serif;
+}
+body.surface-cash .q-act-btn,
+body.surface-cash .cash-tbl .q-act-btn{
+  padding:2px 8px;margin:0;font-size:11px;line-height:1.2;
+  white-space:nowrap;overflow:hidden;
+}
+
+/* Code128 SVG in ticket/pay minis */
+.ticket-mini-bar svg,.pay-mini-bar svg{
+  display:block;width:100%;height:48px;
+}
+.ticket-mini-rcpt,.pay-mini-rcpt{
+  margin:4px 0 8px;color:#2D5FE6;font-size:13px;font-weight:800;
+}
+body.theme-dark .ticket-mini-rcpt,body.theme-dark .pay-mini-rcpt{color:#93C5FD;}
+body.theme-neon .ticket-mini-rcpt,body.theme-neon .pay-mini-rcpt{color:#00F0FF;}
+
+/* main-reception pay mini: no barcode bars, compact actions */
+.pay-mini.pay-mini-main .pay-mini-bar{display:none;}
+.pay-mini.pay-mini-main .pay-btn-disc{display:none;}
+.pay-mini.pay-mini-main .pay-mini-disc{display:none;}

@@ -1464,22 +1464,10 @@ static std::wstring pdReceiptShortCode(long long seed){
 // randomness); two different patients with the same daily queue number get
 // different barcodes because their national ids differ.
 static long long pdReceiptSeed(const ReceptionRecord& r){
-    long long base = (r.receiptNo > 0) ? r.receiptNo
-                                       : (r.queueNo > 0 ? (long long)r.queueNo : 0);
-    if(base <= 0) return 0;
-    // fold the national-id digits in as a deterministic mixer (no effect when
-    // the id was not captured, keeping older receipts byte-identical).
-    long long nidMix = 0;
-    for(wchar_t c : r.nationalId){
-        int d = -1;
-        if(c>=L'0'&&c<=L'9')            d=c-L'0';
-        else if(c>=0x06F0&&c<=0x06F9)   d=(int)(c-0x06F0);   // Persian digits
-        else if(c>=0x0660&&c<=0x0669)   d=(int)(c-0x0660);   // Arabic digits
-        if(d>=0) nidMix = (nidMix*10 + d) % 100000LL;
-    }
-    // combine deterministically: keep `base` dominant so consecutive receipts
-    // stay well-ordered, but let the patient id perturb the low digits.
-    return base * 100000LL + nidMix;
+    // v1.98: barcode is NOT the national id. Seed is receipt/queue number only.
+    if(r.receiptNo > 0) return r.receiptNo;
+    if(r.queueNo > 0) return (long long)r.queueNo;
+    return 0;
 }
 
 static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& tokIn){
@@ -1553,7 +1541,10 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
     if(tok==L"{visittype}")    return r.patientType;
     if(tok==L"{insidx}")     { wchar_t b[16]; swprintf(b,16,L"%d",r.insIdx); return toFaDigits(b); }
     if(tok==L"{shiftuser}")    return r.shift+L" — "+(r.userName.empty()?g_session.user.fullname:r.userName);
-    if(tok==L"{barcode}")      return toFaDigits(r.nationalId);   // barcode payload = NID
+    if(tok==L"{barcode}"){
+        if(!r.receiptBarcode.empty()) return toFaDigits(r.receiptBarcode);
+        return toFaDigits(pdReceiptBarcode(pdReceiptSeed(r)));
+    }
     if(tok==L"{nationalcard}") return toFaDigits(r.nationalId);
     if(tok==L"{regdate}")      return toFaDigits(r.apptDate);
     if(tok==L"{regtime}")      return toFaDigits(r.apptTime);

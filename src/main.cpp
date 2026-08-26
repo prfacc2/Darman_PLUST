@@ -245,7 +245,7 @@ static HomeGeom homeGeom(int W, int H){
     if(H < S(260)) H = S(260);
 
     // ---- horizontal: derive the panel width from the three app-icon cells --
-    //  v1.97: three centered iOS icons — پرسنل | حسابداری | مدیریت (RTL).
+    //  v1.98 RTL right→left: حسابداری | حساب پرسنل | حساب مدیریت.
     int padX  = S(36);
     int cgap  = S(24);
     int cardW = S(168);
@@ -305,8 +305,8 @@ static HomeGeom homeGeom(int W, int H){
     int cardsW = 3*cardW + 2*cgap;
     int cl = cx - cardsW/2;
     SetRect(&g.cardL, cl,                y, cl+cardW,             y+cardH); // RTL left: مدیریت
-    SetRect(&g.cardM, cl+cardW+cgap,     y, cl+2*cardW+cgap,      y+cardH); // center: حسابداری
-    SetRect(&g.cardR, cl+2*(cardW+cgap), y, cl+cardsW,            y+cardH); // RTL right: پرسنل
+    SetRect(&g.cardM, cl+cardW+cgap,     y, cl+2*cardW+cgap,      y+cardH); // center: پرسنل
+    SetRect(&g.cardR, cl+2*(cardW+cgap), y, cl+cardsW,            y+cardH); // RTL right: حسابداری
     // v1.92.0: the glass tray now nearly matches the hero panel's width
     // (inset S(14) — down from S(28)) so the inner container holding the two
     // account icons reads as the same width as the outer panel behind it.
@@ -335,15 +335,14 @@ static COLORREF homePanelBot(){
                   : RGB(0xEC, 0xF1, 0xF7); // subtle shading bottom
 }
 
-// v1.97: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
-// 2 مدیریت left, 3 حسابداری center). The icons are painted directly on the
-// hero buffer and hit-tested — no child windows.
+// v1.98: which app-icon cell the mouse is over (0 none, 1 پرسنل center,
+// 2 مدیریت left, 3 حسابداری right). RTL from the right: حسابداری | پرسنل | مدیریت.
 static int s_appHot = 0;
 
 static RECT homeHotCell(const HomeGeom& g, int hot){
-    if(hot==1) return g.cardR;
-    if(hot==2) return g.cardL;
-    if(hot==3) return g.cardM;
+    if(hot==1) return g.cardM; // پرسنل
+    if(hot==2) return g.cardL; // مدیریت
+    if(hot==3) return g.cardR; // حسابداری
     RECT z={0,0,0,0}; return z;
 }
 static void homeUnionRect(RECT& a, const RECT& b){
@@ -355,9 +354,9 @@ static void homeUnionRect(RECT& a, const RECT& b){
     if(b.bottom>a.bottom) a.bottom=b.bottom;
 }
 static int homeHitCell(const HomeGeom& g, POINT pt){
-    if(PtInRect(&g.cardR,pt)) return 1;
-    if(PtInRect(&g.cardM,pt)) return 3;
-    if(PtInRect(&g.cardL,pt)) return 2;
+    if(PtInRect(&g.cardR,pt)) return 3; // حسابداری (right)
+    if(PtInRect(&g.cardM,pt)) return 1; // پرسنل
+    if(PtInRect(&g.cardL,pt)) return 2; // مدیریت
     return 0;
 }
 static COLORREF homeAccBrand(){
@@ -489,8 +488,8 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         RECT rc; GetClientRect(h,&rc);
         HomeGeom g = homeGeom(rc.right, rc.bottom);
         POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
-        if(PtInRect(&g.cardR,pt))      SendMessageW(h,WM_COMMAND,ID_HM_RECEPTION,0);
-        else if(PtInRect(&g.cardM,pt)) SendMessageW(h,WM_COMMAND,ID_HM_ACCOUNTING,0);
+        if(PtInRect(&g.cardR,pt))      SendMessageW(h,WM_COMMAND,ID_HM_ACCOUNTING,0);
+        else if(PtInRect(&g.cardM,pt)) SendMessageW(h,WM_COMMAND,ID_HM_RECEPTION,0);
         else if(PtInRect(&g.cardL,pt)) SendMessageW(h,WM_COMMAND,ID_HM_MANAGE,0);
         return 0; }
     case WM_COMMAND: {
@@ -738,11 +737,11 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 }
                 SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
-            // RTL: پرسنل | حسابداری | مدیریت
-            paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
-                         L"حساب پرسنل", NULL, s_appHot==1);
-            paintAppIcon(dc, g.cardM, ICO_WALLET, homeAccBrand(),
+            // RTL right → left: حسابداری | حساب پرسنل | حساب مدیریت
+            paintAppIcon(dc, g.cardR, ICO_WALLET, homeAccBrand(),
                          L"حسابداری", NULL, s_appHot==3);
+            paintAppIcon(dc, g.cardM, ICO_USER_ADD, g_theme.accent,
+                         L"حساب پرسنل", NULL, s_appHot==1);
             paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
                          L"حساب مدیریت", NULL, s_appHot==2);
         }

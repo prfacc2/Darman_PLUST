@@ -59,8 +59,8 @@ CashScope Cash_ResolveScope();
 
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err);
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashTicket& created);
-// v1.97: method = cash|pos|free|discount|test. amount/discount 0 → full remain.
-// test succeeds ~80% and fails ~20%. Cash_Pay wraps a full cash payment.
+// v1.98: method = cash|pos|free|discount|test. amount/discount 0 → full remain.
+// test always settles the amount (no POS) and adds it to shift income.
 bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
                 long long amount, long long discount, std::wstring& err);
 bool Cash_Pay(const std::wstring& id, std::wstring& err);

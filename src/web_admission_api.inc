@@ -179,6 +179,38 @@ static bool adCatalogPrice(const std::vector<ServiceDef>& catalog,
     std::wstring want     = serviceIdentityKey(u82w(codeU));
     std::wstring wantName = serviceIdentityKey(u82w(nameU));
 
+    auto pickTariff=[&](const ServiceDef& s)->long long{
+        long long a=0;
+        if(hasIns){
+            if(s.priceIns>0) a=s.priceIns;
+            else if(s.priceInsNew>0) a=s.priceInsNew;
+            else if(s.priceGov>0) a=s.priceGov;
+            else if(s.priceGovNew>0) a=s.priceGovNew;
+            else if(s.priceFree>0) a=s.priceFree;
+            else if(s.priceFreeNew>0) a=s.priceFreeNew;
+            else a=s.price;
+        } else {
+            if(s.priceFree>0) a=s.priceFree;
+            else if(s.priceFreeNew>0) a=s.priceFreeNew;
+            else if(s.priceGov>0) a=s.priceGov;
+            else if(s.priceGovNew>0) a=s.priceGovNew;
+            else if(s.priceIns>0) a=s.priceIns;
+            else if(s.priceInsNew>0) a=s.priceInsNew;
+            else a=s.price;
+        }
+        if(a<0) a=0;
+        if(!s.multiplier.empty()){
+            std::wstring m=s.multiplier;
+            for(auto& c:m){
+                if(c==L'٫'||c==L'،') c=L'.';
+                if(c>=0x06F0&&c<=0x06F9) c=(wchar_t)(L'0'+(c-0x06F0));
+                if(c>=0x0660&&c<=0x0669) c=(wchar_t)(L'0'+(c-0x0660));
+            }
+            double mul=_wtof(m.c_str());
+            if(mul>0.0001 && mul!=1.0) a=(long long)llround((double)a * mul);
+        }
+        return a;
+    };
     if(freeRate){
         // Manual («آزاد») rate row: trust the typed amount, but still bind the
         // row to its catalogue entry when we can so نام/شرح/دسته stay real.
@@ -200,13 +232,7 @@ static bool adCatalogPrice(const std::vector<ServiceDef>& catalog,
     if(!want.empty()){
         for(const auto& s:catalog){
             if(s.status!=0 && serviceIdentityKey(s.code)==want){
-                // v1.75.0: pick the tariff that matches the patient's insurance
-                if(hasIns){
-                    price = s.priceIns>0 ? s.priceIns : s.price;
-                } else {
-                    price = s.priceFree>0 ? s.priceFree : s.price;
-                }
-                if(price<0) price=0;
+                price = pickTariff(s);
                 if(defOut) *defOut=&s;
                 return true;
             }
@@ -218,12 +244,7 @@ static bool adCatalogPrice(const std::vector<ServiceDef>& catalog,
     if(want.empty()&&!wantName.empty()){
         for(const auto& s:catalog){
             if(s.status!=0 && serviceIdentityKey(s.name)==wantName){
-                if(hasIns){
-                    price = s.priceIns>0 ? s.priceIns : s.price;
-                } else {
-                    price = s.priceFree>0 ? s.priceFree : s.price;
-                }
-                if(price<0) price=0;
+                price = pickTariff(s);
                 if(defOut) *defOut=&s;
                 return true;
             }
@@ -1114,6 +1135,14 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             return "{\"ok\":false,\"err\":\"حداقل یک خدمت با مبلغ لازم است\"}";
 
         int q=saveReception(r);   // assigns queue no + persists CSV
+        if(r.receiptNo<=0) r.receiptNo = (q>0)? (long long)q : 1;
+        if(r.receiptBarcode.empty()){
+            long long seed = r.receiptNo>0 ? r.receiptNo : (long long)q;
+            long long v = 100000000000LL + ((seed * 2654435761LL) % 899999999999LL);
+            if(v<0) v=-v;
+            wchar_t bb[24]; swprintf(bb,24,L"%012lld",v);
+            r.receiptBarcode=bb;
+        }
         std::wstring cashWarn;
         CashTicket cashT;
         bool cashOk=false;
@@ -1193,10 +1222,29 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         }
         std::string svc=w2u8(cashT.servicesJson);
         if(svc.empty()) svc="[]";
+        bool mainRec=false;
+        {
+            CashScope sc=Cash_ResolveScope();
+            if(sc.homeSubId<=0){
+                mainRec=true;
+                std::vector<Section> all; Sections_All(all);
+                for(const auto& s:all){
+                    if(s.id==sc.homeSectionId){
+                        mainRec = (s.parent_id==0 && Ops_IsReception(s));
+                        break;
+                    }
+                }
+            }
+        }
+        const char* miniKind = "none";
+        if(!posHas) miniKind = mainRec ? "mainPay" : "subTicket";
         std::string o="{\"ok\":true,\"queueNo\":"+jnum(q)+
             ",\"printMode\":"+jstr(printMode)+
             ",\"needsCashier\":"; o+=(posHas?"false":"true");
         o+=",\"posHas\":"; o+=(posHas?"true":"false");
+        o+=",\"miniKind\":\""; o+=miniKind; o+="\"";
+        o+=",\"receiptNo\":"+jnum(r.receiptNo);
+        o+=",\"nid\":"+jstr(r.nationalId);
         if(cashOk){
             o+=",\"ticketId\":"+jstr(cashT.id);
             o+=",\"barcode\":"+jstr(cashT.barcode);
@@ -1207,6 +1255,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+=",\"ps\":"+adDoctorStatsJson(r.treatingDoctor);
         if(!cashWarn.empty()) o+=",\"cashWarn\":"+jstr(cashWarn);
         o+="}";
+        WebAdmission_PushEvent("cashier.changed","{\"ok\":true}");
         return o;
     }
 
@@ -1359,6 +1408,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(method.empty()) method=L"cash";
         if(!Cash_PayEx(u82w(idU),method,(long long)amt,(long long)disc,err))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        WebAdmission_PushEvent("cashier.changed","{\"ok\":true}");
         return "{\"ok\":true}";
     }
     if(verb=="cashier.manual"){
