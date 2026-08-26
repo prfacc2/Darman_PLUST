@@ -1001,6 +1001,53 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return "{\"ok\":true}";
     }
 
+    // ---- blacklist.list (v1.94 درمان پلاس) — «لیست سیاه» همه موارد ---------
+    //   Returns every blacklist entry (newest first, as Blacklist_Load returns
+    //   them) with an "active" flag derived from the expiry epoch (0 == permanent).
+    if(verb=="blacklist.list"){
+        auto rows=Blacklist_Load();
+        std::string o="{\"rows\":[";
+        for(size_t i=0;i<rows.size();i++){
+            if(i) o+=",";
+            auto& b=rows[i];
+            o+="{\"nid\":"+jstr(b.nid)+",\"first\":"+jstr(b.first)+",\"last\":"+jstr(b.last);
+            o+=",\"reason\":"+jstr(b.reason)+",\"durationLabel\":"+jstr(b.durationLabel);
+            o+=",\"createdText\":"+jstr(b.createdText)+",\"createdBy\":"+jstr(b.createdBy);
+            long long now=Blacklist_NowEpochMinutes();
+            bool active = (b.expiresEpochMin==0 || b.expiresEpochMin>now);
+            o+=",\"active\":";
+            o+=(active?"true":"false");
+            o+="}";
+        }
+        o+="]}";
+        return o;
+    }
+
+    // ---- blacklist.add (v1.94 درمان پلاس) — «افزودن به لیست سیاه» ------------
+    //   Adds a new blacklist entry from the UI. duration is in minutes (0 ==
+    //   permanent). The created timestamp is stamped here in Iran local time;
+    //   Blacklist_Add keeps it (it only fills createdText when empty).
+    if(verb=="blacklist.add"){
+        BlacklistEntry b;
+        std::string t;
+        if(jsonGetString(body,"nid",t)) b.nid=u82w(t);
+        if(jsonGetString(body,"first",t)) b.first=u82w(t);
+        if(jsonGetString(body,"last",t)) b.last=u82w(t);
+        if(jsonGetString(body,"mobile",t)) b.mobile=u82w(t);
+        if(jsonGetString(body,"reason",t)) b.reason=u82w(t);
+        if(jsonGetString(body,"durationLabel",t)) b.durationLabel=u82w(t);
+        double dur=0; jsonGetNumber(body,"duration",dur);
+        long long now=Blacklist_NowEpochMinutes();
+        b.createdEpochMin=now;
+        b.expiresEpochMin=(dur==0)?0:(now+(long long)dur);
+        SYSTEMTIME st=iranNow();
+        b.createdText=jalaliDateShort(st)+L" "+iranTimeStr(st,false);
+        b.createdBy=g_session.user.username;
+        std::wstring err;
+        if(Blacklist_Add(b,err)) return "{\"ok\":true}";
+        return "{\"ok\":false,\"err\":"+jstr(err)+"}";
+    }
+
     // ---- blacklist.remove (v1.64.0 درمان پلاس) — «رفع مسدودی» ---------------
     //   Permanently deletes every blacklist entry for the given national id so
     //   the patient can be admitted normally from now on.
@@ -1120,6 +1167,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="queue")      RunOnUiThread([](){ Reception_OpenQueue(); });
         else if(kind=="receipts")   RunOnUiThread([](){ Reception_OpenReceipts(); });
         else if(kind=="portal")     RunOnUiThread([](){ Reception_OpenPortal(); });
+        else if(kind=="blacklist")  RunOnUiThread([](){ Reception_OpenBlacklist(); });
         else if(kind=="empty")      RunOnUiThread([](){ Reception_OpenNewTab(); });
         else if(kind=="admission")  RunOnUiThread([](){ Reception_OpenAdmissionNew(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";

@@ -679,6 +679,27 @@
     });
   }
 
+  /* v1.94: doctor search auto-select — mirrors resolvePerfCode() for the
+     performer: when the search yields exactly one row, OR an exact medicalId/
+     code match is found, auto-select it via selectDoctor() instead of just
+     listing suggestions. The matched row/index are captured into locals before
+     defer() so the setTimeout closure never sees a stale loop variable. */
+  function autoSelectDoctor(rows, en) {
+    if (!rows || !rows.length) return;
+    if (rows.length === 1) {
+      var d0 = rows[0];
+      defer(function () { selectDoctor(d0, 0); });
+      return;
+    }
+    var matched = null, mIdx = -1, i;
+    for (i = 0; i < rows.length; i++) {
+      if (toEn(rows[i].medicalId || '') === en || toEn(rows[i].code || '') === en) {
+        matched = rows[i]; mIdx = i; break;
+      }
+    }
+    if (matched) defer(function () { selectDoctor(matched, mIdx); });
+  }
+
   /* ---------------------------------------------------------------------- *
      v1.78.0 — «انجام دهنده» (performer) wiring.
      داستان: بیمار از سمت «پزشک معالج» می‌آید (ارجاع — جستجو با کد نظام پزشکی
@@ -1121,7 +1142,12 @@
       var byCode = /^[0-9]+$/.test(en);          /* numeric → medical ID search */
       docTimer = setTimeout(function () {
         var params = byCode ? { q: en, code: en } : { q: q };
-        Bridge.call('doctor.search', params).then(function (r) { renderDocResults(r.rows || r.doctors || []); });
+        Bridge.call('doctor.search', params).then(function (r) {
+          var rows = r.rows || r.doctors || [];
+          renderDocResults(rows);
+          /* v1.94: auto-select single result / exact match (like performer) */
+          autoSelectDoctor(rows, en);
+        });
       }, 180);
     }
     on($('doc2code'), 'input', docLiveSearch);
@@ -1730,7 +1756,8 @@
     on($('hdrSettings'), 'click', function () { Bridge.call('ui.settings', {}); });
     on($('btnErx'), 'click', function () { Bridge.call('rx.electronic', collectRecord()); });
 
-    /* F8 = print last; F7 = cashier; F4 = unlock locked form; Ctrl+Enter = save. */
+    /* F8 = print last; F7 = cashier; F4 = unlock locked form; F5 = toggle edit
+       mode; Ctrl+Enter = save. */
     on(document, 'keydown', function (e) {
       e = e || window.event; var key = e.keyCode || e.which;
       if (key === 118) { /* F7 */
@@ -1743,6 +1770,13 @@
       } else if (key === 115) { /* F4 */
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
         unlockCashForm();
+      } else if (key === 116) { /* F5 — toggle admission edit mode (req. v1.94) */
+        /* preventDefault so F5 never refreshes the page; only act on the
+           admission surface (edit mode is an admission-form concept). */
+        if (state.surface === 'admission') {
+          if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+          toggleEditMode();
+        }
       } else if (key === 119) { Bridge.call('print.last', {}); }        /* F8 */
       else if (key === 13 && e.ctrlKey) {
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
@@ -1978,6 +2012,14 @@
     toast('ویرایش باز شد', 'ok');
   }
 
+  /* v1.94: F5 toggle for admission edit mode. Loaded receipts start read-only;
+     pressing F5 unlocks editing (and locks again on the next press). */
+  function toggleEditMode() {
+    state.formLocked = !state.formLocked;
+    setFormLocked(state.formLocked);
+    toast(state.formLocked ? 'فرم قفل شد' : 'ویرایش فعال شد — F5 برای قفل', 'info');
+  }
+
   function setOverlay(panelId, backId, open) {
     var p = $(panelId), b = $(backId);
     if (p) {
@@ -2017,7 +2059,11 @@
     }
   }
   function applyTicketToForm(t) {
-    setFormLocked(false);
+    /* v1.94: a loaded receipt starts read-only — data seated but not editable;
+       F5 unlocks editing. clearForm keeps the lock (keepLock:true) so it survives
+       the field reset, and JS .value assignment still populates locked fields. */
+    state.formLocked = true;
+    setFormLocked(true);
     clearForm({ keepLock: true, skipFocus: true });
     fillPatient({
       nid: t.nid, first: t.first, last: t.last, mobile: t.mobile,
@@ -2573,7 +2619,12 @@
     var en = toEn(q).replace(/\s+/g, '');
     var byCode = /^[0-9]+$/.test(en);
     var params = byCode ? { q: en, code: en } : { q: q };
-    Bridge.call('doctor.search', params).then(function (r) { renderDocResults(r.rows || r.doctors || []); });
+    Bridge.call('doctor.search', params).then(function (r) {
+      var rows = r.rows || r.doctors || [];
+      renderDocResults(rows);
+      /* v1.94: auto-select single result / exact match (like performer) */
+      autoSelectDoctor(rows, en);
+    });
   }
 
   /* --- add current admission to queue (صندوق نرفته‌ها) --- */
@@ -2868,17 +2919,18 @@
   }
 
   function portalTileHtml(m) {
+    /* v1.94: messenger-style preview tile — sender name bold, small date,
+       2-line preview, pin star, unread dot. Inline styles dropped so the CSS
+       agent owns the look; the severity class on the tile colors the stripe. */
     var pv = String(m.text || '').replace(/\s+/g, ' ');
     pv = pv.replace(/^\s+|\s+$/g, '');
     if (pv.length > 140) pv = pv.substring(0, 140) + '\u2026';   /* 2-line preview */
     var pin = m.pinned
-      ? '<span class="portal-tile-pin" style="color:#f5a623" title="سنجاق‌شده">\u2605</span>'
+      ? '<span class="portal-tile-pin" title="سنجاق‌شده">\u2605</span>'
       : '';
-    var dot = (!m.seen)
-      ? '<span class="portal-unread-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e15a5a;margin-right:6px"></span>'
-      : '';
+    var dot = (!m.seen) ? '<span class="portal-unread-dot"></span>' : '';
     return '<div class="portal-tile ' + portalStripe(m.type) + '" data-idx="' + esc(m.idx) + '">' +
-      '<span class="portal-stripe" style="background-color:' + portalStripeColor(m.type) + '"></span>' +
+      '<span class="portal-stripe"></span>' +
       '<div class="portal-tile-main">' +
         '<div class="portal-tile-row">' + dot +
           '<span class="portal-tile-from">' + esc(m.from || '—') + '</span>' + pin +
@@ -2904,6 +2956,8 @@
       }
       out.push(m);
     }
+    /* v1.94: pinned messages sort to the top (pin = star = bring to top) */
+    out.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); });
     if (!out.length) {
       list.innerHTML = '<div class="portal-empty">پیامی یافت نشد</div>';
       return;
@@ -2970,23 +3024,30 @@
     } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
   }
 
-  /* open a full message in #portalDetail and mark it seen immediately (req. H) */
+  /* open a full message in #portalDetail and mark it seen immediately (req. H).
+     v1.94: redesigned as a messenger chat detail — avatar (initial letter),
+     sender name + severity badge in the header, body in a chat bubble, a meta
+     row (date / time / to), an action-button row, and a toggled reply box. */
   function portalDetail(idx) {
     var det = $('portalDetail'); if (!det) return;
     var m = null, i, src = (portal.view === 'archive') ? portal.saved : portal.rows;
     for (i = 0; i < src.length; i++) { if (Number(src[i].idx) === Number(idx)) { m = src[i]; break; } }
     portal.detailIdx = m ? Number(m.idx) : -1;
     if (!m) { det.innerHTML = '<div class="portal-empty">پیام یافت نشد</div>'; return; }
+    var initial = String(m.from || '؟').replace(/^\s+|\s+$/g, '').charAt(0) || '؟';
     var html = '<div class="portal-detail">' +
       '<div class="portal-detail-head">' +
-        '<button type="button" class="portal-act" data-act="back">بازگشت</button>' +
-        '<span class="portal-detail-sev ' + portalStripe(m.type) + '" style="background-color:' + portalStripeColor(m.type) + '">' + esc(portalSeverityLabel(m.type)) + '</span>' +
+        '<button type="button" class="portal-act portal-back" data-act="back">بازگشت</button>' +
+        '<span class="portal-avatar">' + esc(initial) + '</span>' +
+        '<span class="portal-detail-name">' + esc(m.from || '—') + '</span>' +
+        '<span class="portal-detail-sev ' + portalStripe(m.type) + '">' + esc(portalSeverityLabel(m.type)) + '</span>' +
       '</div>' +
-      '<div class="portal-detail-from">از: ' + esc(m.from || '—') + '</div>' +
-      '<div class="portal-detail-to">به: ' + esc(m.to || '—') + '</div>' +
-      '<div class="portal-detail-date">' + esc(m.date || '') + '</div>' +
-      '<div class="portal-detail-time">' + esc(m.time || '') + '</div>' +
-      '<div class="portal-detail-body">' + esc(m.text || '') + '</div>' +
+      '<div class="portal-bubble">' + esc(m.text || '') + '</div>' +
+      '<div class="portal-detail-meta">' +
+        '<span class="portal-meta-item">' + esc(m.date || '') + '</span>' +
+        (m.time ? '<span class="portal-meta-item">' + esc(m.time) + '</span>' : '') +
+        '<span class="portal-meta-item">به: ' + esc(m.to || '—') + '</span>' +
+      '</div>' +
       '<div class="portal-detail-actions">' +
         '<button type="button" class="portal-act" data-act="reply">پاسخ</button>' +
         '<button type="button" class="portal-act" data-act="pin">' + (m.pinned ? 'برداشتن سنجاق' : 'سنجاق') + '</button>' +
@@ -3035,11 +3096,19 @@
     }
   }
 
-  function portalToggleDrawer() {
+  function portalToggleDrawer(force) {
+    /* v1.94: optional `force` (true=open, false=close) so the click-outside
+       handler can force-close. The right-side slide is driven by the `open`
+       class (the CSS agent positions the drawer on the right). */
     var dr = $('portalDrawer'); if (!dr) return;
     var cn = String(dr.className || '');
-    if (/(^|\s)open(\s|$)/.test(cn)) dr.className = cn.replace(/\s*open/g, '');
-    else dr.className = cn + ' open';
+    var isOpen = /(^|\s)open(\s|$)/.test(cn);
+    var open;
+    if (force === true) open = true;
+    else if (force === false) open = false;
+    else open = !isOpen;
+    if (open && !isOpen) dr.className = cn + ' open';
+    else if (!open && isOpen) dr.className = cn.replace(/\s*open/g, '');
   }
 
   function portalSwitchView(view) {
@@ -3091,10 +3160,155 @@
         }
       }
     } catch (e) {}
+    /* v1.94: click-outside-to-close for the right-side drawer. The drawer
+       signals visibility via the `open` class (not inline display), so we test
+       that class instead of style.display. Clicks inside the drawer or on the
+       burger are ignored; everything else force-closes it. */
+    try {
+      on(document, 'click', function (e) {
+        e = e || window.event;
+        var tgt = e.target || e.srcElement;
+        var dr = $('portalDrawer');
+        var bg = $('portalBurger');
+        if (!dr || !tgt) return;
+        if (!/(^|\s)open(\s|$)/.test(String(dr.className || ''))) return; /* closed -> ignore */
+        var p = tgt;
+        while (p) { if (p === dr || p === bg) return; p = p.parentNode; }
+        portalToggleDrawer(false);
+      });
+    } catch (e) {}
     /* live refresh (req. G): reload on new messages; keep the badge in sync */
     try {
       Bridge.on('portal.changed', function () { defer(portalLoad); });
       Bridge.on('dash.unread', function (d) { if (d && d.n != null) portalSetUnread(d.n); });
+    } catch (e) {}
+  }
+
+  /* ==========================================================================
+     v1.94 — BLACKLIST MANAGEMENT SURFACE
+     Drives the #blPanel markup the CSS agent adds to index.html. Lists blocked
+     patients (nid / name / reason / duration / date / status / unblock), adds
+     new entries, unblocks by row or by NID, and live-filters the table. Every
+     bridge verb is wrapped in try-catch so a missing C++ handler never crashes
+     the UI. ES5-only (var/function/string concat). All element refs are guarded
+     so the helpers no-op safely if the markup is absent.
+     ========================================================================== */
+  function blacklistRowHtml(r) {
+    var nid = esc(r.nid || '');
+    var active = true;
+    if (r.status) active = String(r.status).toLowerCase() === 'active';
+    else if (r.expired) active = false;
+    return '<tr data-nid="' + nid + '">' +
+      '<td class="bl-nid">' + toFa(nid) + '</td>' +
+      '<td class="bl-name">' + esc((r.first || '') + ' ' + (r.last || '')) + '</td>' +
+      '<td class="bl-reason">' + esc(r.reason || '') + '</td>' +
+      '<td class="bl-dur">' + esc(r.duration || '') + '</td>' +
+      '<td class="bl-date">' + esc(r.date || '') + '</td>' +
+      '<td class="bl-status">' + (active ? 'فعال' : 'منقضی') + '</td>' +
+      '<td class="bl-act"><button type="button" class="btn bl-unblock" data-act="unblock" data-nid="' + nid + '">رفع مسدودی</button></td>' +
+    '</tr>';
+  }
+
+  function blacklistLoad() {
+    var body = $('blBody');
+    function fail() { if (body) body.innerHTML = '<tr><td colspan="7" class="bl-empty">بارگذاری ناموفق بود</td></tr>'; }
+    if (!body) return;
+    try {
+      Bridge.call('blacklist.list', {}).then(function (r) {
+        var rows = (r && r.rows) || (r && r.items) || [];
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="7" class="bl-empty">رکوردی یافت نشد</td></tr>';
+          return;
+        }
+        var h = '', i;
+        for (i = 0; i < rows.length; i++) h += blacklistRowHtml(rows[i]);
+        body.innerHTML = h;
+      }, fail);
+    } catch (e) { fail(); }
+  }
+
+  function blacklistClearForm() {
+    var ids = ['blNid', 'blFirst', 'blLast', 'blMobile', 'blDuration', 'blReason'], i, el;
+    for (i = 0; i < ids.length; i++) { el = $(ids[i]); if (el) el.value = ''; }
+  }
+
+  function blacklistAdd() {
+    var nid = trimStr(val('blNid'));
+    if (!nid) { toast('کد ملی را وارد کنید', 'err'); return; }
+    var rec = {
+      nid: toEn(nid),
+      first: trimStr(val('blFirst')),
+      last: trimStr(val('blLast')),
+      mobile: trimStr(val('blMobile')),
+      duration: trimStr(val('blDuration')),
+      reason: trimStr(val('blReason'))
+    };
+    try {
+      Bridge.call('blacklist.add', rec).then(function (res) {
+        if (res && res.ok) {
+          toast('به لیست سیاه افزوده شد', 'ok');
+          blacklistClearForm();
+          blacklistLoad();
+        } else {
+          toast('افزودن ناموفق بود', 'err');
+        }
+      }, function () { toast('افزودن ناموفق بود', 'err'); });
+    } catch (e) { toast('افزودن ناموفق بود', 'err'); }
+  }
+
+  function blacklistUnblock() {
+    var nid = trimStr(val('blUnblockNid'));
+    if (!nid) { toast('کد ملی را وارد کنید', 'err'); return; }
+    nid = toEn(nid);
+    try {
+      Bridge.call('blacklist.remove', { nid: nid }).then(function (res) {
+        if (res && res.ok) {
+          toast('مسدودی رفع شد', 'ok');
+          var f = $('blUnblockNid'); if (f) f.value = '';
+          blacklistLoad();
+        } else {
+          toast('رفع مسدودی ناموفق بود', 'err');
+        }
+      }, function () { toast('رفع مسدودی ناموفق بود', 'err'); });
+    } catch (e) { toast('رفع مسدودی ناموفق بود', 'err'); }
+  }
+
+  function blacklistSearch() {
+    var s = $('blSearch'); if (!s) return;
+    var q = trimStr(s.value).toLowerCase();
+    var body = $('blBody'); if (!body) return;
+    var rows = body.getElementsByTagName('tr'), i, hay;
+    for (i = 0; i < rows.length; i++) {
+      hay = (rows[i].textContent || rows[i].innerText || '').toLowerCase();
+      rows[i].style.display = (q && hay.indexOf(q) < 0) ? 'none' : '';
+    }
+  }
+
+  var _blWired = false;
+  function blacklistWire() {
+    if (_blWired) return;
+    _blWired = true;
+    try { on($('blAddBtn'), 'click', blacklistAdd); } catch (e) {}
+    try { on($('blUnblockBtn'), 'click', blacklistUnblock); } catch (e) {}
+    try { on($('blSearch'), 'input', blacklistSearch); } catch (e) {}
+    try { on($('blSearch'), 'keyup', blacklistSearch); } catch (e) {}
+    /* per-row unblock buttons — delegated on #blBody so re-renders stay wired */
+    try {
+      on($('blBody'), 'click', function (e) {
+        e = e || window.event;
+        var tgt = e.target || e.srcElement;
+        var body = $('blBody');
+        var btn = findUp(tgt, 'data-act', body);
+        if (!btn || btn.getAttribute('data-act') !== 'unblock') return;
+        var nid = btn.getAttribute('data-nid') || '';
+        if (!nid) return;
+        try {
+          Bridge.call('blacklist.remove', { nid: nid }).then(function (res) {
+            if (res && res.ok) { toast('مسدودی رفع شد', 'ok'); blacklistLoad(); }
+            else toast('رفع مسدودی ناموفق بود', 'err');
+          }, function () { toast('رفع مسدودی ناموفق بود', 'err'); });
+        } catch (e2) { toast('رفع مسدودی ناموفق بود', 'err'); }
+      });
     } catch (e) {}
   }
 
@@ -3114,17 +3328,18 @@
     var surf = window.__azSurface || 'admission';
     /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
        grid); the same HTML file renders it full-page via body.surface-rc. */
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal' && surf !== 'blacklist') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal|bl)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
     else if (surf === 'receipts') cls += ' surface-rc';
     else if (surf === 'dash') cls += ' surface-dash';
     else if (surf === 'portal') cls += ' surface-portal';
+    else if (surf === 'blacklist') cls += ' surface-bl';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -3161,6 +3376,8 @@
       on($('dashNewTab'), 'click', function () { openApp('empty'); });
       on($('dashPortal'), 'click', function () { openApp('portal'); });
       on($('dashMail'), 'click', function () { openApp('portal'); });
+      /* v1.94: dashboard blacklist launcher */
+      on($('dashBlacklist'), 'click', function () { openApp('blacklist'); });
       /* initial count + live sync from the native poll */
       Bridge.call('portal.unread', {}).then(function (d) {
         if (d && d.ok) dashSetUnread(d.n);
@@ -3248,7 +3465,7 @@
       /* v1.90: dash/tools skip the admission form fill (selects, performers,
          queue, services, zoom) — those surfaces hide #appBody and the extra
          work was the main reason they hung on open. Theme/user/perms stay. */
-      var light = (state.surface === 'dash' || state.surface === 'tools' || state.surface === 'portal');
+      var light = (state.surface === 'dash' || state.surface === 'tools' || state.surface === 'portal' || state.surface === 'blacklist');
       if (!light) {
         if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
         if (r.supp) { state.supp = r.supp; fillSelect($('insSupp'), r.supp); }
@@ -3326,6 +3543,12 @@
       if (state.surface === 'portal') {
         /* v1.93: portal message workdesk — fetch the inbox on surface boot */
         portalLoad();
+        return;
+      }
+      if (state.surface === 'blacklist') {
+        /* v1.94: blacklist management surface — wire buttons + load the table */
+        blacklistWire();
+        blacklistLoad();
         return;
       }
       if (state.surface === 'dash') {

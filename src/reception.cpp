@@ -124,7 +124,8 @@ enum TabKind {
     TK_CASHIER     = 4,   // v1.84: native «صندوق» web surface
     TK_QUEUE       = 5,   // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
     TK_RECEIPTS    = 6,   // v1.88: native «جستجوی قبض» web surface (was in-page)
-    TK_DASH        = 7    // v1.89: native «داشبورد» — the permanent landing tab
+    TK_DASH        = 7,   // v1.89: native «داشبورد» — the permanent landing tab
+    TK_BLACKLIST   = 8    // v1.94: لیست سیاه بیماران — HTML surface
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
@@ -562,6 +563,7 @@ static int tabIconFor(int kind){
     if(kind==TK_QUEUE)   return ICO_PEOPLE;  // صف پذیرش — people waiting
     if(kind==TK_RECEIPTS) return ICO_RECEIPT; // جستجوی قبض — receipt glyph
     if(kind==TK_DASH)    return ICO_HOME;     // داشبورد — home glyph
+    if(kind==TK_BLACKLIST) return ICO_ID;     // لیست سیاه — national-id card glyph
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
@@ -2756,7 +2758,8 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  together with the whole feature.
         if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
            && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS && t->kind!=TK_DASH
-           && t->kind!=TK_PORTAL)    // v1.93: portal now has an HTML surface
+           && t->kind!=TK_PORTAL     // v1.93: portal now has an HTML surface
+           && t->kind!=TK_BLACKLIST) // v1.94: blacklist has an HTML surface
             return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
@@ -2779,6 +2782,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             else if(t->kind==TK_RECEIPTS) surf="receipts";
             else if(t->kind==TK_DASH) surf="dash";
             else if(t->kind==TK_PORTAL) surf="portal";
+            else if(t->kind==TK_BLACKLIST) surf="blacklist";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
@@ -4793,6 +4797,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_QUEUE)     t->title=L"صندوق نرفته‌ها و صف پذیرش";
     else if(kind==TK_RECEIPTS)  t->title=L"جستجوی قبض";
     else if(kind==TK_DASH)      t->title=L"داشبورد";
+    else if(kind==TK_BLACKLIST) t->title=L"لیست سیاه بیماران";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5597,6 +5602,15 @@ void Reception_OpenQueue(){
 void Reception_OpenReceipts(){
     HWND h=recWnd(); if(!h) return;
     activateKind(h, TK_RECEIPTS);
+}
+// v1.94.0: «لیست سیاه بیماران» — opens the blacklist HTML surface as its own
+// closable tab. Auto-creates the reception screen if it isn't up yet, then
+// focuses (or spawns) the blacklist tab.
+void Reception_OpenBlacklist(){
+    HWND h=recWnd();
+    if(!h) h=createReceptionScreen(g_hFrame);
+    if(!h) return;
+    activateKind(h, TK_BLACKLIST);
 }
 // v1.89.0: dashboard app-icon actions — portal / new empty tab / fresh
 // admission (the «پذیرش بیمار» behaviour that used to live in the removed

@@ -322,14 +322,13 @@ static HomeGeom homeGeom(int W, int H){
 // the dark panel keeps its deep slate gradient. The cards live in the lower
 // band of the panel, so homePanelBot() is the colour behind them.
 static COLORREF homePanelTop(){
-    // v1.90.0: one more step off white — a cool periwinkle wash so the hero
-    // no longer reads as a blank sheet on the light theme.
+    // v1.94: white with a very subtle blue tint for depth (not flat white)
     return g_dark ? RGB(24,29,38)
-                  : blendColor(g_theme.surface2, g_theme.accent, 18);
+                  : RGB(0xF6, 0xF8, 0xFB); // near-white
 }
 static COLORREF homePanelBot(){
     return g_dark ? RGB(14,18,25)
-                  : blendColor(g_theme.bg2, g_theme.accent, 14);
+                  : RGB(0xEC, 0xF1, 0xF7); // subtle shading bottom
 }
 
 // v1.88.0: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
@@ -670,10 +669,10 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             gpShadowColor(dc, tr, S(24), S(8), g_dark?70:36, g_theme.accent);
             COLORREF trayTop = g_dark
                 ? blendColor(homePanelTop(), RGB(255,255,255), 8)
-                : blendColor(RGB(214,226,244), g_theme.accent, 12);
+                : RGB(0xFC, 0xFD, 0xFE); // v1.94: white tray top
             COLORREF trayBot = g_dark
                 ? blendColor(homePanelBot(), RGB(255,255,255), 4)
-                : blendColor(RGB(188,206,230), g_theme.accent, 10);
+                : RGB(0xF2, 0xF5, 0xF9); // v1.94: subtle shading tray bottom
             gpGradRoundRect(dc, tr, S(24), trayTop, trayBot,
                 blendColor(g_theme.border, g_theme.accent, 28));
             RECT itr=tr; InflateRect(&itr,-S(1),-S(1));

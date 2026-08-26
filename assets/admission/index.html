@@ -590,6 +590,13 @@
           </span>
           <span class="dash-appname">تب جدید</span>
         </button>
+        <!-- v1.94.0: BLACKLIST — patient blocklist launcher (لیست سیاه بیماران) -->
+        <button type="button" class="dash-app" id="dashBlacklist" data-name="لیست سیاه بیماران مسدودسازی پذیرش">
+          <span class="dash-appico dash-appico-bl" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="#fff" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
+          </span>
+          <span class="dash-appname">لیست سیاه بیماران</span>
+        </button>
       </div>
       <!-- hidden: permission gating + drawer data-app="dashPortal" still resolve -->
       <button type="button" class="dash-app" id="dashPortal" style="display:none" aria-hidden="true" data-name="کارتابل پیام صندوق پیام‌ها مدیریت"></button>
@@ -646,6 +653,48 @@
     <div class="portal-body" id="portalBody">
       <div class="portal-list" id="portalList"><!-- message tiles injected by JS --></div>
       <div class="portal-detail" id="portalDetail"><!-- message detail injected by JS --></div>
+    </div>
+  </section>
+
+  <!-- BLACKLIST: Patient Blacklist (لیست سیاه بیماران) — v1.94 HTML surface -->
+  <section class="bl-panel" id="blPanel" aria-hidden="true">
+    <header class="bl-topbar">
+      <button class="bl-burger" id="blBurger" title="منو">☰</button>
+      <div class="bl-titles"><div class="bl-title">لیست سیاه بیماران</div></div>
+      <div class="bl-search-wrap">
+        <input class="inp bl-search" id="blSearch" placeholder="جستجوی بیمار مسدود…" />
+      </div>
+    </header>
+    <div class="bl-body">
+      <div class="bl-add-form">
+        <div class="bl-form-row">
+          <input class="inp" id="blNid" placeholder="کد ملی" inputmode="numeric" />
+          <input class="inp" id="blFirst" placeholder="نام" />
+          <input class="inp" id="blLast" placeholder="نام خانوادگی" />
+        </div>
+        <div class="bl-form-row">
+          <input class="inp" id="blMobile" placeholder="موبایل" />
+          <select class="inp" id="blDuration">
+            <option value="1440">۲۴ ساعت</option>
+            <option value="10080">یک هفته</option>
+            <option value="43200">یک ماه</option>
+            <option value="525600">یک سال</option>
+            <option value="0">دائم</option>
+          </select>
+          <input class="inp" id="blReason" placeholder="علت مسدودی" />
+        </div>
+        <button class="btn btn-primary" id="blAddBtn">ثبت مسدودی</button>
+      </div>
+      <div class="bl-history">
+        <div class="bl-history-head">تاریخچه مسدودی‌ها</div>
+        <table class="tbl bl-tbl"><thead><tr>
+          <th>کد ملی</th><th>نام و نام خانوادگی</th><th>علت</th><th>مدت</th><th>تاریخ</th><th>وضعیت</th><th>عملیات</th>
+        </tr></thead><tbody id="blBody"></tbody></table>
+      </div>
+      <div class="bl-unblock">
+        <input class="inp" id="blUnblockNid" placeholder="کد ملی برای رفع مسدودی" inputmode="numeric" />
+        <button class="btn btn-outline" id="blUnblockBtn">رفع مسدودی</button>
+      </div>
     </div>
   </section>
 

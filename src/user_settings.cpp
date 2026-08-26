@@ -85,7 +85,7 @@ static bool canAccess(int row, int mode){
     case ROW_PROFILE:   return true;
     case ROW_THEME:     return true;
     case ROW_RECEPTION: return false;
-    case ROW_BLACKLIST: return true;
+    case ROW_BLACKLIST: return false;
     case ROW_DESIGNER:  return true;
     case ROW_BACKUP:    return true;
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
@@ -111,10 +111,13 @@ static void selfCheckMatrix(){
     // Reception: everything except employees/sections. v1.93: also skip
     // ROW_RECEPTION and ROW_SAVED_MSG, which are now intentionally unreachable
     // (moved to the HTML portal) so the matrix self-check stays accurate.
+    // v1.94: ROW_BLACKLIST joins the same skip set — the patient blacklist
+    // moves to the HTML dashboard and is unreachable from here.
     assert(!canAccess(ROW_EMP_SECT,SM_RECEPTION));
     assert( canAccess(ROW_EMP_SECT,SM_ADMIN));
     for(int r=0;r<ROW__COUNT;r++){
-        if(r==ROW_EMP_SECT || r==ROW_RECEPTION || r==ROW_SAVED_MSG) continue;
+        if(r==ROW_EMP_SECT || r==ROW_RECEPTION || r==ROW_SAVED_MSG
+           || r==ROW_BLACKLIST) continue;
         assert(canAccess(r,SM_RECEPTION) && "reception should access this row");
         assert(canAccess(r,SM_ADMIN)     && "admin should access this row");
     }
@@ -186,9 +189,6 @@ static std::vector<RowDef> homeRows(int mode){
         { ROW_THEME,     PAGE_THEME,     ICO_PALETTE,
           L"\u062a\u063a\u06cc\u06cc\u0631 \u067e\u0648\u0633\u062a\u0647",                            // تغییر پوسته
           L"\u0631\u0648\u0634\u0646 \u0648 \u0645\u0634\u06a9\u06cc \u0648 \u0646\u0626\u0648\u0646\u06cc" },                    // روشن و مشکی و نئونی
-        { ROW_BLACKLIST, PAGE_BLACKLIST, ICO_ID,
-          L"\u0644\u06cc\u0633\u062a \u0633\u06cc\u0627\u0647 \u0628\u06cc\u0645\u0627\u0631\u0627\u0646",                    // لیست سیاه بیماران
-          L"\u0645\u0633\u062f\u0648\u062f\u0633\u0627\u0632\u06cc \u067e\u0630\u06cc\u0631\u0634 \u0648 \u062a\u0627\u0631\u06cc\u062e\u0686\u0647" }, // مسدودسازی پذیرش و تاریخچه
         { ROW_DESIGNER,  PAGE_DESIGNER,  ICO_PRINT,
           L"\u0637\u0631\u0627\u062d\u06cc \u0686\u0627\u067e",                                        // طراحی چاپ
           L"\u0637\u0631\u0627\u062d\u06cc \u0642\u0627\u0644\u0628 \u0686\u0627\u067e \u0628\u0631\u0627\u06cc \u0647\u0631 \u0628\u062e\u0634" },

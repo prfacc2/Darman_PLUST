@@ -119,9 +119,9 @@ void applyThemeMode(ThemeMode mode){
         g_theme.inputBg     = RGB(0xE8, 0xEF, 0xF8); // #E8EFF8 ice blue tint well
         g_theme.inputText   = RGB(0x0D, 0x1B, 0x2A);
         g_theme.hover       = RGB(0xD8, 0xE4, 0xF4); // soft accent wash
-        // frosted ice-blue header band
-        g_theme.headerTop   = RGB(0xDD, 0xE8, 0xF5); // #DDE8F5 frosted top
-        g_theme.headerBot   = RGB(0xC5, 0xD2, 0xE5); // #C5D2E5 frosted bottom
+        // v1.94: white header with subtle blue-tinted shading (not flat white)
+        g_theme.headerTop   = RGB(0xF4, 0xF7, 0xFB); // #F4F7FB white with blue tint
+        g_theme.headerBot   = RGB(0xE4, 0xEC, 0xF4); // #E4ECF4 subtle shading bottom
         g_infoAccent  = RGB(0x6D, 0x4D, 0xD6);    // #6D4DD6 violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5A, 0x3C, 0xC4);
     }

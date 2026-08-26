@@ -327,21 +327,23 @@ static LRESULT CALLBACK calcProc(HWND h, UINT m, WPARAM w, LPARAM l){
                           g_theme.border, g_theme.bg2);
 
         SetBkMode(dc, TRANSPARENT);
-        // history line — muted, right-aligned, proper RTL reading order
+        // history line — muted, right-aligned. v1.94: keep ASCII digits (no
+        // toFaDigits) — Persian Extended digits reverse under DT_RIGHT.
         SetTextColor(dc, g_theme.textDim);
         SelectObject(dc, g_fSmall);
         RECT hr={ disp.left+S(16), disp.top+S(12),
                   disp.right-S(16), disp.top+S(36) };
-        DrawTextW(dc, toFaDigits(s->history).c_str(), -1, &hr,
-            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX|DT_END_ELLIPSIS);
-        // main number — right-aligned (calculator style). DT_RTLREADING is added
-        // ONLY for the Persian error text: a leading minus on a number would be
-        // mirrored to the wrong side under RTL reading, so numbers stay LTR-safe.
+        DrawTextW(dc, s->history.c_str(), -1, &hr,
+            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX|DT_END_ELLIPSIS);
+        // main number — right-aligned (calculator style). v1.94: keep ASCII
+        // digits for the calculator display — Persian digits (U+06F0-U+06F9)
+        // are classified as AN in the Unicode Bidi Algorithm and get reversed
+        // by DrawTextW under DT_RIGHT. ASCII digits are always LTR-safe.
         SetTextColor(dc, s->err ? g_theme.danger : g_theme.text);
         SelectObject(dc, g_fHuge);
         RECT mr={ disp.left+S(16), disp.top+S(36),
                   disp.right-S(16), disp.bottom-S(12) };
-        std::wstring shown = s->err ? s->display : toFaDigits(groupNum(s->display));
+        std::wstring shown = s->err ? toFaDigits(s->display) : groupNum(s->display);
         DWORD nfmt = DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX|DT_END_ELLIPSIS;
         if(s->err) nfmt |= DT_RTLREADING;
         DrawTextW(dc, shown.c_str(), -1, &mr, nfmt);
