@@ -23,6 +23,7 @@ static std::string crmSectionJson(const Section& s){
     o+="\"parentId\":"+jnum(s.parent_id)+",";
     o+="\"active\":";
     o+=(s.is_active?"true":"false");
+    o+=",\"cashierTab\":"; o+=(s.cashier_tab?"true":"false");   // v1.93
     o+=",\"createdAt\":"+jstr(s.created_at)+",";
     o+="\"updatedAt\":"+jstr(s.updated_at)+"";
     o+="}";
@@ -452,6 +453,7 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         if(jsonGetString(body,"name",t))    s.name_fa=u82w(t);
         if(jsonGetString(body,"kind",t))    s.kind=u82w(t);
         s.is_active=jsonGetBool(body,"active",true)?1:0;
+        s.cashier_tab=jsonGetBool(body,"cashierTab",false)?1:0;   // v1.93 ثبت پذیرش در صندوق
         s.updated_at=crmTodayJalali();
         if(s.id<=0) s.created_at=s.updated_at;
         int rid=Sections_Upsert(s);

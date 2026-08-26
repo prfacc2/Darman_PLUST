@@ -57,6 +57,9 @@ static std::vector<Section> sec_readAll(){
         // v1.74: optional 9th field = parent_id (subsection). Older files have
         // only 7-8 fields and load unchanged (parent_id stays 0 = top-level).
         if(f.size() >= 9) s.parent_id = _wtoi(f[8].c_str());
+        // v1.93: optional 10th field = cashier_tab (ثبت پذیرش در صندوق). Older
+        // files have only 9 fields and load unchanged (cashier_tab stays 0/OFF).
+        if(f.size() >= 10) s.cashier_tab = _wtoi(f[9].c_str());
         v.push_back(s);
     }
     int maxId=0;
@@ -95,7 +98,9 @@ static bool sec_writeAll(const std::vector<Section>& v){
         out += sec_esc(s.created_at);out += L'|';
         out += sec_esc(s.updated_at);out += L'|';
         out += sec_esc(s.net_meta); out += L'|';
-        out += pid; out += L"\r\n";
+        out += pid; out += L'|';                          // v1.74 subsection
+        out += std::to_wstring(s.cashier_tab); out += L"\r\n";   // v1.93 cashier tab
+
     }
     return writeFileUtf8(sec_path(), out, false);
 }

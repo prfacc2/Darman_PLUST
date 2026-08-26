@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.92.0"
+#define APP_VERSION_W   L"1.93.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -38,6 +38,8 @@ extern HWND      g_hFrame;          // fullscreen main frame
 extern double    g_scale;           // responsive UI scale
 extern bool      g_lowSpec;         // speed-handler: weak hardware mode
 extern bool      g_dark;            // dark theme active
+enum ThemeMode { TM_LIGHT=0, TM_DARK=1, TM_NEON=2 };
+extern ThemeMode g_themeMode;       // v1.93: three themes — light / dark / neon
 
 // fonts (Vazirmatn, embedded)
 extern HFONT g_fUI, g_fUIB, g_fSmall, g_fTitle, g_fBig, g_fHuge, g_fMono;
@@ -102,6 +104,7 @@ struct Theme {
 extern Theme   g_theme;
 extern HBRUSH  g_brBg, g_brSurface, g_brSurface2, g_brInput;
 void applyTheme(bool dark);             // rebuild colors + brushes
+void applyThemeMode(ThemeMode mode);    // v1.93: three-mode theme (light/dark/neon)
 void broadcastThemeChange();            // invalidate everything
 #define WM_APP_THEME (WM_APP+11)        // sent to every window on theme switch
 // ---------------------------------------------------------- 1.4.0 messages --

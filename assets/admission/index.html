@@ -163,7 +163,7 @@
              field was removed with the نوبت‌دهی workflow, so the caption was
              stale — it now says plainly what it holds. -->
         <div class="row-3">
-          <section class="card">
+          <section class="card ins-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 1L3 5v6c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V5l-9-4z"/></svg>
               اطلاعات بیمه و نوع پذیرش</span></div>
@@ -175,7 +175,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section class="card doc-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 2a3 3 0 013 3v2h2a3 3 0 013 3v8a3 3 0 01-3 3H7a3 3 0 01-3-3v-8a3 3 0 013-3h2V5a3 3 0 013-3zm1 8h-2v2H9v2h2v2h2v-2h2v-2h-2v-2z"/></svg>
               پزشک معالج</span></div>
@@ -193,7 +193,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section class="card perf-card">
             <div class="card-head"><span class="card-title">
               <svg class="ct-ico" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M9 11a4 4 0 100-8 4 4 0 000 8zm6 2c1.7 0 3-1.3 3-3s-1.3-3-3-3v6zM9 13c-3 0-7 1.5-7 4.5V20h14v-2.5C16 14.5 12 13 9 13z"/></svg>
               انجام دهنده</span></div>
@@ -626,6 +626,28 @@
       </nav>
     </aside>
   </div><!-- /#dashPanel -->
+
+  <!-- PORTAL: Message Workdesk (کارتابل پیام) — v1.93 HTML surface -->
+  <section class="portal-panel" id="portalPanel" aria-hidden="true">
+    <header class="portal-topbar">
+      <button class="portal-burger" id="portalBurger" title="منو" aria-label="منو">☰</button>
+      <div class="portal-titles"><div class="portal-title">کارتابل پیام</div></div>
+      <div class="portal-search-wrap">
+        <input class="inp portal-search" id="portalSearch" placeholder="جستجوی پیام…" />
+      </div>
+    </header>
+    <div class="portal-drawer" id="portalDrawer">
+      <div class="portal-drawer-head">منوی کارتابل</div>
+      <button class="portal-drawer-item active" data-view="inbox">صندوق دریافت</button>
+      <button class="portal-drawer-item" data-view="archive">آرشیو پیام‌ها</button>
+      <button class="portal-drawer-item" data-view="saved">پیام‌های ذخیره‌شده</button>
+      <button class="portal-drawer-item" data-view="pinned">سنجاق‌شده‌ها</button>
+    </div>
+    <div class="portal-body" id="portalBody">
+      <div class="portal-list" id="portalList"><!-- message tiles injected by JS --></div>
+      <div class="portal-detail" id="portalDetail"><!-- message detail injected by JS --></div>
+    </div>
+  </section>
 
   <!-- v1.83: queue overlay is a centered panel (not full-screen) and is a
        sibling of #app so admission zoom never scales it. -->

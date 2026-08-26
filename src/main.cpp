@@ -1552,7 +1552,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
     if(g_scale < 0.62) g_scale = 0.62;
     if(g_scale > 2.00) g_scale = 2.00;
 
-    applyTheme(getSetting(L"theme",L"light")==L"dark");
+    // v1.93: three themes — light / dark / neon
+    {
+        std::wstring tn=getSetting(L"theme",L"light");
+        if(tn==L"dark")       applyThemeMode(TM_DARK);
+        else if(tn==L"neon")  applyThemeMode(TM_NEON);
+        else                  applyThemeMode(TM_LIGHT);
+    }
     buildFonts();
     registerFlatButton();
 

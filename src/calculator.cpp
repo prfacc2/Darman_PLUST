@@ -18,6 +18,7 @@ struct CalcState {
     HWND btns[24];
     int  hot;                 // hovered button index (-1)
     int  press;               // pressed index
+    int  flash;               // v1.93: keyboard press flash index (-1 = none)
 };
 
 // layout: 6 rows x 4 cols
@@ -30,6 +31,42 @@ static const wchar_t* KEYS[24] = {
     L"\u221A", L"x\u00B2", L"1/x", L"M"   // extra row at top? keep 5 rows -> use 20
 };
 // We'll actually use 5 rows of 4 = 20 keys: indices 0..19
+
+// v1.93: map a typed character to the KEYS[] button index it corresponds to,
+// so a keyboard press can flash the matching on-screen button. Returns -1 when
+// the character is not a calculator key. (VK-only keys like Return/Backspace/
+// Delete are flashed directly from WM_KEYDOWN — they never arrive here.)
+static int keyToIndex(wchar_t c){
+    switch(c){
+        case L'0': return 17;
+        case L'1': return 12;
+        case L'2': return 13;
+        case L'3': return 14;
+        case L'4': return 8;
+        case L'5': return 9;
+        case L'6': return 10;
+        case L'7': return 4;
+        case L'8': return 5;
+        case L'9': return 6;
+        case L'+': return 15;
+        case L'-': return 11;
+        case L'*': return 7;
+        case L'/': return 3;
+        case L'=': return 19;
+        case L'.': return 18;
+        case L'%': return 2;
+        default:   return -1;
+    }
+}
+
+// v1.93: briefly highlight the on-screen button that matches a keyboard press.
+// SetTimer with id 99 (re)arms a 120ms timer; WM_TIMER clears the flash.
+static void calcFlash(HWND h, CalcState* s, int idx){
+    if(!s || idx<0) return;
+    s->flash = idx;
+    InvalidateRect(h, NULL, FALSE);
+    SetTimer(h, 99, 120, NULL);
+}
 
 static double toNum(const std::wstring& s){
     if(s.empty()) return 0;
@@ -194,6 +231,7 @@ static LRESULT CALLBACK calcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         s = new CalcState();
         s->display=L"0"; s->acc=0; s->pendOp=0; s->fresh=true; s->err=false;
         s->hot=-1; s->press=-1;
+        s->flash=-1;
         SetWindowLongPtrW(h,GWLP_USERDATA,(LONG_PTR)s);
         return 0; }
     case WM_DESTROY: delete s; break;
@@ -224,28 +262,49 @@ static LRESULT CALLBACK calcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(!s) break;
         switch(w){
         case VK_ESCAPE: DestroyWindow(h); return 0;
-        case VK_RETURN: calcKey(h,s,L"="); return 0;
-        case VK_BACK:   calcKey(h,s,L"\u232B"); return 0;
-        case VK_DELETE: calcKey(h,s,L"C"); return 0;
-        case VK_ADD:      calcKey(h,s,L"+"); return 0;
-        case VK_SUBTRACT: calcKey(h,s,L"-"); return 0;
-        case VK_MULTIPLY: calcKey(h,s,L"*"); return 0;
-        case VK_DIVIDE:   calcKey(h,s,L"/"); return 0;
-        case VK_DECIMAL:  calcKey(h,s,L"."); return 0;
+        case VK_RETURN:   calcFlash(h,s,19); calcKey(h,s,L"="); return 0;
+        case VK_BACK:     calcFlash(h,s,1);  calcKey(h,s,L"\u232B"); return 0;
+        case VK_DELETE:   calcFlash(h,s,0);  calcKey(h,s,L"C"); return 0;
+        case VK_ADD:      calcFlash(h,s,15); calcKey(h,s,L"+"); return 0;
+        case VK_SUBTRACT: calcFlash(h,s,11); calcKey(h,s,L"-"); return 0;
+        case VK_MULTIPLY: calcFlash(h,s,7);  calcKey(h,s,L"*"); return 0;
+        case VK_DIVIDE:   calcFlash(h,s,3);  calcKey(h,s,L"/"); return 0;
+        case VK_DECIMAL:  calcFlash(h,s,18); calcKey(h,s,L"."); return 0;
         }
-        if(w>=L'0'&&w<=L'9' && !(GetKeyState(VK_SHIFT)&0x8000))
-            { calcKey(h,s,std::wstring(1,(wchar_t)w)); return 0; }
-        if(w>=VK_NUMPAD0 && w<=VK_NUMPAD9)
-            { calcKey(h,s,std::wstring(1,(wchar_t)(L'0'+w-VK_NUMPAD0))); return 0; }
+        if(w>=L'0'&&w<=L'9' && !(GetKeyState(VK_SHIFT)&0x8000)){
+            calcFlash(h,s,keyToIndex((wchar_t)w));
+            calcKey(h,s,std::wstring(1,(wchar_t)w)); return 0;
+        }
+        if(w>=VK_NUMPAD0 && w<=VK_NUMPAD9){
+            wchar_t d=(wchar_t)(L'0'+w-VK_NUMPAD0);
+            calcFlash(h,s,keyToIndex(d));
+            calcKey(h,s,std::wstring(1,d)); return 0;
+        }
         break; }
     case WM_CHAR: {
         if(!s) break;
         wchar_t c=(wchar_t)w;
-        if(c==L'+'||c==L'-'||c==L'*'||c==L'/') calcKey(h,s,std::wstring(1,c));
-        else if(c==L'.'||c==L',') calcKey(h,s,L".");
-        else if(c==L'%') calcKey(h,s,L"%");
-        else if(c==L'=') calcKey(h,s,L"=");
+        if(c==L'+'||c==L'-'||c==L'*'||c==L'/'){
+            calcFlash(h,s,keyToIndex(c));
+            calcKey(h,s,std::wstring(1,c));
+        }
+        else if(c==L'.'||c==L','){
+            calcFlash(h,s,18);
+            calcKey(h,s,L".");
+        }
+        else if(c==L'%'){
+            calcFlash(h,s,2);
+            calcKey(h,s,L"%");
+        }
+        else if(c==L'='){
+            calcFlash(h,s,19);
+            calcKey(h,s,L"=");
+        }
         return 0; }
+    case WM_TIMER:
+        // v1.93: end the keyboard-press flash after its 120ms window.
+        if(w==99 && s){ KillTimer(h,99); s->flash=-1; InvalidateRect(h,NULL,FALSE); }
+        return 0;
     case WM_PAINT: {
         if(!s){ PAINTSTRUCT ps; BeginPaint(h,&ps); EndPaint(h,&ps); return 0; }
         PAINTSTRUCT ps; HDC dc0=BeginPaint(h,&ps);
@@ -293,6 +352,7 @@ static LRESULT CALLBACK calcProc(HWND h, UINT m, WPARAM w, LPARAM l){
             const wchar_t* k = KEYS[i];
             bool hot = (i==s->hot);
             bool pressed = (i==s->press);
+            bool flashed = (i==s->flash);   // v1.93: keyboard-press flash
 
             // base fill (top/bottom gradient stops) + ink + border per category
             COLORREF fillTop, fillBot, txt, border;
@@ -328,10 +388,21 @@ static LRESULT CALLBACK calcProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 }
             }
 
+            // v1.93: keyboard-press flash — a distinct accent tint so the operator
+            // can see which on-screen key their keystroke landed on. This is
+            // separate from a mouse press (which sinks + darkens the button); the
+            // flash keeps the button in place and just washes it toward the accent.
+            if(flashed && !pressed){
+                fillTop = blendColor(fillBot, g_theme.accent, 40);
+                fillBot = blendColor(fillBot, g_theme.accent, 20);
+            }
+
             RECT cell = cells[i];
 
-            // elevation: equals always casts an accent glow; others lift on hover
-            if(!pressed){
+            // elevation: equals always casts an accent glow; others lift on hover.
+            // A flashed key also drops its shadow so the accent wash reads as
+            // "active" rather than floating.
+            if(!pressed && !flashed){
                 if(kt==CK_EQ)
                     gpShadowColor(dc, cell, keyRad, S(hot?8:6), hot?115:85, g_theme.accent);
                 else if(hot)

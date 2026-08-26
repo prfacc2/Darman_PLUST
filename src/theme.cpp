@@ -6,39 +6,35 @@
 
 Theme   g_theme;
 bool    g_dark = false;
+ThemeMode g_themeMode = TM_LIGHT;   // v1.93: light / dark / neon
 HBRUSH  g_brBg=0, g_brSurface=0, g_brSurface2=0, g_brInput=0;
 //  v1.8.0: distinct non-red "attention" accent (violet) for change-requests.
 COLORREF g_infoAccent  = RGB(124, 92, 230);
 COLORREF g_infoAccent2 = RGB(98, 70, 210);
 
 // ============================================================================
-//  v1.92.0 STANDARDIZED DESIGN PALETTE — "DarmanPlus Medical Glass"
-//  Two themes: Light (روشن) and Dark (مشکی). The calm/warm palettes were
-//  retired in v1.77. This palette is the SINGLE source of truth for the C++
-//  native UI; the embedded HTML surfaces (assets/admission/admission.css)
-//  mirror these exact hex values. When you change a colour here, update the
-//  matching token in admission.css AND docs/DESIGN_SYSTEM.md.
+//  v1.93.0 STANDARDIZED DESIGN PALETTE — "Soft Medical Glassmorphism"
+//  Three themes: Light (روشن), Dark (مشکی), Neon (نئونی).
 //
-//  LIGHT elevation ladder (V = relative lightness, 0-255):
-//    bg2   181  #B5C1D4  page bottom (deepest — gives the page body)
-//    bg    195  #C3CDDD  page
-//    surface2 221  #DDE4EF  wells / bars / list backgrounds
-//    border 172  #A8B5CC  crisp hairline (CLEARLY visible, not invisible)
-//    inputBg 226  #E2E8F2  input wells (recessed, darker than surface)
-//    surface 241  #F1F4F9  cards (off-white, NOT pure #FFF → glassmorphism depth)
-//    surfaceTop 247  #F7F9FC  soft top-light on cards
-//    header 208-199  #D0D9E8→#BAC6D8  frosted header band
+//  LIGHT — Soft Medical Glassmorphism / Clean Clinical Glass UI:
+//    bg #E8EEF5 Ice White · surface #F2F7FC glass · border #B8C8DC soft blue
+//    text #0D1B2A dark navy · accent #2D5FE6 Medical Blue (slight purple hint)
+//
+//  DARK — deep charcoal, vivid blue, bright text
+//
+//  NEON — Cyberpunk + Retro Futurism: neon cyan/magenta/green on deep blue-black
 //
 //  Design rules (see docs/DESIGN_SYSTEM.md):
-//    • surface is NEVER pure white — off-white #F1F4F9 gives glass depth.
-//    • border is always ≥40 lightness points from surface → visible hairline.
-//    • text is ≥140 lightness points from surface → high contrast (WCAG AA+).
-//    • accent is royal blue #2B48CC; never use purple/violet for admission cards.
-//    • success/danger/warn are the ONLY semantic colours; use them consistently.
+//    • surface is NEVER pure white — gives glassmorphism depth.
+//    • border is always visible (≥40 lightness from surface).
+//    • text is high contrast (≥140 lightness from surface, WCAG AA+).
+//    • success/danger/warn are the ONLY semantic colours.
+//    • On dark/neon themes, text/labels are always light/white — no conflicts.
 // ============================================================================
-void applyTheme(bool dark){
-    g_dark = dark;
-    if(dark){
+void applyThemeMode(ThemeMode mode){
+    g_themeMode = mode;
+    g_dark = (mode != TM_LIGHT);   // neon is dark-based so g_dark checks still work
+    if(mode==TM_DARK){
         // ---- Deep-charcoal dark palette. Near-black page with layered surfaces
         //      that step up in lightness for real depth. Borders are clearly
         //      visible. Labels/text are bright. Accent is a vivid blue. ----
@@ -67,38 +63,65 @@ void applyTheme(bool dark){
         g_theme.headerBot   = RGB(0x07, 0x0A, 0x0F);
         g_infoAccent  = RGB(0xA5, 0x8A, 0xF0);   // soft violet (distinct, non-red)
         g_infoAccent2 = RGB(0x8B, 0x6E, 0xE0);
+    } else if(mode==TM_NEON){
+        // ---- NEON palette — Cyberpunk + Retro Futurism:
+        //      Deep blue-black backgrounds with neon cyan/magenta/green accents.
+        //      Glowing borders, bright text, dark text on neon buttons. ----
+        g_theme.bg          = RGB(0x0A, 0x0E, 0x1A); // #0A0E1A deep blue-black
+        g_theme.bg2         = RGB(0x08, 0x08, 0x12); // gradient bottom
+        g_theme.surface     = RGB(0x12, 0x18, 0x28); // #121828 dark blue card
+        g_theme.surfaceTop  = RGB(0x1A, 0x22, 0x38); // card gradient top
+        g_theme.surface2    = RGB(0x0E, 0x14, 0x20); // bars / wells
+        g_theme.border      = RGB(0x2A, 0x34, 0x58); // #2A3458 neon-blue border
+        g_theme.text        = RGB(0xE0, 0xF0, 0xFF); // bright cyan-white text
+        g_theme.textDim     = RGB(0x80, 0x90, 0xB0); // readable dim
+        g_theme.labelInk    = RGB(0xB0, 0xC4, 0xE0); // light labels
+        g_theme.sectionInk  = RGB(0xE0, 0xF0, 0xFF); // bright titles
+        g_theme.accent      = RGB(0x00, 0xF0, 0xFF); // #00F0FF neon cyan
+        g_theme.accent2     = RGB(0x00, 0x80, 0xFF); // electric blue gradient end
+        g_theme.accentHover = RGB(0x40, 0xFF, 0xFF);
+        g_theme.accentText  = RGB(0x0A, 0x0E, 0x1A); // dark text on neon buttons
+        g_theme.danger      = RGB(0xFF, 0x00, 0x66); // neon pink-red
+        g_theme.dangerHover = RGB(0xFF, 0x33, 0x88);
+        g_theme.success     = RGB(0x00, 0xFF, 0x88); // neon green
+        g_theme.warn        = RGB(0xFF, 0xAA, 0x00); // neon orange
+        g_theme.inputBg     = RGB(0x1A, 0x24, 0x38); // dark blue input
+        g_theme.inputText   = RGB(0xE0, 0xF0, 0xFF);
+        g_theme.hover       = RGB(0x1E, 0x2A, 0x40);
+        g_theme.headerTop   = RGB(0x0E, 0x14, 0x28); // dark blue header
+        g_theme.headerBot   = RGB(0x08, 0x08, 0x10);
+        g_infoAccent  = RGB(0xFF, 0x00, 0xFF);   // neon magenta
+        g_infoAccent2 = RGB(0xCC, 0x00, 0xCC);
     } else {
-        // ---- Premium LIGHT palette "DarmanPlus Medical Glass" (v1.92.0):
-        //      A genuinely LAYERED light theme — NOT a washed-out white sheet.
-        //      The page sits deep (#C3CDDD) so off-white cards (#F1F4F9) extrude
-        //      with real depth and crisp borders (#A8B5CC) are clearly visible.
-        //      Glassmorphism: surface is off-white (never pure #FFF), borders
-        //      are always visible, and the accent is a saturated royal blue.
-        //      Text contrast is high (near-WCAG-AAA on card surface). ----
-        g_theme.bg          = RGB(0xC3, 0xCD, 0xDD); // #C3CDDD deep blue-gray page
-        g_theme.bg2         = RGB(0xB5, 0xC1, 0xD4); // #B5C1D4 page gradient bottom
-        g_theme.surface     = RGB(0xF1, 0xF4, 0xF9); // #F1F4F9 off-white cards (glass)
-        g_theme.surfaceTop  = RGB(0xF7, 0xF9, 0xFC); // soft top-light on cards
-        g_theme.surface2    = RGB(0xDD, 0xE4, 0xEF); // #DDE4EF wells / bars
-        g_theme.border      = RGB(0xA8, 0xB5, 0xCC); // #A8B5CC CRISP visible edge
-        g_theme.text        = RGB(0x1A, 0x24, 0x35); // #1A2435 primary ink (high contrast)
-        g_theme.textDim     = RGB(0x5C, 0x6B, 0x7E); // #5C6B7E muted
-        g_theme.labelInk    = RGB(0x2E, 0x3D, 0x52); // #2E3D52 readable labels
-        g_theme.sectionInk  = RGB(0x0D, 0x17, 0x26); // #0D1726 strong titles
-        g_theme.accent      = RGB(0x2B, 0x48, 0xCC); // #2B48CC royal blue
-        g_theme.accent2     = RGB(0x42, 0x63, 0xE8); // #4263E8 gradient end / hover
-        g_theme.accentHover = RGB(0x42, 0x63, 0xE8); // hover
+        // ---- Soft Medical Glassmorphism (v1.93.0):
+        //      Ice White / Mist Blue background, semi-transparent glass panels,
+        //      Medical Blue accent with a whisper of purple, soft spread shadows,
+        //      very subtle white→ice-blue gradients. Text is dark navy (not black).
+        //      Clean, clinical, premium — NOT a flat white sheet. ----
+        g_theme.bg          = RGB(0xE8, 0xEE, 0xF5); // #E8EEF5 Ice White / Mist Blue
+        g_theme.bg2         = RGB(0xDC, 0xE6, 0xF2); // #DCE6F2 gradient bottom
+        g_theme.surface     = RGB(0xF2, 0xF7, 0xFC); // #F2F7FC glass card (NOT pure white)
+        g_theme.surfaceTop  = RGB(0xF8, 0xFB, 0xFD); // soft top-light
+        g_theme.surface2    = RGB(0xE0, 0xE8, 0xF2); // #E0E8F2 wells / bars
+        g_theme.border      = RGB(0xB8, 0xC8, 0xDC); // #B8C8DC soft blue-tinted visible border
+        g_theme.text        = RGB(0x0D, 0x1B, 0x2A); // #0D1B2A dark navy (not black)
+        g_theme.textDim     = RGB(0x4A, 0x5A, 0x72); // #4A5A72 muted
+        g_theme.labelInk    = RGB(0x2D, 0x3E, 0x54); // #2D3E54 readable labels
+        g_theme.sectionInk  = RGB(0x0A, 0x15, 0x20); // #0A1520 strong titles
+        g_theme.accent      = RGB(0x2D, 0x5F, 0xE6); // #2D5FE6 Medical Blue (slight purple hint)
+        g_theme.accent2     = RGB(0x45, 0x70, 0xF0); // #4570F0 lighter gradient end
+        g_theme.accentHover = RGB(0x45, 0x70, 0xF0); // hover
         g_theme.accentText  = RGB(0xFF, 0xFF, 0xFF);
         g_theme.danger      = RGB(0xDC, 0x26, 0x26); // #DC2626
         g_theme.dangerHover = RGB(0xEF, 0x44, 0x44);
         g_theme.success     = RGB(0x05, 0x96, 0x69); // #059669
         g_theme.warn        = RGB(0xD9, 0x77, 0x06); // #D97706 warning
-        g_theme.inputBg     = RGB(0xE2, 0xE8, 0xF2); // #E2E8F2 tinted well (recessed)
-        g_theme.inputText   = RGB(0x1A, 0x24, 0x35);
-        g_theme.hover       = RGB(0xD6, 0xDE, 0xF0); // soft accent wash on hover
-        // frosted header band with real depth (not white)
-        g_theme.headerTop   = RGB(0xD0, 0xD9, 0xE8); // #D0D9E8 frosted top
-        g_theme.headerBot   = RGB(0xBA, 0xC6, 0xD8); // #BAC6D8 frosted bottom
+        g_theme.inputBg     = RGB(0xE8, 0xEF, 0xF8); // #E8EFF8 ice blue tint well
+        g_theme.inputText   = RGB(0x0D, 0x1B, 0x2A);
+        g_theme.hover       = RGB(0xD8, 0xE4, 0xF4); // soft accent wash
+        // frosted ice-blue header band
+        g_theme.headerTop   = RGB(0xDD, 0xE8, 0xF5); // #DDE8F5 frosted top
+        g_theme.headerBot   = RGB(0xC5, 0xD2, 0xE5); // #C5D2E5 frosted bottom
         g_infoAccent  = RGB(0x6D, 0x4D, 0xD6);    // #6D4DD6 violet (distinct, non-red)
         g_infoAccent2 = RGB(0x5A, 0x3C, 0xC4);
     }
@@ -110,7 +133,12 @@ void applyTheme(bool dark){
     g_brSurface  = CreateSolidBrush(g_theme.surface);
     g_brSurface2 = CreateSolidBrush(g_theme.surface2);
     g_brInput    = CreateSolidBrush(g_theme.inputBg);
-    setSetting(L"theme", dark ? L"dark" : L"light");
+    const wchar_t* tn = (mode==TM_DARK) ? L"dark" : (mode==TM_NEON) ? L"neon" : L"light";
+    setSetting(L"theme", tn);
+}
+// Backward-compatible wrapper: bool dark → TM_DARK/TM_LIGHT
+void applyTheme(bool dark){
+    applyThemeMode(dark ? TM_DARK : TM_LIGHT);
 }
 static BOOL CALLBACK invProc(HWND h, LPARAM){
     SendMessageW(h, WM_APP_THEME, 0, 0);     // let controls re-color themselves

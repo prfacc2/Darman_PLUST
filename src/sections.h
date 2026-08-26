@@ -25,7 +25,12 @@ struct Section {
     // belongs to the section whose id == parent_id; 0 means it is a top-level
     // section. Stored as an optional 9th column so older files load unchanged.
     int          parent_id;
-    Section():id(0),is_active(1),parent_id(0){}
+    // v1.93: «ثبت پذیرش در صندوق». cashier_tab=1 means this section appears as a
+    // tab in the cashier (صندوق) page; default 0/OFF so existing sections do not
+    // surface as cashier tabs until the manager enables it. Stored as an optional
+    // 10th column so older files load unchanged (cashier_tab stays 0).
+    int          cashier_tab;
+    Section():id(0),is_active(1),parent_id(0),cashier_tab(0){}
 };
 
 // Stable durable CATEGORY codes (§7). Section display names may change; these

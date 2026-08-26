@@ -687,19 +687,27 @@
      عنوان انجام دهنده» دارند (پیش‌فرض برای همه فعال است).
      قبل از این نسخه کمبوی #perfname هرگز پر نمی‌شد — از صفر وصل شده است.
      ---------------------------------------------------------------------- */
-  function fillPerformers() {
+  /* v1.93: fillPerformers accepts optional folded rows from the init response.
+     When rows are supplied we render directly (no bridge round-trip); with no
+     argument we fall back to the standalone 'doctor.performers' call. */
+  function fillPerformers(rows) {
     var sel = $('perfname'); if (!sel) return;
-    Bridge.call('doctor.performers', {}).then(function (r) {
-      var rows = (r && r.rows) || [];
-      state.performers = rows;
+    function applyRows(rs) {
+      state.performers = rs || [];
       var h = '<option value="">— انتخاب —</option>', i;
-      for (i = 0; i < rows.length; i++) {
-        var nm = rows[i].name || '';
-        var label = nm + (rows[i].specialty ? ' — ' + rows[i].specialty : '');
+      for (i = 0; i < state.performers.length; i++) {
+        var nm = state.performers[i].name || '';
+        var label = nm + (state.performers[i].specialty ? ' — ' + state.performers[i].specialty : '');
         h += '<option value="' + esc(nm) + '">' + esc(label) + '</option>';
       }
       sel.innerHTML = h;
-    });
+    }
+    if (rows) { applyRows(rows); return; }
+    try {
+      Bridge.call('doctor.performers', {}).then(function (r) {
+        applyRows((r && r.rows) || []);
+      });
+    } catch (e) { /* ignore — combo stays empty */ }
   }
   /* picking a performer name → mirror its code into the numeric code box.
      Convention matches selectDoctor() on this same page (and the native form):
@@ -2423,14 +2431,26 @@
     setText($('cashStatUnpaid'), toFa(st.unpaid || 0));
     setText($('cashStatQ'), toFa(st.queue || 0));
     var sh = d.shift || {};
-    var meta = 'شیفت شروع نشده';
-    if (sh.open) {
-      meta = 'شیفت باز از ' + toFa(sh.startTime || '') +
-             (sh.startJalali ? ' — ' + toFa(sh.startJalali) : '');
-    } else if (sh.startTime) {
-      meta = 'شروع ' + toFa(sh.startTime || '') + ' / پایان ' + toFa(sh.endTime || '');
+    /* v1.93: restructure the shift meta into TWO lines (date / time) and move
+       #cashShiftMeta into the .cash-actions row so it sits beside the shift
+       buttons. Done dynamically here because the JS owns layout on this surface. */
+    var meta = $('cashShiftMeta');
+    var actions = document.querySelector('.cash-actions');
+    if (meta && actions && meta.parentNode !== actions) {
+      actions.appendChild(meta);
+      meta.className = 'cash-shift-meta-inline';
     }
-    setText($('cashShiftMeta'), meta);
+    var dateLine = '', timeLine = '';
+    if (sh.open) {
+      dateLine = toFa(sh.startJalali || '');
+      timeLine = 'شروع: ' + toFa(sh.startTime || '');
+    } else if (sh.startTime) {
+      dateLine = toFa(sh.startJalali || '');
+      timeLine = toFa(sh.startTime || '') + ' — ' + toFa(sh.endTime || '');
+    } else {
+      dateLine = 'شیفت شروع نشده';
+    }
+    if (meta) meta.innerHTML = '<div class="cash-meta-date">' + dateLine + '</div><div class="cash-meta-time">' + timeLine + '</div>';
 
     /* Shift button enable/disable: when a shift is OPEN the start button is
        disabled and the end button enabled, and vice-versa when CLOSED. Only
@@ -2732,6 +2752,17 @@
       if (d.time) setText($('tbClock'), toFa(d.time));
       if (d.date) setText($('tbDate'), toFa(d.date));
     });
+    // v1.93: live theme switching — C++ pushes 'theme.changed' when the user
+    // picks light/dark/neon in settings. Update the body class in place so
+    // all HTML surfaces reflect the new theme without a page reload.
+    Bridge.on('theme.changed', function (d) {
+      var b = document.body;
+      if (!b) return;
+      b.className = String(b.className || '')
+        .replace(/\btheme-(dark|calm|warm|neon)\b/g, '').replace(/\s+/g, ' ');
+      if (d.theme === 'dark') b.className += ' theme-dark';
+      else if (d.theme === 'neon') b.className += ' theme-neon';
+    });
     Bridge.on('insurance.update', function (d) {
       if (d.main) { state.insurances = d.main; fillSelect($('insMain'), d.main); }
       if (d.supp) { state.supp = d.supp; fillSelect($('insSupp'), d.supp); }
@@ -2782,14 +2813,289 @@
 
   function fillSelect(sel, arr) {
     if (!sel) return;
-    var cur = sel.selectedIndex, i;
-    sel.innerHTML = '';
+    var cur = sel.selectedIndex, i, h = '';
     for (i = 0; i < arr.length; i++) {
-      var opt = document.createElement('option');
-      opt.appendChild(document.createTextNode(arr[i].name));
-      sel.appendChild(opt);
+      h += '<option value="' + esc(String(arr[i].id || i)) + '">' + esc(arr[i].name || '') + '</option>';
     }
-    if (cur >= 0 && cur < arr.length) sel.selectedIndex = cur; else sel.selectedIndex = 0;
+    sel.innerHTML = h;
+    if (cur >= 0 && cur < sel.options.length) sel.selectedIndex = cur;
+  }
+
+  /* ==========================================================================
+     v1.93 — PORTAL MESSAGE WORKDESK
+     The portal surface lists clinic messages (from the C++ message store) with
+     severity stripes, unread dots, pin/save/print/reply/delete actions, a
+     hamburger drawer (inbox / archive / pinned) and live search. Every bridge
+     verb is wrapped in try-catch so a missing C++ handler never crashes the UI.
+     ES5-only (var/function/string concat). Drives the #portalPanel markup the
+     CSS agent adds to index.html; if those elements are absent yet, every
+     helper no-ops safely ($ returns null -> guarded).
+     ========================================================================== */
+  var portal = {
+    rows: [],        /* inbox messages (portal.messages.list) */
+    saved: [],       /* archived messages (portal.messages.list_saved) */
+    view: 'inbox',   /* 'inbox' | 'archive' | 'pinned' */
+    detailIdx: -1,   /* idx of the message open in #portalDetail */
+    q: '',           /* current search filter (lower-cased) */
+    wired: false     /* one-time DOM/bridge wiring guard */
+  };
+
+  /* severity: 0 = normal, 1 = urgent (amber), 2 = critical (red) */
+  function portalStripe(type) {
+    var t = Number(type) || 0;
+    if (t === 2) return 'portal-sev-crit';
+    if (t === 1) return 'portal-sev-urgent';
+    return 'portal-sev-normal';
+  }
+  function portalStripeColor(type) {
+    var t = Number(type) || 0;
+    if (t === 2) return '#e53935';
+    if (t === 1) return '#ffb300';
+    return '#3b82f6';
+  }
+  function portalSeverityLabel(type) {
+    var t = Number(type) || 0;
+    if (t === 2) return 'بحرانی';
+    if (t === 1) return 'فوری';
+    return 'عادی';
+  }
+
+  /* unseen badge (#portalBadge) — fed by list responses and 'dash.unread' */
+  function portalSetUnread(n) {
+    var fa = 0; try { fa = (n | 0); } catch (e) { fa = 0; }
+    var b = $('portalBadge');
+    if (b) { b.textContent = toFa(fa); b.style.display = fa > 0 ? '' : 'none'; }
+  }
+
+  function portalTileHtml(m) {
+    var pv = String(m.text || '').replace(/\s+/g, ' ');
+    pv = pv.replace(/^\s+|\s+$/g, '');
+    if (pv.length > 140) pv = pv.substring(0, 140) + '\u2026';   /* 2-line preview */
+    var pin = m.pinned
+      ? '<span class="portal-tile-pin" style="color:#f5a623" title="سنجاق‌شده">\u2605</span>'
+      : '';
+    var dot = (!m.seen)
+      ? '<span class="portal-unread-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e15a5a;margin-right:6px"></span>'
+      : '';
+    return '<div class="portal-tile ' + portalStripe(m.type) + '" data-idx="' + esc(m.idx) + '">' +
+      '<span class="portal-stripe" style="background-color:' + portalStripeColor(m.type) + '"></span>' +
+      '<div class="portal-tile-main">' +
+        '<div class="portal-tile-row">' + dot +
+          '<span class="portal-tile-from">' + esc(m.from || '—') + '</span>' + pin +
+        '</div>' +
+        '<div class="portal-tile-date">' + esc(m.date || m.time || '') + '</div>' +
+        '<div class="portal-tile-prev">' + esc(pv) + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* render the active view (inbox / archive / pinned) into #portalList, applying
+     the live search filter. No bridge call — works on cached rows. */
+  function portalRender() {
+    var list = $('portalList'); if (!list) return;
+    var src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    var q = portal.q, out = [], i, m, hay;
+    for (i = 0; i < src.length; i++) {
+      m = src[i];
+      if (portal.view === 'pinned' && !m.pinned) continue;
+      if (q) {
+        hay = String(m.from || '') + ' ' + String(m.text || '');
+        if (hay.toLowerCase().indexOf(q) < 0) continue;
+      }
+      out.push(m);
+    }
+    if (!out.length) {
+      list.innerHTML = '<div class="portal-empty">پیامی یافت نشد</div>';
+      return;
+    }
+    var h = '', k;
+    for (k = 0; k < out.length; k++) h += portalTileHtml(out[k]);
+    list.innerHTML = h;
+  }
+
+  /* fetch the active view from C++ then render. inbox/pinned read the live list
+     (pinned filters locally); archive reads the saved list. */
+  function portalLoad() {
+    if (portal.view === 'archive') {
+      try {
+        Bridge.call('portal.messages.list_saved', {}).then(function (r) {
+          portal.saved = (r && r.rows) || [];
+          portalRender();
+          if (r && r.unseen != null) portalSetUnread(r.unseen);
+        }, function () { portalRender(); });
+      } catch (e) { portalRender(); }
+      return;
+    }
+    try {
+      Bridge.call('portal.messages.list', {}).then(function (r) {
+        portal.rows = (r && r.rows) || [];
+        portalRender();
+        if (r && r.unseen != null) portalSetUnread(r.unseen);
+      }, function () { portalRender(); });
+    } catch (e) { portalRender(); }
+  }
+
+  function portalCurrentMsg() {
+    var src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    var i;
+    for (i = 0; i < src.length; i++) {
+      if (Number(src[i].idx) === Number(portal.detailIdx)) return src[i];
+    }
+    return null;
+  }
+
+  function portalCloseDetail() {
+    portal.detailIdx = -1;
+    var det = $('portalDetail'); if (det) det.innerHTML = '';
+  }
+
+  function portalToggleReply() {
+    var box = $('portalReplyBox'); if (!box) return;
+    var show = box.style.display === 'none' || !box.style.display;
+    box.style.display = show ? '' : 'none';
+    var ta = $('portalReplyText');
+    if (ta && show) { try { ta.focus(); } catch (e) {} }
+  }
+
+  function portalSendReply() {
+    var ta = $('portalReplyText'); if (!ta) return;
+    var text = trimStr(ta.value);
+    if (!text) { toast('متن پاسخ خالی است', 'err'); return; }
+    try {
+      Bridge.call('portal.message.reply', { idx: portal.detailIdx, text: text }).then(function () {
+        toast('پاسخ ارسال شد', 'ok');
+        portalCloseDetail();
+        portalLoad();
+      }, function () { toast('ارسال پاسخ ناموفق بود', 'err'); });
+    } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
+  }
+
+  /* open a full message in #portalDetail and mark it seen immediately (req. H) */
+  function portalDetail(idx) {
+    var det = $('portalDetail'); if (!det) return;
+    var m = null, i, src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    for (i = 0; i < src.length; i++) { if (Number(src[i].idx) === Number(idx)) { m = src[i]; break; } }
+    portal.detailIdx = m ? Number(m.idx) : -1;
+    if (!m) { det.innerHTML = '<div class="portal-empty">پیام یافت نشد</div>'; return; }
+    var html = '<div class="portal-detail">' +
+      '<div class="portal-detail-head">' +
+        '<button type="button" class="portal-act" data-act="back">بازگشت</button>' +
+        '<span class="portal-detail-sev ' + portalStripe(m.type) + '" style="background-color:' + portalStripeColor(m.type) + '">' + esc(portalSeverityLabel(m.type)) + '</span>' +
+      '</div>' +
+      '<div class="portal-detail-from">از: ' + esc(m.from || '—') + '</div>' +
+      '<div class="portal-detail-to">به: ' + esc(m.to || '—') + '</div>' +
+      '<div class="portal-detail-date">' + esc(m.date || '') + '</div>' +
+      '<div class="portal-detail-time">' + esc(m.time || '') + '</div>' +
+      '<div class="portal-detail-body">' + esc(m.text || '') + '</div>' +
+      '<div class="portal-detail-actions">' +
+        '<button type="button" class="portal-act" data-act="reply">پاسخ</button>' +
+        '<button type="button" class="portal-act" data-act="pin">' + (m.pinned ? 'برداشتن سنجاق' : 'سنجاق') + '</button>' +
+        '<button type="button" class="portal-act" data-act="save">ذخیره</button>' +
+        '<button type="button" class="portal-act" data-act="print">چاپ</button>' +
+        '<button type="button" class="portal-act portal-act-del" data-act="delete">حذف</button>' +
+      '</div>' +
+      '<div class="portal-reply" id="portalReplyBox" style="display:none">' +
+        '<textarea class="portal-reply-text" id="portalReplyText" rows="3"></textarea>' +
+        '<button type="button" class="portal-act" data-act="send">ارسال</button>' +
+      '</div>' +
+    '</div>';
+    det.innerHTML = html;
+    try { Bridge.call('portal.messages.seenone', { idx: portal.detailIdx }); } catch (e) {}
+    m.seen = true;            /* locally clear the unread dot on re-render */
+  }
+
+  /* delegated click handler for the detail action buttons */
+  function portalDetailClick(e) {
+    e = e || window.event;
+    var det = $('portalDetail'); if (!det) return;
+    var tgt = e.target || e.srcElement;
+    var btn = findUp(tgt, 'data-act', det);
+    if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    var idx = portal.detailIdx;
+    if (act === 'back') { portalCloseDetail(); }
+    else if (act === 'reply') { portalToggleReply(); }
+    else if (act === 'send') { portalSendReply(); }
+    else if (act === 'pin') {
+      var cur = portalCurrentMsg();
+      var pin = cur ? !cur.pinned : true;
+      try { Bridge.call('portal.messages.pin', { idx: idx, pin: pin }); } catch (e2) {}
+      if (cur) cur.pinned = pin;
+      defer(portalLoad);
+    } else if (act === 'save') {
+      try { Bridge.call('portal.messages.save', { idx: idx }); } catch (e2) {}
+      toast('پیام ذخیره شد', 'ok');
+    } else if (act === 'print') {
+      try { Bridge.call('portal.message.print', { idx: idx }); } catch (e2) {}
+    } else if (act === 'delete') {
+      try { Bridge.call('portal.messages.delete', { idx: idx }); } catch (e2) {}
+      toast('پیام حذف شد', 'ok');
+      portalCloseDetail();
+      defer(portalLoad);
+    }
+  }
+
+  function portalToggleDrawer() {
+    var dr = $('portalDrawer'); if (!dr) return;
+    var cn = String(dr.className || '');
+    if (/(^|\s)open(\s|$)/.test(cn)) dr.className = cn.replace(/\s*open/g, '');
+    else dr.className = cn + ' open';
+  }
+
+  function portalSwitchView(view) {
+    portal.view = view || 'inbox';
+    portal.q = '';
+    var s = $('portalSearch'); if (s) s.value = '';
+    var dr = $('portalDrawer'); if (dr) dr.className = String(dr.className || '').replace(/\s*open/g, '');
+    portalCloseDetail();
+    portalLoad();
+  }
+
+  function portalOnSearch() {
+    var s = $('portalSearch'); if (!s) return;
+    portal.q = trimStr(s.value).toLowerCase();
+    portalRender();
+  }
+
+  /* one-time wiring of burger / list / detail / search / drawer + live events */
+  function portalWire() {
+    if (portal.wired) return;
+    portal.wired = true;
+    try { on($('portalBurger'), 'click', portalToggleDrawer); } catch (e) {}
+    try {
+      on($('portalList'), 'click', function (e) {
+        e = e || window.event;
+        var tgt = e.target || e.srcElement;
+        var tile = findUp(tgt, 'data-idx', $('portalList'));
+        if (tile) portalDetail(tile.getAttribute('data-idx'));
+      });
+    } catch (e) {}
+    try { on($('portalDetail'), 'click', portalDetailClick); } catch (e) {}
+    try {
+      on($('portalSearch'), 'input', portalOnSearch);
+      on($('portalSearch'), 'keyup', portalOnSearch);
+    } catch (e) {}
+    /* drawer items: any [data-view] inside #portalDrawer (inbox/archive/pinned) */
+    try {
+      var dr = $('portalDrawer');
+      if (dr && dr.querySelectorAll) {
+        var items = dr.querySelectorAll('[data-view]');
+        var k;
+        for (k = 0; k < items.length; k++) {
+          (function (it) {
+            on(it, 'click', function (e) {
+              if (e) { try { e.preventDefault(); } catch (x) {} }
+              portalSwitchView(it.getAttribute('data-view') || 'inbox');
+            });
+          })(items[k]);
+        }
+      }
+    } catch (e) {}
+    /* live refresh (req. G): reload on new messages; keep the badge in sync */
+    try {
+      Bridge.on('portal.changed', function () { defer(portalLoad); });
+      Bridge.on('dash.unread', function (d) { if (d && d.n != null) portalSetUnread(d.n); });
+    } catch (e) {}
   }
 
   /* ==========================================================================
@@ -2808,16 +3114,17 @@
     var surf = window.__azSurface || 'admission';
     /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
        grid); the same HTML file renders it full-page via body.surface-rc. */
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
     else if (surf === 'receipts') cls += ' surface-rc';
     else if (surf === 'dash') cls += ' surface-dash';
+    else if (surf === 'portal') cls += ' surface-portal';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -2932,12 +3239,16 @@
       Bridge.ready(function () { /* bridge already up at boot */ });
     })();
 
+    /* v1.93: portal message workdesk — wire the burger / search / drawer once
+       on the portal surface (same one-time pattern as the dash IIFE above). */
+    if ((window.__azSurface || '') === 'portal') portalWire();
+
     loaderText('در حال همگام‌سازی با برنامه…');
     Bridge.call('init', {}).then(function (r) {
       /* v1.90: dash/tools skip the admission form fill (selects, performers,
          queue, services, zoom) — those surfaces hide #appBody and the extra
          work was the main reason they hung on open. Theme/user/perms stay. */
-      var light = (state.surface === 'dash' || state.surface === 'tools');
+      var light = (state.surface === 'dash' || state.surface === 'tools' || state.surface === 'portal');
       if (!light) {
         if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
         if (r.supp) { state.supp = r.supp; fillSelect($('insSupp'), r.supp); }
@@ -2955,8 +3266,9 @@
         if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
       }
       document.body.className = String(document.body.className || '')
-        .replace(/\btheme-(dark|calm|warm)\b/g, '').replace(/\s+/g, ' ');
+        .replace(/\btheme-(dark|calm|warm|neon)\b/g, '').replace(/\s+/g, ' ');
       if (r.theme === 'dark') document.body.className += ' theme-dark';
+      else if (r.theme === 'neon') document.body.className += ' theme-neon';
       else applyPalette(r.palette || 'blue');
       if (!light) {
         if ($('apptDate')) $('apptDate').value = toFa(r.date || '');
@@ -2970,7 +3282,10 @@
       if (!light) {
         /* invoice starts at ZERO until a service is added */
         renderServices(); recompute();
-        fillPerformers();
+        /* v1.93: performers folded into init to eliminate a round-trip; the
+           standalone call stays as a fallback when the folded data is absent. */
+        if (r.performers) fillPerformers(r.performers);
+        else fillPerformers();
       }
       /* v1.79.0 / v1.82.0: hide launchers when the matching tick is OFF
          (the button must not exist — not merely disabled). */
@@ -2998,13 +3313,21 @@
         }
       }
       if (!light) {
-        refreshQueue();
+        /* v1.93: queue folded into init to eliminate a round-trip; refreshQueue
+           stays as a fallback when the folded data is absent. */
+        if (r.queue) { renderQueue(r.queue.rows || []); updateTurnPreview(); }
+        else refreshQueue();
         wireColResize($('rcTable'), 'az.rc.widths');
         wireColResize(document.getElementById('cashWrap') ? document.getElementById('cashWrap').getElementsByTagName('table')[0] : null, 'az.cash.widths');
       }
       setSync('ok', 'همگام با برنامه');
       state.ready = true;
       hideLoader();
+      if (state.surface === 'portal') {
+        /* v1.93: portal message workdesk — fetch the inbox on surface boot */
+        portalLoad();
+        return;
+      }
       if (state.surface === 'dash') {
         /* dashboard: greet with the user name; badges sync via portal.unread */
         var du = $('dashUser');

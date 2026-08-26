@@ -544,7 +544,7 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     std::string tabs="[{\"id\":0,\"name\":\"\u0635\u0646\u062f\u0648\u0642 \u0646\u0631\u0641\u062a\u0647\u200c\u0647\u0627\",\"kind\":\"unpaid\"}";
     if(sc.supervisor){
         for(const auto& s:secs){
-            if(!s.is_active || s.parent_id!=0) continue;
+            if(!s.is_active || s.parent_id!=0 || !s.cashier_tab) continue;
             tabs+=",{\"id\":"+opsJnum(s.id)+",\"name\":"+opsJstr(s.name_fa)+",\"kind\":\"section\"}";
         }
     } else if(sc.homeSectionId>0){

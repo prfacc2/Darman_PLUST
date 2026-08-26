@@ -2755,7 +2755,8 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
         if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
-           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS && t->kind!=TK_DASH)
+           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS && t->kind!=TK_DASH
+           && t->kind!=TK_PORTAL)    // v1.93: portal now has an HTML surface
             return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
@@ -2777,6 +2778,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             else if(t->kind==TK_QUEUE) surf="queue";
             else if(t->kind==TK_RECEIPTS) surf="receipts";
             else if(t->kind==TK_DASH) surf="dash";
+            else if(t->kind==TK_PORTAL) surf="portal";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
@@ -5018,6 +5020,15 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
         return 0;
     case WM_APP_THEME:
         InvalidateRect(h,NULL,TRUE);
+        // v1.93: propagate theme change to all embedded HTML surfaces so
+        // dark/neon themes apply everywhere, not just native C++ controls.
+        {
+            std::wstring tn=getSetting(L"theme",L"light");
+            std::string ts=std::string("{\"theme\":\"")+
+                (tn==L"dark"?"dark":tn==L"neon"?"neon":"light")+"\"}";
+            for(auto* tp : s_rd->tabs)
+                if(tp->web) WebAdmission_PushEventTo(tp->web,"theme.changed",ts);
+        }
         return 0;
     case WM_TIMER:
         if(w==77 && s_rd){
@@ -5042,6 +5053,10 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
             if(n!=s_rd->lastUnseen){
                 std::string js = std::string("{\"n\":") + std::to_string(n) + "}";
                 WebAdmission_PushEvent("dash.unread", js);
+                // v1.93: tell the portal (cartable) HTML surface a new message
+                // arrived so it can refresh its list without a manual reload.
+                if(n>s_rd->lastUnseen)
+                    WebAdmission_PushEvent("portal.changed","{\"unseen\":"+std::to_string(n)+"}");
             }
             s_rd->lastUnseen=n;
         }

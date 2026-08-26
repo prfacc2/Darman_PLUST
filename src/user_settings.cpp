@@ -76,15 +76,20 @@ static bool canAccess(int row, int mode){
         return row==ROW_THEME || row==ROW_CONTACT;
     }
     // Reception + Admin share the option set; admin-only rows are gated.
+    // v1.93: «تنظیمات پذیرش» (ROW_RECEPTION) and «پیام‌های ذخیره» (ROW_SAVED_MSG)
+    // are no longer surfaced here — reception settings move to the HTML portal
+    // and saved messages open from the portal's hamburger menu. The enum values
+    // are retained (see SettingsRow) so existing indices never shift; the rows
+    // are simply unreachable.
     switch(row){
     case ROW_PROFILE:   return true;
     case ROW_THEME:     return true;
-    case ROW_RECEPTION: return true;
+    case ROW_RECEPTION: return false;
     case ROW_BLACKLIST: return true;
     case ROW_DESIGNER:  return true;
     case ROW_BACKUP:    return true;
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
-    case ROW_SAVED_MSG: return true;
+    case ROW_SAVED_MSG: return false;
     case ROW_UPDATE:    return true;
     case ROW_CONTACT:   return true;
     case ROW_ABOUT:     return true;
@@ -103,11 +108,13 @@ static void selfCheckMatrix(){
         bool want = (r==ROW_THEME || r==ROW_CONTACT);
         assert(g==want && "guest row matrix mismatch");
     }
-    // Reception: everything except employees/sections.
+    // Reception: everything except employees/sections. v1.93: also skip
+    // ROW_RECEPTION and ROW_SAVED_MSG, which are now intentionally unreachable
+    // (moved to the HTML portal) so the matrix self-check stays accurate.
     assert(!canAccess(ROW_EMP_SECT,SM_RECEPTION));
     assert( canAccess(ROW_EMP_SECT,SM_ADMIN));
     for(int r=0;r<ROW__COUNT;r++){
-        if(r==ROW_EMP_SECT) continue;
+        if(r==ROW_EMP_SECT || r==ROW_RECEPTION || r==ROW_SAVED_MSG) continue;
         assert(canAccess(r,SM_RECEPTION) && "reception should access this row");
         assert(canAccess(r,SM_ADMIN)     && "admin should access this row");
     }
@@ -178,10 +185,7 @@ static std::vector<RowDef> homeRows(int mode){
           L"\u0646\u0627\u0645\u060c \u062a\u0644\u0641\u0646\u060c \u0639\u06a9\u0633\u060c \u0631\u0645\u0632" },   // نام، تلفن، عکس، رمز
         { ROW_THEME,     PAGE_THEME,     ICO_PALETTE,
           L"\u062a\u063a\u06cc\u06cc\u0631 \u067e\u0648\u0633\u062a\u0647",                            // تغییر پوسته
-          L"\u0631\u0648\u0634\u0646 \u06cc\u0627 \u0645\u0634\u06a9\u06cc" },                          // روشن یا مشکی
-        { ROW_RECEPTION, PAGE_RECEPTION, ICO_GEAR,
-          L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a \u067e\u0630\u06cc\u0631\u0634",
-          L"\u062d\u0627\u0644\u062a \u0646\u0645\u0627\u06cc\u0634 \u0648 \u0628\u0632\u0631\u06af\u200c\u0646\u0645\u0627\u06cc\u06cc \u0641\u0631\u0645 \u067e\u0630\u06cc\u0631\u0634" },
+          L"\u0631\u0648\u0634\u0646 \u0648 \u0645\u0634\u06a9\u06cc \u0648 \u0646\u0626\u0648\u0646\u06cc" },                    // روشن و مشکی و نئونی
         { ROW_BLACKLIST, PAGE_BLACKLIST, ICO_ID,
           L"\u0644\u06cc\u0633\u062a \u0633\u06cc\u0627\u0647 \u0628\u06cc\u0645\u0627\u0631\u0627\u0646",                    // لیست سیاه بیماران
           L"\u0645\u0633\u062f\u0648\u062f\u0633\u0627\u0632\u06cc \u067e\u0630\u06cc\u0631\u0634 \u0648 \u062a\u0627\u0631\u06cc\u062e\u0686\u0647" }, // مسدودسازی پذیرش و تاریخچه
@@ -194,9 +198,6 @@ static std::vector<RowDef> homeRows(int mode){
         { ROW_EMP_SECT,  PAGE_EMP_SECT,  ICO_PEOPLE,
           L"\u06a9\u0627\u0631\u0645\u0646\u062f\u0627\u0646 \u0648 \u0628\u062e\u0634\u200c\u0647\u0627",  // کارمندان و بخش‌ها
           L"\u0645\u062f\u06cc\u0631\u06cc\u062a \u06a9\u0627\u0631\u0645\u0646\u062f\u0627\u0646 \u0648 \u0628\u062e\u0634\u200c\u0647\u0627" },
-        { ROW_SAVED_MSG, PAGE_SAVED_MSG, ICO_SAVED_MSG,
-          L"\u067e\u06cc\u0627\u0645\u200c\u0647\u0627\u06cc \u0630\u062e\u06cc\u0631\u0647",            // پیام‌های ذخیره
-          NULL },
         { ROW_UPDATE,    PAGE_UPDATE,    ICO_UPDATE,
           L"\u0628\u0647\u200c\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06cc",                         // به‌روزرسانی
           NULL },
@@ -327,14 +328,16 @@ static void buildProfilePage(SettingsWin* sw){
 
 static void buildThemePage(SettingsWin* sw){
     RECT c=contentRect(sw);
-    int x=c.left+S(20), y=subTop(sw), w=c.right-c.left-S(40), gap=S(10), half=(w-gap)/2;
-    // v1.77: exactly two themes — light (روشن) and dark (مشکی). The calm/warm
-    // eye-comfort palettes were retired, so this page now offers only these two.
+    int x=c.left+S(20), y=subTop(sw), w=c.right-c.left-S(40), gap=S(8);
+    // v1.93: three themes — light (روشن), dark (مشکی), neon (نئونی).
+    int third=(w-2*gap)/3;
     HWND bLight=createFlatButton(sw->hwnd,IDC_PANEL_BASE+10,
-        L"\u0631\u0648\u0634\u0646",ICO_SUN,BS_OUTLINE,x+half+gap,y,half,S(52));
+        L"\u0631\u0648\u0634\u0646",ICO_SUN,BS_OUTLINE,x+2*(third+gap),y,third,S(52));
     HWND bDark=createFlatButton(sw->hwnd,IDC_PANEL_BASE+11,
-        L"\u0645\u0634\u06a9\u06cc",ICO_MOON,BS_OUTLINE,x,y,half,S(52));
-    sw->ctrls.push_back(bLight); sw->ctrls.push_back(bDark);
+        L"\u0645\u0634\u06a9\u06cc",ICO_MOON,BS_OUTLINE,x+third+gap,y,third,S(52));
+    HWND bNeon=createFlatButton(sw->hwnd,IDC_PANEL_BASE+12,
+        L"\u0646\u0626\u0648\u0646\u06cc",ICO_PALETTE,BS_OUTLINE,x,y,third,S(52));
+    sw->ctrls.push_back(bLight); sw->ctrls.push_back(bDark); sw->ctrls.push_back(bNeon);
 }
 
 static HWND addSettingsLabel(SettingsWin* sw,const wchar_t* text,int x,int y,int w){
@@ -387,33 +390,10 @@ static void lookupBlacklistPatient(SettingsWin* sw,bool quiet){
         L"جستجوی بیمار",MB_OK|MB_ICONINFORMATION);
 }
 
-static void buildReceptionPage(SettingsWin* sw){
-    RECT c=contentRect(sw);
-    int x=c.left+S(20), y=subTop(sw), w=c.right-c.left-S(40);
-    std::wstring suffix=sw->user.username.empty()?L"":L"."+sw->user.username;
-    std::wstring mode=getSetting(L"reception.mode"+suffix,
-                      getSetting(L"reception.mode",L"simple"));
-    addSettingsLabel(sw,L"حالت نمایش فرم پذیرش",x,y,w);
-    HWND simple=CreateWindowExW(0,L"BUTTON",L"ساده (پیشنهادی)",
-        WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,x+w/2,y+S(24),w/2,S(28),sw->hwnd,
-        (HMENU)(INT_PTR)(IDC_PANEL_BASE+80),g_hInst,NULL);
-    HWND full=CreateWindowExW(0,L"BUTTON",L"کامل",
-        WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,x,y+S(24),w/2,S(28),sw->hwnd,
-        (HMENU)(INT_PTR)(IDC_PANEL_BASE+81),g_hInst,NULL);
-    SendMessageW(simple,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-    SendMessageW(full,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-    sw->ctrls.push_back(simple); sw->ctrls.push_back(full);
-    CheckRadioButton(sw->hwnd,IDC_PANEL_BASE+80,IDC_PANEL_BASE+81,
-        mode==L"full"?IDC_PANEL_BASE+81:IDC_PANEL_BASE+80);
-
-    /* v1.73.0: the «بزرگ‌نمایی فرم» dropdown was REMOVED from the settings panel
-       — zoom is now set only via Ctrl+scroll on the admission page and persists
-       on its own (reception.zoom.save). Only the display mode (ساده/کامل) remains
-       here, so the save button moves up to where the zoom row used to sit. */
-    HWND save=createFlatButton(sw->hwnd,IDC_PANEL_BASE+83,L"ذخیره تنظیمات نمایش",
-        ICO_CHECK,BS_PRIMARY,x,y+S(66),w,S(38));
-    sw->ctrls.push_back(save);
-}
+// v1.93: buildReceptionPage was REMOVED — «تنظیمات پذیرش» no longer has a
+// native settings page; reception display settings are now managed from the
+// HTML portal. The PAGE_RECEPTION id and ROW_RECEPTION enum are retained so
+// existing indices/ids do not shift; the page simply renders nothing.
 
 // v1.58 — the patient BLACKLIST is now a STANDALONE settings page (moved out of
 // the reception / appearance settings, per request). Same controls & control
@@ -640,7 +620,7 @@ static void buildPage(SettingsWin* sw){
     case PAGE_HOME:    break;   // owner-drawn rows
     case PAGE_PROFILE: buildProfilePage(sw); break;
     case PAGE_THEME:   buildThemePage(sw);   break;
-    case PAGE_RECEPTION: buildReceptionPage(sw); break;
+    case PAGE_RECEPTION: break;   // v1.93: removed — reception settings now HTML-side
     case PAGE_BLACKLIST: buildBlacklistPage(sw); break;
     case PAGE_CONTACT: buildContactPage(sw); break;
     case PAGE_ABOUT:   buildAboutPage(sw);   break;
@@ -911,13 +891,12 @@ static int homeRowHit(SettingsWin* sw, int mx, int my){
     return -1;
 }
 
-static void applyThemeByName(SettingsWin* sw, bool dark){
-    setSetting(L"theme", dark?L"dark":L"light");
-    // v1.77: only two themes exist now; always normalise the (now-unused)
-    // palette setting to "blue" so a stale calm/warm value from an older
-    // version cannot linger in the settings store.
+static void applyThemeByName(SettingsWin* sw, int mode){
+    // v1.93: three themes — 0=light, 1=dark, 2=neon
+    ThemeMode tm = (mode==1) ? TM_DARK : (mode==2) ? TM_NEON : TM_LIGHT;
+    setSetting(L"theme", (mode==1)?L"dark":(mode==2)?L"neon":L"light");
     setSetting(L"theme.palette",L"blue");
-    applyTheme(dark);
+    applyThemeMode(tm);
     broadcastThemeChange();
     if(g_hFrame) PostMessageW(g_hFrame,WM_APP_THEME_CHANGED,1,0);
     RedrawWindow(sw->hwnd,NULL,NULL,RDW_INVALIDATE|RDW_UPDATENOW|RDW_ALLCHILDREN|RDW_ERASE);
@@ -1049,23 +1028,9 @@ static LRESULT CALLBACK SettingsProc(HWND h,UINT m,WPARAM w,LPARAM l){
             lookupBlacklistPatient(sw,true);
         }
         switch(id){
-        case IDC_PANEL_BASE+10: applyThemeByName(sw,false); return 0; // روشن (light)
-        case IDC_PANEL_BASE+11: applyThemeByName(sw,true); return 0;  // مشکی (dark)
-        case IDC_PANEL_BASE+83: {
-            std::wstring suffix=sw->user.username.empty()?L"":L"."+sw->user.username;
-            bool full=SendMessageW(GetDlgItem(h,IDC_PANEL_BASE+81),BM_GETCHECK,0,0)==BST_CHECKED;
-            setSetting(L"reception.mode"+suffix,full?L"full":L"simple");
-            /* v1.84.0: keep the persisted Ctrl+scroll zoom (50–200, default 80)
-               so applying display mode does not rewrite a wrap-safe zoom. */
-            int zoom=_wtoi(getSetting(L"reception.zoom"+suffix,
-                               getSetting(L"reception.zoom",L"80")).c_str());
-            if(zoom<50||zoom>200) zoom=80;
-            std::string payload=std::string("{\"mode\":\"")+(full?"full":"simple")+
-                "\",\"zoom\":"+std::to_string(zoom)+"}";
-            WebAdmission_PushEvent("reception.settings",payload);
-            MessageBoxW(h,L"تنظیمات پذیرش برای این کاربر ذخیره شد.",
-                L"تنظیمات پذیرش",MB_OK|MB_ICONINFORMATION);
-            return 0; }
+        case IDC_PANEL_BASE+10: applyThemeByName(sw,0); return 0; // روشن (light)
+        case IDC_PANEL_BASE+11: applyThemeByName(sw,1); return 0; // مشکی (dark)
+        case IDC_PANEL_BASE+12: applyThemeByName(sw,2); return 0; // نئونی (neon)
         case IDC_PANEL_BASE+96: {   // v1.64.0: رفع مسدودی (unblock by national id)
             std::wstring nid=settingsDigits(settingsText(h,IDC_PANEL_BASE+95));
             if(nid.empty()){
@@ -1208,16 +1173,17 @@ static void openSettingsWindow(HWND hMain,const User& u,int mode){
         mode==SM_ADMIN?  L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a \u0645\u062f\u06cc\u0631\u06cc\u062a" :
         mode==SM_GUEST?  L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a" :
                          L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a \u067e\u0630\u06cc\u0631\u0634";
-    // §1.12.0 (§1): settings now opens as a SEPARATE FULL-PAGE view. It covers
-    // the entire work area as an opaque WS_POPUP top-level window so the screen
-    // behind it (reception/management) is NOT visible — no background bleed. A
-    // standard vertical scrollbar (WS_VSCROLL) + WS_CLIPCHILDREN gives smooth,
-    // smear-free scrolling. The content is rendered in a centered column so it
-    // still reads as a clean, modern settings page on wide monitors.
-    RECT wa; SystemParametersInfoW(SPI_GETWORKAREA,0,&wa,0);
-    int x=wa.left, y=wa.top, W=wa.right-wa.left, H=wa.bottom-wa.top;
+    // §1.12.0 (§1): settings now opens as a SEPARATE FULL-PAGE view. v1.93: it
+    // covers the ENTIRE screen — including the taskbar — as an opaque WS_POPUP
+    // top-level window, so the screen behind it (reception/management) is NOT
+    // visible and nothing bleeds through. A standard vertical scrollbar
+    // (WS_VSCROLL) + WS_CLIPCHILDREN gives smooth, smear-free scrolling. The
+    // content is rendered in a centered column so it still reads as a clean,
+    // modern settings page on wide monitors.
+    int W = GetSystemMetrics(SM_CXSCREEN);
+    int H = GetSystemMetrics(SM_CYSCREEN);
     HWND h=CreateWindowExW(0,CLS,titleTxt,
-        WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN|WS_VSCROLL,x,y,W,H,hMain,NULL,g_hInst,NULL);
+        WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN|WS_VSCROLL,0,0,W,H,hMain,NULL,g_hInst,NULL);
     sw->hwnd=h;
     SetWindowLongPtrW(h,GWLP_USERDATA,(LONG_PTR)sw);
     buildPage(sw);

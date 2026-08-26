@@ -8,6 +8,7 @@
 // ============================================================================
 #include "service_identity.h"
 #include "service_canonicalization.h"
+#include <algorithm>          // v1.93: std::reverse for portal message ordering
 
 // ---- serialize a PatientRow to JSON (v1.40.0 struct-based, authoritative) ---
 //  The struct overload is the single source of truth for the wire format; the
@@ -566,6 +567,56 @@ static ReceptionRecord adBuildRecord(const std::string& body){
 }
 
 // ---------------------------------------------------------------------------
+//  v1.93: portal-message + performer helpers (folded into init / verbs).
+//  reception.cpp has static equivalents (cartHtmlEsc / splitMsgTime / sevLabel)
+//  but they live in a different translation unit, so the admission bridge
+//  re-implements the small ones here. toFaDigits() comes from app.h.
+// ---------------------------------------------------------------------------
+static std::wstring portalHtmlEsc(const std::wstring& s){
+    std::wstring o; o.reserve(s.size());
+    for(size_t i=0;i<s.size();i++){
+        wchar_t c=s[i];
+        if(c==L'&') o+=L"&amp;";
+        else if(c==L'<') o+=L"&lt;";
+        else if(c==L'>') o+=L"&gt;";
+        else if(c==L'"') o+=L"&quot;";
+        else o+=c;
+    }
+    return o;
+}
+static std::wstring portalSevLabel(int type){
+    return type==KMSG_CRITICAL ? L"بحرانی"
+         : type==KMSG_URGENT   ? L"فوری"
+         :                       L"عادی";
+}
+static void portalSplitTime(const std::wstring& s, std::wstring& date, std::wstring& time){
+    size_t sp=s.find(L' ');
+    if(sp==std::wstring::npos){ date=s; time=L""; }
+    else { date=s.substr(0,sp); time=s.substr(sp+1); }
+}
+// v1.93: the full performer directory (performers only, no filter) — folded
+// into init so the portal surface can populate its performer combo without a
+// second round-trip. Mirrors the doctor.performers verb's no-filter path.
+static std::string performersJson(){
+    auto docs=loadDoctors();
+    std::string o="{\"rows\":[";
+    int n=0;
+    for(size_t i=0;i<docs.size();++i){
+        const auto& d=docs[i];
+        if(!d.isPerformer) continue;
+        wchar_t cb[16]; swprintf(cb,16,L"%d",(int)i+1);
+        std::wstring dcode=cb;
+        if(n++) o+=",";
+        o+="{\"name\":"+jstr(d.name)+",\"specialty\":"+jstr(d.specialty)+
+           ",\"code\":"+jstr(dcode)+
+           ",\"medicalId\":"+jstr(d.medicalId)+
+           ",\"isPerformer\":"+(d.isPerformer?std::string("true"):std::string("false"))+"}";
+        if(n>=500) break;
+    }
+    o+="]}"; return o;
+}
+
+// ---------------------------------------------------------------------------
 //  admissionApi — route a verb + JSON payload to a JSON response.
 // ---------------------------------------------------------------------------
 static std::string admissionApi(const std::string& verb, const std::string& body){
@@ -607,6 +658,11 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+="\"settings\":";      o+=(userHasPerm(g_session.user,L"settings")?"true":"false");
         o+="},";
         o+="\"role\":"+jnum(g_session.user.role)+",";
+        // v1.93: fold the performer directory + recent admission queue into
+        // init so the portal surface renders without two extra round-trips
+        // (doctor.performers + queue.list). Same wire format as those verbs.
+        o+="\"performers\":"+performersJson()+",";
+        o+="\"queue\":"+adQueueJson(true,24)+",";
         o+="\"user\":"+jstr(g_session.user.fullname.empty()?g_session.user.username:g_session.user.fullname);
         o+="}";
         return o;
@@ -1227,6 +1283,133 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring m = L"JS Error: " + u82w(msgU) + L" at " + u82w(srcU) +
                          L":" + lnB + L":" + colB + L" stack: " + u82w(stkU);
         logHtmlError(m);
+        return "{\"ok\":true}";
+    }
+
+    // ====================================================================
+    //  v1.93: portal (cartable / کارتابل) message verbs.
+    //  loadMessages() returns oldest-first (file order); the portal works
+    //  newest-first, so every verb reverses once and indexes into that order
+    //  — matching seenOneMessage / deleteOneMessage / pinMessage which take
+    //  an `indexNewestFirst`. Field names mirror crmMsgJson (web_crm_api.inc).
+    // ====================================================================
+    if(verb=="portal.messages.list"){
+        auto msgs=loadMessages(g_session.user.username);
+        std::reverse(msgs.begin(),msgs.end());   // newest-first
+        std::string o="{\"rows\":[";
+        for(size_t i=0;i<msgs.size();i++){
+            const auto& m=msgs[i];
+            if(i) o+=",";
+            o+="{\"idx\":"+jnum((long long)i)+",";
+            o+="\"from\":"+jstr(m.from)+",";
+            o+="\"to\":"+jstr(m.to)+",";
+            o+="\"text\":"+jstr(m.text)+",";
+            o+="\"time\":"+jstr(m.time)+",";
+            o+="\"seen\":"; o+=(m.seen?"true":"false"); o+=",";
+            o+="\"type\":"+jnum(m.type)+",";
+            o+="\"pinned\":"; o+=(m.pinned?"true":"false");
+            o+="}";
+        }
+        o+="],\"unseen\":"+jnum((long long)unseenMessageCount(g_session.user.username))+"}";
+        return o;
+    }
+    if(verb=="portal.messages.seenone"){
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        seenOneMessage(g_session.user.username,(int)idx);
+        // keep the dashboard envelope badge in sync after a read
+        WebAdmission_PushEvent("dash.unread","{\"n\":"+std::to_string(unseenMessageCount(g_session.user.username))+"}");
+        return "{\"ok\":true}";
+    }
+    if(verb=="portal.messages.delete"){
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        deleteOneMessage(g_session.user.username,(int)idx);
+        WebAdmission_PushEvent("dash.unread","{\"n\":"+std::to_string(unseenMessageCount(g_session.user.username))+"}");
+        return "{\"ok\":true}";
+    }
+    if(verb=="portal.messages.pin"){
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        bool pin=jsonGetBool(body,"pin",true);
+        pinMessage(g_session.user.username,(int)idx,pin);
+        return "{\"ok\":true}";
+    }
+    if(verb=="portal.messages.save"){
+        // archive one inbox message to saved_msgs.dat (no attachment)
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        auto msgs=loadMessages(g_session.user.username);
+        std::reverse(msgs.begin(),msgs.end());
+        int i=(int)idx; if(i>=0&&i<(int)msgs.size()){
+            const auto& m=msgs[i];
+            pushSavedMsg(m.from,g_session.user.username,m.text,m.type,L"");
+        }
+        return "{\"ok\":true}";
+    }
+    if(verb=="portal.messages.list_saved"){
+        auto msgs=loadSavedMsgs();
+        std::reverse(msgs.begin(),msgs.end());
+        std::string o="{\"rows\":[";
+        for(size_t i=0;i<msgs.size();i++){
+            if(i) o+=",";
+            const auto& m=msgs[i];
+            o+="{\"idx\":"+jnum((long long)i)+",\"from\":"+jstr(m.from)+",\"to\":"+jstr(m.to);
+            o+=",\"text\":"+jstr(m.text)+",\"time\":"+jstr(m.time)+",\"type\":"+jnum(m.type)+"}";
+        }
+        o+="]}";
+        return o;
+    }
+    if(verb=="portal.message.reply"){
+        // reply to the original sender (← پاسخ: prefix)
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        std::string txt; jsonGetString(body,"text",txt);
+        auto msgs=loadMessages(g_session.user.username);
+        std::reverse(msgs.begin(),msgs.end());
+        int i=(int)idx; if(i>=0&&i<(int)msgs.size()){
+            pushMessageT(g_session.user.username,msgs[i].from,L"↩ پاسخ: "+u82w(txt),KMSG_NORMAL);
+        }
+        return "{\"ok\":true}";
+    }
+    if(verb=="portal.message.print"){
+        // render one message to a temp RTL .htm and hand it to the shell
+        // "print" verb (pattern copied from reception.cpp CART_BTN_PRINT).
+        double idx=0; jsonGetNumber(body,"idx",idx);
+        auto msgs=loadMessages(g_session.user.username);
+        std::reverse(msgs.begin(),msgs.end());
+        int i=(int)idx; if(i>=0&&i<(int)msgs.size()){
+            const KMsg& mm=msgs[i];
+            std::wstring date,time; portalSplitTime(mm.time,date,time);
+            std::wstring sender=mm.from.empty()?std::wstring(L"مدیریت درمانگاه"):mm.from;
+            std::wstring recip=(mm.to==L"*")?std::wstring(L"همه کاربران"):mm.to;
+            std::wstring html=L"<!doctype html><html dir='rtl' lang='fa'><head>"
+                L"<meta charset='utf-8'><title>پیام مدیریت</title>"
+                L"<style>body{font-family:Tahoma,Arial,sans-serif;direction:rtl;"
+                L"padding:34px;color:#233042;line-height:1.75;max-width:680px;margin:0 auto}"
+                L"h2{color:#1f5fd6;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:0}"
+                L".m{margin:6px 0;font-size:15px}.k{color:#64748b;font-weight:bold}"
+                L".b{margin-top:18px;padding:16px 18px;background:#f7f9fc;"
+                L"border:1px solid #e2e8f0;border-radius:10px;font-size:16px;white-space:pre-wrap}</style></head><body>"
+                L"<h2>پیام مدیریت درمانگاه</h2>"
+                L"<div class='m'><span class='k'>فرستنده: </span>"+portalHtmlEsc(sender)+L"</div>"
+                L"<div class='m'><span class='k'>گیرنده: </span>"+portalHtmlEsc(recip)+L"</div>"
+                L"<div class='m'><span class='k'>اولویت: </span>"+portalSevLabel(mm.type)+L"</div>"
+                L"<div class='m'><span class='k'>تاریخ: </span>"+toFaDigits(date)+
+                L" &nbsp; <span class='k'>ساعت: </span>"+toFaDigits(time)+L"</div>"
+                L"<div class='b'>"+portalHtmlEsc(mm.text)+L"</div>"
+                L"</body></html>";
+            // wstring → UTF-8 (no BOM; meta charset declares utf-8)
+            std::string u8;
+            int n=WideCharToMultiByte(CP_UTF8,0,html.c_str(),(int)html.size(),NULL,0,NULL,NULL);
+            if(n>0){ u8.resize(n); WideCharToMultiByte(CP_UTF8,0,html.c_str(),(int)html.size(),&u8[0],n,NULL,NULL); }
+            wchar_t tmpDir[MAX_PATH]; GetTempPathW(MAX_PATH,tmpDir);
+            std::wstring path=std::wstring(tmpDir)+L"az_portal_msg.htm";
+            // Win32 file write (keeps this TU free of a stdio dependency).
+            HANDLE hf=CreateFileW(path.c_str(),GENERIC_WRITE,0,NULL,
+                                  CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+            if(hf!=INVALID_HANDLE_VALUE){
+                if(!u8.empty()) WriteFile(hf,u8.data(),(DWORD)u8.size(),NULL,NULL);
+                CloseHandle(hf);
+                if(!u8.empty())
+                    ShellExecuteW(NULL,L"print",path.c_str(),NULL,NULL,SW_SHOWNORMAL);
+            }
+        }
         return "{\"ok\":true}";
     }
 
