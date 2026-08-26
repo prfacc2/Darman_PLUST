@@ -197,6 +197,11 @@ static std::vector<CashTicket> cashLoad(){
         if(f.size()>=30) t.cancelReason=f[29];
         if(f.size()>=31) t.cancelUser=f[30];
         if(f.size()>=32) t.cancelAt=f[31];
+        if(f.size()>=33) t.payMethod=f[32];
+        if(f.size()>=34) t.cashAmt=_wtoi64(f[33].c_str());
+        if(f.size()>=35) t.posAmt=_wtoi64(f[34].c_str());
+        if(f.size()>=36) t.discountAmt=_wtoi64(f[35].c_str());
+        if(f.size()>=37) t.hasPos=_wtoi(f[36].c_str());
         if(t.status.empty()) t.status = t.paid>0 ? L"paid" : L"unpaid";
         out.push_back(t);
     }
@@ -221,7 +226,10 @@ static bool cashSave(const std::vector<CashTicket>& rows){
                opsEscPipe(t.insBase)+L"|"+opsEscPipe(t.insSupp)+L"|"+opsEscPipe(t.receiptNo)+L"|"+
                opsEscPipe(t.apptDate)+L"|"+opsEscPipe(t.turn)+L"|"+opsEscPipe(t.shift)+L"|"+
                opsEscPipe(t.status)+L"|"+opsEscPipe(t.cancelReason)+L"|"+
-               opsEscPipe(t.cancelUser)+L"|"+opsEscPipe(t.cancelAt)+L"\r\n";
+               opsEscPipe(t.cancelUser)+L"|"+opsEscPipe(t.cancelAt)+L"|"+
+               opsEscPipe(t.payMethod)+L"|"+std::to_wstring(t.cashAmt)+L"|"+
+               std::to_wstring(t.posAmt)+L"|"+std::to_wstring(t.discountAmt)+L"|"+
+               std::to_wstring(t.hasPos)+L"\r\n";
     }
     return writeFileUtf8(opsTicketsPath(), all, false);
 }
@@ -280,6 +288,10 @@ static std::wstring cashNewId(){
 }
 
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
+    CashTicket unused;
+    return Cash_CreateFromReception(r, err, unused);
+}
+bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashTicket& created){
     CashTicket t;
     t.id=cashNewId();
     if(!r.insNo.empty()) t.barcode=r.insNo;
@@ -288,9 +300,12 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
     t.nid=r.nationalId; t.first=r.firstName; t.last=r.lastName;
     t.doctor=r.treatingDoctor;
     cashFillHome(t);
+    // v1.97: POS on the subsection first, then the section. No parent walk.
+    if(t.subId>0 && Sections_HasPos(t.subId)) t.hasPos=1;
+    else if(t.sectionId>0 && Sections_HasPos(t.sectionId)) t.hasPos=1;
+    else t.hasPos=0;
     t.payable=r.finalTotal;
-    t.paid=0;
-    cashStampNow(t, false);
+    if(t.payable<0) t.payable=0;
     t.servicesJson=cashBuildServicesJson(r);
     t.mobile=r.mobile;
     t.fileNo=r.nationalId;
@@ -299,19 +314,30 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err){
     t.insBase=r.insurance;
     t.insSupp=r.suppInsurance;
     t.receiptNo=t.barcode;
-    t.apptDate=r.apptDate.empty()?t.jdate:r.apptDate;
-    if(!r.apptTime.empty()) t.time=r.apptTime;
     if(r.queueNo>0){
         wchar_t tb[16]; swprintf(tb,16,L"%d",r.queueNo);
         t.turn=tb;
         if(t.receiptNo.empty()) t.receiptNo=tb;
     }
     t.shift=r.shift;
-    t.status=L"unpaid";
+    if(t.hasPos){
+        t.paid=t.payable;
+        t.posAmt=t.payable;
+        t.payMethod=L"pos";
+        t.status=L"paid";
+        cashStampNow(t, true);
+    } else {
+        t.paid=0;
+        t.status=L"unpaid";
+        cashStampNow(t, false);
+    }
+    t.apptDate=r.apptDate.empty()?t.jdate:r.apptDate;
+    if(!r.apptTime.empty()) t.time=r.apptTime;
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
     rows.push_back(t);
     if(!cashSave(rows)){ err=L"نوشتن بلیت صندوق ناموفق بود."; return false; }
+    created=t;
     return true;
 }
 
@@ -472,21 +498,83 @@ static CashTicket* cashFind(std::vector<CashTicket>& rows, const std::wstring& i
     return nullptr;
 }
 
-bool Cash_Pay(const std::wstring& id, std::wstring& err){
+static long long cashRemain(const CashTicket& t){
+    long long r=t.payable - t.paid - t.discountAmt;
+    return r>0?r:0;
+}
+static std::wstring opsLowerAscii(const std::wstring& s){
+    std::wstring o=s;
+    for(auto& c:o) if(c>=L'A'&&c<=L'Z') c=(wchar_t)(c-L'A'+L'a');
+    return o;
+}
+static bool opsTestFail20(){
+    static volatile LONG seq=0;
+    FILETIME ft; GetSystemTimeAsFileTime(&ft);
+    unsigned n=(unsigned)InterlockedIncrement(&seq);
+    return ((n ^ ft.dwLowDateTime) % 5u)==0u;
+}
+
+bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
+                long long amount, long long discount, std::wstring& err){
     if(!opsNeedCashEdit(err)) return false;
+    std::wstring m=opsLowerAscii(method);
+    if(m.empty()) m=L"cash";
+    if(m!=L"cash" && m!=L"pos" && m!=L"free" && m!=L"discount" && m!=L"test"){
+        err=L"روش پرداخت نامعتبر است."; return false;
+    }
+    if(m==L"test" && opsTestFail20()){
+        err=L"پرداخت آزمایشی ناموفق بود."; return false;
+    }
+    if(m==L"test") m=L"cash";
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
     CashTicket* t=cashFind(rows,id);
     if(!t){ err=L"بلیت پیدا نشد."; return false; }
-    if(t->paid>0){ err=L"این بلیت قبلاً صندوق شده است."; return false; }
-    SYSTEMTIME st=iranNow();
-    t->paid = t->payable;
-    t->paidAt = jalaliDateShort(st)+L" "+iranTimeStr(st,false);
-    t->paidUser = g_session.user.username;
-    t->status = L"paid";
+    if(t->status==L"cancelled"){ err=L"این بلیت لغو شده است."; return false; }
+    if(discount<0) discount=0;
+    if(amount<0) amount=0;
+    long long remain=cashRemain(*t);
+    if(remain<=0){ err=L"این بلیت قبلاً صندوق شده است."; return false; }
+    if(discount>0){
+        t->discountAmt += discount;
+        if(t->discountAmt > t->payable) t->discountAmt=t->payable;
+        remain=cashRemain(*t);
+    }
+    long long took=0;
+    if(m==L"free"){
+        t->discountAmt = t->payable - t->paid;
+        if(t->discountAmt<0) t->discountAmt=0;
+        t->payMethod=L"free";
+        remain=0;
+    } else if(m==L"discount"){
+        if(discount<=0){ err=L"مبلغ تخفیف نامعتبر است."; return false; }
+        t->payMethod=L"discount";
+        remain=cashRemain(*t);
+    } else if(remain>0){
+        long long take = amount>0 ? amount : remain;
+        if(take>remain) take=remain;
+        if(m==L"pos"){ t->posAmt += take; t->payMethod=L"pos"; }
+        else { t->cashAmt += take; t->payMethod=L"cash"; }
+        t->paid += take;
+        took=take;
+        remain=cashRemain(*t);
+    } else if(discount>0){
+        t->payMethod=L"discount";
+    }
+    if(remain<=0){
+        t->status=L"paid";
+        SYSTEMTIME st=iranNow();
+        t->paidAt = jalaliDateShort(st)+L" "+iranTimeStr(st,false);
+        t->paidUser = g_session.user.username;
+    } else if(t->status.empty() || t->status==L"unpaid"){
+        t->status=L"unpaid";
+    }
     if(!cashSave(rows)){ err=L"ذخیره پرداخت ناموفق بود."; return false; }
-    shiftAddIncome(t->paid);
+    if(took>0) shiftAddIncome(took);
     return true;
+}
+bool Cash_Pay(const std::wstring& id, std::wstring& err){
+    return Cash_PayEx(id, L"cash", 0, 0, err);
 }
 
 bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
@@ -500,6 +588,7 @@ bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
     t.nid=nid; t.first=first; t.last=last; t.doctor=doctor;
     cashFillHome(t);
     t.payable=amount; t.paid=amount;
+    t.cashAmt=amount; t.payMethod=L"cash"; t.status=L"paid"; t.hasPos=0;
     cashStampNow(t, true);
     t.servicesJson=L"[]";
     std::lock_guard<std::mutex> lk(g_opsMx);
@@ -556,17 +645,37 @@ static std::string ticketRowJson(const CashTicket& t, const std::string& extra="
     o+="\"cancelReason\":"+opsJstr(t.cancelReason)+",";
     o+="\"cancelUser\":"+opsJstr(t.cancelUser)+",";
     o+="\"cancelAt\":"+opsJstr(t.cancelAt)+",";
+    o+="\"payMethod\":"+opsJstr(t.payMethod)+",";
+    o+="\"cashAmt\":"+opsJnum(t.cashAmt)+",";
+    o+="\"posAmt\":"+opsJnum(t.posAmt)+",";
+    o+="\"discountAmt\":"+opsJnum(t.discountAmt)+",";
+    o+="\"remain\":"+opsJnum(cashRemain(t))+",";
+    o+="\"hasPos\":"; o+=(t.hasPos?"true":"false"); o+=",";
     o+="\"user\":"+opsJstr(t.user);
     if(!extra.empty()){ o+=","; o+=extra; }
     o+="}";
     return o;
 }
 
-std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
+static bool cashStatusEq(const CashTicket& t, const std::wstring& want){
+    if(want.empty()) return true;
+    std::wstring st=opsLowerAscii(t.status);
+    if(st==want) return true;
+    if(want==L"refund"   && t.status.find(L"\u0627\u0633\u062a\u0631\u062f\u0627\u062f")!=std::wstring::npos) return true;
+    if(want==L"waiting"  && t.status.find(L"\u0627\u0646\u062a\u0638\u0627\u0631")!=std::wstring::npos) return true;
+    if(want==L"debtor"   && t.status.find(L"\u0628\u062f\u0647\u06a9\u0627\u0631")!=std::wstring::npos) return true;
+    if(want==L"creditor" && t.status.find(L"\u0628\u0633\u062a\u0627\u0646\u06a9\u0627\u0631")!=std::wstring::npos) return true;
+    return false;
+}
+
+std::string Cash_PageJson(const std::wstring& q, int tabSectionId,
+                          const std::wstring& statusFilter){
     CashScope sc=Cash_ResolveScope();
     if(!sc.canView)
         return "{\"ok\":false,\"err\":\"دسترسی مشاهده صندوق ندارید.\"}";
     std::wstring qn=opsNormDigits(q);
+    std::wstring sf=opsLowerAscii(statusFilter);
+    bool statusTab = (sf==L"refund"||sf==L"waiting"||sf==L"debtor"||sf==L"creditor");
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=cashLoad();
     long long now=opsEpochMin();
@@ -576,15 +685,16 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     std::string tabs="[{\"id\":0,\"name\":\"\u0635\u0646\u062f\u0648\u0642 \u0646\u0631\u0641\u062a\u0647\u200c\u0647\u0627\",\"kind\":\"unpaid\"}";
     if(sc.supervisor){
         for(const auto& s:secs){
-            if(!s.is_active || s.parent_id!=0 || !s.cashier_tab) continue;
+            if(!s.is_active || s.parent_id!=0 || s.has_pos) continue;
             tabs+=",{\"id\":"+opsJnum(s.id)+",\"name\":"+opsJstr(s.name_fa)+",\"kind\":\"section\"}";
         }
-    } else if(sc.homeSectionId>0){
+    } else if(sc.homeSectionId>0 && !Sections_HasPos(sc.homeSectionId)){
         tabs+=",{\"id\":"+opsJnum(sc.homeSectionId)+",\"name\":"+opsJstr(sc.homeSectionName)+",\"kind\":\"section\"}";
     }
     tabs+="]";
 
     int patients=0, paidN=0, unpaidN=0;
+    int cRefund=0, cWait=0, cDebt=0, cCred=0;
     std::string list="[";
     bool first=true;
     for(int i=(int)rows.size()-1;i>=0;--i){
@@ -592,12 +702,19 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
         if(t.epochMin<win) continue;
         if(!sc.supervisor && sc.homeSectionId>0 && t.sectionId!=sc.homeSectionId)
             continue;
+        if(t.hasPos) continue;                 // POS-origin never in cashier
+        if(t.status==L"cancelled") continue;
+        if(cashStatusEq(t,L"refund"))   cRefund++;
+        else if(cashStatusEq(t,L"waiting"))  cWait++;
+        else if(cashStatusEq(t,L"debtor"))   cDebt++;
+        else if(cashStatusEq(t,L"creditor")) cCred++;
         bool inTab=false;
-        if(tabSectionId<=0) inTab=(t.paid==0);
+        if(statusTab) inTab=cashStatusEq(t,sf);
+        else if(tabSectionId<=0) inTab=(cashRemain(t)>0 && !cashStatusEq(t,L"refund"));
         else inTab=(t.sectionId==tabSectionId);
         if(!inTab) continue;
         patients++;
-        if(t.paid>0) paidN++; else unpaidN++;
+        if(cashRemain(t)<=0) paidN++; else unpaidN++;
         if(!cashHit(t,qn)) continue;
         if(!first) list+=",";
         first=false;
@@ -619,6 +736,12 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId){
     o+="\"paid\":"+opsJnum(paidN)+",";
     o+="\"unpaid\":"+opsJnum(unpaidN)+",";
     o+="\"queue\":"+opsJnum(cashQueueCount());
+    o+="},";
+    o+="\"statusCounts\":{";
+    o+="\"refund\":"+opsJnum(cRefund)+",";
+    o+="\"waiting\":"+opsJnum(cWait)+",";
+    o+="\"debtor\":"+opsJnum(cDebt)+",";
+    o+="\"creditor\":"+opsJnum(cCred);
     o+="},";
     o+="\"rows\":"+list;
     o+="}";
@@ -649,7 +772,7 @@ std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode,
         if(!nidOnly && r.barcode!=barcode && r.receiptNo!=barcode && r.fileNo!=barcode)
             continue;
         if(!any || r.epochMin>=any->epochMin) any=&r;
-        if(r.status!=L"cancelled" && r.paid==0){
+        if(r.status!=L"cancelled" && cashRemain(r)>0){
             if(!unpaid || r.epochMin>=unpaid->epochMin) unpaid=&r;
         }
     }
@@ -809,6 +932,48 @@ std::string Receipt_SectionsJson(){
     }
     o+="]}";
     return o;
+}
+
+AccountingStats Accounting_Stats(){
+    AccountingStats st;
+    SYSTEMTIME now=iranNow();
+    st.date=jalaliDateShort(now);
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    for(const auto& t:rows){
+        if(t.status==L"cancelled") continue;
+        bool today = (t.jdate==st.date) ||
+                     (t.paidAt.size()>=st.date.size() && t.paidAt.compare(0,st.date.size(),st.date)==0);
+        bool refund = cashStatusEq(t, L"refund");
+        long long remain=cashRemain(t);
+        if(refund){
+            if(today){ st.refund++; st.refundAmt += t.paid>0?t.paid:t.payable; }
+            continue;
+        }
+        if(!t.hasPos && remain>0){
+            st.unpaid++;
+            st.unpaidAmt += remain;
+        }
+        if(today && t.paid>0){
+            st.income += t.paid;
+            if(!t.hasPos){
+                st.cashed++;
+                st.cashedAmt += t.paid;
+            }
+        }
+    }
+    return st;
+}
+std::vector<CashTicket> Accounting_Recent(int limit){
+    if(limit<=0) limit=30;
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=cashLoad();
+    std::vector<CashTicket> out;
+    for(int i=(int)rows.size()-1;i>=0 && (int)out.size()<limit;--i){
+        if(rows[i].status==L"cancelled") continue;
+        out.push_back(rows[i]);
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------

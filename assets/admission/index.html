@@ -639,6 +639,7 @@
     <header class="portal-topbar">
       <button class="portal-burger" id="portalBurger" title="منو" aria-label="منو"><svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M4 6h16v2.2H4V6zm0 4.9h16v2.2H4v-2.2zm0 4.9h16v2.2H4v-2.2z"/></svg></button>
       <div class="portal-titles"><div class="portal-title">کارتابل پیام</div></div>
+      <span class="portal-badge" id="portalBadge" style="display:none">۰</span>
       <div class="portal-search-wrap">
         <input class="inp portal-search" id="portalSearch" placeholder="جستجوی پیام…" />
       </div>
@@ -803,6 +804,12 @@
         <div class="qov-sum-card"><span class="qov-sum-num" id="cashStatQ">۰</span><span class="qov-sum-lbl">صف پذیرش</span></div>
         <div class="qov-sum-hint" id="cashShiftMeta">شیفت شروع نشده</div>
       </div>
+      <div class="cash-status-strip" id="cashStatusStrip">
+        <button type="button" class="cash-st" data-status="refund">قبوض استردادی <b id="cashStRefund">۰</b></button>
+        <button type="button" class="cash-st" data-status="waiting">ایست انتظار <b id="cashStWait">۰</b></button>
+        <button type="button" class="cash-st" data-status="debtor">بدهکار <b id="cashStDebt">۰</b></button>
+        <button type="button" class="cash-st" data-status="creditor">بستانکار <b id="cashStCred">۰</b></button>
+      </div>
       <div class="tbl-wrap" id="cashWrap">
         <table class="tbl q-tbl cash-tbl">
           <thead><tr>
@@ -850,6 +857,84 @@
       </div>
     </div>
   </div>
+  <!-- v1.97: ticket mini — after non-POS save (needsCashier) -->
+  <div class="ticket-mini-back" id="ticketMiniBack"></div>
+  <div class="ticket-mini" id="ticketMini" aria-hidden="true">
+    <div class="ticket-mini-card">
+      <div class="ticket-mini-kicker">قبض پذیرش</div>
+      <div class="ticket-mini-bar" id="ticketMiniBar" aria-hidden="true"></div>
+      <div class="ticket-mini-code" id="ticketMiniCode">—</div>
+      <div class="ticket-mini-name" id="ticketMiniName">—</div>
+      <div class="ticket-mini-tbl-wrap">
+        <table class="tbl ticket-mini-tbl">
+          <thead><tr><th>نام خدمت</th><th>تعداد</th><th>مبلغ</th></tr></thead>
+          <tbody id="ticketMiniSvc"></tbody>
+        </table>
+      </div>
+      <div class="ticket-mini-act">
+        <button type="button" class="btn btn-primary" id="ticketMiniPrint">چاپ</button>
+        <button type="button" class="btn btn-outline" id="ticketMiniClose">بستن</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v1.97: payment mini — cashier صدور / صندوق شد -->
+  <div class="pay-mini-back" id="payMiniBack"></div>
+  <div class="pay-mini" id="payMini" aria-hidden="true">
+    <div class="pay-mini-card">
+      <div class="pay-mini-kicker">صدور صندوق</div>
+      <div class="pay-mini-who">
+        <div class="pay-mini-name" id="payMiniName">—</div>
+        <div class="pay-mini-code" id="payMiniCode">—</div>
+      </div>
+      <div class="pay-mini-bar" id="payMiniBar" aria-hidden="true"></div>
+      <div class="pay-mini-tbl-wrap">
+        <table class="tbl pay-mini-tbl">
+          <thead><tr><th>نام خدمت</th><th>تعداد</th><th>مبلغ</th></tr></thead>
+          <tbody id="payMiniSvc"></tbody>
+        </table>
+      </div>
+      <div class="pay-mini-final">
+        <span>مبلغ نهایی قابل پرداخت</span>
+        <b id="payMiniAmt">۰</b>
+        <em>ریال</em>
+      </div>
+      <div class="pay-mini-disc" id="payMiniDiscBox" style="display:none">
+        <label class="fld"><span>مبلغ تخفیف (ریال)</span><input type="text" id="payMiniDisc" class="inp" inputmode="numeric" /></label>
+      </div>
+      <div class="pay-mini-acts">
+        <button type="button" class="btn pay-btn pay-btn-pos" data-paym="pos">
+          <span class="pay-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 6h18v12H3V6zm2 2v8h14V8H5zm1 2h4v2H6v-2zm6 0h6v2h-6v-2z"/></svg></span>
+          پرداخت با کارتخوان
+        </button>
+        <button type="button" class="btn pay-btn pay-btn-cash" data-paym="cash">
+          <span class="pay-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 7h18v10H3V7zm2 2v6h14V9H5zm7 1.2A2.3 2.3 0 1112 15a2.3 2.3 0 010-4.8z"/></svg></span>
+          پرداخت نقدی
+        </button>
+        <button type="button" class="btn pay-btn pay-btn-free" data-paym="free">
+          <span class="pay-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2L12 16.8 5.7 20.8 8 13.6 2 9.2h7.6z"/></svg></span>
+          رایگان
+        </button>
+        <button type="button" class="btn pay-btn pay-btn-disc" data-paym="discount">
+          <span class="pay-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7.5 6A2.5 2.5 0 107.5 11 2.5 2.5 0 007.5 6zm9 7A2.5 2.5 0 1016.5 18 2.5 2.5 0 0016.5 13zM6 18L18 6l1.4 1.4L7.4 19.4z"/></svg></span>
+          تخفیف
+        </button>
+      </div>
+      <div class="pay-mini-foot">
+        <button type="button" class="btn pay-btn-test" data-paym="test">تست</button>
+        <button type="button" class="btn btn-outline" id="payMiniClose">بستن</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v1.97: portal list tile context menu (pin/save/print/delete) -->
+  <div id="portalCtx" class="portal-ctx" style="display:none">
+    <button type="button" class="portal-ctx-item" data-pact="pin">سنجاق</button>
+    <button type="button" class="portal-ctx-item" data-pact="save">ذخیره</button>
+    <button type="button" class="portal-ctx-item" data-pact="print">چاپ</button>
+    <button type="button" class="portal-ctx-item portal-ctx-del" data-pact="delete">حذف</button>
+  </div>
+
   <div id="toast" class="toast"></div>
   <!-- v1.40.0: SHARED shell runtime FIRST — defines AzBoot/AzBridge/AzUi/AzNav/
        AzPerf. bridge.js still owns the admission page's `Bridge` transport

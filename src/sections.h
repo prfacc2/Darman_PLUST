@@ -30,7 +30,12 @@ struct Section {
     // surface as cashier tabs until the manager enables it. Stored as an optional
     // 10th column so older files load unchanged (cashier_tab stays 0).
     int          cashier_tab;
-    Section():id(0),is_active(1),parent_id(0),cashier_tab(0){}
+    // v1.97: «بخش/زیربخش دستگاه پوز دارد». has_pos=1 means this row takes payment
+    // itself (ticket is marked paid/pos and is excluded from cashier). Default
+    // 0/OFF. Stored as an optional 11th column so older files load unchanged.
+    // Sections_HasPos does NOT inherit from the parent row.
+    int          has_pos;
+    Section():id(0),is_active(1),parent_id(0),cashier_tab(0),has_pos(0){}
 };
 
 // Stable durable CATEGORY codes (§7). Section display names may change; these
@@ -63,3 +68,6 @@ int  Sections_Delete(int id);
 
 // Localized label for a kind code.
 const wchar_t* Sections_KindLabel(const std::wstring& kind);
+
+// v1.97: POS flag on THIS id only — no parent inheritance. Missing/unknown → false.
+bool Sections_HasPos(int id);

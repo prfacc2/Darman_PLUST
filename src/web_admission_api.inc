@@ -1063,6 +1063,41 @@ static std::string admissionApi(const std::string& verb, const std::string& body
 
     // ---- admission.save: persist + PRINT per the Management print design ----
     if(verb=="admission.save"){
+        // v1.97: reprint / ticketId → print the existing ticket, no new save.
+        {
+            std::string tidU;
+            if(!jsonGetString(body,"ticketId",tidU) || tidU.empty())
+                jsonGetString(body,"reprintId",tidU);
+            if(tidU.empty()){
+                std::string rp;
+                if(jsonGetString(body,"reprint",rp) && !rp.empty() &&
+                   rp!="true" && rp!="false" && rp!="1" && rp!="0")
+                    tidU=rp;
+            }
+            if(!tidU.empty()){
+                ReceptionRecord rec;
+                if(!Receipt_BuildRecord(u82w(tidU),rec))
+                    return "{\"ok\":false,\"err\":\"قبض پیدا نشد.\"}";
+                HWND owner=g_hFrame;
+                int sid=adResolveSectionId();
+                std::wstring printMode=L"none";
+                RunOnUiThreadSync([&](){
+                    bool done=false;
+                    done=printPrintDesign(rec,sid,owner);
+                    if(done) printMode=L"print-design section="+std::to_wstring(sid);
+                    if(!done){
+                        done=printDesignedReceipt(rec,0,owner);
+                        if(done) printMode=L"designed-receipt idx=0";
+                    }
+                    if(!done){
+                        printReceipt(rec,2,owner);
+                        printMode=L"classic-gdi";
+                    }
+                });
+                return std::string("{\"ok\":true,\"reprinted\":true,\"ticketId\":")+
+                       jstr(u82w(tidU))+",\"printMode\":"+jstr(printMode)+"}";
+            }
+        }
         AdPatient p=adReadPatient(body);
         if(p.nid.empty())
             return "{\"ok\":false,\"err\":\"کد ملی خالی است\"}";
@@ -1080,12 +1115,21 @@ static std::string admissionApi(const std::string& verb, const std::string& body
 
         int q=saveReception(r);   // assigns queue no + persists CSV
         std::wstring cashWarn;
+        CashTicket cashT;
+        bool cashOk=false;
         {
             std::wstring cerr;
-            if(!Cash_CreateFromReception(r,cerr)){
+            cashOk=Cash_CreateFromReception(r,cerr,cashT);
+            if(!cashOk){
                 logError(L"admission.save cashier ticket: "+cerr);
                 cashWarn=cerr.empty()?L"ثبت بلیت صندوق ناموفق بود.":cerr;
             }
+        }
+        bool posHas = cashOk ? (cashT.hasPos!=0) : false;
+        if(!cashOk){
+            CashScope sc=Cash_ResolveScope();
+            posHas = (sc.homeSubId>0 && Sections_HasPos(sc.homeSubId)) ||
+                     Sections_HasPos(sc.homeSectionId);
         }
 
         // remember this operator-confirmed identity (never fabricated).
@@ -1112,35 +1156,55 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         // owns g_hFrame. Calling it here directly deadlocked the whole program
         // (the "everything freezes after adding a service + saving" bug). We now
         // marshal the entire print block onto the UI thread and wait for it.
-        HWND owner = g_hFrame;
-        int  sid=adResolveSectionId();
         std::wstring printMode=L"none";
-        RunOnUiThreadSync([&](){
-            bool done=false;
-            // v1.65.0: ALWAYS try the services-capable print-design first —
-            // even when sid==0 (SectionDesign_Resolve maps sid<=0 to the first
-            // builtin, and printPrintDesign now seeds the design store lazily).
-            // Previously sid==0 or an unseeded store silently degraded to the
-            // legacy label-only receipt, which cannot render the services table.
-            done=printPrintDesign(r,sid,owner);
-            if(done) printMode=L"print-design section="+std::to_wstring(sid);
-            if(!done){
-                done=printDesignedReceipt(r,0,owner);
-                if(done) printMode=L"designed-receipt idx=0";
-            }
-            if(!done){
-                printReceipt(r,2,owner);
-                printMode=L"classic-gdi";
-            }
-            kickCashDrawer();
-        });
+        // v1.97: non-POS tickets go to cashier — skip print, return needsCashier.
+        if(posHas){
+            HWND owner = g_hFrame;
+            int  sid=adResolveSectionId();
+            RunOnUiThreadSync([&](){
+                bool done=false;
+                // v1.65.0: ALWAYS try the services-capable print-design first —
+                // even when sid==0 (SectionDesign_Resolve maps sid<=0 to the first
+                // builtin, and printPrintDesign now seeds the design store lazily).
+                // Previously sid==0 or an unseeded store silently degraded to the
+                // legacy label-only receipt, which cannot render the services table.
+                done=printPrintDesign(r,sid,owner);
+                if(done) printMode=L"print-design section="+std::to_wstring(sid);
+                if(!done){
+                    done=printDesignedReceipt(r,0,owner);
+                    if(done) printMode=L"designed-receipt idx=0";
+                }
+                if(!done){
+                    printReceipt(r,2,owner);
+                    printMode=L"classic-gdi";
+                }
+                kickCashDrawer();
+            });
+            logLine(L"admission printed via: "+printMode+L"  nid="+r.nationalId);
+            if(g_hFrame) PostMessageW(g_hFrame,WM_APP_DESIGN_PUSHED,0,0);
+        } else {
+            logLine(L"admission saved → cashier (no POS) nid="+r.nationalId);
+        }
 
-        logLine(L"admission printed via: "+printMode+L"  nid="+r.nationalId);
-        if(g_hFrame) PostMessageW(g_hFrame,WM_APP_DESIGN_PUSHED,0,0);
-
+        std::wstring fullName=r.firstName;
+        if(!r.lastName.empty()){
+            if(!fullName.empty()) fullName+=L" ";
+            fullName+=r.lastName;
+        }
+        std::string svc=w2u8(cashT.servicesJson);
+        if(svc.empty()) svc="[]";
         std::string o="{\"ok\":true,\"queueNo\":"+jnum(q)+
             ",\"printMode\":"+jstr(printMode)+
-            ",\"ps\":"+adDoctorStatsJson(r.treatingDoctor);
+            ",\"needsCashier\":"; o+=(posHas?"false":"true");
+        o+=",\"posHas\":"; o+=(posHas?"true":"false");
+        if(cashOk){
+            o+=",\"ticketId\":"+jstr(cashT.id);
+            o+=",\"barcode\":"+jstr(cashT.barcode);
+            o+=",\"name\":"+jstr(fullName);
+            o+=",\"payable\":"+jnum(cashT.payable);
+            o+=",\"services\":"+svc;
+        }
+        o+=",\"ps\":"+adDoctorStatsJson(r.treatingDoctor);
         if(!cashWarn.empty()) o+=",\"cashWarn\":"+jstr(cashWarn);
         o+="}";
         return o;
@@ -1275,18 +1339,25 @@ static std::string admissionApi(const std::string& verb, const std::string& body
 
     // ---- v1.82.0 cashier page ----------------------------------------------
     if(verb=="cashier.page"){
-        std::string qU; jsonGetString(body,"q",qU);
+        std::string qU, stU; jsonGetString(body,"q",qU);
+        jsonGetString(body,"status",stU);
         double tab=0; jsonGetNumber(body,"tab",tab);
-        return Cash_PageJson(u82w(qU),(int)tab);
+        return Cash_PageJson(u82w(qU),(int)tab,u82w(stU));
     }
     if(verb=="cashier.get"){
         std::string idU; jsonGetString(body,"id",idU);
         return Cash_GetJson(u82w(idU));
     }
     if(verb=="cashier.pay"){
-        std::string idU; jsonGetString(body,"id",idU);
+        std::string idU, methodU; jsonGetString(body,"id",idU);
+        jsonGetString(body,"method",methodU);
+        double amt=0, disc=0;
+        jsonGetNumber(body,"amount",amt);
+        jsonGetNumber(body,"discount",disc);
         std::wstring err;
-        if(!Cash_Pay(u82w(idU),err))
+        std::wstring method=u82w(methodU);
+        if(method.empty()) method=L"cash";
+        if(!Cash_PayEx(u82w(idU),method,(long long)amt,(long long)disc,err))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
         return "{\"ok\":true}";
     }
@@ -1459,6 +1530,31 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             }
         }
         return "{\"ok\":true}";
+    }
+
+    // v1.97: lookup a cashier ticket by nid / barcode / q (or id).
+    if(verb=="cashier.lookup"){
+        std::string nidU, bcU, qU, idU;
+        jsonGetString(body,"nid",nidU);
+        jsonGetString(body,"barcode",bcU);
+        jsonGetString(body,"q",qU);
+        jsonGetString(body,"id",idU);
+        bool unpaidOnly=jsonGetBool(body,"unpaidOnly",false);
+        std::wstring tid=u82w(idU);
+        if(tid.empty()){
+            std::wstring nid=u82w(nidU), bc=u82w(bcU);
+            if(nid.empty() && bc.empty()){
+                std::wstring q=u82w(qU);
+                nid=q; bc=q;
+            }
+            tid=Cash_LookupId(nid,bc,unpaidOnly);
+        }
+        if(tid.empty()) return "{\"ok\":false,\"err\":\"قبض پیدا نشد.\"}";
+        std::string raw=Cash_GetJson(tid);
+        if(raw.find("\"ok\":false")!=std::string::npos) return raw;
+        if(!raw.empty() && raw[0]=='{')
+            return std::string("{\"ok\":true,\"id\":")+jstr(tid)+","+raw.substr(1);
+        return raw;
     }
 
     return "{\"ok\":false,\"err\":\"verb ناشناخته\"}";

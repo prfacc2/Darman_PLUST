@@ -19,7 +19,12 @@ struct CashTicket {
     std::wstring mobile, fileNo, archiveNo, insBase, insSupp, receiptNo;
     std::wstring apptDate, turn, shift, status;
     std::wstring cancelReason, cancelUser, cancelAt;
-    CashTicket():sectionId(0),subId(0),payable(0),paid(0),epochMin(0){}
+    // v1.97 payment split — optional extra | columns on disk
+    std::wstring payMethod;          // cash | pos | free | discount | test
+    long long cashAmt, posAmt, discountAmt;
+    int hasPos;                      // 1 = originated from a POS section
+    CashTicket():sectionId(0),subId(0),payable(0),paid(0),epochMin(0),
+                 cashAmt(0),posAmt(0),discountAmt(0),hasPos(0){}
 };
 
 struct CashShift {
@@ -53,6 +58,11 @@ bool Ops_IsReception(const Section& s);
 CashScope Cash_ResolveScope();
 
 bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err);
+bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashTicket& created);
+// v1.97: method = cash|pos|free|discount|test. amount/discount 0 → full remain.
+// test succeeds ~80% and fails ~20%. Cash_Pay wraps a full cash payment.
+bool Cash_PayEx(const std::wstring& id, const std::wstring& method,
+                long long amount, long long discount, std::wstring& err);
 bool Cash_Pay(const std::wstring& id, std::wstring& err);
 bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
                  const std::wstring& last, const std::wstring& doctor,
@@ -60,9 +70,28 @@ bool Cash_Manual(const std::wstring& nid, const std::wstring& first,
 
 // q filters barcode/name/doctor/section inside the active tab only.
 // tabSectionId==0 → «صندوق نرفته‌ها» (unpaid). Otherwise a top-level section id.
-std::string Cash_PageJson(const std::wstring& q, int tabSectionId);
+// statusFilter: refund|waiting|debtor|creditor (independent of section tabs).
+std::string Cash_PageJson(const std::wstring& q, int tabSectionId,
+                          const std::wstring& statusFilter=L"");
 std::string Cash_GetJson(const std::wstring& id);
 std::wstring Cash_LookupId(const std::wstring& nid, const std::wstring& barcode, bool unpaidOnly);
+
+// v1.97 accounting dashboard (GDI SC_ACCOUNTING).
+//   income     درآمد امروز (sum of paid today, including POS-origin)
+//   unpaid     پرداخت‌نشده count (cashier outstanding, not POS-origin)
+//   cashed     صندوق‌شده count (cashier-paid today, not POS-origin)
+//   refund     استرداد count today
+struct AccountingStats {
+    std::wstring date;
+    long long income;
+    int unpaid, cashed, refund;
+    long long unpaidAmt, cashedAmt, refundAmt;
+    AccountingStats():income(0),unpaid(0),cashed(0),refund(0),
+                      unpaidAmt(0),cashedAmt(0),refundAmt(0){}
+};
+AccountingStats Accounting_Stats();
+// Newest tickets first, up to `limit` (default 30).
+std::vector<CashTicket> Accounting_Recent(int limit=30);
 
 bool Shift_Start(std::wstring& err);
 bool Shift_End(std::wstring& err);

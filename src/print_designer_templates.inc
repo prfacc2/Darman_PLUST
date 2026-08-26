@@ -134,50 +134,50 @@ static PrintItem mkPhoto(double x,double y,double w,double h){
 //  caption of each column decides its meaning (pdSvcColOf), so a clinic may
 //  reorder or delete columns in the designer and the data still lands right.
 //
-//  v1.67.0 — every preset contains the four authoritative columns required on
-//  every receipt: نام خدمت | شرح خدمت | تعداد | مبلغ کل. Optional columns may
-//  add row/code/category/unit/insurance detail but never replace those four.
+//  v1.97.0 — every preset contains the four authoritative columns required on
+//  every receipt, RTL right→left: نام خدمت | تعداد | مبلغ کل | شرح خدمت last.
+//  Row # is omitted or last — never in the middle. Optional columns may add
+//  code/category/unit/insurance detail but never replace those four.
 // ---------------------------------------------------------------------------
 enum SvcPreset {
     SVC3 = 0, SVC4_ROW, SVC4_CAT, SVC5, SVC5_CODE, SVC6_FIN, SVC6_INS, SVC7,
     SVC_PRESET_COUNT
 };
 
-// v1.96.0 — COLUMN ORDER is now DESCRIPTION-FIRST per the medical-receipt
-// spec: شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل (right→left in RTL).
+// v1.97.0 — COLUMN ORDER: نام خدمت | تعداد | مبلغ کل | شرح خدمت (last).
 // The renderer is label-driven (pdSvcColOf), so reordering is safe: each column
-// still pulls the right data by its caption. Extra columns (کد/نوع/مبلغ واحد/
-// تخفیف/سهم بیمه/سهم بیمار) are appended after the canonical five.
+// still pulls the right data by its caption. Extra columns sit between name
+// and description; ردیف if present is always last.
 static std::wstring svcModelJson(int preset){
     switch(preset){
-    case SVC4_ROW:      // canonical five, name-emphasized widths
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.27,0.08,0.33,0.10,0.22],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    case SVC4_ROW:      // canonical four + ردیف last
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.32,0.10,0.20,0.30,0.08],"
+               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\",\"ردیف\"]}";
     case SVC4_CAT:      // + نوع خدمت
-        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.06,0.24,0.12,0.10,0.24],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"نوع خدمت\",\"تعداد\",\"مبلغ کل\"]}";
-    case SVC5:          // canonical five, balanced widths
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.29,0.07,0.32,0.10,0.22],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.26,0.12,0.10,0.22,0.30],"
+               L"\"labels\":[\"نام خدمت\",\"نوع خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
+    case SVC5:          // canonical four, balanced widths
+        return L"{\"cols\":4,\"header\":true,\"widths\":[0.32,0.12,0.24,0.32],"
+               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
     case SVC5_CODE:     // + کد خدمت
-        return L"{\"cols\":6,\"header\":true,\"widths\":[0.22,0.06,0.12,0.26,0.10,0.24],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.26,0.12,0.10,0.22,0.30],"
+               L"\"labels\":[\"نام خدمت\",\"کد خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
     case SVC6_FIN:      // + مبلغ واحد / تخفیف
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.05,0.18,0.08,0.14,0.11,0.24],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ واحد\","
-               L"\"تخفیف\",\"مبلغ کل\"]}";
+        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.08,0.14,0.10,0.18,0.26],"
+               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ واحد\",\"تخفیف\",\"مبلغ کل\","
+               L"\"شرح خدمت\"]}";
     case SVC6_INS:      // + سهم بیمه / سهم بیمار
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.05,0.18,0.08,0.17,0.16,0.16],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\","
-               L"\"سهم بیمه\",\"سهم بیمار\"]}";
-    case SVC7:          // + کد خدمت / مبلغ واحد
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.18,0.05,0.11,0.18,0.08,0.14,0.26],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"تعداد\","
-               L"\"مبلغ واحد\",\"مبلغ کل\"]}";
+        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.08,0.16,0.14,0.14,0.24],"
+               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"سهم بیمه\",\"سهم بیمار\","
+               L"\"شرح خدمت\"]}";
+    case SVC7:          // + کد خدمت / مبلغ واحد + ردیف last
+        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.10,0.08,0.12,0.16,0.26,0.08],"
+               L"\"labels\":[\"نام خدمت\",\"کد خدمت\",\"تعداد\",\"مبلغ واحد\",\"مبلغ کل\","
+               L"\"شرح خدمت\",\"ردیف\"]}";
     case SVC3:
-    default:           // canonical five, description-emphasized widths
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.30,0.07,0.31,0.10,0.22],"
-               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    default:           // canonical four, name-emphasized
+        return L"{\"cols\":4,\"header\":true,\"widths\":[0.34,0.10,0.22,0.34],"
+               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
     }
 }
 
@@ -316,7 +316,7 @@ static const TplSpec TPL[30] = {
 // (قبض پزشک / رسید بیمه / قبض و رسید پزشکی) and the family signature follows.
 static const wchar_t* const TPL_NAMES[30]={
     L"۰۱) قبض پزشک — کلاسیک",
-    L"۰۲) رسید بیمه — کلاسیک باند خاکستری",
+    L"۰۲) رسید بیمه — کلاسیک خط‌کشی",
     L"۰۳) قبض و رسید — کلاسیک دوخطی",
     L"۰۴) قبض پزشک — باند سرتیتر",
     L"۰۵) رسید بیمه — باند سرتیتر",
@@ -330,9 +330,9 @@ static const wchar_t* const TPL_NAMES[30]={
     L"۱۳) قبض پزشک — خط‌کشی تک‌رنگ",
     L"۱۴) رسید بیمه — خط‌کشی قاب‌دار",
     L"۱۵) قبض و رسید — خط‌کشی",
-    L"۱۶) قبض پزشک — کارتی سایه‌دار",
-    L"۱۷) رسید بیمه — کارتی سایه‌دار",
-    L"۱۸) قبض و رسید — کارتی سایه‌دار",
+    L"۱۶) قبض پزشک — کارتی خط‌کشی",
+    L"۱۷) رسید بیمه — کارتی خط‌کشی",
+    L"۱۸) قبض و رسید — کارتی خط‌کشی",
     L"۱۹) قبض پزشک — عکس بیمار",
     L"۲۰) رسید بیمه — عکس بیمار",
     L"۲۱) قبض و رسید — عکس بیمار",
@@ -455,8 +455,8 @@ static double medInfo(std::vector<PrintItem>& v,double x,double y,double w,
       v.push_back(mkField (lx+f2+g,     cy+0.3, f1,    fh, L"supp",         L"", pt, 0));
       v.push_back(mkLabel (lx+lw-lblW,  cy+0.3, lblW,  fh, FA_SUPP, pt, false, 0)); }
     rule();
-    // d: نام بیمار: {full}  |  سن: {age}
-    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_FULL, L"full", pt, true,  false, 0.40);
+    // d: نام بیمار: {P-Name}  |  سن: {age}  (10Y/24Y)
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_FULL, L"P-Name", pt, true,  false, 0.40);
              putLF(v, lx, cy+0.3, lw, fh, FA_AGE,  L"age",  pt, false, false, 0.20); rule();
     // e: دکتر: {doctor}  |  کد نظام پزشکی: {doctorcode}
     vline(); putLF(v, rx, cy+0.3, rw, fh, FA_DOCTOR,  L"doctor",     pt, false, false, 0.22);
@@ -554,7 +554,7 @@ static double medBelow(std::vector<PrintItem>& v,double x,double y,double w,doub
 
 // Family 8 — compact tear-off: a rule + a mini «نسخهٔ بیمار» stub (name / receipt
 // / total / insshare / paid), split label/value. No second barcode: the main
-// receipt already carries the one deterministic Code128 in section 2.
+// receipt already carries the one deterministic Code128 below the services table.
 static double medStub(std::vector<PrintItem>& v,double x,double y,double w,double pt){
     v.push_back(mkHLine(x, y, w, 0.3));
     v.push_back(mkLabel(x, y+0.6, w, 4, FA_TEAR, pt-1.0, false, 1));
@@ -564,7 +564,7 @@ static double medStub(std::vector<PrintItem>& v,double x,double y,double w,doubl
     double rH=5.0, fh=4.4, half=w/2.0;
     v.push_back(mkRect(x, y, w, 3*rH, 0.3, 0));
     v.push_back(mkVLine(x+half, y, 3*rH, 0.3));
-    putLF(v, x+half+1.0, y+0.3,      half-2.0, fh, FA_FULL,     L"full",      pt-1.0, true,  false, 0.36);
+    putLF(v, x+half+1.0, y+0.3,      half-2.0, fh, FA_FULL,     L"P-Name",    pt-1.0, true,  false, 0.36);
     putLF(v, x+1.0,      y+0.3,      half-2.0, fh, FA_RECEIPT,  L"receiptNo", pt-1.0, false, false, 0.40);
     v.push_back(mkHLine(x, y+rH, w, 0.3));
     putLF(v, x+half+1.0, y+rH+0.3,   half-2.0, fh, FA_TOTAL,    L"total",     pt-1.0, false, false, 0.36);
@@ -578,8 +578,8 @@ static double medStub(std::vector<PrintItem>& v,double x,double y,double w,doubl
 }
 
 
-// Family 3 — sidebar: a narrow left panel (logo + clinic identity + barcode)
-// and a main column carrying the title + the ruled receipt box + below lines.
+// Family 3 — sidebar: a narrow left panel (logo + clinic identity) and a main
+// column carrying the title + info + services + barcode + totals + below lines.
 static void renderSidebar(PrintDesign& d,const TplSpec& sp,double pt,double rH,
                           double bw,double svcH,const std::wstring& title){
     std::vector<PrintItem>& v=d.items;
@@ -592,17 +592,16 @@ static void renderSidebar(PrintDesign& d,const TplSpec& sp,double pt,double rH,
     v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 10.0, L"clinicaddr",  L"", pt-2.0, 1)); sy+=11.0;
     v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 5.0,  L"clinicphone", L"", pt-2.0, 1)); sy+=6.0;
     v.push_back(mkHLine(sbX+1.0, sy, sbW-2.0, 0.3)); sy+=3.0;
-    double bcH=7.0;
-    v.push_back(mkBarcode(sbX+2.0, sy, sbW-4.0, bcH));
-    double sbBottom=sy+bcH+2.0;
+    double sbBottom=sy+2.0;
     v.push_back(mkRect(sbX, sbTop, sbW, sbBottom-sbTop, bw, 0));
-    // main column: section 3 title + sections 4..8 box + sections 9..11
+    // main column: title + info + services + barcode BELOW the table + totals
     double mx=mainX, mw=mainW, boxTop=R_M, y=boxTop+1.2;
     v.push_back(mkLabel(mx, y, mw, 6.0, title, pt+2.0, true, 1)); y+=7.5;
     v.push_back(mkHLine(mx, y, mw, 0.3)); y+=2.0;
     y=medInfo(v, mx, y, mw, rH, pt, bw);
     v.push_back(mkServices(mx, y, mw, svcH, pt-0.5, sp.svc, 0, bw, rH-1.0, rH-0.8));
     y+=svcH;
+    y=medBarcode(v, mx, y, mw, pt);
     y=medFinancial(v, mx, y, mw, rH, pt, bw, 0);
     y=medEpresReferral(v, mx, y, mw, rH, pt, bw);
     v.push_back(mkRect(mx, boxTop, mw, y-boxTop, bw, 0));
@@ -655,20 +654,20 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
 
     // 1 clinic header
     y = medHeader(v, x, y, w, pt, hdrMode, photo);
-    // 2 barcode
-    y = medBarcode(v, x, y, w, pt);
-    // 3 document title
+    // 2 document title (barcode moves BELOW the services table — v1.97)
     y = medTitle(v, x, y, w, pt, title);
 
     // optional ruled section captions (card family)
     if(capBars) caption(L"مشخصات بیمار");
-    // 4 ruled info box
+    // 3 ruled info box
     y = medInfo(v, x, y, w, rH, pt, bw);
 
     if(capBars) caption(FA_SVCLIST);
-    // 5 services table (dynamic, PIT_SERVICES)
+    // 4 services table (dynamic, PIT_SERVICES)
     v.push_back(mkServices(x, y, w, svcH, pt-0.5, sp.svc, svcHdr, bw, rH-1.0, rH-0.8));
     y += svcH;
+    // 5 exactly one thin Code128 barcode, BELOW the services table (~72×7 mm)
+    y = medBarcode(v, x, y, w, pt);
 
     if(capBars) caption(L"مالی و پرداخت");
     // 6 financial section
@@ -719,6 +718,7 @@ void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
     const int N = 30;
     auto stamp=[](){
+        setSetting(L"tpl_migration_1_97", L"1");
         setSetting(L"tpl_migration_1_67", L"1");
         setSetting(L"tpl_migration_1_66", L"1");
         setSetting(L"tpl_migration_1_65", L"1");
@@ -735,9 +735,10 @@ void Designs_Init(){
         stamp();
         return;
     }
-    // v1.67.0 migration: rebuild all builtins with the mandatory service
-    // columns and runtime-sized rows. Preserve ids and section bindings.
-    if(getSetting(L"tpl_migration_1_67", L"0") != L"1"){
+    // v1.97.0 migration: rebuild all builtins — name/qty/line/desc column
+    // order, barcode below the services table, token fields, 10Y age.
+    // Preserve ids and section bindings.
+    if(getSetting(L"tpl_migration_1_97", L"0") != L"1"){
         for(int i=0;i<N;i++){
             PrintDesign fresh=buildTemplate(i);
             if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }

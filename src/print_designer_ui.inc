@@ -261,6 +261,9 @@ struct DesignerState {
 
 static double pxPerMm(DesignerState* st){ return 96.0/25.4 * st->zoom; }
 
+static PrintItem g_designerClip;
+static bool g_designerHasClip=false;
+
 static PrintItem* findItem(DesignerState* st,int id){
     for(auto& it:st->design.items) if(it.id==id) return &it;
     return nullptr;
@@ -395,18 +398,15 @@ static Gdiplus::Font* makeSafeFont(const std::wstring& reqName,double pxSize,int
 
 // ---- GDI+ rendering of one item into canvas px coords ----------------------
 static std::wstring sampleValue(const std::wstring& field){
-    if(field==L"firstName") return L"\u0639\u0644\u06cc";
-    if(field==L"lastName")  return L"\u0631\u0636\u0627\u06cc\u06cc";
-    if(field==L"nationalCode") return L"\u06f0\u06f0\u06f1\u06f2\u06f3\u06f4\u06f5\u06f6\u06f7\u06f8";
-    if(field==L"insurance") return L"\u062a\u0623\u0645\u06cc\u0646 \u0627\u062c\u062a\u0645\u0627\u0639\u06cc";
-    if(field==L"suppInsurance") return L"\u062f\u0627\u0646\u0627";
-    if(field==L"doctor")    return L"\u062f\u06a9\u062a\u0631 \u0645\u062d\u0645\u062f\u06cc";
-    if(field==L"total")     return L"\u06f5\u06f0\u06f0\u060c\u06f0\u06f0\u06f0";
-    if(field==L"paid")      return L"\u06f4\u06f5\u06f0\u060c\u06f0\u06f0\u06f0";
-    if(field==L"receiptNo") return L"\u06f1\u06f2\u06f3\u06f4";
-    if(field==L"date")      return FormatJalaliPersian(0);
-    if(field==L"time")      return L"\u06f1\u06f0:\u06f3\u06f0";
-    return L"\u2014";
+    // v1.97.0 — designer preview shows tokens, never example patient names.
+    std::wstring f=field;
+    if(f.size()>=2 && f.front()==L'{' && f.back()==L'}') f=f.substr(1,f.size()-2);
+    std::wstring low=f;
+    for(wchar_t& c:low) if(c>=L'A'&&c<=L'Z') c=(wchar_t)(c-L'A'+L'a');
+    if(low==L"full"||low==L"fullname"||low==L"p-name"||low==L"pname"||low==L"p_name")
+        return L"[P-Name]";
+    if(f.empty()) return L"[field]";
+    return L"["+f+L"]";
 }
 
 static void drawItemGdip(Graphics& g,DesignerState* st,const PrintItem& it,bool selected){
@@ -548,9 +548,9 @@ static void drawItemGdip(Graphics& g,DesignerState* st,const PrintItem& it,bool 
         if(m.cols<1) m.cols=5;
         if((int)m.widths.size()!=m.cols) m.widths.assign(m.cols,1.0);
         if(m.labels.empty()){
-            // v1.96.0: canonical description-first header (شرح خدمت | ردیف | نام خدمت | تعداد | مبلغ کل)
-            const wchar_t* def[5]={L"شرح خدمت",L"ردیف",L"نام خدمت",L"تعداد",L"مبلغ کل"};
-            for(int c=0;c<m.cols;++c) m.labels.push_back(c<5?std::wstring(def[c]):L"");
+            // v1.97.0: نام خدمت | تعداد | مبلغ کل | شرح خدمت last
+            const wchar_t* def[4]={L"نام خدمت",L"تعداد",L"مبلغ کل",L"شرح خدمت"};
+            for(int c=0;c<m.cols;++c) m.labels.push_back(c<4?std::wstring(def[c]):L"");
         }
         while((int)m.labels.size()<m.cols) m.labels.push_back(L"");
         double sum=0; for(double width:m.widths) if(width>0) sum+=width;
@@ -584,7 +584,7 @@ static void drawItemGdip(Graphics& g,DesignerState* st,const PrintItem& it,bool 
             if(font){
                 StringFormat sf; sf.SetAlignment(StringAlignmentCenter);
                 sf.SetLineAlignment(StringAlignmentCenter);
-                sf.SetFormatFlags(StringFormatFlagsDirectionRightToLeft|StringFormatFlagsNoWrap);
+                sf.SetFormatFlags(StringFormatFlagsDirectionRightToLeft);
                 for(int c=0;c<m.cols;++c){
                     REAL pad=(REAL)std::max(1.0,it.padding*pxPerMillimetre);
                     RectF cell(cx[c+1]+pad,y,cx[c]-cx[c+1]-2*pad,headH);
@@ -599,6 +599,25 @@ static void drawItemGdip(Graphics& g,DesignerState* st,const PrintItem& it,bool 
         for(int r=0;r<=blankRows;++r){
             REAL yy=y+headH+r*rowH; if(yy>y+tableH) yy=y+tableH;
             g.DrawLine(&grid,x,yy,x+w,yy);
+        }
+        // v1.97.0 — first data row shows field tokens, never example names.
+        if(blankRows>=1){
+            int style=it.italic?FontStyleItalic:FontStyleRegular;
+            double pt=(it.fontPt>0)?it.fontPt:8.5;
+            Font* font=makeSafeFont(it.fontName,pt*1.333*(st->zoom>0?st->zoom:1.0),style);
+            if(font){
+                SolidBrush textBrush(tc);
+                StringFormat sf; sf.SetAlignment(StringAlignmentCenter);
+                sf.SetLineAlignment(StringAlignmentCenter);
+                sf.SetFormatFlags(StringFormatFlagsDirectionRightToLeft);
+                REAL pad=(REAL)std::max(1.0,it.padding*pxPerMillimetre);
+                for(int c=0;c<m.cols;++c){
+                    std::wstring tok=L"["+m.labels[c]+L"]";
+                    RectF cell(cx[c+1]+pad,y+headH,cx[c]-cx[c+1]-2*pad,rowH);
+                    if(cell.Width>0) g.DrawString(tok.c_str(),-1,font,cell,&sf,&textBrush);
+                }
+                delete font;
+            }
         }
         break; }
     case PIT_BARCODE:{
@@ -1039,15 +1058,14 @@ static void addPaletteItem(DesignerState* st,int type){
     case PIT_SERVICES: {
         // §1.53.0: dynamic services list, sensible default size + model. Centered
         // horizontally, ~42mm tall (room for header + ~6 service rows). Carries
-        // v1.96.0 the canonical DESCRIPTION-FIRST five-column RTL header
-        // — شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل — monochrome line-art.
+        // v1.97.0 the canonical four-column RTL header
+        // — نام خدمت | تعداد | مبلغ کل | شرح خدمت last — monochrome line-art.
         it.x=st->design.paperW/2-60; it.y=st->design.paperH/2-20; it.w=120; it.h=42;
-        it.text=L"{\"cols\":5,\"header\":true,\"widths\":[0.30,0.07,0.31,0.10,0.22],"
-                L"\"labels\":[\"\u0634\u0631\u062d \u062e\u062f\u0645\u062a\","
-                L"\"\u0631\u062f\u06cc\u0641\","
-                L"\"\u0646\u0627\u0645 \u062e\u062f\u0645\u062a\","
+        it.text=L"{\"cols\":4,\"header\":true,\"widths\":[0.34,0.10,0.22,0.34],"
+                L"\"labels\":[\"\u0646\u0627\u0645 \u062e\u062f\u0645\u062a\","
                 L"\"\u062a\u0639\u062f\u0627\u062f\","
-                L"\"\u0645\u0628\u0644\u063a \u06a9\u0644\"]}";
+                L"\"\u0645\u0628\u0644\u063a \u06a9\u0644\","
+                L"\"\u0634\u0631\u062d \u062e\u062f\u0645\u062a\"]}";
         it.fontPt=8.5; it.bold=false; it.align=0; it.dir=0;
         it.borderColor=0x000000; it.borderWidth=0.3;
         it.textColor=0x000000; it.fillTransparent=true; it.padding=0.8;
@@ -1175,6 +1193,14 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
         case 'S': if(ctrl){ designer_save(h,(GetKeyState(VK_SHIFT)&0x8000)!=0); } return 0;
         case 'Z': if(ctrl){ PrintDesign p; if(st->undo.undo(p)){ st->design=p; designer_buildInspector(h); InvalidateRect(h,NULL,FALSE);} } return 0;
         case 'Y': if(ctrl){ PrintDesign p; if(st->undo.redo(p)){ st->design=p; designer_buildInspector(h); InvalidateRect(h,NULL,FALSE);} } return 0;
+        case 'C': if(ctrl && it){ g_designerClip=*it; g_designerHasClip=true; } return 0;
+        case 'V':
+        case 'P':
+            if(ctrl && g_designerHasClip){
+                PrintItem n=g_designerClip; n.id=nextItemId(st); n.x+=6; n.y+=6;
+                st->design.items.push_back(n); st->selId=n.id; commit(st);
+                designer_buildInspector(h); InvalidateRect(h,NULL,FALSE);
+            } return 0;
         case 'D': if(ctrl && it){ PrintItem n=*it; n.id=nextItemId(st); n.x+=10; n.y+=10;
                     st->design.items.push_back(n); st->selId=n.id; commit(st);
                     designer_buildInspector(h); InvalidateRect(h,NULL,FALSE);} return 0;

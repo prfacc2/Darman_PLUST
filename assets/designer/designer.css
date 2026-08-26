@@ -103,7 +103,8 @@ code{background:#eef2f8;border-radius:4px;padding:1px 5px;font-family:Consolas,m
 .pi-table{background:#fff}
 .pi-table table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}
 .pi-table td{border:0.5px solid #333;padding:1px 3px;overflow:hidden;
-  white-space:nowrap;text-overflow:ellipsis;text-align:center;vertical-align:middle}
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word;
+  text-align:center;vertical-align:middle}
 .pi-table td.th{font-weight:700;background:#eef2fb}
 /* §1.53.0 (Bug A): live services list — same grid look, coloured header band */
 /* §1.55.0: monochrome + genuinely RTL. Text flows right→left and prose columns
@@ -113,8 +114,10 @@ code{background:#eef2f8;border-radius:4px;padding:1px 5px;font-family:Consolas,m
 .pi-services table.svc-tbl{width:100%;height:100%;border-collapse:collapse;
   table-layout:fixed;direction:rtl;unicode-bidi:plaintext}
 .pi-services td{border:0.5px solid #000;padding:1px 3px;overflow:hidden;
-  white-space:nowrap;text-overflow:ellipsis;text-align:center;vertical-align:middle;
+  white-space:normal;overflow-wrap:anywhere;word-break:break-word;
+  text-align:center;vertical-align:middle;
   direction:rtl;unicode-bidi:plaintext}
+.pi.nowrap td,.pi.nowrap .pi-text{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
 .pi-services td.th{font-weight:700}
 /* §1.55.0: static tables are RTL too — column 0 is the RIGHT-most column */
 .pi-table table{direction:rtl}

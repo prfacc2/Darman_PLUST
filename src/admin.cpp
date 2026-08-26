@@ -323,7 +323,11 @@ static LRESULT CALLBACK adminProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(d){
             applyThemedListView(d->list);
             applyThemedListView(d->pList);
+            if(d->bCreate) setFlatButtonBg(d->bCreate,g_theme.surface);
+            if(d->bDelete) setFlatButtonBg(d->bDelete,g_theme.bg);
+            if(d->bPDel)   setFlatButtonBg(d->bPDel,g_theme.bg);
         }
+        InvalidateRect(h,NULL,TRUE);
         return 0;
     case WM_CTLCOLOREDIT: {
         HDC dc=(HDC)w;

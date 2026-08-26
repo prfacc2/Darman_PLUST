@@ -92,6 +92,14 @@ static LRESULT CALLBACK crmScreenProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(view) WebCrm_Resize(view,LOWORD(l),HIWORD(l));
         return 0;
     }
+    case WM_APP_THEME: {
+        std::wstring tn=getSetting(L"theme",L"light");
+        std::string ts=std::string("{\"theme\":\"")+
+            (tn==L"dark"?"dark":tn==L"neon"?"neon":"light")+"\"}";
+        WebCrm_PushEvent("theme.changed", ts);
+        InvalidateRect(h,NULL,TRUE);
+        return 0;
+    }
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: {
         HWND view=(HWND)GetWindowLongPtrW(h,GWLP_USERDATA);
@@ -99,10 +107,9 @@ static LRESULT CALLBACK crmScreenProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // No view (engine unavailable): paint a friendly centered notice.
         PAINTSTRUCT ps; HDC dc=BeginPaint(h,&ps);
         RECT rc; GetClientRect(h,&rc);
-        HBRUSH bg=CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-        FillRect(dc,&rc,bg); DeleteObject(bg);
+        FillRect(dc,&rc,g_brBg);
         SetBkMode(dc,TRANSPARENT);
-        SetTextColor(dc,GetSysColor(COLOR_GRAYTEXT));
+        SetTextColor(dc,g_theme.textDim);
         HFONT f=CreateFontW(S(20),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,
                             DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,
                             CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,
@@ -130,7 +137,7 @@ HWND WebCrm_CreateScreen(HWND frame){
         WNDCLASSW wc={0};
         wc.lpfnWndProc=crmScreenProc; wc.hInstance=g_hInst;
         wc.hCursor=LoadCursor(NULL,IDC_ARROW);
-        wc.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);
+        wc.hbrBackground=g_brBg;
         wc.lpszClassName=CRM_SCREEN_CLASS;
         if(!RegisterClassW(&wc) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS)
             return nullptr;

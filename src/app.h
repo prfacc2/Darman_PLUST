@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"1.96.0"
+#define APP_VERSION_W   L"1.97.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -548,7 +548,7 @@ std::wstring resolveSessionTitle(const User& u);
 extern Session g_session;
 
 // ---------------------------------------------------------------- screens --
-enum ScreenId { SC_HOME=0, SC_RECEPTION=1, SC_ADMIN=2, SC_MANAGE=3 };
+enum ScreenId { SC_HOME=0, SC_RECEPTION=1, SC_ADMIN=2, SC_MANAGE=3, SC_ACCOUNTING=4 };
 void switchScreen(ScreenId id);
 RECT frameContentRect();                 // area between top & bottom bars
 
@@ -556,6 +556,7 @@ HWND createHomeScreen(HWND frame);       // main.cpp
 HWND createReceptionScreen(HWND frame);  // reception.cpp
 HWND createAdminScreen(HWND frame);      // admin.cpp
 HWND createManageScreen(HWND frame);     // admin.cpp
+HWND createAccountingScreen(HWND frame); // accounting.cpp
 
 // v1.7.0: header→reception action routing. The frame header (main.cpp) owns
 // the «پذیرش بیمار» / «تب جدید» buttons and routes them to the

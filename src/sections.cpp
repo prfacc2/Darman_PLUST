@@ -60,6 +60,9 @@ static std::vector<Section> sec_readAll(){
         // v1.93: optional 10th field = cashier_tab (ثبت پذیرش در صندوق). Older
         // files have only 9 fields and load unchanged (cashier_tab stays 0/OFF).
         if(f.size() >= 10) s.cashier_tab = _wtoi(f[9].c_str());
+        // v1.97: optional 11th field = has_pos (دستگاه پوز). Older files load
+        // unchanged (has_pos stays 0/OFF).
+        if(f.size() >= 11) s.has_pos = _wtoi(f[10].c_str());
         v.push_back(s);
     }
     int maxId=0;
@@ -99,7 +102,8 @@ static bool sec_writeAll(const std::vector<Section>& v){
         out += sec_esc(s.updated_at);out += L'|';
         out += sec_esc(s.net_meta); out += L'|';
         out += pid; out += L'|';                          // v1.74 subsection
-        out += std::to_wstring(s.cashier_tab); out += L"\r\n";   // v1.93 cashier tab
+        out += std::to_wstring(s.cashier_tab); out += L'|';       // v1.93 cashier tab
+        out += std::to_wstring(s.has_pos); out += L"\r\n";        // v1.97 POS flag
 
     }
     return writeFileUtf8(sec_path(), out, false);
@@ -266,6 +270,13 @@ const wchar_t* Sections_CategoryCode(const std::wstring& kind){
     if(kind==L"radiology" || kind.find(L"\u0631\u0627\u062f\u06cc\u0648")!=std::wstring::npos) return L"RAD";
     if(kind==L"physio" || kind.find(L"\u0641\u06cc\u0632\u06cc\u0648")!=std::wstring::npos) return L"PHY";
     return L"GEN";
+}
+
+bool Sections_HasPos(int id){
+    if(id<=0) return false;
+    std::vector<Section> all = sec_readAll();
+    for(const auto& s : all) if(s.id==id) return s.has_pos!=0;
+    return false;
 }
 
 std::wstring Sections_CodePrefix(const Section& s){

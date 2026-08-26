@@ -210,12 +210,18 @@
     el.style.zIndex = it.z || 0;
   }
 
+  function fieldTokenLabel(field) {
+    var raw = String(field || "").replace(/^\{|\}$/g, "");
+    var low = raw.toLowerCase();
+    if (low === "full" || low === "fullname" || low === "p-name" ||
+        low === "pname" || low === "p_name") return "P-Name";
+    var f = window.AZ_FIELDS[field] || window.AZ_FIELDS["{" + raw + "}"];
+    return f ? f.label : (raw || "فیلد");
+  }
   function displayText(it) {
     if (it.type === "label") return it.text || "";
     if (it.type === "field") {
-      var f = window.AZ_FIELDS[it.field];
-      var lbl = f ? f.label : (it.field || "فیلد");
-      return (it.prefix || "") + "［" + lbl + "］" + (it.suffix || "");
+      return (it.prefix || "") + "[" + fieldTokenLabel(it.field) + "]" + (it.suffix || "");
     }
     // v1.55.0: a barcode item keeps its symbology model (JSON) in it.text — never
     // show that raw JSON on the canvas; show the bound field / literal payload.
@@ -291,15 +297,15 @@
         return m;
       }
     } catch (e) {}
-    // v1.96.0: the canonical medical-receipt services table is DESCRIPTION-FIRST,
-    // right→left: شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل
-    return { cols: 5, header: true, widths: SVC_DEF_WIDTHS.slice(),
+    // v1.97.0: canonical services table RTL:
+    // نام خدمت | تعداد | مبلغ کل | شرح خدمت last. Row # omitted.
+    return { cols: 4, header: true, widths: SVC_DEF_WIDTHS.slice(),
       labels: SVC_DEF_LABELS.slice() };
   }
 
-  // v1.96.0 canonical 5-column services model (mirrors printer.cpp svcModelJson SVC3)
-  var SVC_DEF_LABELS = ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل"];
-  var SVC_DEF_WIDTHS = [0.30, 0.07, 0.31, 0.10, 0.22];
+  // v1.97.0 canonical 4-column services model (mirrors printer.cpp svcModelJson SVC3)
+  var SVC_DEF_LABELS = ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"];
+  var SVC_DEF_WIDTHS = [0.34, 0.10, 0.22, 0.34];
 
   /* --- label-driven column resolution (mirrors C++ pdSvcColOf) ------------ *
    * The CAPTION decides which live datum a column shows — never the index.
@@ -330,31 +336,22 @@
     if (has("نام") || has("خدمت") || has("عنوان")) return PSC.NAME;
     return PSC.NONE;
   }
-  // sample cell values for the DESIGN-TIME preview only. These are fixed,
-  // deterministic demo strings (never random); at print time every cell comes
-  // from the live ReceptionRecord.services vector.
-  var SVC_SAMPLES = [
-    { name: "ویزیت پزشک عمومی", desc: "معاینه و شرح حال", cat: "ویزیت", qty: "۱",
-      code: "۹۰۱", price: "۸۵۰٬۰۰۰", line: "۸۵۰٬۰۰۰", disc: "۰", ins: "۵۹۵٬۰۰۰", pat: "۲۵۵٬۰۰۰" },
-    { name: "نوار قلب", desc: "الکتروکاردیوگرام ۱۲ لید", cat: "تشخیصی", qty: "۱",
-      code: "۹۰۳", price: "۴۵۰٬۰۰۰", line: "۴۵۰٬۰۰۰", disc: "۰", ins: "۳۱۵٬۰۰۰", pat: "۱۳۵٬۰۰۰" },
-    { name: "تزریق عضلانی", desc: "تزریقات و پانسمان", cat: "درمانی", qty: "۲",
-      code: "۹۱۲", price: "۲۰۰٬۰۰۰", line: "۴۰۰٬۰۰۰", disc: "۰", ins: "۲۸۰٬۰۰۰", pat: "۱۲۰٬۰۰۰" }
-  ];
-  function svcSample(kind, rowIdx) {
-    var s = SVC_SAMPLES[rowIdx % SVC_SAMPLES.length];
+  // DESIGN-TIME preview uses field tokens, never example service names
+  // («ویزیت عمومی»). Print time still fills live ReceptionRecord.services.
+  var SVC_SAMPLES = [{}, {}, {}];
+  function svcSample(kind) {
     switch (kind) {
-      case PSC.NAME:  return s.name;
-      case PSC.DESC:  return s.desc;
-      case PSC.CAT:   return s.cat;
-      case PSC.QTY:   return s.qty;
-      case PSC.CODE:  return s.code;
-      case PSC.ROW:   return faDigits(String(rowIdx + 1));
-      case PSC.PRICE: return s.price;
-      case PSC.LINE:  return s.line;
-      case PSC.DISC:  return s.disc;
-      case PSC.INS:   return s.ins;
-      case PSC.PAT:   return s.pat;
+      case PSC.NAME:  return "[نام خدمت]";
+      case PSC.DESC:  return "[شرح خدمت]";
+      case PSC.CAT:   return "[نوع خدمت]";
+      case PSC.QTY:   return "[تعداد]";
+      case PSC.CODE:  return "[کد خدمت]";
+      case PSC.ROW:   return "[#]";
+      case PSC.PRICE: return "[مبلغ واحد]";
+      case PSC.LINE:  return "[مبلغ کل]";
+      case PSC.DISC:  return "[تخفیف]";
+      case PSC.INS:   return "[سهم بیمه]";
+      case PSC.PAT:   return "[سهم بیمار]";
       default:        return "";
     }
   }
@@ -411,8 +408,8 @@
       html += "<tr" + (rHpx > 0 ? " style='height:" + rHpx.toFixed(2) + "px'" : "") + ">";
       for (var cc = 0; cc < m.cols; cc++) {
         var wpc2 = ((m.widths[cc] || 1) / sum * 100).toFixed(3);
-        var v = svcSample(kinds[cc], r);
-        if (kinds[cc] === PSC.NAME && !v) v = "—";
+        var v = svcSample(kinds[cc]);
+        if (kinds[cc] === PSC.NAME && !v) v = "[نام خدمت]";
         var prose = (kinds[cc] === PSC.NAME || kinds[cc] === PSC.DESC || kinds[cc] === PSC.CAT);
         html += "<td style='width:" + wpc2 + "%;" + (bg ? "background:" + bg + ";" : "") +
           "border-color:" + rule + ";text-align:" + (prose ? "right" : "center") + "'>" +
@@ -699,7 +696,8 @@
 
   function buildItemEl(it) {
     var el = document.createElement("div");
-    el.className = "pi pi-" + it.type + (it.id === S.selId ? " sel" : "");
+    el.className = "pi pi-" + it.type + (it.id === S.selId ? " sel" : "") +
+      (it.fmt === "nowrap" ? " nowrap" : "");
     el.dataset.id = it.id;
     styleItem(el, it);
 
@@ -893,12 +891,12 @@
       var narrow = dm2[0] < 90;
       it.w = narrow ? 60 : 130; it.h = narrow ? 30 : 40;
       it.pt = narrow ? 7.5 : 8.5; it.borderWidth = 0.4;
-      // v1.96.0: monochrome line-art + the canonical description-first five columns
+      // v1.97.0: monochrome line-art + canonical name/qty/line/desc columns
       it.borderColor = "#000000"; it.fillColor = "#ffffff"; it.textColor = "#000000";
       it.fillTransparent = true;
       it.align = 0; it.dir = 0;
       it.headerH = narrow ? 6 : 7.5; it.rowH = narrow ? 5.5 : 6.5;
-      it.text = JSON.stringify({ cols: 5, header: true, widths: SVC_DEF_WIDTHS.slice(),
+      it.text = JSON.stringify({ cols: 4, header: true, widths: SVC_DEF_WIDTHS.slice(),
         labels: SVC_DEF_LABELS.slice() });
     }
     return it;
@@ -1138,7 +1136,7 @@
       var rst = document.createElement("button");
       rst.className = "btn btn-sm btn-outline"; rst.style.cssText = "width:100%;margin:6px 0 2px";
       rst.textContent = "بازگردانی به ستون‌های استاندارد رسید";
-      rst.title = "شرح خدمت | ردیف | نام خدمت | تعداد | مبلغ کل";
+      rst.title = "نام خدمت | تعداد | مبلغ کل | شرح خدمت";
       rst.addEventListener("click", function () {
         pushUndo();
         m.cols = 5; m.header = true;
@@ -1187,6 +1185,11 @@
       if (it.type === "services") {
         gt.appendChild(row("بدون سایهٔ سرستون", checkInput(it.fillTransparent, function (v) { it.fillTransparent = v; up(); })));
         gt.appendChild(row("سایهٔ سرستون", colorInput(it.fillColor, function (v) { it.fillColor = v; it.fillTransparent = false; up(); renderInspector(); })));
+      }
+      if (it.type === "label" || it.type === "field" || it.type === "table" || it.type === "services") {
+        gt.appendChild(row("شکستن متن طولانی", checkInput(it.fmt !== "nowrap", function (v) {
+          it.fmt = v ? "wrap" : "nowrap"; up();
+        })));
       }
       if (it.type !== "table" && it.type !== "services" && it.type !== "barcode") {
         gt.appendChild(row("ضخیم", checkInput(it.bold, function (v) { it.bold = v; up(); })));
@@ -1395,15 +1398,15 @@
       if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
       var it = selItem();
       var ctrl = e.ctrlKey || e.metaKey;
-      // v1.96.0 — undo / redo (Ctrl+Z and Ctrl+Shift+Z or Ctrl+Y), save (Ctrl+S),
-      // copy / paste (Ctrl+C / Ctrl+V). Redo must be checked BEFORE undo so that
-      // Ctrl+Shift+Z does not fall through to the undo branch.
+      // undo / redo (Ctrl+Z and Ctrl+Shift+Z or Ctrl+Y), save (Ctrl+S),
+      // copy / paste (Ctrl+C / Ctrl+V / Ctrl+P). Redo must be checked BEFORE undo.
       if (ctrl && e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); doRedo(); return; }
       if (ctrl && e.key.toLowerCase() === "z") { e.preventDefault(); doUndo(); return; }
       if (ctrl && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); return; }
       if (ctrl && e.key.toLowerCase() === "s") { e.preventDefault(); saveDesign(); return; }
       if (ctrl && e.key.toLowerCase() === "c") { e.preventDefault(); copyItem(); return; }
       if (ctrl && e.key.toLowerCase() === "v") { e.preventDefault(); pasteItem(); return; }
+      if (ctrl && e.key.toLowerCase() === "p") { e.preventDefault(); pasteItem(); return; }
       if (!it) return;
       var step = e.shiftKey ? 5 : 1;
       if (e.key === "Delete") { e.preventDefault(); deleteItem(it.id); }

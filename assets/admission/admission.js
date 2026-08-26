@@ -94,6 +94,13 @@
     canCashEdit: true,
     cashTab: 0,
     cashQ: '',
+    cashStatus: '',
+    cashRows: [],
+    loadedTicketId: '',
+    reprintId: '',
+    payTicketId: '',
+    payCtx: null,
+    ticketMiniId: '',
     role: 0,
     userName: '',
     todayJalali: '',
@@ -1656,7 +1663,21 @@
     on($('cashClose'),    'click', function () {
       if (state.surface === 'cashier') Bridge.call('ui.closeTab', { kind: 'cashier' });
     });
-    on($('cashSearch'), 'keyup', function () { state.cashQ = this.value; refreshCash(); });
+    on($('cashSearch'), 'keyup', function (e) {
+      e = e || window.event;
+      state.cashQ = this.value;
+      var key = e.keyCode || e.which;
+      if (key === 13) { lookupCashSearch(this.value); return; }
+      refreshCash();
+    });
+    on($('cashStatusStrip'), 'click', function (e) {
+      e = e || window.event;
+      var btn = findUp(e.target || e.srcElement, 'data-status', $('cashStatusStrip'));
+      if (!btn) return;
+      var st = btn.getAttribute('data-status') || '';
+      state.cashStatus = (state.cashStatus === st) ? '' : st;
+      refreshCash();
+    });
     on($('cashShiftStart'), 'click', function () {
       cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود');
     });
@@ -1690,6 +1711,7 @@
       var btn = findUp(tgt, 'data-tab', $('cashTabs'));
       if (!btn) return;
       state.cashTab = +btn.getAttribute('data-tab') || 0;
+      state.cashStatus = '';
       refreshCash();
     });
     on($('cashBody'), 'dblclick', function (e) {
@@ -1708,7 +1730,7 @@
       if (!pay) return;
       if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
       var id = pay.getAttribute('data-pay');
-      cashCall('این بلیت صندوق شود؟', 'cashier.pay', { id: id }, 'صندوق شد', 'پرداخت ناموفق بود');
+      openPayMini(cashRowById(id) || { id: id });
     });
     /* v1.79.0: the «صندوق نرفته‌ها» / «صف پذیرش» nav buttons were removed from
        the action card (they duplicated the launcher). The handlers stay out —
@@ -1773,7 +1795,7 @@
       } else if (key === 116) { /* F5 — toggle admission edit mode (req. v1.94) */
         /* preventDefault so F5 never refreshes the page; only act on the
            admission surface (edit mode is an admission-form concept). */
-        if (state.surface === 'admission') {
+        if (state.surface === 'admission' || state.loadedTicketId) {
           if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
           toggleEditMode();
         }
@@ -2079,6 +2101,26 @@
     for (i = 0; i < sv.length; i++) addServiceRow(sv[i]);
     renderServices();
     applyTicketBill(t);
+    /* v1.97: remember the loaded ticket. Paid → reprint via receipt.print;
+       unpaid → صدور / صندوق شد opens the payment mini. */
+    state.loadedTicketId = t.id || t.ticketId || '';
+    var paidAmt = Number(t.paid) || 0;
+    var st = String(t.status || '').toLowerCase();
+    var unpaid = !paidAmt || st === 'unpaid' || st === 'waiting' || st === 'debtor';
+    if (unpaid && state.loadedTicketId) {
+      state.payTicketId = state.loadedTicketId;
+      state.reprintId = '';
+    } else {
+      state.payTicketId = '';
+      state.reprintId = state.loadedTicketId;
+    }
+    state.payCtx = {
+      id: state.loadedTicketId,
+      name: t.name || trimStr((t.first || '') + ' ' + (t.last || '')),
+      barcode: t.barcode || '',
+      payable: (t.payable != null) ? t.payable : 0,
+      services: t.services || state.services || []
+    };
   }
   function showToolsHome() {
     var h = $('toolsHome'), r = $('toolsReceiptsView');
@@ -2427,7 +2469,11 @@
 
   function refreshCash() {
     if (!state.canCashView) return;
-    Bridge.call('cashier.page', { q: state.cashQ || '', tab: state.cashTab || 0 }).then(function (d) {
+    Bridge.call('cashier.page', {
+      q: state.cashQ || '',
+      tab: state.cashTab || 0,
+      status: state.cashStatus || ''
+    }).then(function (d) {
       renderCash(d || {});
     }, function () { toast('بارگذاری صندوق ناموفق بود', 'err'); });
   }
@@ -2455,7 +2501,9 @@
       above.id = 'cashTabsAbove';
       above.className = 'tabs cash-tabs';
       var wrap = $('cashWrap');
-      if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(above, wrap);
+      var strip = $('cashStatusStrip');
+      var before = strip || wrap;
+      if (before && before.parentNode) before.parentNode.insertBefore(above, before);
       /* delegated tab handler — wired ONCE (same pattern as #cashTabs in
          wire()) so re-renders never double-bind. */
       on(above, 'click', function (e) {
@@ -2464,10 +2512,12 @@
         var btn = findUp(tgt, 'data-tab', above);
         if (!btn) return;
         state.cashTab = +btn.getAttribute('data-tab') || 0;
+        state.cashStatus = '';
         refreshCash();
       });
     }
     if (above) above.innerHTML = h;
+    paintCashStatus(d.statusCounts || {});
     var inc = (d.shift && d.shift.income != null) ? d.shift.income : (d.income || 0);
     var incEl = $('cashIncome');
     if (incEl) incEl.innerHTML = '<b>' + money(inc) + '</b> <span class="cash-cur">ریال</span>';
@@ -2513,6 +2563,7 @@
     }
 
     var rows = d.rows || [];
+    state.cashRows = rows;
     var body = $('cashBody');
     if (!body) return;
     if (!rows.length) {
@@ -2537,6 +2588,186 @@
         '</td></tr>';
     }
     body.innerHTML = html;
+  }
+
+  function paintCashStatus(counts) {
+    counts = counts || {};
+    setText($('cashStRefund'), toFa(counts.refund || 0));
+    setText($('cashStWait'), toFa(counts.waiting || 0));
+    setText($('cashStDebt'), toFa(counts.debtor || 0));
+    setText($('cashStCred'), toFa(counts.creditor || 0));
+    var strip = $('cashStatusStrip');
+    if (!strip) return;
+    var btns = strip.getElementsByTagName('button'), i, b, st, cls;
+    for (i = 0; i < btns.length; i++) {
+      b = btns[i];
+      st = b.getAttribute('data-status') || '';
+      cls = String(b.className || '').replace(/\s*on\b/g, '');
+      if (st && st === state.cashStatus) cls += ' on';
+      b.className = cls;
+    }
+  }
+
+  function cashRowById(id) {
+    var rows = state.cashRows || [], i;
+    for (i = 0; i < rows.length; i++) {
+      if (String(rows[i].id) === String(id)) return rows[i];
+    }
+    return null;
+  }
+
+  function lookupCashSearch(q) {
+    var raw = trimStr(toEn(q || '')).replace(/\s+/g, '');
+    if (!raw) { refreshCash(); return; }
+    if (!/^[0-9]{4,}$/.test(raw)) { refreshCash(); return; }
+    Bridge.call('cashier.lookup', { barcode: raw, nid: raw }).then(function (r) {
+      if (r && r.ok && r.id) openReceiptOnAdmission(r.id);
+      else refreshCash();
+    }, function () { refreshCash(); });
+  }
+
+  function barcodeHtml(code) {
+    var s = toEn(String(code || ''));
+    var h = '<span class="bc-quiet"></span>', i, d, w;
+    for (i = 0; i < s.length; i++) {
+      d = s.charCodeAt(i) - 48;
+      if (d < 0 || d > 9) d = (s.charCodeAt(i) % 7) + 1;
+      w = 1 + (d % 4);
+      h += '<span class="bc-bar bc-w' + w + '"></span>';
+      h += '<span class="bc-gap bc-g' + (1 + ((d + 1) % 3)) + '"></span>';
+    }
+    h += '<span class="bc-quiet"></span>';
+    return h;
+  }
+
+  function fillMiniServices(tbodyId, services) {
+    var body = $(tbodyId);
+    if (!body) return;
+    var sv = services || [], i, s, q, p, tot, html = '';
+    if (!sv.length) {
+      body.innerHTML = '<tr><td colspan="3" class="empty">خدمتی ثبت نشده</td></tr>';
+      return;
+    }
+    for (i = 0; i < sv.length; i++) {
+      s = sv[i] || {};
+      q = Number(s.qty) || 1;
+      if (q < 1) q = 1;
+      p = Number(s.price) || 0;
+      if (s.total != null) tot = Number(s.total) || 0;
+      else if (s.patShare != null) tot = Number(s.patShare) || 0;
+      else tot = p * q;
+      html += '<tr><td>' + esc(s.name || s.code || '—') + '</td><td>' +
+        toFa(q) + '</td><td>' + money(tot) + '</td></tr>';
+    }
+    body.innerHTML = html;
+  }
+
+  function setMiniOpen(panelId, backId, open) {
+    var p = $(panelId), b = $(backId);
+    if (p) {
+      p.className = String(p.className || '').replace(/\s*open\b/g, '') + (open ? ' open' : '');
+      p.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+    if (b) b.className = String(b.className || '').replace(/\s*open\b/g, '') + (open ? ' open' : '');
+  }
+
+  function openTicketMini(r) {
+    r = r || {};
+    state.ticketMiniId = r.ticketId || r.id || '';
+    var name = r.name || trimStr((r.first || '') + ' ' + (r.last || ''));
+    var code = r.barcode || state.ticketMiniId || '';
+    setText($('ticketMiniName'), name || '—');
+    setText($('ticketMiniCode'), code ? toFa(code) : '—');
+    if ($('ticketMiniBar')) $('ticketMiniBar').innerHTML = barcodeHtml(code);
+    fillMiniServices('ticketMiniSvc', r.services || []);
+    setMiniOpen('ticketMini', 'ticketMiniBack', true);
+  }
+
+  function closeTicketMini() {
+    setMiniOpen('ticketMini', 'ticketMiniBack', false);
+  }
+
+  function openPayMini(ctx) {
+    ctx = ctx || {};
+    var id = ctx.id || ctx.ticketId || state.payTicketId || '';
+    if (!id) { toast('بلیت صندوق مشخص نیست', 'err'); return; }
+    var name = ctx.name || trimStr((ctx.first || '') + ' ' + (ctx.last || ''));
+    if (!name && state.payCtx && state.payCtx.name) name = state.payCtx.name;
+    var code = ctx.barcode || (state.payCtx && state.payCtx.barcode) || '';
+    var sv = ctx.services || (state.payCtx && state.payCtx.services) || state.services || [];
+    var payable = ctx.payable;
+    if (payable == null && state.payCtx) payable = state.payCtx.payable;
+    if (payable == null) payable = 0;
+    state.payCtx = { id: id, name: name, barcode: code, payable: payable, services: sv };
+    state.payTicketId = id;
+    setText($('payMiniName'), name || '—');
+    setText($('payMiniCode'), code ? toFa(code) : '—');
+    if ($('payMiniBar')) $('payMiniBar').innerHTML = barcodeHtml(code);
+    fillMiniServices('payMiniSvc', sv);
+    if ($('payMiniAmt')) $('payMiniAmt').innerHTML = money(payable);
+    var box = $('payMiniDiscBox');
+    if (box) box.style.display = 'none';
+    if ($('payMiniDisc')) $('payMiniDisc').value = '';
+    setMiniOpen('payMini', 'payMiniBack', true);
+  }
+
+  function closePayMini() {
+    setMiniOpen('payMini', 'payMiniBack', false);
+  }
+
+  function submitPayMini(method) {
+    var ctx = state.payCtx || {};
+    var id = ctx.id || state.payTicketId;
+    if (!id) { toast('بلیت صندوق مشخص نیست', 'err'); return; }
+    if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
+    var payable = Number(ctx.payable) || 0;
+    var disc = 0, amount = payable;
+    if (method === 'discount') {
+      var box = $('payMiniDiscBox');
+      var inp = $('payMiniDisc');
+      if (box && box.style.display === 'none') {
+        box.style.display = 'block';
+        if (inp) try { inp.focus(); } catch (e) {}
+        return;
+      }
+      disc = Number(toEn(inp ? inp.value : '').replace(/,/g, '')) || 0;
+      if (disc < 0) disc = 0;
+      amount = payable - disc;
+      if (amount < 0) amount = 0;
+    } else if (method === 'free') {
+      amount = 0;
+      disc = 0;
+    }
+    Bridge.call('cashier.pay', { id: id, method: method, amount: amount, discount: disc }).then(function (r) {
+      if (r && r.ok === false) { toast(r.err || 'پرداخت ناموفق بود', 'err'); return; }
+      toast(method === 'test' ? 'تست موفق بود' : 'صندوق شد', 'ok');
+      closePayMini();
+      state.payTicketId = '';
+      state.payCtx = null;
+      refreshCash();
+    }, function () { toast('پرداخت ناموفق بود', 'err'); });
+  }
+
+  function wireMinis() {
+    on($('ticketMiniClose'), 'click', closeTicketMini);
+    on($('ticketMiniBack'), 'click', closeTicketMini);
+    on($('ticketMiniPrint'), 'click', function () {
+      var id = state.ticketMiniId;
+      if (!id) { toast('قبضی برای چاپ نیست', 'err'); return; }
+      Bridge.call('receipt.print', { id: id }).then(function (r) {
+        if (r && r.ok) toast('چاپ قبض', 'ok');
+        else toast((r && r.err) || 'چاپ ناموفق بود', 'err');
+      }, function () { toast('چاپ ناموفق بود', 'err'); });
+    });
+    on($('payMiniClose'), 'click', closePayMini);
+    on($('payMiniBack'), 'click', closePayMini);
+    function onPayClick(e) {
+      e = e || window.event;
+      var btn = findUp(e.target || e.srcElement, 'data-paym', $('payMini'));
+      if (!btn) return;
+      submitPayMini(btn.getAttribute('data-paym') || 'cash');
+    }
+    on($('payMini'), 'click', onPayClick);
   }
 
   function applyTicketBill(t) {
@@ -2643,7 +2874,17 @@
 
   /* --- save admission + print per Management design --- */
   function saveAdmission() {
-    if (state.formLocked) { toast('فرم قفل است — F4 برای ویرایش', 'err'); return; }
+    /* v1.97: unpaid loaded ticket → صدور opens the payment mini (even if locked). */
+    if (state.payTicketId) { openPayMini(state.payCtx || { id: state.payTicketId }); return; }
+    var reprint = state.reprintId || state.loadedTicketId;
+    if (reprint) {
+      Bridge.call('receipt.print', { id: reprint }).then(function (r) {
+        if (r && r.ok) toast('چاپ قبض با تاریخ اصلی', 'ok');
+        else toast((r && r.err) || 'چاپ ناموفق بود', 'err');
+      }, function () { toast('چاپ ناموفق بود', 'err'); });
+      return;
+    }
+    if (state.formLocked) { toast('فرم قفل است — F5 برای ویرایش', 'err'); return; }
     var rec = collectRecord();
     /* v1.69.0: SMART SUBMIT — if the patient fields are empty (no national ID
        AND no name), the operator is re-printing the PREVIOUS receipt (F8
@@ -2661,7 +2902,13 @@
     Bridge.call('admission.save', rec).then(function (r) {
       if (r && r.blocked) { state.pendingBlockedRecord=rec; showBlock(r.block); setSync('err','بیمار مسدود'); return; }
       if (r && r.ok) {
-        toast('پذیرش ثبت و قبض چاپ شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : ''), 'ok');
+        if (r.needsCashier) {
+          /* non-POS: ticket is created unpaid — show mini, do NOT claim printed */
+          toast('پذیرش ثبت شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : ''), 'ok');
+          openTicketMini(r);
+        } else {
+          toast('پذیرش ثبت و قبض چاپ شد' + (r.queueNo ? ' — نوبت ' + toFa(r.queueNo) : ''), 'ok');
+        }
         /* B5: warn when the classic-GDI fallback template was used because no
            print-design is bound to the operator's section. */
         if (r.printMode && String(r.printMode).indexOf('classic-') === 0) {
@@ -2738,7 +2985,13 @@
     if ($('hasIns')) $('hasIns').checked = false;
     if ($('noPay')) $('noPay').checked = false;
     state.services = []; state.patient = null; state.catalog = []; state.overrideBlock = false;
-    if (!opts.keepLock) setFormLocked(false);
+    if (!opts.keepLock) {
+      setFormLocked(false);
+      state.loadedTicketId = '';
+      state.reprintId = '';
+      state.payTicketId = '';
+      state.payCtx = null;
+    }
     setText($('pfName'), 'بیمار جدید');
     setText($('pfFile'), '----');
     setText($('profileStateText'), 'برای شروع، مشخصات بیمار را وارد کنید');
@@ -2884,9 +3137,11 @@
      ========================================================================== */
   var portal = {
     rows: [],        /* inbox messages (portal.messages.list) */
-    saved: [],       /* archived messages (portal.messages.list_saved) */
-    view: 'inbox',   /* 'inbox' | 'archive' | 'pinned' */
+    saved: [],       /* saved+archive (portal.messages.list_saved) */
+    view: 'inbox',   /* 'inbox' | 'archive' | 'saved' | 'pinned' */
     detailIdx: -1,   /* idx of the message open in #portalDetail */
+    ctxIdx: -1,      /* idx targeted by the list context menu */
+    peer: '',        /* conversation counterpart (from) */
     q: '',           /* current search filter (lower-cased) */
     wired: false     /* one-time DOM/bridge wiring guard */
   };
@@ -2919,33 +3174,40 @@
   }
 
   function portalTileHtml(m) {
-    /* v1.94: messenger-style preview tile — sender name bold, small date,
-       2-line preview, pin star, unread dot. Inline styles dropped so the CSS
-       agent owns the look; the severity class on the tile colors the stripe. */
+    /* v1.97: WhatsApp-style list tile — priority BACKGROUND + date AND time. */
     var pv = String(m.text || '').replace(/\s+/g, ' ');
     pv = pv.replace(/^\s+|\s+$/g, '');
-    if (pv.length > 140) pv = pv.substring(0, 140) + '\u2026';   /* 2-line preview */
+    if (pv.indexOf('\u21a9') === 0) pv = pv.substring(1);
+    pv = pv.replace(/^\s+|\s+$/g, '');
+    if (pv.length > 140) pv = pv.substring(0, 140) + '\u2026';
     var pin = m.pinned
       ? '<span class="portal-tile-pin" title="سنجاق‌شده">\u2605</span>'
       : '';
     var dot = (!m.seen) ? '<span class="portal-unread-dot"></span>' : '';
-    return '<div class="portal-tile ' + portalStripe(m.type) + '" data-idx="' + esc(m.idx) + '">' +
+    var when = trimStr((m.date || '') + (m.time ? '  ' + m.time : ''));
+    var act = (Number(m.idx) === Number(portal.detailIdx)) ? ' active' : '';
+    return '<div class="portal-tile ' + portalStripe(m.type) + act + '" data-idx="' + esc(m.idx) + '">' +
       '<span class="portal-stripe"></span>' +
       '<div class="portal-tile-main">' +
         '<div class="portal-tile-row">' + dot +
           '<span class="portal-tile-from">' + esc(m.from || '—') + '</span>' + pin +
         '</div>' +
-        '<div class="portal-tile-date">' + esc(m.date || m.time || '') + '</div>' +
+        '<div class="portal-tile-date">' + esc(when || '—') + '</div>' +
         '<div class="portal-tile-prev">' + esc(pv) + '</div>' +
       '</div>' +
     '</div>';
+  }
+
+  function portalSrc() {
+    if (portal.view === 'archive' || portal.view === 'saved') return portal.saved;
+    return portal.rows;
   }
 
   /* render the active view (inbox / archive / pinned) into #portalList, applying
      the live search filter. No bridge call — works on cached rows. */
   function portalRender() {
     var list = $('portalList'); if (!list) return;
-    var src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    var src = portalSrc();
     var q = portal.q, out = [], i, m, hay;
     for (i = 0; i < src.length; i++) {
       m = src[i];
@@ -2970,12 +3232,13 @@
   /* fetch the active view from C++ then render. inbox/pinned read the live list
      (pinned filters locally); archive reads the saved list. */
   function portalLoad() {
-    if (portal.view === 'archive') {
+    if (portal.view === 'archive' || portal.view === 'saved') {
       try {
         Bridge.call('portal.messages.list_saved', {}).then(function (r) {
           portal.saved = (r && r.rows) || [];
           portalRender();
           if (r && r.unseen != null) portalSetUnread(r.unseen);
+          if (portal.detailIdx >= 0) portalDetail(portal.detailIdx);
         }, function () { portalRender(); });
       } catch (e) { portalRender(); }
       return;
@@ -2985,12 +3248,13 @@
         portal.rows = (r && r.rows) || [];
         portalRender();
         if (r && r.unseen != null) portalSetUnread(r.unseen);
+        if (portal.detailIdx >= 0) portalDetail(portal.detailIdx);
       }, function () { portalRender(); });
     } catch (e) { portalRender(); }
   }
 
   function portalCurrentMsg() {
-    var src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    var src = portalSrc();
     var i;
     for (i = 0; i < src.length; i++) {
       if (Number(src[i].idx) === Number(portal.detailIdx)) return src[i];
@@ -3000,7 +3264,9 @@
 
   function portalCloseDetail() {
     portal.detailIdx = -1;
-    var det = $('portalDetail'); if (det) det.innerHTML = '';
+    portal.peer = '';
+    var det = $('portalDetail');
+    if (det) det.innerHTML = '<div class="portal-empty">یک گفتگو را از فهرست انتخاب کنید</div>';
   }
 
   function portalToggleReply() {
@@ -3011,17 +3277,45 @@
     if (ta && show) { try { ta.focus(); } catch (e) {} }
   }
 
+  function portalIsOurs(m) {
+    if (!m) return false;
+    var txt = String(m.text || '');
+    if (txt.indexOf('\u21a9') === 0) return true;
+    var from = String(m.from || '');
+    var us = state.userName || '';
+    if (us && from === us) return true;
+    return false;
+  }
+
+  function portalThread(seed) {
+    var src = portalSrc();
+    var who = String((seed && seed.from) || portal.peer || '');
+    var us = state.userName || '';
+    var out = [], i, m, from, to;
+    for (i = 0; i < src.length; i++) {
+      m = src[i];
+      from = String(m.from || '');
+      to = String(m.to || '');
+      if (who && from === who) out.push(m);
+      else if (portalIsOurs(m) && (from === us || to === who || from === who)) out.push(m);
+    }
+    if (!out.length && seed) out.push(seed);
+    return out;
+  }
+
   function portalSendReply() {
     var ta = $('portalReplyText'); if (!ta) return;
     var text = trimStr(ta.value);
     if (!text) { toast('متن پاسخ خالی است', 'err'); return; }
-    try {
-      Bridge.call('portal.message.reply', { idx: portal.detailIdx, text: text }).then(function () {
-        toast('پاسخ ارسال شد', 'ok');
-        portalCloseDetail();
-        portalLoad();
-      }, function () { toast('ارسال پاسخ ناموفق بود', 'err'); });
-    } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
+    cashAsk('آیا مطمئن هستید پیام را ارسال می‌کنید؟', function () {
+      try {
+        Bridge.call('portal.message.reply', { idx: portal.detailIdx, text: text }).then(function () {
+          toast('پاسخ ارسال شد', 'ok');
+          ta.value = '';
+          portalLoad();
+        }, function () { toast('ارسال پاسخ ناموفق بود', 'err'); });
+      } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
+    });
   }
 
   /* open a full message in #portalDetail and mark it seen immediately (req. H).
@@ -3030,39 +3324,43 @@
      row (date / time / to), an action-button row, and a toggled reply box. */
   function portalDetail(idx) {
     var det = $('portalDetail'); if (!det) return;
-    var m = null, i, src = (portal.view === 'archive') ? portal.saved : portal.rows;
+    var m = null, i, src = portalSrc();
     for (i = 0; i < src.length; i++) { if (Number(src[i].idx) === Number(idx)) { m = src[i]; break; } }
     portal.detailIdx = m ? Number(m.idx) : -1;
+    portal.peer = m ? String(m.from || '') : '';
     if (!m) { det.innerHTML = '<div class="portal-empty">پیام یافت نشد</div>'; return; }
     var initial = String(m.from || '؟').replace(/^\s+|\s+$/g, '').charAt(0) || '؟';
-    var html = '<div class="portal-detail">' +
-      '<div class="portal-detail-head">' +
-        '<button type="button" class="portal-act portal-back" data-act="back">بازگشت</button>' +
+    var thread = portalThread(m);
+    var bubbles = '', k, row, ours, body, when;
+    for (k = 0; k < thread.length; k++) {
+      row = thread[k];
+      ours = portalIsOurs(row);
+      body = String(row.text || '');
+      if (body.indexOf('\u21a9') === 0) body = body.substring(1);
+      when = trimStr((row.date || '') + (row.time ? '  ' + row.time : ''));
+      bubbles += '<div class="portal-bub ' + (ours ? 'portal-bub-out' : 'portal-bub-in') + '">' +
+        '<div class="portal-bub-txt">' + esc(body) + '</div>' +
+        (when ? '<div class="portal-bub-meta">' + esc(when) + '</div>' : '') +
+      '</div>';
+    }
+    var html = '<div class="portal-chat">' +
+      '<div class="portal-chat-head">' +
         '<span class="portal-avatar">' + esc(initial) + '</span>' +
         '<span class="portal-detail-name">' + esc(m.from || '—') + '</span>' +
         '<span class="portal-detail-sev ' + portalStripe(m.type) + '">' + esc(portalSeverityLabel(m.type)) + '</span>' +
       '</div>' +
-      '<div class="portal-bubble">' + esc(m.text || '') + '</div>' +
-      '<div class="portal-detail-meta">' +
-        '<span class="portal-meta-item">' + esc(m.date || '') + '</span>' +
-        (m.time ? '<span class="portal-meta-item">' + esc(m.time) + '</span>' : '') +
-        '<span class="portal-meta-item">به: ' + esc(m.to || '—') + '</span>' +
-      '</div>' +
-      '<div class="portal-detail-actions">' +
-        '<button type="button" class="portal-act" data-act="reply">پاسخ</button>' +
-        '<button type="button" class="portal-act" data-act="pin">' + (m.pinned ? 'برداشتن سنجاق' : 'سنجاق') + '</button>' +
-        '<button type="button" class="portal-act" data-act="save">ذخیره</button>' +
-        '<button type="button" class="portal-act" data-act="print">چاپ</button>' +
-        '<button type="button" class="portal-act portal-act-del" data-act="delete">حذف</button>' +
-      '</div>' +
-      '<div class="portal-reply" id="portalReplyBox" style="display:none">' +
-        '<textarea class="portal-reply-text" id="portalReplyText" rows="3"></textarea>' +
-        '<button type="button" class="portal-act" data-act="send">ارسال</button>' +
+      '<div class="portal-chat-thread" id="portalThread">' + bubbles + '</div>' +
+      '<div class="portal-chat-composer">' +
+        '<textarea class="portal-reply-text" id="portalReplyText" rows="2" placeholder="نوشتن پیام…"></textarea>' +
+        '<button type="button" class="portal-act portal-send" data-act="send">ارسال</button>' +
       '</div>' +
     '</div>';
     det.innerHTML = html;
     try { Bridge.call('portal.messages.seenone', { idx: portal.detailIdx }); } catch (e) {}
-    m.seen = true;            /* locally clear the unread dot on re-render */
+    m.seen = true;
+    var threadEl = $('portalThread');
+    if (threadEl) threadEl.scrollTop = threadEl.scrollHeight;
+    portalRender(); /* refresh active tile */
   }
 
   /* delegated click handler for the detail action buttons */
@@ -3111,11 +3409,25 @@
     else if (!open && isOpen) dr.className = cn.replace(/\s*open/g, '');
   }
 
+  function portalMarkView(view) {
+    var dr = $('portalDrawer'); if (!dr) return;
+    var items = dr.getElementsByTagName('button'), i, it, v, cls;
+    for (i = 0; i < items.length; i++) {
+      it = items[i];
+      v = it.getAttribute('data-view');
+      if (v == null) continue;
+      cls = String(it.className || '').replace(/\s*active\b/g, '');
+      if (v === view) cls += ' active';
+      it.className = cls;
+    }
+  }
+
   function portalSwitchView(view) {
     portal.view = view || 'inbox';
     portal.q = '';
     var s = $('portalSearch'); if (s) s.value = '';
     var dr = $('portalDrawer'); if (dr) dr.className = String(dr.className || '').replace(/\s*open/g, '');
+    portalMarkView(portal.view);
     portalCloseDetail();
     portalLoad();
   }
@@ -3124,6 +3436,63 @@
     var s = $('portalSearch'); if (!s) return;
     portal.q = trimStr(s.value).toLowerCase();
     portalRender();
+  }
+
+  function portalHideCtx() {
+    var m = $('portalCtx');
+    if (m) m.style.display = 'none';
+    portal.ctxIdx = -1;
+  }
+
+  function portalShowCtx(e, idx) {
+    var menu = $('portalCtx'); if (!menu) return;
+    portal.ctxIdx = Number(idx);
+    var cur = null, src = portalSrc(), i;
+    for (i = 0; i < src.length; i++) {
+      if (Number(src[i].idx) === portal.ctxIdx) { cur = src[i]; break; }
+    }
+    var pinBtn = null, items = menu.getElementsByTagName('button'), k;
+    for (k = 0; k < items.length; k++) {
+      if (items[k].getAttribute('data-pact') === 'pin') pinBtn = items[k];
+    }
+    if (pinBtn) setText(pinBtn, (cur && cur.pinned) ? 'برداشتن سنجاق' : 'سنجاق');
+    menu.style.display = 'block';
+    var x = (e.clientX != null) ? e.clientX : 0;
+    var y = (e.clientY != null) ? e.clientY : 0;
+    var mw = menu.offsetWidth || 160, mh = menu.offsetHeight || 140;
+    var vw = document.documentElement.clientWidth || 800;
+    var vh = document.documentElement.clientHeight || 600;
+    if (x + mw > vw) x = vw - mw - 8;
+    if (y + mh > vh) y = vh - mh - 8;
+    if (x < 8) x = 8; if (y < 8) y = 8;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }
+
+  function portalCtxAct(act) {
+    var idx = portal.ctxIdx;
+    portalHideCtx();
+    if (idx < 0) return;
+    var cur = null, src = portalSrc(), i;
+    for (i = 0; i < src.length; i++) {
+      if (Number(src[i].idx) === Number(idx)) { cur = src[i]; break; }
+    }
+    if (act === 'pin') {
+      var pin = cur ? !cur.pinned : true;
+      try { Bridge.call('portal.messages.pin', { idx: idx, pin: pin }); } catch (e2) {}
+      if (cur) cur.pinned = pin;
+      defer(portalLoad);
+    } else if (act === 'save') {
+      try { Bridge.call('portal.messages.save', { idx: idx }); } catch (e2) {}
+      toast('پیام ذخیره شد', 'ok');
+    } else if (act === 'print') {
+      try { Bridge.call('portal.message.print', { idx: idx }); } catch (e2) {}
+    } else if (act === 'delete') {
+      try { Bridge.call('portal.messages.delete', { idx: idx }); } catch (e2) {}
+      toast('پیام حذف شد', 'ok');
+      if (Number(portal.detailIdx) === Number(idx)) portalCloseDetail();
+      defer(portalLoad);
+    }
   }
 
   /* one-time wiring of burger / list / detail / search / drawer + live events */
@@ -3137,6 +3506,40 @@
         var tgt = e.target || e.srcElement;
         var tile = findUp(tgt, 'data-idx', $('portalList'));
         if (tile) portalDetail(tile.getAttribute('data-idx'));
+      });
+    } catch (e) {}
+    /* capture-phase so the shared contextmenu.js never steals the list tile */
+    try {
+      var plist = $('portalList');
+      function onListCtx(e) {
+        e = e || window.event;
+        var tile = findUp(e.target || e.srcElement, 'data-idx', plist);
+        if (!tile) return;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        e.cancelBubble = true;
+        e.returnValue = false;
+        portalShowCtx(e, tile.getAttribute('data-idx'));
+        return false;
+      }
+      if (plist && plist.addEventListener) plist.addEventListener('contextmenu', onListCtx, true);
+      else on(plist, 'contextmenu', onListCtx);
+    } catch (e) {}
+    try {
+      on($('portalCtx'), 'click', function (e) {
+        e = e || window.event;
+        var btn = findUp(e.target || e.srcElement, 'data-pact', $('portalCtx'));
+        if (btn) portalCtxAct(btn.getAttribute('data-pact'));
+      });
+    } catch (e) {}
+    try {
+      on(document, 'mousedown', function (e) {
+        e = e || window.event;
+        var menu = $('portalCtx');
+        if (!menu || menu.style.display === 'none') return;
+        var n = e.target || e.srcElement;
+        while (n) { if (n === menu) return; n = n.parentNode; }
+        portalHideCtx();
       });
     } catch (e) {}
     try { on($('portalDetail'), 'click', portalDetailClick); } catch (e) {}
@@ -3542,6 +3945,8 @@
       hideLoader();
       if (state.surface === 'portal') {
         /* v1.93: portal message workdesk — fetch the inbox on surface boot */
+        portalMarkView(portal.view || 'inbox');
+        portalCloseDetail();
         portalLoad();
         return;
       }
@@ -3606,6 +4011,7 @@
     if (_wired) return;
     _wired = true;
     wire();
+    wireMinis();
     subscribeEvents();
     on($('blockClose'),'click',closeBlock);
     on($('blockOverride'),'click',function(){closeBlock();state.overrideBlock=true;saveAdmission();});

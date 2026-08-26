@@ -33,6 +33,7 @@ static const wchar_t* roleTitle(int r){
         // access ticks deciding what they can do afterwards.
         case 0: return L"ورود به حساب پرسنل";
         case 1: return L"ورود به پنل مدیریت";
+        case 3: return L"ورود به حسابداری";
         default:return L"پنل مخفی ادمین";
     }
 }

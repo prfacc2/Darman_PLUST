@@ -270,7 +270,7 @@ static Design defaultDesign(int sec){
     addLbl(R,y,colW,L"apptdate",L"تاریخ نوبت: ",10,false,INK); y+=7;
     addLine(y); y+=3;
     // patient rows
-    addLbl(L,y,colW,L"full",L"نام بیمار: ",12,true,INK);
+    addLbl(L,y,colW,L"P-Name",L"نام بیمار: ",12,true,INK);
     addLbl(R,y,colW,L"nid",L"کد ملی: ",10,false,INK); y+=7;
     addVLine(cw/2.0,y-1,7);
     addLbl(L,y,colW,L"age",L"سن: ",10,false,INK);
@@ -1074,11 +1074,12 @@ static std::wstring fieldValue(const ReceptionRecord& r, const std::wstring& tok
     if(tok==L"{clinicphone}")  return toFaDigits(getSetting(L"clinic_phone",L""));
     if(tok==L"{apptdate}")     return toFaDigits(r.apptDate);
     if(tok==L"{age}"){
+        // v1.97.0: thermal receipts print age as 10Y / 24Y (Latin digits + Y).
         std::wstring bd=r.birthDate; if(bd.size()>=4){
             int by=_wtoi(bd.substr(0,4).c_str());
             if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
                 int jy=st.wYear-621; int age=jy-by;
-                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b)+L" سال"; } } }
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%dY",age); return b; } } }
         return L"";
     }
     if(tok==L"{agenum}"){   // v1.96.0: bare numeric age
@@ -1086,7 +1087,7 @@ static std::wstring fieldValue(const ReceptionRecord& r, const std::wstring& tok
             int by=_wtoi(bd.substr(0,4).c_str());
             if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
                 int jy=st.wYear-621; int age=jy-by;
-                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b); } } }
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return b; } } }
         return L"";
     }
     if(tok==L"{doctorcode}")    return toFaDigits(r.doctorCode);
@@ -1320,7 +1321,20 @@ static std::wstring pdSubstFields(const ReceptionRecord& r, const std::wstring& 
 // existing and future designs without touching their stored JSON.
 static std::wstring pdNormalizeField(const std::wstring& f){
     if(f.empty()) return f;
-    if(f.size()>=2 && f.front()==L'{' && f.back()==L'}') return f; // already a token
+    if(f.size()>=2 && f.front()==L'{' && f.back()==L'}'){
+        // v1.97.0 — {P-Name} is a documented alias for the live full name.
+        std::wstring inner=f.substr(1,f.size()-2);
+        auto ieq=[&](const char* a)->bool{
+            size_t i=0; for(; i<inner.size() && a[i]; ++i){
+                wchar_t c=inner[i]; if(c>=L'A'&&c<=L'Z') c=(wchar_t)(c-L'A'+L'a');
+                wchar_t d=(wchar_t)(unsigned char)a[i];
+                if(d>=L'A'&&d<=L'Z') d=(wchar_t)(d-L'A'+L'a');
+                if(c!=d) return false; }
+            return a[i]==0 && i==inner.size();
+        };
+        if(ieq("p-name")||ieq("pname")||ieq("p_name")) return L"{full}";
+        return f;
+    }
     // lowercase compare helper (ASCII only — field names are ASCII).
     // §1.52.0 — accept const char* literals so callers can pass plain
     // narrow strings; widen each byte on the fly.
@@ -1335,7 +1349,7 @@ static std::wstring pdNormalizeField(const std::wstring& f){
     // identity / general clinic meta
     if(eq("firstName")||eq("firstname")||eq("fname")||eq("name"))  return L"{first}";
     if(eq("lastName") ||eq("lastname") ||eq("lname")||eq("surname")) return L"{last}";
-    if(eq("fullName") ||eq("fullname") ||eq("fullname"))            return L"{full}";
+    if(eq("fullName") ||eq("fullname")||eq("full")||eq("p-name")||eq("pname")||eq("p_name")) return L"{full}";
     if(eq("fatherName")||eq("fathername")||eq("father"))             return L"{father}";
     if(eq("nationalCode")||eq("nationalcode")||eq("nationalId")||eq("nationalid")||eq("nid")||eq("nationalNo")||eq("id")) return L"{nid}";
     if(eq("birthDate") ||eq("birthdate") ||eq("birth")||eq("dob"))   return L"{birth}";
@@ -1352,7 +1366,7 @@ static std::wstring pdNormalizeField(const std::wstring& f){
     if(eq("shift"))                                                  return L"{shift}";
     if(eq("dept")     ||eq("department")||eq("section")||eq("unit")) return L"{dept}";
     if(eq("doctor")   ||eq("physician")||eq("doc"))                  return L"{doctor}";
-    if(eq("userName") ||eq("username")||eq("user")||eq("operator")||eq("receptionist")) return L"{user}";
+    if(eq("userName") ||eq("username")||eq("user")||eq("operator")) return L"{user}";
     if(eq("clinic")   ||eq("clinicName")||eq("clinicname")||eq("center")) return L"{clinic}";
     if(eq("receiptNo")||eq("receiptno")||eq("receipt")||eq("invoiceNo")||eq("invoiceno")) return L"{receiptNo}";
     // money
@@ -1518,20 +1532,20 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
     if(tok==L"{clinicmgr}")   return getSetting(L"clinic_manager",L"");
     if(tok==L"{cliniclic}")   return toFaDigits(getSetting(L"clinic_license",L""));
     if(tok==L"{age}"){
-        // derive age from birthDate (Jalali "YYYY/MM/DD") roughly.
+        // v1.97.0: thermal receipts print age as 10Y / 24Y (Latin digits + Y).
         std::wstring bd=r.birthDate; if(bd.size()>=4){
             int by=_wtoi(bd.substr(0,4).c_str());
             if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
                 int jy=st.wYear-621; int age=jy-by;
-                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b)+L" سال"; } } }
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%dY",age); return b; } } }
         return L"";
     }
-    if(tok==L"{agenum}"){   // v1.96.0: bare numeric age (for «سن: …Y» suffix fields)
+    if(tok==L"{agenum}"){   // v1.96.0: bare numeric age
         std::wstring bd=r.birthDate; if(bd.size()>=4){
             int by=_wtoi(bd.substr(0,4).c_str());
             if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
                 int jy=st.wYear-621; int age=jy-by;
-                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b); } } }
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return b; } } }
         return L"";
     }
     if(tok==L"{patientshare}") return toFaDigits(formatMoney(r.patientShare))+L" ریال";

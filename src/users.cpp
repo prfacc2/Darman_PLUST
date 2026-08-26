@@ -184,7 +184,7 @@ bool setUserFullName(const std::wstring& username, const std::wstring& fullname)
     return found;
 }
 
-//  wantRole: 0 پذیرش / 1 مدیریت / 2 hidden admin
+//  wantRole: 0 پذیرش / 1 مدیریت / 2 hidden admin / 3 حسابداری (role 0 or 1)
 bool verifyLogin(const std::wstring& uname, const std::wstring& pass,
                  int wantRole, User& out, std::wstring& err){
     if(wantRole == 2){
@@ -206,7 +206,14 @@ bool verifyLogin(const std::wstring& uname, const std::wstring& pass,
                 logLine(L"login wrong password: "+uname);
                 return false;
             }
-            if(u.role != wantRole){
+            if(wantRole==3){
+                // v1.97: accounting accepts staff (0) or management (1)
+                if(u.role!=0 && u.role!=1){
+                    err = L"این حساب به حسابداری دسترسی ندارد.";
+                    logLine(L"login wrong role: "+uname);
+                    return false;
+                }
+            } else if(u.role != wantRole){
                 // v1.79.0: the reception entrance is «حساب پرسنل» now
                 err = (wantRole==0)
                     ? L"این حساب برای ورود پرسنل تعریف نشده است."

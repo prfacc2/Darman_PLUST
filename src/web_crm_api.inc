@@ -24,6 +24,7 @@ static std::string crmSectionJson(const Section& s){
     o+="\"active\":";
     o+=(s.is_active?"true":"false");
     o+=",\"cashierTab\":"; o+=(s.cashier_tab?"true":"false");   // v1.93
+    o+=",\"hasPos\":"; o+=(s.has_pos?"true":"false");           // v1.97
     o+=",\"createdAt\":"+jstr(s.created_at)+",";
     o+="\"updatedAt\":"+jstr(s.updated_at)+"";
     o+="}";
@@ -447,13 +448,21 @@ static std::string crmApi(const std::string& verb, const std::string& body){
     if(verb=="crm.sections.save"){
         Section s;                       // default ctor: id=0, is_active=1, parent_id=0
         double id=0; jsonGetNumber(body,"id",id); s.id=(int)id;
-        double pid=0; jsonGetNumber(body,"parentId",pid); s.parent_id=(int)pid; // v1.74 زیربخش
+        // v1.97: load the existing row first so cashier_tab / has_pos (and the
+        // rest) are not wiped when the payload omits them.
+        if(s.id>0){
+            std::vector<Section> all; Sections_All(all);
+            for(const auto& x:all) if(x.id==s.id){ s=x; break; }
+        }
+        double pid=0;
+        if(jsonGetNumber(body,"parentId",pid)) s.parent_id=(int)pid; // v1.74 زیربخش
         std::string t;
         if(jsonGetString(body,"code",t))    s.code=u82w(t);
         if(jsonGetString(body,"name",t))    s.name_fa=u82w(t);
         if(jsonGetString(body,"kind",t))    s.kind=u82w(t);
-        s.is_active=jsonGetBool(body,"active",true)?1:0;
-        s.cashier_tab=jsonGetBool(body,"cashierTab",false)?1:0;   // v1.93 ثبت پذیرش در صندوق
+        if(jsonHasKey(body,"active"))     s.is_active=jsonGetBool(body,"active",true)?1:0;
+        if(jsonHasKey(body,"cashierTab")) s.cashier_tab=jsonGetBool(body,"cashierTab",false)?1:0;
+        if(jsonHasKey(body,"hasPos"))     s.has_pos=jsonGetBool(body,"hasPos",false)?1:0;
         s.updated_at=crmTodayJalali();
         if(s.id<=0) s.created_at=s.updated_at;
         int rid=Sections_Upsert(s);

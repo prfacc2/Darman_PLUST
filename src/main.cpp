@@ -180,7 +180,8 @@ void switchScreen(ScreenId id){
     { const wchar_t* nm = id==SC_HOME?L"switchScreen: HOME"
                         : id==SC_RECEPTION?L"switchScreen: RECEPTION"
                         : id==SC_ADMIN?L"switchScreen: ADMIN"
-                        : id==SC_MANAGE?L"switchScreen: MANAGE":L"switchScreen: ?";
+                        : id==SC_MANAGE?L"switchScreen: MANAGE"
+                        : id==SC_ACCOUNTING?L"switchScreen: ACCOUNTING":L"switchScreen: ?";
       Breadcrumb(nm); }
     if(s_screen){ DestroyWindow(s_screen); s_screen=0; }
     s_curScreen = id;
@@ -192,6 +193,7 @@ void switchScreen(ScreenId id){
         case SC_RECEPTION: s_screen = createReceptionScreen(g_hFrame); break;
         case SC_ADMIN:     s_screen = createAdminScreen(g_hFrame); break;
         case SC_MANAGE:    s_screen = createManageScreen(g_hFrame); break;
+        case SC_ACCOUNTING:s_screen = createAccountingScreen(g_hFrame); break;
     }
     RECT rc = frameContentRect();
     if(s_screen)
@@ -202,8 +204,9 @@ void switchScreen(ScreenId id){
 
 // ================================================================ HOME =====
 #define HM_CLASS L"AzHome"
-#define ID_HM_RECEPTION 111
-#define ID_HM_MANAGE    112
+#define ID_HM_RECEPTION  111
+#define ID_HM_MANAGE     112
+#define ID_HM_ACCOUNTING 113
 
 // ---------------------------------------------------------------------------
 //  v1.62.0 WELCOME SCREEN REDESIGN
@@ -227,8 +230,9 @@ struct HomeGeom {
     RECT title;      // «سامانه پذیرش و مدیریت درمانگاه»
     RECT sub;        // tagline
     RECT chips;      // capability chip row
-    RECT tray;       // v1.88.0: glass vessel holding the two app icons
-    RECT cardR;      // پذیرش app-icon cell (RTL: right)
+    RECT tray;       // v1.88.0: glass vessel holding the three app icons
+    RECT cardR;      // پرسنل app-icon cell (RTL: right)
+    RECT cardM;      // حسابداری app-icon cell (center)
     RECT cardL;      // مدیریت app-icon cell (RTL: left)
     RECT foot;       // footer pill (brand • version • security note)
     int  radius;     // panel corner radius
@@ -240,21 +244,20 @@ static HomeGeom homeGeom(int W, int H){
     if(W < S(320)) W = S(320);
     if(H < S(260)) H = S(260);
 
-    // ---- horizontal: derive the panel width from the two app-icon cells ----
-    //  v1.88.0: the cells are phone-app-icon sized (a touch larger than a
-    //  mobile app icon, per request) — far airier than the old wide cards.
-    int padX  = S(46);
-    int cgap  = S(46);
-    int cardW = S(196);
+    // ---- horizontal: derive the panel width from the three app-icon cells --
+    //  v1.97: three centered iOS icons — پرسنل | حسابداری | مدیریت (RTL).
+    int padX  = S(36);
+    int cgap  = S(24);
+    int cardW = S(168);
     int maxW  = W - S(40);
-    if(2*cardW + cgap + 2*padX > maxW){
-        if(maxW < S(560)) padX = S(20);
-        int avail = maxW - cgap - 2*padX;
-        if(avail < S(300)) avail = S(300);
-        cardW = avail/2;
-        if(cardW < S(146)) cardW = S(146);
+    if(3*cardW + 2*cgap + 2*padX > maxW){
+        if(maxW < S(640)) padX = S(16);
+        int avail = maxW - 2*cgap - 2*padX;
+        if(avail < S(360)) avail = S(360);
+        cardW = avail/3;
+        if(cardW < S(118)) cardW = S(118);
     }
-    int panelW = 2*cardW + cgap + 2*padX;
+    int panelW = 3*cardW + 2*cgap + 2*padX;
     // v1.88.0: the app-icon cells are compact, but the panel must still be wide
     // enough for the full title «سامانه پذیرش و مدیریت درمانگاه و بیمارستان»
     // and the 3-chip capability row — enforce a generous minimum width.
@@ -299,10 +302,11 @@ static HomeGeom homeGeom(int W, int H){
     SetRect(&g.chips, g.panel.left+S(16), y, g.panel.right-S(16), y+chipH);
     y += chipH + gChip;
 
-    int cardsW = 2*cardW + cgap;
+    int cardsW = 3*cardW + 2*cgap;
     int cl = cx - cardsW/2;
-    SetRect(&g.cardR, cl+cardW+cgap, y, cl+cardsW,  y+cardH);   // RTL right
-    SetRect(&g.cardL, cl,            y, cl+cardW,   y+cardH);   // RTL left
+    SetRect(&g.cardL, cl,                y, cl+cardW,             y+cardH); // RTL left: مدیریت
+    SetRect(&g.cardM, cl+cardW+cgap,     y, cl+2*cardW+cgap,      y+cardH); // center: حسابداری
+    SetRect(&g.cardR, cl+2*(cardW+cgap), y, cl+cardsW,            y+cardH); // RTL right: پرسنل
     // v1.92.0: the glass tray now nearly matches the hero panel's width
     // (inset S(14) — down from S(28)) so the inner container holding the two
     // account icons reads as the same width as the outer panel behind it.
@@ -331,11 +335,36 @@ static COLORREF homePanelBot(){
                   : RGB(0xEC, 0xF1, 0xF7); // subtle shading bottom
 }
 
-// v1.88.0: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
-// 2 مدیریت left). The icons are painted directly on the hero buffer and
-// hit-tested — no child windows, so no background rectangles or chipped
-// corners behind the rounded badges.
+// v1.97: which app-icon cell the mouse is over (0 none, 1 پرسنل right,
+// 2 مدیریت left, 3 حسابداری center). The icons are painted directly on the
+// hero buffer and hit-tested — no child windows.
 static int s_appHot = 0;
+
+static RECT homeHotCell(const HomeGeom& g, int hot){
+    if(hot==1) return g.cardR;
+    if(hot==2) return g.cardL;
+    if(hot==3) return g.cardM;
+    RECT z={0,0,0,0}; return z;
+}
+static void homeUnionRect(RECT& a, const RECT& b){
+    if(b.right<=b.left) return;
+    if(a.right<=a.left){ a=b; return; }
+    if(b.left<a.left) a.left=b.left;
+    if(b.top<a.top) a.top=b.top;
+    if(b.right>a.right) a.right=b.right;
+    if(b.bottom>a.bottom) a.bottom=b.bottom;
+}
+static int homeHitCell(const HomeGeom& g, POINT pt){
+    if(PtInRect(&g.cardR,pt)) return 1;
+    if(PtInRect(&g.cardM,pt)) return 3;
+    if(PtInRect(&g.cardL,pt)) return 2;
+    return 0;
+}
+static COLORREF homeAccBrand(){
+    if(g_themeMode==TM_NEON) return RGB(0x2A,0xC8,0xB4); // refined teal
+    if(g_dark) return RGB(0x3A,0xB4,0x9C);
+    return RGB(0x12,0x7A,0x6A); // deep teal — not cheap yellow
+}
 
 // v1.88.0: iOS-style app icon — a glossy squircle badge with a white glyph, a
 // soft tinted shadow and the account name underneath; NO button chrome, NO
@@ -431,20 +460,12 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         RECT rc; GetClientRect(h,&rc);
         HomeGeom g = homeGeom(rc.right, rc.bottom);
         POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
-        int hot = PtInRect(&g.cardR,pt) ? 1 : PtInRect(&g.cardL,pt) ? 2 : 0;
+        int hot = homeHitCell(g,pt);
         if(hot != s_appHot){
-            // repaint just the affected cells (v1.89.0 — no full-window hit)
             RECT dirty={0,0,0,0};
-            if(s_appHot==1) dirty=g.cardR; else if(s_appHot==2) dirty=g.cardL;
-            RECT cell = hot==1 ? g.cardR : hot==2 ? g.cardL : dirty;
-            if(dirty.right>dirty.left){
-                RECT u={ dirty.left<cell.left?dirty.left:cell.left,
-                         dirty.top<cell.top?dirty.top:cell.top,
-                         dirty.right>cell.right?dirty.right:cell.right,
-                         dirty.bottom>cell.bottom?dirty.bottom:cell.bottom };
-                cell=u;
-            }
-            if(cell.right>cell.left) InvalidateRect(h,&cell,FALSE);
+            homeUnionRect(dirty, homeHotCell(g,s_appHot));
+            homeUnionRect(dirty, homeHotCell(g,hot));
+            if(dirty.right>dirty.left) InvalidateRect(h,&dirty,FALSE);
             s_appHot = hot;
         }
         SetCursor(LoadCursor(NULL, hot ? IDC_HAND : IDC_ARROW));
@@ -457,7 +478,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         if(s_appHot){
             RECT rc; GetClientRect(h,&rc);
             HomeGeom g = homeGeom(rc.right, rc.bottom);
-            RECT cell = s_appHot==1 ? g.cardR : g.cardL;
+            RECT cell = homeHotCell(g,s_appHot);
             InvalidateRect(h,&cell,FALSE);   // just the hovered cell (v1.89.0)
             s_appHot=0;
         }
@@ -469,6 +490,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
         HomeGeom g = homeGeom(rc.right, rc.bottom);
         POINT pt={(short)LOWORD(l),(short)HIWORD(l)};
         if(PtInRect(&g.cardR,pt))      SendMessageW(h,WM_COMMAND,ID_HM_RECEPTION,0);
+        else if(PtInRect(&g.cardM,pt)) SendMessageW(h,WM_COMMAND,ID_HM_ACCOUNTING,0);
         else if(PtInRect(&g.cardL,pt)) SendMessageW(h,WM_COMMAND,ID_HM_MANAGE,0);
         return 0; }
     case WM_COMMAND: {
@@ -501,6 +523,19 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 setUserOnline(u.username,true);
                 s_busy=false;
                 switchScreen(SC_MANAGE);
+                return 0;
+            }
+            s_busy=false;
+        } else if(id==ID_HM_ACCOUNTING){
+            s_busy=true;
+            User u;
+            if(showLoginDialog(g_hFrame, 3, u)){
+                g_session.user=u; g_session.shift=detectShift();
+                g_session.title=resolveSessionTitle(u);
+                g_session.loginAt=iranNow();
+                setUserOnline(u.username,true);
+                s_busy=false;
+                switchScreen(SC_ACCOUNTING);
                 return 0;
             }
             s_busy=false;
@@ -683,26 +718,31 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             // — light catching the top rim is the depth cue.
             gpLine(dc, tr.left+S(24), tr.top+S(1), tr.right-S(24), tr.top+S(1),
                    RGB(255,255,255), 1.0f, g_dark?34:120);
-            // v1.90: a thin faint divider between the two programs
+            // v1.97: faint dividers between the three programs
             {
-                int mx = (g.cardL.right + g.cardR.left)/2;
+                int mids[2]={(g.cardL.right+g.cardM.left)/2,
+                             (g.cardM.right+g.cardR.left)/2};
                 int y1 = tr.top + S(28), y2 = tr.bottom - S(28);
                 COLORREF dc1 = blendColor(g_theme.border, g_theme.accent, 40);
-                gpLine(dc, mx, y1, mx, y2, dc1, 1.0f, 150);
-                // tiny accent diamonds at both ends so it reads as designed
                 HBRUSH db=CreateSolidBrush(blendColor(g_theme.accent, trayTop, 35));
                 HGDIOBJ ob2=SelectObject(dc,db);
                 HGDIOBJ op2=SelectObject(dc,GetStockObject(NULL_PEN));
                 int ds=S(3);
-                POINT pt[4]={{mx,y1-ds},{mx+ds,y1},{mx,y1+ds},{mx-ds,y1}};
-                Polygon(dc,pt,4);
-                POINT pb[4]={{mx,y2-ds},{mx+ds,y2},{mx,y2+ds},{mx-ds,y2}};
-                Polygon(dc,pb,4);
+                for(int i=0;i<2;i++){
+                    int mx=mids[i];
+                    gpLine(dc, mx, y1, mx, y2, dc1, 1.0f, 150);
+                    POINT pt[4]={{mx,y1-ds},{mx+ds,y1},{mx,y1+ds},{mx-ds,y1}};
+                    Polygon(dc,pt,4);
+                    POINT pb[4]={{mx,y2-ds},{mx+ds,y2},{mx,y2+ds},{mx-ds,y2}};
+                    Polygon(dc,pb,4);
+                }
                 SelectObject(dc,ob2); SelectObject(dc,op2); DeleteObject(db);
             }
-            // RTL: پرسنل on the RIGHT cell, مدیریت on the LEFT cell.
+            // RTL: پرسنل | حسابداری | مدیریت
             paintAppIcon(dc, g.cardR, ICO_USER_ADD, g_theme.accent,
                          L"حساب پرسنل", NULL, s_appHot==1);
+            paintAppIcon(dc, g.cardM, ICO_WALLET, homeAccBrand(),
+                         L"حسابداری", NULL, s_appHot==3);
             paintAppIcon(dc, g.cardL, ICO_PEOPLE, g_infoAccent,
                          L"حساب مدیریت", NULL, s_appHot==2);
         }
@@ -1611,6 +1651,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
             else if(!wcscmp(dbg,L"admin")){    u.role=2; g_session.user=u;
                                                g_session.title=resolveSessionTitle(u);
                                                switchScreen(SC_ADMIN); }
+            else if(!wcscmp(dbg,L"accounting")){ switchScreen(SC_ACCOUNTING); }
             else if(!wcscmp(dbg,L"settings")){ switchScreen(SC_RECEPTION);
                                                OpenSettings(f, g_session.user); }
             else if(!wcscmp(dbg,L"backup")){   u.role=1; g_session.user=u;

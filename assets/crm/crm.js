@@ -230,9 +230,10 @@
        and appearance are owned by the C++ shell settings, so showing them here
        was redundant. We still honour the persisted theme C++ sends on crm.init
        so the page matches the operator's chosen appearance. */
-    if (typeof d.theme === 'string') {
-      Crm._dark = d.theme === 'dark';
-      if (global.AzBoot) global.AzBoot.applyTheme(Crm._dark);
+    if (typeof d.theme === 'string' && d.theme) {
+      Crm._theme = d.theme;
+      Crm._dark = d.theme === 'dark' || d.theme === 'neon';
+      if (global.AzBoot) global.AzBoot.applyTheme(d.theme);
     }
     /* v1.76: the brand label next to the hamburger shows the logged-in
        management account's display name (first + last name, else username) —
@@ -337,6 +338,12 @@
       if (p && host && typeof p.render === 'function') {
         host.innerHTML = ''; p.render(host);
       }
+    });
+    global.AzBridge.on('theme.changed', function (d) {
+      var th = (d && d.theme) ? d.theme : 'light';
+      Crm._theme = th;
+      Crm._dark = th === 'dark' || th === 'neon';
+      if (global.AzBoot) global.AzBoot.applyTheme(th);
     });
   }
 

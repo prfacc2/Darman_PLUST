@@ -129,30 +129,30 @@
   function svcModel(preset) {
     switch (preset) {
       case SVC4_ROW: return { cols: 5, header: true,
-        widths: [0.27, 0.08, 0.33, 0.10, 0.22],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل"] };
-      case SVC4_CAT: return { cols: 6, header: true,
-        widths: [0.24, 0.06, 0.24, 0.12, 0.10, 0.24],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "نوع خدمت", "تعداد", "مبلغ کل"] };
-      case SVC5: return { cols: 5, header: true,
-        widths: [0.29, 0.07, 0.32, 0.10, 0.22],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل"] };
-      case SVC5_CODE: return { cols: 6, header: true,
-        widths: [0.22, 0.06, 0.12, 0.26, 0.10, 0.24],
-        labels: ["شرح خدمت", "ردیف", "کد خدمت", "نام خدمت", "تعداد", "مبلغ کل"] };
-      case SVC6_FIN: return { cols: 7, header: true,
-        widths: [0.20, 0.05, 0.18, 0.08, 0.14, 0.11, 0.24],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ واحد", "تخفیف", "مبلغ کل"] };
-      case SVC6_INS: return { cols: 7, header: true,
-        widths: [0.20, 0.05, 0.18, 0.08, 0.17, 0.16, 0.16],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل", "سهم بیمه", "سهم بیمار"] };
+        widths: [0.32, 0.10, 0.20, 0.30, 0.08],
+        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت", "ردیف"] };
+      case SVC4_CAT: return { cols: 5, header: true,
+        widths: [0.26, 0.12, 0.10, 0.22, 0.30],
+        labels: ["نام خدمت", "نوع خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
+      case SVC5: return { cols: 4, header: true,
+        widths: [0.32, 0.12, 0.24, 0.32],
+        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
+      case SVC5_CODE: return { cols: 5, header: true,
+        widths: [0.26, 0.12, 0.10, 0.22, 0.30],
+        labels: ["نام خدمت", "کد خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
+      case SVC6_FIN: return { cols: 6, header: true,
+        widths: [0.24, 0.08, 0.14, 0.10, 0.18, 0.26],
+        labels: ["نام خدمت", "تعداد", "مبلغ واحد", "تخفیف", "مبلغ کل", "شرح خدمت"] };
+      case SVC6_INS: return { cols: 6, header: true,
+        widths: [0.24, 0.08, 0.16, 0.14, 0.14, 0.24],
+        labels: ["نام خدمت", "تعداد", "مبلغ کل", "سهم بیمه", "سهم بیمار", "شرح خدمت"] };
       case SVC7: return { cols: 7, header: true,
-        widths: [0.18, 0.05, 0.11, 0.18, 0.08, 0.14, 0.26],
-        labels: ["شرح خدمت", "ردیف", "کد خدمت", "نام خدمت", "تعداد",
-                 "مبلغ واحد", "مبلغ کل"] };
-      default: return { cols: 5, header: true,
-        widths: [0.30, 0.07, 0.31, 0.10, 0.22],
-        labels: ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل"] };
+        widths: [0.20, 0.10, 0.08, 0.12, 0.16, 0.26, 0.08],
+        labels: ["نام خدمت", "کد خدمت", "تعداد", "مبلغ واحد", "مبلغ کل",
+                 "شرح خدمت", "ردیف"] };
+      default: return { cols: 4, header: true,
+        widths: [0.34, 0.10, 0.22, 0.34],
+        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
     }
   }
 
@@ -255,7 +255,7 @@
 
   var NAMES = [
     "۰۱) قبض پزشک — کلاسیک",
-    "۰۲) رسید بیمه — کلاسیک باند خاکستری",
+    "۰۲) رسید بیمه — کلاسیک خط‌کشی",
     "۰۳) قبض و رسید — کلاسیک دوخطی",
     "۰۴) قبض پزشک — باند سرتیتر",
     "۰۵) رسید بیمه — باند سرتیتر",
@@ -269,9 +269,9 @@
     "۱۳) قبض پزشک — خط‌کشی تک‌رنگ",
     "۱۴) رسید بیمه — خط‌کشی قاب‌دار",
     "۱۵) قبض و رسید — خط‌کشی",
-    "۱۶) قبض پزشک — کارتی سایه‌دار",
-    "۱۷) رسید بیمه — کارتی سایه‌دار",
-    "۱۸) قبض و رسید — کارتی سایه‌دار",
+    "۱۶) قبض پزشک — کارتی خط‌کشی",
+    "۱۷) رسید بیمه — کارتی خط‌کشی",
+    "۱۸) قبض و رسید — کارتی خط‌کشی",
     "۱۹) قبض پزشک — عکس بیمار",
     "۲۰) رسید بیمه — عکس بیمار",
     "۲۱) قبض و رسید — عکس بیمار",
@@ -382,8 +382,8 @@
     d.push(F (lx + f2 + g, cy + 0.3, f1,    fh, "supp",         "", pt, 0));
     d.push(L (lx + lw - lblW, cy + 0.3, lblW, fh, FA_SUPP, pt, false, 0));
     rule();
-    /* d: نام بیمار: {full}  |  سن: {age} */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_FULL, "full", pt, true, false, 0.40);
+    /* d: نام بیمار: {P-Name}  |  سن: {age}  (10Y/24Y) */
+    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_FULL, "P-Name", pt, true, false, 0.40);
              putLF(d, lx, cy + 0.3, lw, fh, FA_AGE, "age", pt, false, false, 0.20); rule();
     /* e: دکتر: {doctor}  |  کد نظام پزشکی: {doctorcode} */
     vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_DOCTOR, "doctor", pt, false, false, 0.22);
@@ -483,7 +483,7 @@
     var rH = 5.0, fh = 4.4, half = w / 2.0;
     d.push(RECT(x, y, w, 3 * rH, 0.3, 0));
     d.push(VL(x + half, y, 3 * rH, 0.3));
-    putLF(d, x + half + 1.0, y + 0.3, half - 2.0, fh, FA_FULL, "full", pt - 1.0, true, false, 0.36);
+    putLF(d, x + half + 1.0, y + 0.3, half - 2.0, fh, FA_FULL, "P-Name", pt - 1.0, true, false, 0.36);
     putLF(d, x + 1.0, y + 0.3, half - 2.0, fh, FA_RECEIPT, "receiptNo", pt - 1.0, false, false, 0.40);
     d.push(HL(x, y + rH, w, 0.3));
     putLF(d, x + half + 1.0, y + rH + 0.3, half - 2.0, fh, FA_TOTAL, "total", pt - 1.0, false, false, 0.36);
@@ -509,17 +509,16 @@
     d.push(F(sbX + 1.0, sy, sbW - 2.0, 10.0, "clinicaddr", "", pt - 2.0, 1)); sy += 11.0;
     d.push(F(sbX + 1.0, sy, sbW - 2.0, 5.0, "clinicphone", "", pt - 2.0, 1)); sy += 6.0;
     d.push(HL(sbX + 1.0, sy, sbW - 2.0, 0.3)); sy += 3.0;
-    var bcH = 7.0;
-    d.push(BARCODE(sbX + 2.0, sy, sbW - 4.0, bcH));
-    var sbBottom = sy + bcH + 2.0;
+    var sbBottom = sy + 2.0;
     d.push(RECT(sbX, sbTop, sbW, sbBottom - sbTop, bw, 0));
-    /* main column: section 3 title + sections 4..8 box + sections 9..11 */
+    /* main column: title + info + services + barcode BELOW the table + totals */
     var mx = mainX, mw = mainW, boxTop = R_M, y = boxTop + 1.2;
     d.push(L(mx, y, mw, 6.0, title, pt + 2.0, true, 1)); y += 7.5;
     d.push(HL(mx, y, mw, 0.3)); y += 2.0;
     y = medInfo(d, mx, y, mw, rH, pt, bw);
     d.push(SERVICES(mx, y, mw, svcH, pt - 0.5, sp.s, 0, bw, rH - 1.0, rH - 0.8));
     y += svcH;
+    y = medBarcode(d, mx, y, mw);
     y = medFinancial(d, mx, y, mw, rH, pt, bw, 0);
     y = medEpresReferral(d, mx, y, mw, rH, pt, bw);
     d.push(RECT(mx, boxTop, mw, y - boxTop, bw, 0));
@@ -560,20 +559,20 @@
 
     /* 1 clinic header */
     y = medHeader(d, x, y, w, pt, hdrMode, photo);
-    /* 2 barcode */
-    y = medBarcode(d, x, y, w);
-    /* 3 document title */
+    /* 2 document title (barcode moves BELOW the services table — v1.97) */
     y = medTitle(d, x, y, w, pt, title);
 
     /* optional ruled section captions (card family) */
     if (capBars) caption("مشخصات بیمار");
-    /* 4 ruled info box */
+    /* 3 ruled info box */
     y = medInfo(d, x, y, w, rH, pt, bw);
 
     if (capBars) caption(FA_SVCLIST);
-    /* 5 services table (dynamic, PIT_SERVICES) */
+    /* 4 services table (dynamic, PIT_SERVICES) */
     d.push(SERVICES(x, y, w, svcH, pt - 0.5, sp.s, svcHdr, bw, rH - 1.0, rH - 0.8));
     y += svcH;
+    /* 5 exactly one thin Code128 barcode, BELOW the services table (~72×7 mm) */
+    y = medBarcode(d, x, y, w);
 
     if (capBars) caption("مالی و پرداخت");
     /* 6 financial section */

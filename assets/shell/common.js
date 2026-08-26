@@ -61,17 +61,18 @@
       if (_booted) { try { cb(); } catch (e) {} return; }
       _bootCbs.push(cb);
     },
-    /* toggle the shared dark/light surfaces (class on <html>). */
-    applyTheme: function (dark) {
+    /* apply light | dark | neon (class on <html>). Boolean true still means dark. */
+    applyTheme: function (mode) {
       var h = doc.documentElement;
       if (!h) return;
-      if (dark) {
-        if (h.className.indexOf('theme-dark') < 0) {
-          h.className = (h.className ? h.className + ' ' : '') + 'theme-dark';
-        }
-      } else {
-        h.className = ('' + h.className).replace(/(^|\s)theme-dark(\s|$)/g, ' ');
-      }
+      var name = '';
+      if (mode === true || mode === 'dark') name = 'theme-dark';
+      else if (mode === 'neon') name = 'theme-neon';
+      h.className = ('' + (h.className || ''))
+        .replace(/(^|\s)theme-(dark|neon)(\s|$)/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/^\s+|\s+$/g, '');
+      if (name) h.className = (h.className ? h.className + ' ' : '') + name;
     }
   };
 
@@ -508,8 +509,9 @@
   /* apply the persisted theme early (best-effort). */
   (function () {
     var h = doc.documentElement;
-    if (h && h.getAttribute && h.getAttribute('data-theme') === 'dark') {
-      AzBoot.applyTheme(true);
+    if (h && h.getAttribute) {
+      var dt = h.getAttribute('data-theme');
+      if (dt) AzBoot.applyTheme(dt);
     }
   })();
 

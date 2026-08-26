@@ -117,7 +117,9 @@ struct PrintDesign {
 //     {reg_ts}        تاریخ و ساعت ثبت پذیرش
 //   patient
 //     {first} {last} {full} {father} {nid} {birth} {gender} {mobile}
-//     {landline} {address} {ptype} {age} {barcode} {nationalcard}
+//     {landline} {address} {ptype} {barcode} {nationalcard}
+//     {age}           سن به‌صورت 10Y / 24Y (ارقام لاتین + Y)
+//     {P-Name}        نام کامل بیمار (alias → {full})؛ نمایش دیزاینر [P-Name]
 //     {receiptcode}   کد کوتاه رسید (deterministic از شمارهٔ قبض)
 //   insurance
 //     {ins} {supp} {insno} {insexp} {insidx}

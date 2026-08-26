@@ -142,6 +142,8 @@
       '<div class="crm-field"><label class="crm-label">نوع بخش</label>' +
         '<input class="crm-input" id="fKind" value="' + Crm.esc(sec ? sec.kind : '') + '" placeholder="مثال: عمومی، تزریقات، آزمایشگاه" /></div>' +
       '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="fActive" ' + (!sec || sec.active ? 'checked' : '') + ' />فعال</label></div>' +
+      '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="fCashier" ' + (sec && sec.cashierTab ? 'checked' : '') + ' />ثبت پذیرش در صندوق</label></div>' +
+      '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="fHasPos" ' + (sec && sec.hasPos ? 'checked' : '') + ' />بخش دستگاه پوز دارد</label></div>' +
       '</div>';
     var foot = Crm.el('div', 'crm-modal-foot');
     foot.innerHTML = '<button class="crm-btn ghost" id="mCancel">انصراف</button><button class="crm-btn primary" id="mSave">ذخیره</button>';
@@ -154,7 +156,9 @@
         code: Crm.$('fCode').value,
         name: Crm.$('fName').value,
         kind: Crm.$('fKind').value,
-        active: Crm.$('fActive').checked
+        active: Crm.$('fActive').checked,
+        cashierTab: !!(Crm.$('fCashier') && Crm.$('fCashier').checked),
+        hasPos: !!(Crm.$('fHasPos') && Crm.$('fHasPos').checked)
       };
       if (!payload.name) { Crm.toast('نام بخش الزامی است.', 'err'); return; }
       Crm.call('crm.sections.save', payload).then(function () {
@@ -258,6 +262,8 @@
       '<div class="crm-field"><label class="crm-label">نوع</label>' +
         '<input class="crm-input" id="gKind" value="' + Crm.esc(sub ? sub.kind : '') + '" placeholder="مثال: تزریقات، ویزیت" /></div>' +
       '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gActive" ' + (!sub || sub.active ? 'checked' : '') + ' />فعال</label></div>' +
+      '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gCashier" ' + (sub && sub.cashierTab ? 'checked' : '') + ' />ثبت پذیرش در صندوق</label></div>' +
+      '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gHasPos" ' + (sub && sub.hasPos ? 'checked' : '') + ' />زیر بخش دستگاه پوز دارد</label></div>' +
       '</div>';
     var foot = Crm.el('div', 'crm-modal-foot');
     foot.innerHTML = '<button class="crm-btn ghost" id="mCancel">انصراف</button><button class="crm-btn primary" id="mSave">ذخیره</button>';
@@ -270,7 +276,9 @@
         code: Crm.$('gCode').value,
         name: Crm.$('gName').value,
         kind: Crm.$('gKind').value,
-        active: Crm.$('gActive').checked
+        active: Crm.$('gActive').checked,
+        cashierTab: !!(Crm.$('gCashier') && Crm.$('gCashier').checked),
+        hasPos: !!(Crm.$('gHasPos') && Crm.$('gHasPos').checked)
       };
       if (!payload.name) { Crm.toast('نام زیربخش الزامی است.', 'err'); return; }
       if (!payload.parentId) { Crm.toast('انتخاب بخش مربوطه الزامی است.', 'err'); return; }

@@ -29,7 +29,7 @@ SRCS="main util handlers theme users billing calculator dialogs update \
       admin reception gdiplus settings printer employees data_ext appointment \
       backup ui_kit backup_analyzer backup_log sections print_designer \
       user_settings net_sync profile_requests backup_log_viewer backup_mtf \
-      saved_messages setup_splash web_designer services clinic_ops"
+      saved_messages setup_splash web_designer services clinic_ops accounting"
 
 echo "[1/3] Compiling resources..."
 $RES -O coff -i src/app.rc -o obj/app.res

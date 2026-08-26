@@ -5668,6 +5668,18 @@ HWND createReceptionScreen(HWND frame){
         s_rd->active = 0;            // focus the dashboard tab
         recLayoutTabs(h);
     }
+    // v1.97: coming online → toast unseen کارتابل count (offline → login).
+    {
+        int n=unseenMessageCount(g_session.user.username);
+        if(n>0){
+            KMsg syn;
+            syn.from=L"\u06a9\u0627\u0631\u062a\u0627\u0628\u0644";
+            syn.text=L"\u0634\u0645\u0627 "+toFaDigits(std::to_wstring(n))+
+                     L" \u067e\u06cc\u0627\u0645 \u062e\u0648\u0627\u0646\u062f\u0647\u200c\u0646\u0634\u062f\u0647 \u062f\u0627\u0631\u06cc\u062f";
+            syn.type=KMSG_NORMAL;
+            MsgToast_Show(h, syn, n);
+        }
+    }
 #ifdef AZ_DEBUG_BUILD
     {   // headless screenshot helper: open a specific tab for inspection
         wchar_t dbg[32]={0};

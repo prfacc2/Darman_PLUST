@@ -110,6 +110,12 @@ static bool jsonGetBool(const std::string& j, const std::string& key, bool def){
     p++; while(p<j.size()&&(j[p]==' '||j[p]=='\t')) p++;
     return j.compare(p,4,"true")==0;
 }
+static bool jsonHasKey(const std::string& j, const std::string& key){
+    std::string pat="\""+key+"\"";
+    size_t p=j.find(pat); if(p==std::string::npos) return false;
+    p=j.find(':',p+pat.size());
+    return p!=std::string::npos;
+}
 // extract the raw substring of a nested object/array value for `key`
 static bool jsonGetRaw(const std::string& j, const std::string& key, std::string& out){
     std::string pat="\""+key+"\"";

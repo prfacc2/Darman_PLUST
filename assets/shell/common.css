@@ -63,6 +63,17 @@ html.theme-dark body{
 }
 html.theme-dark a{color:#7ab0ff;}
 
+html.theme-neon body{
+  background:#0A0E1A;
+  background:-webkit-linear-gradient(top,#0E1428 0%,#080812 100%);
+  background:linear-gradient(180deg,#0E1428 0%,#080812 100%);
+  color:#E0F0FF;
+}
+html.theme-neon a{color:#00F0FF;}
+html.theme-neon .az-card{background:#121828;border-color:#2A3458;}
+html.theme-neon .az-muted{color:#8090B0;}
+html.theme-neon .az-btn.ghost{color:#00F0FF;border-color:#2A3458;}
+
 /* ------------------------------------------------------------- primitives --- */
 .az-card{
   background:#ffffff;border:1px solid #d3ddec;border-radius:12px;

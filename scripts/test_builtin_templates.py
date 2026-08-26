@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural regression checks for the 30 builtin print designs (v1.67.0).
+"""Structural regression checks for the 30 builtin print designs (v1.97.0).
 
 Validates BOTH sides of the ready-made-template contract:
 
@@ -198,6 +198,21 @@ def audit_preset(where, key, model):
         len(set(kinds)) == len(kinds),
         f"{where} preset {key} repeats a column kind: {kinds}",
     )
+    # v1.97.0 — شرح خدمت last; ردیف omitted or last (never in the middle).
+    if "ROW" in kinds:
+        check(
+            kinds[-1] == "ROW",
+            f"{where} preset {key} has row # in the middle: {kinds}",
+        )
+        check(
+            kinds[-2] == "DESC",
+            f"{where} preset {key} must put DESC immediately before trailing ROW: {kinds}",
+        )
+    else:
+        check(
+            kinds[-1] == "DESC",
+            f"{where} preset {key} must put DESC last: {kinds}",
+        )
     return kinds
 
 
@@ -311,25 +326,30 @@ for fam in explicit_fams:
         f"fam=={fam}" in render_body,
         f"renderReceipt() does not handle family {fam} (explicit flag check)",
     )
-# v1.95: every medical receipt carries a barcode (section 2 of the spec).
-# The old no_code>=5 assertion is no longer valid — all 30 have barcodes by design.
+# v1.97: every medical receipt carries exactly one barcode BELOW the services table.
 check(
     "medBarcode(" in render_body,
     "renderReceipt() does not emit the medical barcode (medBarcode)",
+)
+svc_pos = render_body.find("mkServices(")
+bc_pos = render_body.find("medBarcode(")
+check(
+    svc_pos >= 0 and bc_pos > svc_pos,
+    "barcode is not placed below the services table in renderReceipt()",
 )
 
 check('d.paper=L"A4"' in inc.replace(" ", "").replace('d.paper=L"A4"', 'd.paper=L"A4"') or 'd.paper=L"A4"' in inc,
       "designs are no longer authored against A4")
 
 # --- migration guard ---------------------------------------------------
-check('getSetting(L"tpl_migration_1_67"' in inc, "the v1.67 migration guard is missing")
+check('getSetting(L"tpl_migration_1_97"' in inc, "the v1.97 migration guard is missing")
 init_fn = re.search(r"void Designs_Init\(\)\{(.*?)\n\}", inc, re.S)
 check(init_fn is not None, "Designs_Init() was not found")
 if init_fn:
     init_body = init_fn.group(1)
     check(
         init_body.count("stamp();") == 2,
-        "the migration must be stamped for fresh installs and the v1.67 upgrade "
+        "the migration must be stamped for fresh installs and the v1.97 upgrade "
         f"(found {init_body.count('stamp();')} stamp() calls)",
     )
     check(
@@ -340,7 +360,7 @@ if init_fn:
         "Designs_Delete(existing[i].id)" in init_body,
         "Designs_Init() no longer removes surplus builtins beyond the 30",
     )
-for old in ("1_52", "1_53", "1_58", "1_59", "1_60", "1_61", "1_62", "1_65", "1_66"):
+for old in ("1_52", "1_53", "1_58", "1_59", "1_60", "1_61", "1_62", "1_65", "1_66", "1_67"):
     check(
         'setSetting(L"tpl_migration_%s", L"1")' % old in inc,
         f"upgrade path no longer retires the tpl_migration_{old} guard",
@@ -377,6 +397,7 @@ for (var i = 0; i < all.length; i++) {
     if (it.y + it.h > maxY) maxY = it.y + it.h;
   }
   var s = svc.length === 1 ? svc[0] : null;
+  var bc = barcode.length === 1 ? barcode[0] : null;
   var model = null;
   if (s) { try { model = JSON.parse(s.text); } catch (e) { model = null; } }
   var rows = 0;
@@ -386,6 +407,8 @@ for (var i = 0; i < all.length; i++) {
     items: t.items.length, svcCount: svc.length, barcodeCount: barcode.length,
     model: model, h: s ? s.h : 0, y: s ? s.y : 0, rowH: s ? s.rowH : 0,
     headerH: s ? s.headerH : 0, rows: rows,
+    barcodeY: bc ? bc.y : -1, barcodeH: bc ? bc.h : 0, barcodeW: bc ? bc.w : 0,
+    barcodeBelow: !!(bc && s && bc.y + 0.05 >= s.y + s.h),
     minX: minX, minY: minY, maxX: maxX, maxY: maxY
   });
 }
@@ -460,6 +483,15 @@ if js_designs:
             f"{tag} bleeds off the printable height ({d['minY']:.1f}..{d['maxY']:.1f})",
         )
         check(d["items"] >= 18, f"{tag} looks under-designed ({d['items']} items)")
+        check(
+            d["barcodeBelow"],
+            f"{tag} barcode is not below the services table "
+            f"(svc y={d['y']:.1f} h={d['h']:.1f}, bc y={d['barcodeY']:.1f})",
+        )
+        check(
+            70.0 <= d["barcodeW"] <= 74.0 and 6.0 <= d["barcodeH"] <= 8.0,
+            f"{tag} barcode size {d['barcodeW']:.1f}×{d['barcodeH']:.1f} is not ~72×7 mm",
+        )
 
     # v1.69.0 — the 30 designs must be VISUALLY DISTINCT, not mere colour swaps.
     # Each family's three variants get a different services-table height (a direct
@@ -496,6 +528,12 @@ check("if(dst.discount>cap) dst.discount=cap;" in canonical_header and
       "merged service discounts do not clamp down to line gross")
 check("minRows" not in printer, "printer still pads live services to frame capacity")
 check("pdSvcCellSample" not in printer, "printer still fabricates sample service text")
+check('L"%dY"' in printer, "{age} must print as 10Y/24Y")
+check("p-name" in printer.lower(), "P-Name → {full} alias is missing")
+check(
+    "ویزیت پزشک عمومی" not in (ROOT / "assets" / "designer" / "designer.js").read_text(encoding="utf-8"),
+    "designer services preview still shows example service names",
+)
 check("نمونهٔ خدمت" not in manage, "native ready-template preview still shows a fake service")
 check("ry.reserve(totalRows+1)" in printer, "renderer no longer allocates totalRows+1 boundaries")
 check("DT_WORDBREAK" in printer and "pdBuildServicesLayout" in printer,
@@ -748,5 +786,5 @@ print("PASS: all 30 designs carry their Persian name (no more blank gallery card
 print("PASS: every family emits exactly one live PIT_SERVICES table + a footer band")
 print("PASS: runtime service rows are compact, wrapped, bounded, and never sample-padded")
 print("PASS: assets/designer/templates.js mirrors the C++ seeder exactly")
-print("PASS: tpl_migration_1_67 guard stamped for fresh installs and upgrades")
+print("PASS: tpl_migration_1_97 guard stamped for fresh installs and upgrades")
 print("PASS: toggled-back normal rows charge 170 in both orders through production canonicalization")
