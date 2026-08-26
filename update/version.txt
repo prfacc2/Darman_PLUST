@@ -1,2 +1,2 @@
-1.95.0
-https://github.com/prfacc2/Darman_PLUST/releases/download/v1.95.0/DarmanPlus.exe
+1.96.0
+https://github.com/prfacc2/Darman_PLUST/releases/download/v1.96.0/DarmanPlus.exe

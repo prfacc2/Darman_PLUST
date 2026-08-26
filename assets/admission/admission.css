@@ -7209,3 +7209,188 @@ body.theme-neon.surface-adm .sf-cell span{color:#8090B0;}
 body.theme-neon.surface-adm .rx-lbl{color:#8090B0;}
 body.theme-neon.surface-adm .rx-val{color:#E0F0FF;}
 body.theme-neon.surface-adm .svc-count{color:#8090B0;}
+
+/* ==========================================================================
+   v1.96.1 — EXHAUSTIVE dark/neon admission parity + neon receipts/dash fills
+   v1.94–v1.96 repainted cards/inputs/buttons at (0,3,1) but left three classes
+   of surfaces still light/white in neon (and a few in dark):
+     (a) ADMISSION 3-column trays (.col-left/.col-center/.col-action) — neon had
+         NO .col-* rule at all, so the whole left/center/right rail rendered the
+         base #ffffff / #f8fbff milk wash ("right side white, left side white,
+         middle white"). .action-card, .ps-line, .ps-val, .profile-card/.avatar
+         and the .btn / .btn:active / .btn-queue-add family had no surface-scoped
+         override either, so the ungated (0,2,1) white-inset shadow + light bg
+         bled through. This block raises specificity to (0,3,1) for the columns
+         and replaces the button chrome. Neon gets real glow (box-shadow
+         0 0 8px rgba(0,240,255,.3)). Dark columns already had (0,2,0) rules but
+         are re-asserted at (0,3,1) for bullet-proof parity.
+     (b) RECEIPTS (surface-rc): dark had a block; neon had none → white tiles.
+     (c) DASH drawer: dark covered; neon drawer panel + items were white.
+   Trident-safe: no var()/calc()/grid/gap. All colors literal hex/rgba.
+   ========================================================================== */
+
+/* ============ DARK — admission columns + remaining white trays ============ */
+body.theme-dark.surface-adm .col-left,
+body.theme-dark.surface-adm .col-action{
+  background:#161F2C;border:1px solid #2C3645;color:#C2CCDC;
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+body.theme-dark.surface-adm .col-center{
+  background:#1B2737;border:1px solid #2C3645;color:#C2CCDC;
+  -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,.03);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+body.theme-dark.surface-adm .col.is-active{
+  border-color:#3B82F6;background:#1B2737;
+  -webkit-box-shadow:0 0 0 2px rgba(59,130,246,.18);box-shadow:0 0 0 2px rgba(59,130,246,.18);
+}
+body.theme-dark.surface-adm .col.is-active .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .action-card{
+  background:#1D2735;border:1px solid #2C3645;color:#E8EEF6;
+}
+body.theme-dark.surface-adm .ps-line{
+  background:#1B2637;border:1px solid #2C3645;
+}
+body.theme-dark.surface-adm .ps-val{color:#ecf6ff;}
+/* .btn / .btn:active base box-shadow is a dark inset (not white) and the typed
+   buttons (primary/submit/outline/print/erx/danger) already carry (0,3,1) dark
+   box-shadow overrides, so only the untyped queue-add buttons need a repaint. */
+body.theme-dark.surface-adm .btn-queue-add{
+  -webkit-box-shadow:inset 0 2px 3px rgba(0,0,0,.30), inset 0 -1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(120,80,10,.18);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.30), inset 0 -1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(120,80,10,.18);
+}
+body.theme-dark.surface-adm .btn-queue-add2{
+  -webkit-box-shadow:inset 0 2px 3px rgba(0,0,0,.30), inset 0 -1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(25,60,150,.20);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.30), inset 0 -1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(25,60,150,.20);
+}
+
+/* ============ NEON — admission columns + remaining white trays + glow ============ */
+body.theme-neon.surface-adm .col-left,
+body.theme-neon.surface-adm .col-action{
+  background:#121828;border:1px solid #2A3458;color:#B0C4E0;
+  -webkit-box-shadow:inset 0 0 0 1px rgba(0,240,255,.05), 0 0 8px rgba(0,240,255,.12);
+  box-shadow:inset 0 0 0 1px rgba(0,240,255,.05), 0 0 8px rgba(0,240,255,.12);
+}
+body.theme-neon.surface-adm .col-center{
+  background:#0E1420;border:1px solid #2A3458;color:#B0C4E0;
+  -webkit-box-shadow:inset 0 0 0 1px rgba(0,240,255,.05), 0 0 8px rgba(0,240,255,.10);
+  box-shadow:inset 0 0 0 1px rgba(0,240,255,.05), 0 0 8px rgba(0,240,255,.10);
+}
+body.theme-neon.surface-adm .col.is-active{
+  border-color:#00F0FF;background:#0E1420;
+  -webkit-box-shadow:0 0 0 2px rgba(0,240,255,.24), 0 0 16px rgba(0,240,255,.22);
+  box-shadow:0 0 0 2px rgba(0,240,255,.24), 0 0 16px rgba(0,240,255,.22);
+}
+body.theme-neon.surface-adm .col.is-active .card-title{color:#00F0FF;}
+body.theme-neon.surface-adm .action-card{
+  background:#121828;border:1px solid #2A3458;color:#E0F0FF;
+  -webkit-box-shadow:0 0 8px rgba(0,240,255,.12);box-shadow:0 0 8px rgba(0,240,255,.12);
+}
+body.theme-neon.surface-adm .ps-line{
+  background:#1A2238;border:1px solid #2A3458;
+  -webkit-box-shadow:inset 0 0 0 1px rgba(0,240,255,.06);box-shadow:inset 0 0 0 1px rgba(0,240,255,.06);
+}
+body.theme-neon.surface-adm .ps-val{color:#00F0FF;}
+body.theme-neon.surface-adm .ps-cap{color:#B0C4E0;}
+/* profile-card: base is a royal-blue gradient — repaint dark glass + cyan glow */
+body.theme-neon.surface-adm .profile-card{
+  background:#121828;background:linear-gradient(180deg,#1A2238 0%,#121828 100%);
+  border:1px solid #2A3458;color:#E0F0FF;
+  -webkit-box-shadow:0 8px 20px rgba(0,0,0,.40), inset 0 0 0 1px rgba(0,240,255,.10);
+  box-shadow:0 8px 20px rgba(0,0,0,.40), inset 0 0 0 1px rgba(0,240,255,.10);
+}
+body.theme-neon.surface-adm .profile-card .avatar{
+  background:#0E2A3A;border:1px solid rgba(0,240,255,.40);color:#00F0FF;
+}
+/* payable caption/value: neon payable-card is green glass with dark ink */
+body.theme-neon.surface-adm .payable-caption{color:#04261A;}
+body.theme-neon.surface-adm .payable-value b,
+body.theme-neon.surface-adm .payable-value span{color:#0A0E1A;text-shadow:0 2px 6px rgba(4,78,87,.35);}
+/* typed buttons (primary/submit/outline/print/erx/danger) already carry (0,3,1)
+   neon glow box-shadow; only the untyped queue-add buttons lacked an override. */
+body.theme-neon.surface-adm .btn-queue-add{
+  -webkit-box-shadow:inset 0 2px 3px rgba(0,0,0,.34), 0 3px 8px rgba(255,170,0,.22), 0 0 8px rgba(255,170,0,.18);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.34), 0 3px 8px rgba(255,170,0,.22), 0 0 8px rgba(255,170,0,.18);
+}
+body.theme-neon.surface-adm .btn-queue-add2{
+  -webkit-box-shadow:inset 0 2px 3px rgba(0,0,0,.34), 0 3px 8px rgba(0,240,255,.22), 0 0 8px rgba(0,240,255,.18);
+  box-shadow:inset 0 2px 3px rgba(0,0,0,.34), 0 3px 8px rgba(0,240,255,.22), 0 0 8px rgba(0,240,255,.18);
+}
+
+/* ============ NEON — RECEIPTS surface (surface-rc) — was entirely missing ============ */
+body.theme-neon.surface-rc{
+  background:#0A0E1A;background:linear-gradient(150deg,#0A0E1A 0%,#080812 100%);
+}
+body.theme-neon.surface-rc .tools-panel{background:transparent;}
+body.theme-neon.surface-rc .tools-topbar{background:#121828;border-color:#2A3458;}
+body.theme-neon.surface-rc .tools-tile{
+  background:#121828;background:linear-gradient(180deg,#1A2238 0%,#121828 100%);border:1px solid #2A3458;
+  -webkit-box-shadow:0 6px 16px rgba(0,0,0,.34);box-shadow:0 6px 16px rgba(0,0,0,.34);
+}
+body.theme-neon.surface-rc .tools-tile:hover{
+  background:rgba(0,240,255,.10);
+  -webkit-box-shadow:0 14px 30px rgba(0,0,0,.40), 0 0 0 1px rgba(0,240,255,.18);
+  box-shadow:0 14px 30px rgba(0,0,0,.40), 0 0 0 1px rgba(0,240,255,.18);
+}
+body.theme-neon.surface-rc .inp{background:#1A2438;border:1px solid #2A3458;color:#E0F0FF;}
+body.theme-neon.surface-rc .inp:focus{
+  border-color:#00F0FF;
+  -webkit-box-shadow:0 0 0 3px rgba(0,240,255,.22);box-shadow:0 0 0 3px rgba(0,240,255,.22);
+}
+body.theme-neon.surface-rc .btn-primary{
+  color:#0A0E1A;border:1px solid #00F0FF;font-weight:800;
+  background:linear-gradient(180deg,#00F0FF 0%,#0080FF 100%);
+}
+body.theme-neon.surface-rc .btn-primary:hover{background:linear-gradient(180deg,#40FFFF 0%,#00A0FF 100%);}
+body.theme-neon.surface-rc .btn-outline,
+body.theme-neon.surface-rc .btn-print{
+  background:#1A2238;border:1px solid #2A3458;color:#B0C4E0;
+}
+body.theme-neon.surface-rc .btn-outline:hover,
+body.theme-neon.surface-rc .btn-print:hover{border-color:#00F0FF;color:#00F0FF;background:rgba(0,240,255,.10);}
+body.theme-neon.surface-rc .btn-danger{
+  color:#fff;border:1px solid #FF0066;
+  background:linear-gradient(180deg,#FF0066 0%,#CC0044 100%);
+}
+body.theme-neon.surface-rc .btn-danger:hover{background:linear-gradient(180deg,#FF2277 0%,#DD1166 100%);}
+body.theme-neon.surface-rc .rc-tbl-wrap{
+  background:#0E1420;border:1px solid #2A3458;border-radius:14px;
+  -webkit-box-shadow:0 4px 14px rgba(0,0,0,.40);box-shadow:0 4px 14px rgba(0,0,0,.40);
+}
+body.theme-neon.surface-rc .rc-side{
+  background:#121828;border:1px solid #2A3458;border-radius:14px;color:#E0F0FF;
+}
+body.theme-neon.surface-rc .rc-side-title{color:#00F0FF;}
+body.theme-neon.surface-rc .rc-side .fld > span{color:#8090B0;}
+body.theme-neon.surface-rc .rc-help-hdr{background:transparent;border:none;-webkit-box-shadow:none;box-shadow:none;}
+body.theme-neon.surface-rc .tabs{background:#0E1420;border-color:#2A3458;}
+body.theme-neon.surface-rc .tab{color:#B0C4E0;}
+body.theme-neon.surface-rc .tab.active{color:#00F0FF;border-color:#00F0FF;}
+body.theme-neon.surface-rc .tools-empty{color:#8090B0;}
+
+/* ============ NEON — DASH drawer gap fill (vessel/topbar already covered) ============ */
+body.theme-neon .dash-drawer{
+  background:#121828;background:linear-gradient(180deg,rgba(26,34,56,.95) 0%,rgba(18,24,40,.92) 100%);
+  border-color:#2A3458;
+}
+body.theme-neon .dash-drawer-head{
+  background:#0E1420;border-color:#2A3458;
+}
+body.theme-neon .dash-drawer-title{color:#E0F0FF;}
+body.theme-neon .dash-drawer-item{
+  background:linear-gradient(180deg,rgba(26,34,56,.85) 0%,rgba(18,24,40,.70) 100%);
+  border:1px solid #2A3458;border-right:3px solid #2A3458;color:#B0C4E0;
+  -webkit-box-shadow:inset 0 1px 0 rgba(0,240,255,.06);box-shadow:inset 0 1px 0 rgba(0,240,255,.06);
+}
+body.theme-neon .dash-drawer-item:hover{
+  background:linear-gradient(180deg,#1A2238 0%,#121828 100%);border-right-color:#00F0FF;
+  -webkit-box-shadow:0 6px 14px rgba(0,240,255,.14), inset 0 1px 0 rgba(0,240,255,.10);
+  box-shadow:0 6px 14px rgba(0,240,255,.14), inset 0 1px 0 rgba(0,240,255,.10);
+}
+body.theme-neon .dash-cat{color:#8090B0;}
+body.theme-neon .dash-dri-tx b{color:#E0F0FF;}
+body.theme-neon .dash-dri-tx small{color:#8090B0;}
+body.theme-neon .dash-search-ic{color:#00F0FF;}
+body.theme-neon .dash-search-wrap .inp:focus{
+  border-color:#00F0FF;
+  -webkit-box-shadow:0 0 0 3px rgba(0,240,255,.22);box-shadow:0 0 0 3px rgba(0,240,255,.22);
+}

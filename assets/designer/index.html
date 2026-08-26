@@ -32,6 +32,9 @@
       <option value="0">عمودی</option>
       <option value="1">افقی</option>
     </select>
+    <label class="reflow-toggle" title="حاشیهٔ امن چاپ (میلی‌متر) — خط‌راهنما روی صفحه">
+      حاشیه <input type="number" id="marginInp" class="form-control form-control-sm" min="0" max="30" step="1" value="8" style="width:54px">
+    </label>
     <label class="reflow-toggle" title="با تغییر اندازهٔ کاغذ، همهٔ عناصر متناسب جابه‌جا و تغییر اندازه می‌دهند">
       <input type="checkbox" id="chkReflow" checked> واکنش‌گرا
     </label>
@@ -80,6 +83,7 @@
     <div id="canvasScroll">
       <div id="canvasStage">
         <div id="paper">
+          <div id="marginGuide" class="margin-guide hidden"></div>
           <div id="selBox" class="sel-box hidden">
             <span class="handle h-nw"></span><span class="handle h-ne"></span>
             <span class="handle h-sw"></span><span class="handle h-se"></span>

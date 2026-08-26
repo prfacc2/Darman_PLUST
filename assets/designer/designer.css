@@ -90,6 +90,8 @@ code{background:#eef2f8;border-radius:4px;padding:1px 5px;font-family:Consolas,m
 
 /* items */
 .pi{position:absolute;overflow:hidden;cursor:move;user-select:none}
+/* v1.96.0 — safe-print margin guide (dashed inset rectangle on the page) */
+.margin-guide{position:absolute;border:1px dashed #c9a23a;pointer-events:none;z-index:1;box-sizing:border-box}
 .pi.sel{outline:1px solid var(--accent)}
 .pi-text{box-sizing:border-box;width:100%;height:100%;display:block;
   white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;

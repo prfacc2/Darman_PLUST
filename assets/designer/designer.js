@@ -138,6 +138,7 @@
     pxPerMM: 3.7795, scale: 1,
     undo: [], redo: [], dirty: false,
     reflowOnResize: true,                 // v1.22.0 responsive paper resize
+    pageMargin: 8,                        // v1.96.0 safe-print margin guide (mm)
     templates: window.AZ_TEMPLATES || []
   };
 
@@ -290,15 +291,15 @@
         return m;
       }
     } catch (e) {}
-    // v1.55.0: the real paper receipt has EXACTLY three columns, right→left:
-    //   نام خدمت | شرح خدمت | تعداد      (0.55 / 0.30 / 0.15)
-    return { cols: 3, header: true, widths: SVC_DEF_WIDTHS.slice(),
+    // v1.96.0: the canonical medical-receipt services table is DESCRIPTION-FIRST,
+    // right→left: شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل
+    return { cols: 5, header: true, widths: SVC_DEF_WIDTHS.slice(),
       labels: SVC_DEF_LABELS.slice() };
   }
 
-  // v1.55.0 canonical 3-column services model (mirrors printer.cpp defaults)
-  var SVC_DEF_LABELS = ["نام خدمت", "شرح خدمت", "تعداد"];
-  var SVC_DEF_WIDTHS = [0.55, 0.30, 0.15];
+  // v1.96.0 canonical 5-column services model (mirrors printer.cpp svcModelJson SVC3)
+  var SVC_DEF_LABELS = ["شرح خدمت", "ردیف", "نام خدمت", "تعداد", "مبلغ کل"];
+  var SVC_DEF_WIDTHS = [0.30, 0.07, 0.31, 0.10, 0.22];
 
   /* --- label-driven column resolution (mirrors C++ pdSvcColOf) ------------ *
    * The CAPTION decides which live datum a column shows — never the index.
@@ -316,6 +317,7 @@
     if (!L) return (idx === 0) ? PSC.NAME : (idx === 1) ? PSC.DESC : (idx === 2) ? PSC.QTY : PSC.NONE;
     function has(x) { return L.indexOf(x) >= 0; }
     if (has("ردیف") || has("شماره") || L === "ر") return PSC.ROW;
+    if (L === "#" || L === "№") return PSC.ROW;        // v1.96.0 row-no column
     if (has("شرح") || has("توضیح")) return PSC.DESC;
     if (has("نوع")) return PSC.CAT;
     if (has("تعداد") || has("مقدار") || L === "تع") return PSC.QTY;
@@ -770,6 +772,19 @@
     return el;
   }
 
+  // v1.96.0 — draw the safe-print margin guide (dashed inset) on the page so the
+  // operator sees the printable area while laying out items.
+  function renderMarginGuide() {
+    var g = document.getElementById("marginGuide"); if (!g) return;
+    var m = S.pageMargin || 0;
+    if (!(m > 0)) { g.classList.add("hidden"); return; }
+    g.classList.remove("hidden");
+    g.style.left = mm(m) + "px";
+    g.style.top = mm(m) + "px";
+    g.style.width = mm(S.design.paperW - 2 * m) + "px";
+    g.style.height = mm(S.design.paperH - 2 * m) + "px";
+  }
+
   function renderAll() {
     if (!S.design) return;
     var dims = paperDims(S.design.paper, S.design.orientation);
@@ -777,6 +792,7 @@
 
     $paper.style.width = mm(dims[0]) + "px";
     $paper.style.height = mm(dims[1]) + "px";
+    renderMarginGuide();
 
     Array.prototype.slice.call($paper.querySelectorAll(".pi")).forEach(function (e) { e.remove(); });
 
@@ -877,12 +893,12 @@
       var narrow = dm2[0] < 90;
       it.w = narrow ? 60 : 130; it.h = narrow ? 30 : 40;
       it.pt = narrow ? 7.5 : 8.5; it.borderWidth = 0.4;
-      // v1.55.0: monochrome + the real receipt's three columns, anchored RTL
-      it.borderColor = "#000000"; it.fillColor = "#e9e9e9"; it.textColor = "#000000";
-      it.fillTransparent = false;
+      // v1.96.0: monochrome line-art + the canonical description-first five columns
+      it.borderColor = "#000000"; it.fillColor = "#ffffff"; it.textColor = "#000000";
+      it.fillTransparent = true;
       it.align = 0; it.dir = 0;
       it.headerH = narrow ? 6 : 7.5; it.rowH = narrow ? 5.5 : 6.5;
-      it.text = JSON.stringify({ cols: 3, header: true, widths: SVC_DEF_WIDTHS.slice(),
+      it.text = JSON.stringify({ cols: 5, header: true, widths: SVC_DEF_WIDTHS.slice(),
         labels: SVC_DEF_LABELS.slice() });
     }
     return it;
@@ -913,6 +929,21 @@
     var it = findItem(id); if (!it) return;
     pushUndo(); var c = clone(it); c.id = genId(); c.x += 4; c.y += 4; c.z = S.design.items.length + 1;
     S.design.items.push(c); renderAll(); select(c.id);
+  }
+
+  /* v1.96.0 — clipboard copy/paste for the keyboard shortcuts (Ctrl+C / Ctrl+V). */
+  var clipItem = null;
+  function copyItem() {
+    var it = selItem(); if (!it) return;
+    clipItem = clone(it);
+    toast("کپی شد: " + (ITEM_LABELS[it.type] || it.type));
+  }
+  function pasteItem() {
+    if (!clipItem) { toast("حافظه خالی است", "err"); return; }
+    pushUndo();
+    var c = clone(clipItem); c.id = genId(); c.x += 6; c.y += 6; c.z = S.design.items.length + 1;
+    S.design.items.push(c); renderAll(); select(c.id);
+    toast("چسبانده شد");
   }
 
   /* ------------------------------------------------------------ palette --- */
@@ -1107,10 +1138,10 @@
       var rst = document.createElement("button");
       rst.className = "btn btn-sm btn-outline"; rst.style.cssText = "width:100%;margin:6px 0 2px";
       rst.textContent = "بازگردانی به ستون‌های استاندارد رسید";
-      rst.title = "نام خدمت | شرح خدمت | تعداد";
+      rst.title = "شرح خدمت | ردیف | نام خدمت | تعداد | مبلغ کل";
       rst.addEventListener("click", function () {
         pushUndo();
-        m.cols = 3; m.header = true;
+        m.cols = 5; m.header = true;
         m.widths = SVC_DEF_WIDTHS.slice(); m.labels = SVC_DEF_LABELS.slice();
         it.align = 0; it.dir = 0;
         it.text = JSON.stringify(m);
@@ -1363,9 +1394,16 @@
     window.addEventListener("keydown", function (e) {
       if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
       var it = selItem();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); doUndo(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveDesign(); return; }
+      var ctrl = e.ctrlKey || e.metaKey;
+      // v1.96.0 — undo / redo (Ctrl+Z and Ctrl+Shift+Z or Ctrl+Y), save (Ctrl+S),
+      // copy / paste (Ctrl+C / Ctrl+V). Redo must be checked BEFORE undo so that
+      // Ctrl+Shift+Z does not fall through to the undo branch.
+      if (ctrl && e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); doRedo(); return; }
+      if (ctrl && e.key.toLowerCase() === "z") { e.preventDefault(); doUndo(); return; }
+      if (ctrl && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); return; }
+      if (ctrl && e.key.toLowerCase() === "s") { e.preventDefault(); saveDesign(); return; }
+      if (ctrl && e.key.toLowerCase() === "c") { e.preventDefault(); copyItem(); return; }
+      if (ctrl && e.key.toLowerCase() === "v") { e.preventDefault(); pasteItem(); return; }
       if (!it) return;
       var step = e.shiftKey ? 5 : 1;
       if (e.key === "Delete") { e.preventDefault(); deleteItem(it.id); }
@@ -1858,6 +1896,11 @@
     document.getElementById("orientSel").addEventListener("change", function () { changePaper(undefined, +this.value); });
     var rf = document.getElementById("chkReflow");
     if (rf) { rf.checked = S.reflowOnResize; rf.addEventListener("change", function () { S.reflowOnResize = this.checked; }); }
+    var mi = document.getElementById("marginInp");
+    if (mi) { mi.value = S.pageMargin; mi.addEventListener("change", function () {
+      S.pageMargin = Math.max(0, Math.min(30, parseFloat(mi.value) || 0)); mi.value = S.pageMargin;
+      renderMarginGuide();
+    }); }
     document.getElementById("btnUndo").addEventListener("click", doUndo);
     document.getElementById("btnRedo").addEventListener("click", doRedo);
     document.getElementById("btnZoomIn").addEventListener("click", function () { setScale(S.scale * 1.15); });

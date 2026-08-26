@@ -100,17 +100,6 @@ static PrintItem mkRectC(double x,double y,double w,double h,double bw,double co
                          unsigned border){
     PrintItem it=mkRect(x,y,w,h,bw,corner); it.borderColor=border; return it;
 }
-static PrintItem mkBand(double x,double y,double w,double h,unsigned fill,double bw){
-    PrintItem it; it.id=nid(); it.type=PIT_RECT; it.x=x; it.y=y; it.w=w; it.h=h;
-    it.fillColor=fill; it.fillTransparent=false; it.borderWidth=bw;
-    it.borderColor=fill; return it;
-}
-static PrintItem mkTint(double x,double y,double w,double h,unsigned fill,
-                        unsigned border,double bw,double corner){
-    PrintItem it; it.id=nid(); it.type=PIT_RECT; it.x=x; it.y=y; it.w=w; it.h=h;
-    it.fillColor=fill; it.fillTransparent=false;
-    it.borderColor=border; it.borderWidth=bw; it.corner=corner; return it;
-}
 static PrintItem mkFrame(double pw,double ph,double margin,unsigned col,double bw){
     PrintItem it; it.id=nid(); it.type=PIT_FRAME; it.is_frame=true;
     it.x=margin; it.y=margin; it.w=pw-2*margin; it.h=ph-2*margin;
@@ -154,36 +143,41 @@ enum SvcPreset {
     SVC_PRESET_COUNT
 };
 
+// v1.96.0 — COLUMN ORDER is now DESCRIPTION-FIRST per the medical-receipt
+// spec: شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل (right→left in RTL).
+// The renderer is label-driven (pdSvcColOf), so reordering is safe: each column
+// still pulls the right data by its caption. Extra columns (کد/نوع/مبلغ واحد/
+// تخفیف/سهم بیمه/سهم بیمار) are appended after the canonical five.
 static std::wstring svcModelJson(int preset){
     switch(preset){
-    case SVC4_ROW:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.07,0.36,0.25,0.10,0.22],"
-               L"\"labels\":[\"ردیف\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\"]}";
-    case SVC4_CAT:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.32,0.18,0.22,0.09,0.19],"
-               L"\"labels\":[\"نام خدمت\",\"نوع خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\"]}";
-    case SVC5:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.07,0.36,0.25,0.10,0.22],"
-               L"\"labels\":[\"ردیف\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\"]}";
-    case SVC5_CODE:
-        return L"{\"cols\":6,\"header\":true,\"widths\":[0.06,0.12,0.29,0.22,0.09,0.22],"
-               L"\"labels\":[\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\"]}";
-    case SVC6_FIN:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.05,0.27,0.20,0.08,0.14,0.11,0.15],"
-               L"\"labels\":[\"ردیف\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ واحد\","
+    case SVC4_ROW:      // canonical five, name-emphasized widths
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.27,0.08,0.33,0.10,0.22],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    case SVC4_CAT:      // + نوع خدمت
+        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.06,0.24,0.12,0.10,0.24],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"نوع خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    case SVC5:          // canonical five, balanced widths
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.29,0.07,0.32,0.10,0.22],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    case SVC5_CODE:     // + کد خدمت
+        return L"{\"cols\":6,\"header\":true,\"widths\":[0.22,0.06,0.12,0.26,0.10,0.24],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    case SVC6_FIN:      // + مبلغ واحد / تخفیف
+        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.05,0.18,0.08,0.14,0.11,0.24],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ واحد\","
                L"\"تخفیف\",\"مبلغ کل\"]}";
-    case SVC6_INS:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.05,0.26,0.20,0.08,0.15,0.13,0.13],"
-               L"\"labels\":[\"ردیف\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\","
+    case SVC6_INS:      // + سهم بیمه / سهم بیمار
+        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.05,0.18,0.08,0.17,0.16,0.16],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\","
                L"\"سهم بیمه\",\"سهم بیمار\"]}";
-    case SVC7:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.05,0.11,0.27,0.20,0.08,0.14,0.15],"
-               L"\"labels\":[\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"شرح خدمت\",\"تعداد\","
+    case SVC7:          // + کد خدمت / مبلغ واحد
+        return L"{\"cols\":7,\"header\":true,\"widths\":[0.18,0.05,0.11,0.18,0.08,0.14,0.26],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"کد خدمت\",\"نام خدمت\",\"تعداد\","
                L"\"مبلغ واحد\",\"مبلغ کل\"]}";
     case SVC3:
-    default:
-        return L"{\"cols\":4,\"header\":true,\"widths\":[0.39,0.29,0.10,0.22],"
-               L"\"labels\":[\"نام خدمت\",\"شرح خدمت\",\"تعداد\",\"مبلغ کل\"]}";
+    default:           // canonical five, description-emphasized widths
+        return L"{\"cols\":5,\"header\":true,\"widths\":[0.30,0.07,0.31,0.10,0.22],"
+               L"\"labels\":[\"شرح خدمت\",\"ردیف\",\"نام خدمت\",\"تعداد\",\"مبلغ کل\"]}";
     }
 }
 
@@ -281,13 +275,17 @@ struct TplSpec {
     bool     frame;       // page frame
 };
 
+// v1.96.0 — pure monochrome line-art: headFill is 0 for every template (no
+// coloured / shaded backgrounds), per the medical-receipt spec. The ten layout
+// families stay distinct through LAYOUT (frame / sidebar / photo / tear-off /
+// dual-block / compact pitch / hairline / ruled captions), not colour.
 static const TplSpec TPL[30] = {
   /* 01 */ {0,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.2, false},
-  /* 02 */ {0,1, SVC4_ROW , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.2, false},
+  /* 02 */ {0,1, SVC4_ROW , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.2, false},
   /* 03 */ {0,2, SVC5     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.2, false},
-  /* 04 */ {1,0, SVC3     , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
-  /* 05 */ {1,1, SVC4_CAT , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
-  /* 06 */ {1,2, SVC5_CODE, 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
+  /* 04 */ {1,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 05 */ {1,1, SVC4_CAT , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 06 */ {1,2, SVC5_CODE, 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
   /* 07 */ {2,0, SVC6_FIN , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, true },
   /* 08 */ {2,1, SVC6_INS , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, true },
   /* 09 */ {2,2, SVC7     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, true },
@@ -297,21 +295,21 @@ static const TplSpec TPL[30] = {
   /* 13 */ {4,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.25, 6.0, false},
   /* 14 */ {4,1, SVC4_ROW , 0x000000, 0xFFFFFF, 0x000000, 0.25, 6.0, true },
   /* 15 */ {4,2, SVC5     , 0x000000, 0xFFFFFF, 0x000000, 0.25, 6.0, false},
-  /* 16 */ {5,0, SVC3     , 0x000000, 0xECECEC, 0xECECEC, 0.30, 6.0, false},
-  /* 17 */ {5,1, SVC4_CAT , 0x000000, 0xECECEC, 0xECECEC, 0.30, 6.0, false},
-  /* 18 */ {5,2, SVC6_INS , 0x000000, 0xECECEC, 0xECECEC, 0.30, 6.0, false},
+  /* 16 */ {5,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 17 */ {5,1, SVC4_CAT , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 18 */ {5,2, SVC6_INS , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
   /* 19 */ {6,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
-  /* 20 */ {6,1, SVC4_CAT , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
+  /* 20 */ {6,1, SVC4_CAT , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
   /* 21 */ {6,2, SVC5     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
-  /* 22 */ {7,0, SVC6_FIN , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 5.6, false},
-  /* 23 */ {7,1, SVC6_INS , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 5.6, false},
+  /* 22 */ {7,0, SVC6_FIN , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, false},
+  /* 23 */ {7,1, SVC6_INS , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, false},
   /* 24 */ {7,2, SVC7     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.6, true },
   /* 25 */ {8,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.2, false},
-  /* 26 */ {8,1, SVC4_ROW , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 5.2, false},
+  /* 26 */ {8,1, SVC4_ROW , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.2, false},
   /* 27 */ {8,2, SVC5     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 5.2, false},
-  /* 28 */ {9,0, SVC3     , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
-  /* 29 */ {9,1, SVC6_FIN , 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, false},
-  /* 30 */ {9,2, SVC5_CODE, 0x000000, 0xFFFFFF, 0xECECEC, 0.30, 6.0, true },
+  /* 28 */ {9,0, SVC3     , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 29 */ {9,1, SVC6_FIN , 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, false},
+  /* 30 */ {9,2, SVC5_CODE, 0x000000, 0xFFFFFF, 0x000000, 0.30, 6.0, true },
 };
 
 // v1.95.0 — the 30 Persian gallery names. The document title cycles by variant
@@ -353,15 +351,21 @@ static const wchar_t* const TPL_NAMES[30]={
 static const double R_M   = 8.0;
 static const double R_CW  = PG_W - 2*R_M;            // 194 mm content width
 static const double FR_M  = 5.0;                     // page-frame margin (outside box)
-static const unsigned R_INK   = 0x000000;            // black ink
-static const unsigned R_SHADE = 0xECECEC;            // very light gray (monochrome)
+static const unsigned R_INK   = 0x000000;            // black ink (monochrome line-art)
 
-// push a labelled data field into a cell; align 0 = right (RTL cell start)
-static inline void putF(std::vector<PrintItem>& v,double x,double y,double w,double h,
-                        const wchar_t* field,const wchar_t* prefix,double pt,
-                        bool bold,int align=0){
-    v.push_back(bold? mkFieldB(x,y,w,h,field,prefix,pt,align)
-                    : mkField (x,y,w,h,field,prefix,pt,align));
+// v1.96.0 — SPLIT LABEL / VALUE (CRITICAL RULE): the caption is its own
+// PIT_LABEL (right-aligned at the cell's right edge) and the bound value is its
+// own PIT_FIELD with an EMPTY prefix (right-aligned just left of the label), so
+// the row reads «label:  value» with NO hardcoded example text inside the field.
+// `lwFrac` tunes the label band so long Persian captions never clip. A label-only
+// cell (field==NULL) emits just the PIT_LABEL.
+static inline void putLF(std::vector<PrintItem>& v,double x,double y,double w,double h,
+                         const wchar_t* label,const wchar_t* field,double pt,
+                         bool lblBold,bool valBold,double lwFrac=0.42){
+    double lw=w*lwFrac, gap=1.2, vw=w-lw-gap; if(vw<6) vw=6;
+    v.push_back(mkLabel(x+w-lw, y, lw, h, label, pt, lblBold, 0));
+    if(field) v.push_back(valBold? mkFieldB(x, y, vw, h, field, L"", pt, 0)
+                                 : mkField (x, y, vw, h, field, L"", pt, 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -372,22 +376,23 @@ static inline void putF(std::vector<PrintItem>& v,double x,double y,double w,dou
 // ---------------------------------------------------------------------------
 
 // Section 1 — clinic header (centered name + address + phone).
-// hdrMode: 0 plain, 1 gray band behind the name, 2 double rule below.
-// photo: a small patient-photo box tucked into the top-right corner.
+// hdrMode: 0 plain, 1 line-art emphasis (larger bold name bracketed by two
+// rules — was a gray band, now pure line-art per the no-coloured-background
+// rule), 2 double rule below. photo: a small patient-photo box top-right.
 static double medHeader(std::vector<PrintItem>& v,double x,double y,double w,
                         double pt,int hdrMode,bool photo){
     double pw=15.0, ph=18.0, tw=w;
     if(photo) tw=w-pw-3.0;
     double yy=y+0.8, namePt=pt+3.0;
     if(hdrMode==1 && !photo){
-        v.push_back(mkBand(x, y+0.4, w, 7.0, R_SHADE, 0));
-        v.push_back(mkLabel(x+1, y+0.7, w-2, 6.2, FA_CLINIC, namePt, true, 1));
-        yy=y+0.4+7.0+0.6;
+        v.push_back(mkHLine(x, y+0.4, w, 0.3));
+        v.push_back(mkLabel(x+1, y+0.8, w-2, 6.4, FA_CLINIC, namePt+1.0, true, 1));
+        yy=y+0.4+7.4+0.6;
     } else {
         v.push_back(mkLabel(x, yy, tw, 6.4, FA_CLINIC, namePt, true, 1)); yy+=7.0;
     }
-    v.push_back(mkField(x, yy, tw, 4.4, L"clinicaddr",  FA_ADDR,  pt-2.0, 1)); yy+=5.0;
-    v.push_back(mkField(x, yy, tw, 4.2, L"clinicphone", FA_PHONE, pt-2.0, 1));
+    v.push_back(mkField(x, yy, tw, 4.4, L"clinicaddr",  L"", pt-2.0, 1)); yy+=5.0;
+    v.push_back(mkField(x, yy, tw, 4.2, L"clinicphone", L"", pt-2.0, 1));
     if(photo) v.push_back(mkPhoto(x+w-pw, y+0.8, pw, ph));
     double bottom = y + (photo?19.0:18.0);
     v.push_back(mkHLine(x, bottom, w, 0.3));
@@ -395,10 +400,12 @@ static double medHeader(std::vector<PrintItem>& v,double x,double y,double w,
     return bottom;
 }
 
-// Section 2 — wide, short barcode (centered) + divider rule.
+// Section 2 — wide, short barcode (centered, STANDARD size ~72×7 mm so the
+// Code128 bars stay ~0.6 mm/module and scan reliably — not the oversized 150 mm
+// wide / 11 mm tall block that drew thick bars) + divider rule.
 static double medBarcode(std::vector<PrintItem>& v,double x,double y,double w,double){
-    double bcW=w*0.82, bcH=11.0;
-    v.push_back(mkBarcode(x+(w-bcW)/2.0, y+0.5, bcW, bcH));
+    double bcW=72.0, bcH=7.0;
+    v.push_back(mkBarcode(x+(w-bcW)/2.0, y+0.4, bcW, bcH));
     double bottom = y + bcH + 1.5;
     v.push_back(mkHLine(x, bottom, w, 0.3));
     return bottom;
@@ -413,131 +420,140 @@ static double medTitle(std::vector<PrintItem>& v,double x,double y,double w,
     return bottom;
 }
 
-// Section 4 — the ruled info box: 6 rows × 2 columns, split by a center
-// vertical line and separated by horizontal rules. The last row leaves its
-// bottom rule to the services table's top border. Right cell = first (right-
-// most) field; rows a & c carry two concatenated fields in one cell.
+// Section 4 — the ruled info box: 6 rows × 2 columns, split by a center vertical
+// line and separated by horizontal rules. v1.96.0: every row now carries SPLIT
+// label (PIT_LABEL) + bound value (PIT_FIELD, empty prefix) cells, so no row holds
+// hardcoded example text. Row a (date+time) and row c (supp+percent) carry two
+// bound fields in one cell. The last row leaves its bottom rule to the services
+// table's top border.
 static double medInfo(std::vector<PrintItem>& v,double x,double y,double w,
                       double rH,double pt,double bw){
     double half=w/2.0, vx=x+half, fh=rH-0.6;
-    double RR=x+w-1.0, LR=x+half-1.0, cy=y;
+    double rx=x+half+1.0, rw=half-2.0;     // right (first) cell
+    double lx=x+1.0,       lw=half-2.0;     // left  (second) cell
+    double cy=y;
     auto vline=[&](){ v.push_back(mkVLine(vx, cy, rH, bw)); };
     auto rule =[&](){ cy+=rH; v.push_back(mkHLine(x, cy, w, bw)); };
-    auto r1=[&](const wchar_t* f,const wchar_t* p,bool b){
-        putF(v, x+half+1.0, cy+0.3, half-2.0, fh, f, p, pt, b, 0); };
-    auto l1=[&](const wchar_t* f,const wchar_t* p,bool b){
-        putF(v, x+1.0, cy+0.3, half-2.0, fh, f, p, pt, b, 0); };
 
     // a: تاریخ نوبت: {apptdate} {appttime}  |  نوبت: {queue}
+    // RTL cell order right→left: [label][apptdate][appttime]
     vline();
-    { double sw=half*0.50, pw2=half*0.28, g=1.0;
-      putF(v, RR-sw,       cy+0.3, sw,  fh, L"apptdate", FA_APPT, pt, true,  0);
-      putF(v, RR-sw-g-pw2, cy+0.3, pw2, fh, L"appttime", L"",     pt, false, 0);
-      l1(L"queue", FA_QUEUE, false); }
+    { double lblW=rw*0.34, g=1.0, rem=rw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField (rx,         cy+0.3, f2,    fh, L"appttime", L"", pt, 0));
+      v.push_back(mkFieldB(rx+f2+g,     cy+0.3, f1,    fh, L"apptdate", L"", pt, 0));
+      v.push_back(mkLabel (rx+rw-lblW,  cy+0.3, lblW,  fh, FA_APPT, pt, true, 0)); }
+    putLF(v, lx, cy+0.3, lw, fh, FA_QUEUE, L"queue", pt, false, false, 0.26);
     rule();
     // b: کد ملی: {nid}  |  بارکد: {barcode}
-    vline(); r1(L"nid", FA_NID, true); l1(L"barcode", FA_BARCODE, false); rule();
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_NID,     L"nid",     pt, true,  false, 0.42);
+             putLF(v, lx, cy+0.3, lw, fh, FA_BARCODE, L"barcode", pt, false, false, 0.30); rule();
     // c: بیمه پایه: {ins}  |  مکمل: {supp} {supp_percent}
-    vline(); r1(L"ins", FA_BASEINS, false);
-    { double sw=half*0.52, pw2=half*0.30, g=1.0;
-      putF(v, LR-sw,       cy+0.3, sw,  fh, L"supp",         FA_SUPP, pt, false, 0);
-      putF(v, LR-sw-g-pw2, cy+0.3, pw2, fh, L"supp_percent", L"",     pt, false, 0); }
+    // RTL cell order right→left: [label][supp][supp_percent]
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_BASEINS, L"ins", pt, false, false, 0.40);
+    { double lblW=lw*0.22, g=1.0, rem=lw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
+      v.push_back(mkField (lx,         cy+0.3, f2,    fh, L"supp_percent", L"", pt, 0));
+      v.push_back(mkField (lx+f2+g,     cy+0.3, f1,    fh, L"supp",         L"", pt, 0));
+      v.push_back(mkLabel (lx+lw-lblW,  cy+0.3, lblW,  fh, FA_SUPP, pt, false, 0)); }
     rule();
     // d: نام بیمار: {full}  |  سن: {age}
-    vline(); r1(L"full", FA_FULL, true); l1(L"age", FA_AGE, false); rule();
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_FULL, L"full", pt, true,  false, 0.40);
+             putLF(v, lx, cy+0.3, lw, fh, FA_AGE,  L"age",  pt, false, false, 0.20); rule();
     // e: دکتر: {doctor}  |  کد نظام پزشکی: {doctorcode}
-    vline(); r1(L"doctor", FA_DOCTOR, false); l1(L"doctorcode", FA_DOCCODE, false); rule();
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_DOCTOR,  L"doctor",     pt, false, false, 0.22);
+             putLF(v, lx, cy+0.3, lw, fh, FA_DOCCODE, L"doctorcode", pt, false, false, 0.46); rule();
     // f: کد تخصص: {specialtycode}  |  شرح تخصص: {specialty}   (no bottom rule)
-    vline(); r1(L"specialtycode", FA_SPECCODE, false); l1(L"specialty", FA_SPECIALTY, false);
+    vline(); putLF(v, rx, cy+0.3, rw, fh, FA_SPECCODE,  L"specialtycode", pt, false, false, 0.30);
+             putLF(v, lx, cy+0.3, lw, fh, FA_SPECIALTY, L"specialty",     pt, false, false, 0.30);
     cy+=rH;
     return cy;
 }
-// Section 6 — financial section. mode 0: 4 rows (a 2col, b 2col, c 1col,
-// d 2col); mode 1: full (adds سهم بیمار / مبلغ نهایی / سهم بیمه پایه);
-// mode 2: dual-block — two side-by-side sub-boxes with gray caption strips.
-// Ends with a full-width rule that divides financial from e-prescription.
+// Section 6 — financial section. v1.96.0: split label/value items, line-art only.
+// mode 0: 4 rows (a 2col, b 2col, c 1col, d 2col); mode 1: full (adds سهم بیمار /
+// مبلغ نهایی / سهم بیمه پایه); mode 2: dual-block — two side-by-side sub-boxes
+// with bold line-art caption labels (no fill). Ends with a full-width rule that
+// divides financial from e-prescription.
 static double medFinancial(std::vector<PrintItem>& v,double x,double y,double w,
                            double rH,double pt,double bw,int mode){
     double half=w/2.0, vx=x+half, fh=rH-0.6, cy=y;
+    double rx=x+half+1.0, rw=half-2.0, lx=x+1.0, lw=half-2.0;
     if(mode==2){
-        double gap=3.0, bw2=(w-gap)/2.0, lx=x, rx=x+bw2+gap, capH=5.0;
+        double gap=3.0, bw2=(w-gap)/2.0, lx2=x, rx2=x+bw2+gap, capH=5.5;
         double iy=y+capH;
-        v.push_back(mkBand(lx, y, bw2, capH, R_SHADE, 0));
-        v.push_back(mkLabel(lx+1, y+0.4, bw2-2, capH-0.6, FA_PAYLBL,   pt-0.5, true, 1));
-        v.push_back(mkBand(rx, y, bw2, capH, R_SHADE, 0));
-        v.push_back(mkLabel(rx+1, y+0.4, bw2-2, capH-0.6, FA_SHARELBL, pt-0.5, true, 1));
+        // line-art caption labels (bold, centered) replacing the old gray bands
+        v.push_back(mkLabel(lx2+1, y+0.5, bw2-2, capH-0.7, FA_PAYLBL,   pt-0.5, true, 1));
+        v.push_back(mkLabel(rx2+1, y+0.5, bw2-2, capH-0.7, FA_SHARELBL, pt-0.5, true, 1));
+        v.push_back(mkHLine(lx2, y+capH, bw2, bw));
+        v.push_back(mkHLine(rx2, y+capH, bw2, bw));
         // left block: paid / total / discount
-        putF(v, lx+1, iy+0.3,      bw2-2, fh, L"paid",     FA_PAID,     pt, true,  0);
-        v.push_back(mkHLine(lx, iy+rH, bw2, bw));
-        putF(v, lx+1, iy+rH+0.3,   bw2-2, fh, L"total",    FA_TOTAL,    pt, false, 0);
-        v.push_back(mkHLine(lx, iy+2*rH, bw2, bw));
-        putF(v, lx+1, iy+2*rH+0.3, bw2-2, fh, L"discount", FA_DISCOUNT, pt, false, 0);
+        putLF(v, lx2+1, iy+0.3,      bw2-2, fh, FA_PAID,     L"paid",     pt, true,  false, 0.40);
+        v.push_back(mkHLine(lx2, iy+rH, bw2, bw));
+        putLF(v, lx2+1, iy+rH+0.3,   bw2-2, fh, FA_TOTAL,    L"total",    pt, false, false, 0.40);
+        v.push_back(mkHLine(lx2, iy+2*rH, bw2, bw));
+        putLF(v, lx2+1, iy+2*rH+0.3, bw2-2, fh, FA_DISCOUNT, L"discount", pt, false, false, 0.40);
         // right block: insshare / supppay / pos / cash
-        putF(v, rx+1, iy+0.3,      bw2-2, fh, L"insshare", FA_INSSHARE, pt, false, 0);
-        v.push_back(mkHLine(rx, iy+rH, bw2, bw));
-        putF(v, rx+1, iy+rH+0.3,   bw2-2, fh, L"supppay",  FA_SUPPPAY,  pt, false, 0);
-        v.push_back(mkHLine(rx, iy+2*rH, bw2, bw));
-        putF(v, rx+1, iy+2*rH+0.3, bw2-2, fh, L"pos",      FA_POS,      pt, false, 0);
-        v.push_back(mkHLine(rx, iy+3*rH, bw2, bw));
-        putF(v, rx+1, iy+3*rH+0.3, bw2-2, fh, L"cash",     FA_CASH,     pt, true,  0);
+        putLF(v, rx2+1, iy+0.3,      bw2-2, fh, FA_INSSHARE, L"insshare", pt, false, false, 0.40);
+        v.push_back(mkHLine(rx2, iy+rH, bw2, bw));
+        putLF(v, rx2+1, iy+rH+0.3,   bw2-2, fh, FA_SUPPPAY,  L"supppay",  pt, false, false, 0.40);
+        v.push_back(mkHLine(rx2, iy+2*rH, bw2, bw));
+        putLF(v, rx2+1, iy+2*rH+0.3, bw2-2, fh, FA_POS,      L"pos",      pt, false, false, 0.30);
+        v.push_back(mkHLine(rx2, iy+3*rH, bw2, bw));
+        putLF(v, rx2+1, iy+3*rH+0.3, bw2-2, fh, FA_CASH,     L"cash",     pt, true,  false, 0.30);
         double bottom = y + capH + 4*rH;
-        v.push_back(mkRect(lx, y, bw2, capH+4*rH, bw, 0));
-        v.push_back(mkRect(rx, y, bw2, capH+4*rH, bw, 0));
+        v.push_back(mkRect(lx2, y, bw2, capH+4*rH, bw, 0));
+        v.push_back(mkRect(rx2, y, bw2, capH+4*rH, bw, 0));
         v.push_back(mkHLine(x, bottom, w, bw));          // fin/epres divider
         return bottom;
     }
     auto vline=[&](){ v.push_back(mkVLine(vx, cy, rH, bw)); };
     auto rule =[&](){ cy+=rH; v.push_back(mkHLine(x, cy, w, bw)); };
-    auto r1=[&](const wchar_t* f,const wchar_t* p,bool b){
-        putF(v, x+half+1.0, cy+0.3, half-2.0, fh, f, p, pt, b, 0); };
-    auto l1=[&](const wchar_t* f,const wchar_t* p,bool b){
-        putF(v, x+1.0, cy+0.3, half-2.0, fh, f, p, pt, b, 0); };
-    auto row2=[&](const wchar_t* f1,const wchar_t* p1,
-                  const wchar_t* f2,const wchar_t* p2,bool b1,bool b2){
-        vline(); r1(f1,p1,b1); l1(f2,p2,b2); rule(); };
-    auto row1=[&](const wchar_t* f,const wchar_t* p,bool b){
-        putF(v, x+1.0, cy+0.3, w-2.0, fh, f, p, pt, b, 0); rule(); };
-    row2(L"paid",     FA_PAID,     L"total",    FA_TOTAL,    true,  false);  // a
-    row2(L"insshare", FA_INSSHARE, L"supppay",  FA_SUPPPAY,  false, false);  // b
-    row1(L"discount", FA_DISCOUNT, false);                                  // c (full width)
-    row2(L"pos",      FA_POS,      L"cash",     FA_CASH,     false, false);  // d
+    auto row2=[&](const wchar_t* l1,const wchar_t* f1,bool b1,
+                  const wchar_t* l2,const wchar_t* f2,bool b2){
+        vline(); putLF(v, rx, cy+0.3, rw, fh, l1, f1, pt, b1, b2, 0.40);
+                 putLF(v, lx, cy+0.3, lw, fh, l2, f2, pt, b2, false, 0.40); rule(); };
+    auto row1=[&](const wchar_t* l,const wchar_t* f,bool b){
+        putLF(v, x+1.0, cy+0.3, w-2.0, fh, l, f, pt, b, false, 0.30); rule(); };
+    row2(FA_PAID,     L"paid",     true,  FA_TOTAL,    L"total",    false);  // a
+    row2(FA_INSSHARE, L"insshare", false, FA_SUPPPAY,  L"supppay",  false);  // b
+    row1(FA_DISCOUNT, L"discount", false);                                       // c (full width)
+    row2(FA_POS,      L"pos",      false, FA_CASH,     L"cash",     false);  // d
     if(mode==1){
-        row2(L"patientshare", FA_PATSHARE, L"finaltotal", FA_FINAL, false, true); // e
-        row1(L"basepay",      L"سهم بیمه پایه: ", false);                          // f
+        row2(FA_PATSHARE, L"patientshare", false, FA_FINAL, L"finaltotal", true); // e
+        row1(L"سهم بیمه پایه: ", L"basepay", false);                              // f
     }
     return cy;
 }
 
-// Sections 7 & 8 — e-prescription + referral (full-width ruled rows, the last
-// one leaving its bottom rule to the outer box border).
+// Sections 7 & 8 — e-prescription + referral (full-width split label/value rows,
+// the last one leaving its bottom rule to the outer box border).
 static double medEpresReferral(std::vector<PrintItem>& v,double x,double y,double w,
                                double rH,double pt,double bw){
     double fh=rH-0.6, cy=y;
-    putF(v, x+1.0, cy+0.3, w-2.0, fh, L"eprescription", FA_EPRESC, pt, false, 0);
+    putLF(v, x+1.0, cy+0.3, w-2.0, fh, FA_EPRESC,   L"eprescription", pt, false, false, 0.46);
     cy+=rH; v.push_back(mkHLine(x, cy, w, bw));
-    putF(v, x+1.0, cy+0.3, w-2.0, fh, L"referralno",    FA_REFERRAL, pt, false, 0);
+    putLF(v, x+1.0, cy+0.3, w-2.0, fh, FA_REFERRAL, L"referralno",    pt, false, false, 0.32);
     cy+=rH;
     return cy;
 }
 
-// Sections 9 / 10 / 11 — below the box: پذیرش | صندوق , ش.ص , print timestamp.
+// Sections 9 / 10 / 11 — below the box: پذیرش | صندوق (two columns split by a
+// vertical line), ش.ص , print timestamp. v1.96.0: split label/value items.
 static double medBelow(std::vector<PrintItem>& v,double x,double y,double w,double pt){
-    double fh=5.5, gap=2.2, half=w/2.0;
+    double fh=5.5, gap=2.2, half=w/2.0, vx=x+half;
     v.push_back(mkHLine(x, y, w, 0.25));
-    putF(v, x+half+1.0, y+1.0, half-2.0, fh, L"receptionist", FA_RECEPTION, pt-1.0, false, 0);
-    putF(v, x+1.0,      y+1.0, half-2.0, fh, L"cashier",      FA_CASHIER,   pt-1.0, false, 0);
+    v.push_back(mkVLine(vx, y+0.5, fh, 0.25));
+    putLF(v, x+half+1.0, y+1.0, half-2.0, fh, FA_RECEPTION, L"receptionist", pt-1.0, false, false, 0.30);
+    putLF(v, x+1.0,      y+1.0, half-2.0, fh, FA_CASHIER,   L"cashier",      pt-1.0, false, false, 0.30);
     y += fh + gap;
-    putF(v, x+1.0, y, w-2.0, fh, L"scnum", FA_SC, pt-1.0, false, 0);
+    putLF(v, x+1.0, y, w-2.0, fh, FA_SC, L"scnum", pt-1.0, false, false, 0.14);
     y += fh + gap;
-    { double sw=w*0.30, pw2=w*0.22, g=1.0;
-      putF(v, x+w-1.0-sw,        y, sw,  fh, L"date", FA_PRINTTS,    pt-1.0, false, 0);
-      putF(v, x+w-1.0-sw-g-pw2,  y, pw2, fh, L"time", L" ساعت: ",    pt-1.0, false, 0); }
+    putLF(v, x+1.0, y, w*0.50, fh, FA_PRINTTS,   L"date", pt-1.0, false, false, 0.46);
+    putLF(v, x+1.0+w*0.52, y, w*0.46, fh, L" ساعت: ", L"time", pt-1.0, false, false, 0.30);
     y += fh + gap;
     return y;
 }
 
-// Family 8 — compact tear-off: a dotted rule + a mini «نسخهٔ بیمار» stub
-// (name / receipt / total / insshare / paid). No second barcode: the main
+// Family 8 — compact tear-off: a rule + a mini «نسخهٔ بیمار» stub (name / receipt
+// / total / insshare / paid), split label/value. No second barcode: the main
 // receipt already carries the one deterministic Code128 in section 2.
 static double medStub(std::vector<PrintItem>& v,double x,double y,double w,double pt){
     v.push_back(mkHLine(x, y, w, 0.3));
@@ -548,18 +564,19 @@ static double medStub(std::vector<PrintItem>& v,double x,double y,double w,doubl
     double rH=5.0, fh=4.4, half=w/2.0;
     v.push_back(mkRect(x, y, w, 3*rH, 0.3, 0));
     v.push_back(mkVLine(x+half, y, 3*rH, 0.3));
-    putF(v, x+half+1.0, y+0.3,      half-2.0, fh, L"full",      FA_FULL,      pt-1.0, true,  0);
-    putF(v, x+1.0,      y+0.3,      half-2.0, fh, L"receiptNo", FA_RECEIPT,  pt-1.0, false, 0);
+    putLF(v, x+half+1.0, y+0.3,      half-2.0, fh, FA_FULL,     L"full",      pt-1.0, true,  false, 0.36);
+    putLF(v, x+1.0,      y+0.3,      half-2.0, fh, FA_RECEIPT,  L"receiptNo", pt-1.0, false, false, 0.40);
     v.push_back(mkHLine(x, y+rH, w, 0.3));
-    putF(v, x+half+1.0, y+rH+0.3,   half-2.0, fh, L"total",     FA_TOTAL,     pt-1.0, false, 0);
-    putF(v, x+1.0,      y+rH+0.3,   half-2.0, fh, L"insshare",  FA_INSSHARE,  pt-1.0, false, 0);
+    putLF(v, x+half+1.0, y+rH+0.3,   half-2.0, fh, FA_TOTAL,    L"total",     pt-1.0, false, false, 0.36);
+    putLF(v, x+1.0,      y+rH+0.3,   half-2.0, fh, FA_INSSHARE, L"insshare",  pt-1.0, false, false, 0.36);
     v.push_back(mkHLine(x, y+2*rH, w, 0.3));
-    v.push_back(mkFieldB(x+1.0, y+2*rH+0.3, w-2.0, fh, L"paid", FA_FINAL, pt, 0));
+    putLF(v, x+1.0, y+2*rH+0.3, w-2.0, fh, FA_FINAL, L"paid", pt, true, true, 0.34);
     y += 3*rH + 2.0;
     v.push_back(mkHLine(x+w*0.55, y, w*0.45, 0.3));
     v.push_back(mkLabel(x+w*0.55, y+0.4, w*0.45, 4, L"امضا و مهر صندوق", pt-2.0, false, 1));
     return y + 6.0;
 }
+
 
 // Family 3 — sidebar: a narrow left panel (logo + clinic identity + barcode)
 // and a main column carrying the title + the ruled receipt box + below lines.
@@ -572,10 +589,10 @@ static void renderSidebar(PrintDesign& d,const TplSpec& sp,double pt,double rH,
     double sbTop=R_M, sy=sbTop+1.2;
     v.push_back(mkLogo(sbX+(sbW-22.0)/2.0, sy, 22.0, 22.0)); sy+=24.0;
     v.push_back(mkLabel(sbX+1.0, sy, sbW-2.0, 8.0, FA_CLINIC, pt+1.0, true, 1)); sy+=9.0;
-    v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 10.0, L"clinicaddr",  FA_ADDR,  pt-2.0, 1)); sy+=11.0;
-    v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 5.0,  L"clinicphone", FA_PHONE, pt-2.0, 1)); sy+=6.0;
+    v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 10.0, L"clinicaddr",  L"", pt-2.0, 1)); sy+=11.0;
+    v.push_back(mkField(sbX+1.0, sy, sbW-2.0, 5.0,  L"clinicphone", L"", pt-2.0, 1)); sy+=6.0;
     v.push_back(mkHLine(sbX+1.0, sy, sbW-2.0, 0.3)); sy+=3.0;
-    double bcH=12.0;
+    double bcH=7.0;
     v.push_back(mkBarcode(sbX+2.0, sy, sbW-4.0, bcH));
     double sbBottom=sy+bcH+2.0;
     v.push_back(mkRect(sbX, sbTop, sbW, sbBottom-sbTop, bw, 0));
@@ -612,12 +629,12 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     bool   photo    = (fam==6);
     bool   sidebar  = (fam==3);
     bool   tearoff  = (fam==8);
-    bool   shadeBars= (fam==5);
+    bool   capBars  = (fam==5);                 // card family: ruled section captions
     unsigned svcHdr = sp.headFill; if(fam==4) svcHdr=0;
     int    base = (fam==1||fam==5)?1 : (fam==2)?2 : 0;
     int    hdrMode = (base + sp.variant) % 3;
     if(fam==4) hdrMode=0;                       // line-art: plain header, hairline
-    if(photo && hdrMode==1) hdrMode=2;          // never a gray band over the photo
+    if(photo && hdrMode==1) hdrMode=2;          // never an emphasis band over the photo
 
     const std::wstring title = (sp.variant==0)? FA_DOC_REC
                                 :(sp.variant==1)? FA_INS_REC
@@ -627,6 +644,15 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     double x=R_M, w=R_CW, boxTop=R_M, y=boxTop+1.2;
     if(sp.frame) d.items.push_back(mkFrame(PG_W,PG_H,FR_M,R_INK,0.3));
 
+    // v1.96.0 — a ruled section caption: bold centered label sitting on its own
+    // thin rule (pure line-art, replacing the old gray shaded band).
+    auto caption=[&](const wchar_t* txt){
+        v.push_back(mkHLine(x, y, w, 0.3));
+        v.push_back(mkLabel(x+1, y+0.3, w-2, 4.4, txt, pt-1.0, true, 1));
+        v.push_back(mkHLine(x, y+4.9, w, 0.3));
+        y += 5.4;
+    };
+
     // 1 clinic header
     y = medHeader(v, x, y, w, pt, hdrMode, photo);
     // 2 barcode
@@ -634,29 +660,17 @@ static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     // 3 document title
     y = medTitle(v, x, y, w, pt, title);
 
-    // optional shaded section caption bars (card family)
-    if(shadeBars){
-        v.push_back(mkBand(x, y, w, 5.0, R_SHADE, 0));
-        v.push_back(mkLabel(x+1, y+0.4, w-2, 4.4, L"مشخصات بیمار", pt-1.0, true, 1));
-        y += 5.0;
-    }
+    // optional ruled section captions (card family)
+    if(capBars) caption(L"مشخصات بیمار");
     // 4 ruled info box
     y = medInfo(v, x, y, w, rH, pt, bw);
 
-    if(shadeBars){
-        v.push_back(mkBand(x, y, w, 5.0, R_SHADE, 0));
-        v.push_back(mkLabel(x+1, y+0.4, w-2, 4.4, FA_SVCLIST, pt-1.0, true, 1));
-        y += 5.0;
-    }
+    if(capBars) caption(FA_SVCLIST);
     // 5 services table (dynamic, PIT_SERVICES)
     v.push_back(mkServices(x, y, w, svcH, pt-0.5, sp.svc, svcHdr, bw, rH-1.0, rH-0.8));
     y += svcH;
 
-    if(shadeBars){
-        v.push_back(mkBand(x, y, w, 5.0, R_SHADE, 0));
-        v.push_back(mkLabel(x+1, y+0.4, w-2, 4.4, L"مالی و پرداخت", pt-1.0, true, 1));
-        y += 5.0;
-    }
+    if(capBars) caption(L"مالی و پرداخت");
     // 6 financial section
     y = medFinancial(v, x, y, w, rH, pt, bw, finMode);
     // 7 e-prescription  +  8 referral

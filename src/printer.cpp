@@ -234,43 +234,91 @@ static bool loadDesignFile(int sec, Design& d){
 static Design defaultDesign(int sec){
     Design d; d.paper=1;   // A5 is friendliest for a reception slip
     double cw; double ch; paperMM(d.paper,cw,ch);
-    auto addLabel=[&](double x,double y,const wchar_t* token,const wchar_t* text,
-                      int sz,bool bold,COLORREF col){
-        DItem it; it.kind=IT_LABEL; it.x=x; it.y=y; it.w=cw-2*x; it.h=sz*0.45;
+    // v1.96.0 — expanded default slip: the full medical-receipt field set
+    // (doctor/specialty, insurance split, complete financial breakdown,
+    // e-prescription, referral, reception/cashier, ش.ص) in a compact two-column
+    // grid, so the legacy fallback is no longer sparser than the designed path.
+    auto addLbl=[&](double x,double y,double w,const wchar_t* token,
+                    const wchar_t* text,int sz,bool bold,COLORREF col,int align=0){
+        DItem it; it.kind=IT_LABEL; it.x=x; it.y=y; it.w=w; it.h=sz*0.45;
         it.field=token?token:L""; it.text=text?text:L"";
-        it.fontSize=sz; it.bold=bold; it.color=col;
+        it.fontSize=sz; it.bold=bold; it.color=col; it.align=align;
         d.items.push_back(it);
     };
     auto addLine=[&](double y){
         DItem it; it.kind=IT_LINE_H; it.x=8; it.y=y; it.w=cw-16; it.h=0;
-        it.lineW=0.3; it.lineStyle=2; it.color=RGB(60,60,60); d.items.push_back(it);
+        it.lineW=0.3; it.lineStyle=0; it.color=RGB(0,0,0); d.items.push_back(it);
     };
-    // outer border
+    auto addVLine=[&](double x,double y,double h){
+        DItem it; it.kind=IT_LINE_V; it.x=x; it.y=y; it.w=0; it.h=h;
+        it.lineW=0.3; it.lineStyle=0; it.color=RGB(0,0,0); d.items.push_back(it);
+    };
+    const COLORREF INK=RGB(0,0,0), DIM=RGB(70,70,70), ACC=RGB(20,50,100), RED=RGB(150,20,20);
+    double L=8, R=cw/2.0+2, colW=cw/2.0-12;   // two-column cells (left/right)
+    double y=10;
+    // outer border (thin, monochrome)
     { DItem b; b.kind=IT_BORDER; b.x=5; b.y=5; b.w=cw-10; b.h=ch-10;
-      b.lineW=0.5; b.borderColor=RGB(40,70,120); d.items.push_back(b); }
+      b.lineW=0.4; b.borderColor=INK; d.items.push_back(b); }
     // header
-    addLabel(8,10,NULL,(std::wstring(L"درمانگاه ")+APP_NAME_W).c_str(),18,true,RGB(20,50,100));
-    addLabel(8,20,NULL,PRINT_SECTIONS[sec<N_PRINT_SECTIONS?sec:0],13,true,RGB(40,70,120));
-    addLine(30);
-    // top info row
-    addLabel(8,34,L"{queue}",L"شماره پذیرش: ",13,true,RGB(0,0,0));
-    addLabel(8,42,L"{date}", L"تاریخ: ",11,false,RGB(0,0,0));
-    addLabel(70,42,L"{time}",L"ساعت: ",11,false,RGB(0,0,0));
-    addLabel(8,50,L"{shift}",L"شیفت: ",11,false,RGB(0,0,0));
-    addLabel(70,50,L"{dept}",L"بخش: ",11,false,RGB(0,0,0));
-    addLine(58);
-    // patient
-    addLabel(8,62,L"{full}",  L"بیمار: ",13,true,RGB(0,0,0));
-    addLabel(8,70,L"{nid}",   L"کد ملی: ",11,false,RGB(0,0,0));
-    addLabel(70,70,L"{father}",L"نام پدر: ",11,false,RGB(0,0,0));
-    addLabel(8,78,L"{birth}", L"تاریخ تولد: ",11,false,RGB(0,0,0));
-    addLabel(70,78,L"{gender}",L"جنسیت: ",11,false,RGB(0,0,0));
-    addLabel(8,86,L"{mobile}",L"تلفن: ",11,false,RGB(0,0,0));
-    addLine(94);
-    addLabel(8,98, L"{ins}", L"بیمه: ",11,false,RGB(0,0,0));
-    addLabel(8,106,L"{paid}",L"مبلغ پرداختی: ",13,true,RGB(150,20,20));
-    addLine(116);
-    addLabel(8,120,L"{issued}",L"",10,false,RGB(90,90,90));
+    addLbl(8,y,cw-16,NULL,(std::wstring(L"درمانگاه ")+APP_NAME_W).c_str(),16,true,ACC,1); y+=8;
+    addLbl(8,y,cw-16,L"clinicaddr",L"",9,false,DIM,1); y+=5;
+    addLbl(8,y,cw-16,L"clinicphone",L"",9,false,DIM,1); y+=5;
+    addLine(y); y+=4;
+    // appointment row
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"queue",L"نوبت: ",11,true,INK);
+    addLbl(R,y,colW,L"apptdate",L"تاریخ نوبت: ",10,false,INK); y+=7;
+    addLine(y); y+=3;
+    // patient rows
+    addLbl(L,y,colW,L"full",L"نام بیمار: ",12,true,INK);
+    addLbl(R,y,colW,L"nid",L"کد ملی: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"age",L"سن: ",10,false,INK);
+    addLbl(R,y,colW,L"father",L"نام پدر: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"gender",L"جنسیت: ",10,false,INK);
+    addLbl(R,y,colW,L"mobile",L"تلفن: ",10,false,INK); y+=7;
+    addLine(y); y+=3;
+    // doctor rows
+    addLbl(L,y,colW,L"doctor",L"دکتر: ",11,false,INK);
+    addLbl(R,y,colW,L"doctorcode",L"کد نظام پزشکی: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"specialtycode",L"کد تخصص: ",10,false,INK);
+    addLbl(R,y,colW,L"specialty",L"شرح تخصص: ",10,false,INK); y+=7;
+    addLine(y); y+=3;
+    // insurance rows
+    addLbl(L,y,colW,L"ins",L"بیمه پایه: ",10,false,INK);
+    addLbl(R,y,colW,L"supp",L"مکمل: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"ins_percent",L"درصد پایه: ",10,false,INK);
+    addLbl(R,y,colW,L"supp_percent",L"درصد مکمل: ",10,false,INK); y+=7;
+    addLine(y); y+=3;
+    // financial rows
+    addLbl(L,y,colW,L"total",L"قیمت کل: ",11,true,INK);
+    addLbl(R,y,colW,L"paid",L"پرداختی: ",11,true,RED); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"insshare",L"سهم پایه: ",10,false,INK);
+    addLbl(R,y,colW,L"supppay",L"سهم مکمل: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"discount",L"تخفیف: ",10,false,INK);
+    addLbl(R,y,colW,L"patientshare",L"سهم بیمار: ",10,false,INK); y+=7;
+    addVLine(cw/2.0,y-1,7);
+    addLbl(L,y,colW,L"pos",L"POS: ",10,false,INK);
+    addLbl(R,y,colW,L"cash",L"نقد: ",10,false,INK); y+=7;
+    addLine(y); y+=3;
+    // e-prescription / referral (full width)
+    addLbl(8,y,cw-16,L"eprescription",L"کد رهگیری نسخه الکترونیک: ",10,false,INK); y+=6;
+    addLbl(8,y,cw-16,L"referralno",L"شماره معرف نسخه: ",10,false,INK); y+=6;
+    addLine(y); y+=3;
+    // reception / cashier / scnum
+    addVLine(cw/2.0,y-1,6);
+    addLbl(L,y,colW,L"receptionist",L"پذیرش: ",10,false,INK);
+    addLbl(R,y,colW,L"cashier",L"صندوق: ",10,false,INK); y+=6;
+    addLbl(8,y,cw-16,L"scnum",L"ش.ص: ",10,false,INK); y+=6;
+    addLine(y); y+=3;
+    // print timestamp
+    addLbl(8,y,cw-16,L"date",L"تاریخ چاپ: ",9,false,DIM);
+    addLbl(8+cw*0.45,y,cw*0.5,L"time",L" ساعت: ",9,false,DIM);
     return d;
 }
 
@@ -1021,6 +1069,44 @@ static std::wstring fieldValue(const ReceptionRecord& r, const std::wstring& tok
     if(tok==L"{total}")    return toFaDigits(formatMoney(r.total))+L" ریال";
     if(tok==L"{discount}") return toFaDigits(formatMoney(r.discount))+L" ریال";
     if(tok==L"{paid}")     return toFaDigits(formatMoney(r.paid))+L" ریال";
+    // v1.96.0 — full medical-receipt field set for the expanded default slip.
+    if(tok==L"{clinicaddr}")   return getSetting(L"clinic_address",L"");
+    if(tok==L"{clinicphone}")  return toFaDigits(getSetting(L"clinic_phone",L""));
+    if(tok==L"{apptdate}")     return toFaDigits(r.apptDate);
+    if(tok==L"{age}"){
+        std::wstring bd=r.birthDate; if(bd.size()>=4){
+            int by=_wtoi(bd.substr(0,4).c_str());
+            if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
+                int jy=st.wYear-621; int age=jy-by;
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b)+L" سال"; } } }
+        return L"";
+    }
+    if(tok==L"{agenum}"){   // v1.96.0: bare numeric age
+        std::wstring bd=r.birthDate; if(bd.size()>=4){
+            int by=_wtoi(bd.substr(0,4).c_str());
+            if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
+                int jy=st.wYear-621; int age=jy-by;
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b); } } }
+        return L"";
+    }
+    if(tok==L"{doctorcode}")    return toFaDigits(r.doctorCode);
+    if(tok==L"{specialtycode}") return toFaDigits(r.specialtyCode);
+    if(tok==L"{specialty}")     return r.specialty;
+    if(tok==L"{ins_percent}"){  int p=r.insPercent>=0?r.insPercent:Ins_Percent(r.insIdx);
+        if(p<=0) return L""; wchar_t b[16]; swprintf(b,16,L"%d",p); return toFaDigits(b)+L"٪"; }
+    if(tok==L"{supp_percent}"){ int p=r.suppPercent>=0?r.suppPercent:Supp_Percent(r.suppIdx);
+        if(p<=0) return L""; wchar_t b[16]; swprintf(b,16,L"%d",p); return toFaDigits(b)+L"٪"; }
+    if(tok==L"{insshare}")      return toFaDigits(formatMoney(r.mainShare))+L" ریال";
+    if(tok==L"{supppay}")       return toFaDigits(formatMoney(r.orgShare))+L" ریال";
+    if(tok==L"{patientshare}")  return toFaDigits(formatMoney(r.patientShare))+L" ریال";
+    if(tok==L"{pos}")           return toFaDigits(formatMoney(r.pos))+L" ریال";
+    if(tok==L"{cash}")          return toFaDigits(formatMoney(r.cash))+L" ریال";
+    if(tok==L"{eprescription}") return toFaDigits(r.eprescription);
+    if(tok==L"{referralno}")    return toFaDigits(r.referralNo);
+    if(tok==L"{receptionist}")  return r.receptionist.empty()? (r.userName.empty()?g_session.user.fullname:r.userName) : r.receptionist;
+    if(tok==L"{cashier}")       return r.cashierName.empty()? (r.userName.empty()?g_session.user.fullname:r.userName) : r.cashierName;
+    if(tok==L"{scnum}"){ if(!r.scNum.empty()) return toFaDigits(r.scNum);
+        wchar_t b[16]; swprintf(b,16,L"%d",g_session.shift+1); return toFaDigits(b); }
     if(tok==L"{issued}")   return L"چاپ توسط پذیرش: "+
         (r.userName.empty()?g_session.user.fullname:r.userName);
     return L"";
@@ -1440,6 +1526,14 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
                 if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b)+L" سال"; } } }
         return L"";
     }
+    if(tok==L"{agenum}"){   // v1.96.0: bare numeric age (for «سن: …Y» suffix fields)
+        std::wstring bd=r.birthDate; if(bd.size()>=4){
+            int by=_wtoi(bd.substr(0,4).c_str());
+            if(by>1200 && by<1500){ SYSTEMTIME st; GetLocalTime(&st);
+                int jy=st.wYear-621; int age=jy-by;
+                if(age>0&&age<150){ wchar_t b[16]; swprintf(b,16,L"%d",age); return toFaDigits(b); } } }
+        return L"";
+    }
     if(tok==L"{patientshare}") return toFaDigits(formatMoney(r.patientShare))+L" ریال";
     if(tok==L"{finaltotal}")   return toFaDigits(formatMoney(r.finalTotal))+L" ریال";
     if(tok==L"{visittype}")    return r.patientType;
@@ -1722,6 +1816,7 @@ static PdSvcCol pdSvcColOf(const std::wstring& labIn, int idx){
     if(has(L"نوع"))                                       return PSC_CAT;
     if(has(L"تعداد")||has(L"مقدار")||L==L"تع")            return PSC_QTY;
     if(has(L"ردیف")||has(L"شماره")||L==L"ر")              return PSC_ROW;
+    if(L==L"#"||L==L"№"||L==L"#")                        return PSC_ROW; // v1.96.0 row-no col
     if(has(L"سهمبیمه")||has(L"سهمپایه")||has(L"بیمه"))    return PSC_INS;
     if(has(L"سهمبیمار")||has(L"پرداختی"))                 return PSC_PAT;
     if(has(L"تخفیف"))                                     return PSC_DISC;
@@ -2367,29 +2462,41 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     }
     if(!dc) return false;
 
-    // §1.52.0 — RESPONSIVE A4→A5 AUTO-SCALE. All built-in templates are authored
-    // in A4 mm coordinates (210×297). If the operator later switches the paper
-    // size to A5 (148×210) — or any smaller sheet — the item coordinates would
-    // overflow the page. We auto-detect the "authored space" from the bounding
-    // box of all items (max x+w, max y+h) and compute a uniform scale factor so
-    // the whole design shrinks proportionally and relocates to fit the current
-    // paper perfectly. When paper == authored size (normal A4 case) scale == 1
-    // and nothing changes. No schema change needed: the authored size is inferred
-    // from the item extents, so this also fixes designs the user already saved.
+    // §1.52.0 / v1.96.0 — RESPONSIVE A4→smaller AUTO-SCALE. All built-in
+    // templates are authored in A4 mm coordinates (210×297). If the operator
+    // prints that design onto a smaller sheet — A5, 58 mm / 80 mm thermal roll,
+    // or any printer whose actual paper is smaller than the authored space — the
+    // item coordinates would overflow. We auto-detect the "authored space" from
+    // the bounding box of all items (max x+w, max y+h) and compute a uniform
+    // shrink so the whole design fits the ACTUAL printer paper (read back from
+    // the DC's PHYSICALWIDTH/HEIGHT in mm), not just the design's stored paper.
+    // This is what fixes the print-dialog fallback path where the DC paper differs
+    // from d.paper. When paper == authored size (normal A4 case) scale == 1 and
+    // nothing changes. No schema change: authored size is inferred from extents.
     double authW=d.paperW, authH=d.paperH;
     for(const auto& it:d.items){ double ex=it.x+it.w; if(ex>authW)authW=ex;
                                   double ey=it.y+it.h; if(ey>authH)authH=ey; }
     double pscale=1.0;
-    if(authW>d.paperW+0.01 || authH>d.paperH+0.01){
-        double fx=d.paperW/authW, fy=d.paperH/authH;
-        pscale = fx<fy ? fx : fy;
-        if(pscale>1.0) pscale=1.0;
-    }
 
     int dpiX=GetDeviceCaps(dc,LOGPIXELSX), dpiY=GetDeviceCaps(dc,LOGPIXELSY);
     int offX=GetDeviceCaps(dc,PHYSICALOFFSETX), offY=GetDeviceCaps(dc,PHYSICALOFFSETY);
     double sx=dpiX/25.4, sy=dpiY/25.4;
-    // mm→device-px, applying the responsive A4→A5 scale so an A4-authored design
+    // Fit the authored extent onto the ACTUAL printer paper (mm). Recomputed after
+    // the StartDoc fallback below may replace the DC with one of a different size.
+    auto calcPscale=[&](){
+        int pw=GetDeviceCaps(dc,PHYSICALWIDTH), ph=GetDeviceCaps(dc,PHYSICALHEIGHT);
+        double actW = (sx>0 && pw>0)? pw/sx : d.paperW;
+        double actH = (sy>0 && ph>0)? ph/sy : d.paperH;
+        if(actW<=0) actW=d.paperW; if(actH<=0) actH=d.paperH;
+        pscale=1.0;
+        if(authW>actW+0.01 || authH>actH+0.01){
+            double fx=actW/authW, fy=actH/authH;
+            pscale = fx<fy ? fx : fy;
+            if(pscale>1.0) pscale=1.0;
+        }
+    };
+    calcPscale();
+    // mm→device-px, applying the responsive scale so an A4-authored design
     // relocates and shrinks proportionally onto whatever paper size is active.
     auto mmX=[&](double mm){ return (int)(mm*pscale*sx)-offX; };
     auto mmY=[&](double mm){ return (int)(mm*pscale*sy)-offY; };
@@ -2410,6 +2517,7 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
         dpiX=GetDeviceCaps(dc,LOGPIXELSX); dpiY=GetDeviceCaps(dc,LOGPIXELSY);
         offX=GetDeviceCaps(dc,PHYSICALOFFSETX); offY=GetDeviceCaps(dc,PHYSICALOFFSETY);
         sx=dpiX/25.4; sy=dpiY/25.4;
+        calcPscale();                  // v1.96.0: re-fit for the new DC's paper size
         if(StartDocW(dc,&di)<=0){
             MessageBoxW(owner,L"چاپگر انتخاب‌شده از چاپ این سند پشتیبانی نمی‌کند.\n"
                 L"لطفاً یک چاپگر واقعی (نه «Microsoft Print to PDF» یا برنامهٔ عکس) انتخاب کنید.",

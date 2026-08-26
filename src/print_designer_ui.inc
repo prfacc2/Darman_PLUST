@@ -545,11 +545,12 @@ static void drawItemGdip(Graphics& g,DesignerState* st,const PrintItem& it,bool 
             }
             ws(); if(pos<json.size()&&json[pos]==',') ++pos;
         }
-        if(m.cols<1) m.cols=4;
+        if(m.cols<1) m.cols=5;
         if((int)m.widths.size()!=m.cols) m.widths.assign(m.cols,1.0);
         if(m.labels.empty()){
-            const wchar_t* def[4]={L"نام خدمت",L"شرح خدمت",L"تعداد",L"مبلغ کل"};
-            for(int c=0;c<m.cols;++c) m.labels.push_back(c<4?std::wstring(def[c]):L"");
+            // v1.96.0: canonical description-first header (شرح خدمت | ردیف | نام خدمت | تعداد | مبلغ کل)
+            const wchar_t* def[5]={L"شرح خدمت",L"ردیف",L"نام خدمت",L"تعداد",L"مبلغ کل"};
+            for(int c=0;c<m.cols;++c) m.labels.push_back(c<5?std::wstring(def[c]):L"");
         }
         while((int)m.labels.size()<m.cols) m.labels.push_back(L"");
         double sum=0; for(double width:m.widths) if(width>0) sum+=width;
@@ -1038,14 +1039,15 @@ static void addPaletteItem(DesignerState* st,int type){
     case PIT_SERVICES: {
         // §1.53.0: dynamic services list, sensible default size + model. Centered
         // horizontally, ~42mm tall (room for header + ~6 service rows). Carries
-        // the canonical 4-column RTL header (ردیف / نام خدمت / کد / مبلغ).
+        // v1.96.0 the canonical DESCRIPTION-FIRST five-column RTL header
+        // — شرح خدمت | ردیف(#) | نام خدمت | تعداد | مبلغ کل — monochrome line-art.
         it.x=st->design.paperW/2-60; it.y=st->design.paperH/2-20; it.w=120; it.h=42;
-        // v1.55.0: the canonical THREE-column RTL header of the real receipt
-        // — نام خدمت | شرح خدمت | تعداد — with monochrome styling and
-        // explicit row/header heights so the table prints identically anywhere.
-        it.text=L"{\"cols\":3,\"header\":true,\"widths\":[0.55,0.30,0.15],"
-                L"\"labels\":[\"\u0646\u0627\u0645 \u062e\u062f\u0645\u062a\","
-                L"\"\u0634\u0631\u062d \u062e\u062f\u0645\u062a\",\"\u062a\u0639\u062f\u0627\u062f\"]}";
+        it.text=L"{\"cols\":5,\"header\":true,\"widths\":[0.30,0.07,0.31,0.10,0.22],"
+                L"\"labels\":[\"\u0634\u0631\u062d \u062e\u062f\u0645\u062a\","
+                L"\"\u0631\u062f\u06cc\u0641\","
+                L"\"\u0646\u0627\u0645 \u062e\u062f\u0645\u062a\","
+                L"\"\u062a\u0639\u062f\u0627\u062f\","
+                L"\"\u0645\u0628\u0644\u063a \u06a9\u0644\"]}";
         it.fontPt=8.5; it.bold=false; it.align=0; it.dir=0;
         it.borderColor=0x000000; it.borderWidth=0.3;
         it.textColor=0x000000; it.fillTransparent=true; it.padding=0.8;
