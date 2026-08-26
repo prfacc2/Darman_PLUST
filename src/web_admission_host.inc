@@ -278,11 +278,26 @@ struct CtrlHandler : public ICoreWebView2CreateCoreWebView2ControllerCompletedHa
     }
 };
 
-// Environment-created handler -> immediately create the controller.
-struct EnvHandler : public ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler {
-    LONG rc=1; CreateState* state;
-    explicit EnvHandler(CreateState* s):state(s){ state->AddRef(); }
-    virtual ~EnvHandler(){ state->Release(); }
+// ---- shared WebView2 environment (created ONCE, reused for every controller) -
+//  v1.95 PERF: the old path called CreateCoreWebView2EnvironmentWithOptions on
+//  EVERY tab open. That launches/connects the WebView2 browser process and can
+//  take 2-4s on first use (non-trivial afterwards too) — and it leaked the env
+//  every time. The environment is designed to be SHARED: we create ONE (pre-
+//  warmed at startup via WV2_PreWarm) and hand it to every controller. Per-tab
+//  cost then drops to just CreateCoreWebView2Controller + NavigateToString, so
+//  the synchronous WM_CREATE block (the black-screen window) shrinks drastically.
+static ICoreWebView2Environment* g_wv2Env=nullptr;   // strong ref, app lifetime
+static volatile LONG g_wv2EnvReq=0;                  // 0=idle 1=in-flight 2=settled
+static HRESULT g_wv2EnvHr=E_PENDING;
+static std::mutex g_wv2EnvMx;
+
+// Environment-created handler: just cache the environment. No controller is
+// created here — each view creates its own controller from the cached env in
+// WV2_CreateView. Self-deleting on final Release (WebView2 drops its callback).
+struct EnvReadyHandler : public ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler {
+    LONG rc=1;
+    EnvReadyHandler(){}
+    virtual ~EnvReadyHandler(){}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
         if(!ppv) return E_POINTER;
         if(IsEqualIID(riid,IID_IUnknown)||
@@ -293,15 +308,16 @@ struct EnvHandler : public ICoreWebView2CreateCoreWebView2EnvironmentCompletedHa
     ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&rc); }
     ULONG STDMETHODCALLTYPE Release() override { LONG r=InterlockedDecrement(&rc); if(!r) delete this; return r; }
     HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Environment* env) override {
-        if(state->IsCancelled()) return S_OK;
         if(SUCCEEDED(result) && env){
-            CtrlHandler* ch=new CtrlHandler(state);
-            HRESULT hr=env->CreateCoreWebView2Controller(state->host,ch);
-            ch->Release();
-            if(FAILED(hr)) state->Complete(hr);
+            env->AddRef();   // cache holds a strong reference for the app lifetime
+            std::lock_guard<std::mutex> lk(g_wv2EnvMx);
+            g_wv2Env=env;
+            g_wv2EnvHr=S_OK;
         } else {
-            state->Complete(FAILED(result)?result:E_FAIL);
+            std::lock_guard<std::mutex> lk(g_wv2EnvMx);
+            g_wv2EnvHr=FAILED(result)?result:E_FAIL;
         }
+        InterlockedExchange(&g_wv2EnvReq,2);   // settled (success or failure)
         return S_OK;
     }
 };
@@ -336,6 +352,48 @@ static bool WV2_Available(){
     return true; // loader present but no version query — assume usable
 }
 
+// v1.95 PERF: kick off the shared environment creation as early as possible
+// (called from WebAdmission_Prepare at launch, only when WV2 is available).
+// Non-blocking — the env-ready callback fires later on the UI thread once
+// messages are pumped, so by the time the user opens the first tab the
+// environment is usually already warm. Idempotent: a second call is a no-op
+// once creation is in flight or settled.
+static void WV2_PreWarm(){
+    if(InterlockedCompareExchange(&g_wv2EnvReq,1,0)!=0) return;  // already started
+    adLoadLoader();
+    if(!pCreateEnv){
+        std::lock_guard<std::mutex> lk(g_wv2EnvMx);
+        g_wv2EnvHr=E_FAIL; InterlockedExchange(&g_wv2EnvReq,2);
+        return;
+    }
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);   // idempotent on UI thread
+    std::wstring udf=adUserDataFolder();
+    EnvReadyHandler* eh=new EnvReadyHandler();
+    HRESULT hr=pCreateEnv(nullptr, udf.empty()?nullptr:udf.c_str(), nullptr, eh);
+    eh->Release();
+    if(FAILED(hr)){
+        std::lock_guard<std::mutex> lk(g_wv2EnvMx);
+        g_wv2EnvHr=hr; InterlockedExchange(&g_wv2EnvReq,2);
+    }
+}
+
+// Return the shared environment, pumping the UI message queue until the
+// (possibly pre-warmed) creation settles. Returns null (→ MSHTML fallback) when
+// WebView2 is unavailable or environment creation failed/timed out.
+static ICoreWebView2Environment* WV2_EnsureEnvironment(){
+    if(InterlockedCompareExchange(&g_wv2EnvReq,0,0)==0) WV2_PreWarm();  // lazy start
+    DWORD t0=GetTickCount(); MSG pm;
+    while(InterlockedCompareExchange(&g_wv2EnvReq,0,0)!=2){
+        if(GetTickCount()-t0>8000) break;   // env launch can take a few seconds
+        if(PeekMessageW(&pm,NULL,0,0,PM_REMOVE)){
+            TranslateMessage(&pm); DispatchMessageW(&pm);
+        } else Sleep(5);
+    }
+    std::lock_guard<std::mutex> lk(g_wv2EnvMx);
+    if(SUCCEEDED(g_wv2EnvHr) && g_wv2Env){ g_wv2Env->AddRef(); return g_wv2Env; }
+    return nullptr;
+}
+
 static HWND WV2_CreateView(HWND parent){
     if(!parent) return nullptr;
     adLoadLoader();
@@ -368,14 +426,24 @@ static HWND WV2_CreateView(HWND parent){
     AdView* v=new AdView(); v->host=host;
     { std::lock_guard<std::mutex> lk(g_adViewsMx); g_adViews[host]=v; }
 
+    // v1.95 PERF: reuse the single shared (pre-warmed) environment instead of
+    // creating a new one per tab. WV2_EnsureEnvironment pumps until the env is
+    // ready (it is usually already warm by now) and returns null on failure.
+    ICoreWebView2Environment* env=WV2_EnsureEnvironment();
+    if(!env){
+        Breadcrumb(L"admission wv2: env unavailable → mshtml fallback");
+        WV2_DestroyView(host);
+        return nullptr;
+    }
+
     CreateState* state=new CreateState(host);
     // Hold one extra reference across cancellation/teardown. WebView2 owns the
     // callback refs, but Close() can synchronously release those callbacks.
     state->AddRef();
-    std::wstring udf=adUserDataFolder();
-    EnvHandler* eh=new EnvHandler(state);
-    HRESULT hr=pCreateEnv(nullptr, udf.empty()?nullptr:udf.c_str(), nullptr, eh);
-    eh->Release();
+    CtrlHandler* ch=new CtrlHandler(state);
+    HRESULT hr=env->CreateCoreWebView2Controller(host,ch);
+    ch->Release();
+    env->Release();   // drop our local ref; the cache keeps the env alive
     if(FAILED(hr)) state->Complete(hr);
 
     // Pump until both navigation and the JS bridge are ready (or an async
@@ -385,7 +453,7 @@ static HWND WV2_CreateView(HWND parent){
     while(!InterlockedCompareExchange(&state->done,0,0) &&
           !(InterlockedCompareExchange(&state->navReady,0,0) &&
             InterlockedCompareExchange(&v->bridgeReady,0,0))){
-        if(GetTickCount()-start>8000) break;  // v1.69.0: was 6000 — WebView2 env creation can take 2-4s on first launch
+        if(GetTickCount()-start>8000) break;  // env is pre-warmed; this bounds controller+nav (was needed for 2-4s first env launch)
         if(PeekMessageW(&msg,NULL,0,0,PM_REMOVE)){
             TranslateMessage(&msg); DispatchMessageW(&msg);
         } else Sleep(5);

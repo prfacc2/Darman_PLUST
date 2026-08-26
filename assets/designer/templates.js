@@ -168,731 +168,420 @@
   }
 
   /* ------------------------------------------------------------- captions */
-  var FA_CLINIC   = "درمانگاه شبانه‌روزی درمان پلاس";
-  var FA_SUBTITLE = "سامانه پذیرش و مدیریت درمانگاه";
-  var FA_SVCLIST  = "لیست خدمات ارائه‌شده";
-  var FA_NAME     = "نام: ";
-  var FA_FAMILY   = "نام خانوادگی: ";
-  var FA_FULL     = "نام بیمار: ";
-  var FA_NID      = "کد ملی: ";
-  var FA_FATHER   = "نام پدر: ";
-  var FA_BIRTH    = "تاریخ تولد: ";
-  var FA_GENDER   = "جنسیت: ";
-  var FA_DATE     = "تاریخ: ";
-  var FA_TIME     = "ساعت: ";
-  var FA_RECEIPT  = "شماره قبض: ";
-  var FA_TOTAL    = "جمع کل: ";
-  var FA_PAID     = "پرداختی: ";
-  var FA_PATIENT  = "سهم بیمار: ";
-  var FA_INSSHARE = "سهم بیمه: ";
-  var FA_DISCOUNT = "تخفیف: ";
-  var FA_FINAL    = "مبلغ نهایی: ";
-  var FA_INS      = "بیمه: ";
-  var FA_SUPP     = "بیمه مکمل: ";
-  var FA_DOCTOR   = "پزشک: ";
-  var FA_PERF     = "انجام‌دهنده: ";
-  var FA_PHONE    = "تلفن: ";
-  var FA_SHIFT    = "شیفت: ";
-  var FA_DEPT     = "بخش: ";
-  var FA_PTYPE    = "نوع بیمار: ";
-  var FA_USER     = "کاربر: ";
-  var FA_ROWS     = "تعداد ردیف: ";
-  var FA_BARCODE  = "بارکد رسید";
-  var FA_SIGN     = "امضا و مهر پذیرش";
-  var FA_SIGNPAT  = "امضای بیمار";
-  var FA_KEEP     = "این رسید را تا پایان درمان نزد خود نگه دارید.";
+  /* v1.95.0 — thermal medical receipt captions (mirror the C++ .inc).       */
+  var FA_CLINIC    = "درمانگاه شبانه‌روزی درمان پلاس";
+  var FA_SUBTITLE  = "سامانه پذیرش و مدیریت درمانگاه";
+  var FA_PHONE     = "تلفن: ";
+  var FA_ADDR      = "نشانی: ";
+  var FA_APPT      = "تاریخ نوبت: ";
+  var FA_QUEUE     = "نوبت: ";
+  var FA_NID       = "کد ملی: ";
+  var FA_BARCODE   = "بارکد: ";
+  var FA_BASEINS   = "بیمه پایه: ";
+  var FA_SUPP      = "مکمل: ";
+  var FA_FULL      = "نام بیمار: ";
+  var FA_AGE       = "سن: ";
+  var FA_DOCTOR    = "دکتر: ";
+  var FA_DOCCODE   = "کد نظام پزشکی: ";
+  var FA_SPECCODE  = "کد تخصص: ";
+  var FA_SPECIALTY = "شرح تخصص: ";
+  var FA_PAID      = "پرداختی: ";
+  var FA_TOTAL     = "قیمت کل: ";
+  var FA_INSSHARE  = "سهم پایه: ";
+  var FA_SUPPPAY   = "سهم مکمل: ";
+  var FA_DISCOUNT  = "تخفیف از: ";
+  var FA_POS       = "POS: ";
+  var FA_CASH      = "نقد: ";
+  var FA_PATSHARE  = "سهم بیمار: ";
+  var FA_FINAL     = "مبلغ نهایی: ";
+  var FA_EPRESC    = "کد رهگیری نسخه الکترونیک: ";
+  var FA_REFERRAL  = "شماره معرف نسخه: ";
+  var FA_RECEPTION = "پذیرش: ";
+  var FA_CASHIER   = "صندوق: ";
+  var FA_SC        = "ش.ص: ";
+  var FA_PRINTTS   = "تاریخ چاپ: ";
+  var FA_SVCLIST   = "شرح خدمات";
+  var FA_TEAR      = "— — — محل جدا کردن — — —";
+  var FA_STUB      = "نسخهٔ بیمار";
+  var FA_PAYLBL    = "پرداخت‌ها";
+  var FA_SHARELBL  = "سهم بیمه";
+  var FA_DOC_REC   = "قبض پزشک";
+  var FA_INS_REC   = "رسید بیمه";
+  var FA_DOC_BOTH  = "قبض و رسید پزشکی";
+  var FA_RECEIPT   = "شماره قبض: ";
 
-  /* ========================================================= header blocks */
-  function hdrPlain(d, title, titlePt, subtitle, rule) {
-    var y = PG_M;
-    d.push(L(PG_M, y, PG_CW, 11, title, titlePt, true, 1)); y += 13;
-    if (subtitle) { d.push(L(PG_M, y, PG_CW, 6, FA_SUBTITLE, 9, false, 1)); y += 7; }
-    if (rule > 0) { d.push(HL(PG_M, y, PG_CW, rule)); y += 3.5; }
-    return y;
-  }
-  function hdrLogoRight(d, title, titlePt, subtitle, rule) {
-    d.push(LOGO(PG_M + PG_CW - 21, PG_M, 21, 21));
-    d.push(L(PG_M, PG_M + 1, PG_CW - 25, 11, title, titlePt, true, 0));
-    if (subtitle) d.push(L(PG_M, PG_M + 12, PG_CW - 25, 6, FA_SUBTITLE, 9, false, 0));
-    var y = PG_M + 23;
-    if (rule > 0) { d.push(HL(PG_M, y, PG_CW, rule)); y += 3.5; }
-    return y;
-  }
-  function hdrCenterLogo(d, title, titlePt, subtitle, rule) {
-    d.push(LOGO((PG_W - 22) / 2, PG_M, 22, 22));
-    var y = PG_M + 24;
-    d.push(L(PG_M, y, PG_CW, 11, title, titlePt, true, 1)); y += 12.5;
-    if (subtitle) { d.push(L(PG_M, y, PG_CW, 6, FA_SUBTITLE, 9, false, 1)); y += 7; }
-    if (rule > 0) { d.push(HL(PG_M, y, PG_CW, rule)); y += 3.5; }
-    return y;
-  }
-  function hdrBand(d, title, accent, logo, docLabel) {
-    var bh = 22;
-    d.push(BAND(PG_M, PG_M, PG_CW, bh, accent));
-    if (logo) d.push(LOGO(PG_M + 2.5, PG_M + 2.5, 17, 17));
-    var tx = logo ? (PG_M + 22) : (PG_M + 4);
-    var tw = PG_CW - (tx - PG_M) - 4;
-    d.push(LC(tx, PG_M + 3.0, tw, 9, title, 16, true, 0, "#ffffff"));
-    d.push(LC(tx, PG_M + 12.5, tw, 6, FA_SUBTITLE, 8.5, false, 0, "#ffffff"));
-    var y = PG_M + bh + 3;
-    if (docLabel) { d.push(L(PG_M, y, PG_CW, 7, docLabel, 12.5, true, 1)); y += 9; }
-    return y;
-  }
-  /* v1.65.0: receipt number removed — every hdrSplit family also prints it
-     in its meta strip/grid, so it appeared twice on the page. */
-  function hdrSplit(d, title, accent, docLabel) {
-    d.push(L(PG_M + PG_CW * 0.40, PG_M, PG_CW * 0.60, 10, title, 15.5, true, 0));
-    d.push(L(PG_M + PG_CW * 0.40, PG_M + 10, PG_CW * 0.60, 5.5, FA_SUBTITLE, 8.5, false, 0));
-    d.push(LC(PG_M, PG_M + 4, PG_CW * 0.38, 9, docLabel, 13.5, true, 2, accent));
-    var y = PG_M + 19;
-    d.push(HL(PG_M, y, PG_CW, 1.2, accent)); y += 4;
-    return y;
-  }
-
-  /* =========================================================== meta blocks */
-  function metaStrip4(d, y, pt) {
-    var c = PG_CW / 4;
-    d.push(FB(PG_M + 3 * c, y, c, 7, "receiptNo", FA_RECEIPT, pt, 0));
-    d.push(F (PG_M + 2 * c, y, c, 7, "date",      FA_DATE,    pt, 1));
-    d.push(F (PG_M +     c, y, c, 7, "time",      FA_TIME,    pt, 1));
-    d.push(F (PG_M        , y, c, 7, "shift",     FA_SHIFT,   pt, 2));
-    return y + 9;
-  }
-  function metaStripBoxed(d, y, pt, tint, border) {
-    var h = 11, c = PG_CW / 4, i;
-    d.push(TINT(PG_M, y, PG_CW, h, tint, border, 0.3, 1.2));
-    d.push(FB(PG_M + 3 * c + 1, y + 2, c - 2, 7, "receiptNo", FA_RECEIPT, pt, 1));
-    d.push(F (PG_M + 2 * c + 1, y + 2, c - 2, 7, "date",      FA_DATE,    pt, 1));
-    d.push(F (PG_M +     c + 1, y + 2, c - 2, 7, "time",      FA_TIME,    pt, 1));
-    d.push(F (PG_M         + 1, y + 2, c - 2, 7, "shift",     FA_SHIFT,   pt, 1));
-    for (i = 1; i < 4; i++) d.push(VL(PG_M + i * c, y, h, 0.25));
-    return y + h + 3;
-  }
-  function metaGrid6(d, y, pt, border) {
-    var h = 9, c = PG_CW / 3, r, i;
-    for (r = 0; r < 2; r++) d.push(RECT(PG_M, y + r * h, PG_CW, h, 0.3, 0, border));
-    for (i = 1; i < 3; i++) d.push(VL(PG_M + i * c, y, 2 * h, 0.25));
-    d.push(FB(PG_M + 2 * c + 1.5, y + 1, c - 3, 6.5, "receiptNo", FA_RECEIPT, pt, 0));
-    d.push(F (PG_M +     c + 1.5, y + 1, c - 3, 6.5, "date",      FA_DATE,    pt, 0));
-    d.push(F (PG_M         + 1.5, y + 1, c - 3, 6.5, "time",      FA_TIME,    pt, 0));
-    d.push(F (PG_M + 2 * c + 1.5, y + h + 1, c - 3, 6.5, "shift",    FA_SHIFT, pt, 0));
-    d.push(F (PG_M +     c + 1.5, y + h + 1, c - 3, 6.5, "dept",     FA_DEPT,  pt, 0));
-    d.push(F (PG_M         + 1.5, y + h + 1, c - 3, 6.5, "userName", FA_USER,  pt, 0));
-    return y + 2 * h + 3;
-  }
-
-  /* ======================================================== patient blocks */
-  function patient2x3(d, y, pt) {
-    var col = PG_CW / 2 - 3;
-    d.push(FB(PG_M + col + 6, y, col, 7.5, "firstName", FA_NAME, pt, 0));
-    d.push(FB(PG_M, y, col, 7.5, "lastName", FA_FAMILY, pt, 0)); y += 8.5;
-    d.push(F(PG_M + col + 6, y, col, 7.5, "nationalCode", FA_NID, pt, 0));
-    d.push(F(PG_M, y, col, 7.5, "insurance", FA_INS, pt, 0)); y += 8.5;
-    d.push(F(PG_M + col + 6, y, col, 7.5, "doctor", FA_DOCTOR, pt, 0));
-    d.push(F(PG_M, y, col, 7.5, "mobile", FA_PHONE, pt, 0)); y += 8.5;
-    return y + 2;
-  }
-  function patient3x3(d, y, pt) {
-    var c = PG_CW / 3;
-    d.push(FB(PG_M + 2 * c, y, c - 2, 7, "fullName", FA_FULL, pt, 0));
-    d.push(F (PG_M +     c, y, c - 2, 7, "nationalCode", FA_NID, pt, 0));
-    d.push(F (PG_M        , y, c - 2, 7, "fatherName", FA_FATHER, pt, 0)); y += 8;
-    d.push(F (PG_M + 2 * c, y, c - 2, 7, "birthDate", FA_BIRTH, pt, 0));
-    d.push(F (PG_M +     c, y, c - 2, 7, "gender", FA_GENDER, pt, 0));
-    d.push(F (PG_M        , y, c - 2, 7, "mobile", FA_PHONE, pt, 0)); y += 8;
-    d.push(F (PG_M + 2 * c, y, c - 2, 7, "insurance", FA_INS, pt, 0));
-    d.push(F (PG_M +     c, y, c - 2, 7, "suppInsurance", FA_SUPP, pt, 0));
-    d.push(F (PG_M        , y, c - 2, 7, "doctor", FA_DOCTOR, pt, 0)); y += 8;
-    return y + 2;
-  }
-  function patientCard(d, y, pt, tint, border, accent) {
-    var h = 32, iy, c = PG_CW / 3;
-    d.push(TINT(PG_M, y, PG_CW, h, tint, border, 0.35, 1.5));
-    d.push(BAND(PG_M, y, PG_CW, 7, accent));
-    d.push(LC(PG_M + 3, y + 0.8, PG_CW - 6, 5.5, "مشخصات بیمار", 9.5, true, 0, "#ffffff"));
-    iy = y + 8.5;
-    d.push(FB(PG_M + 2 * c + 1.5, iy, c - 3, 7, "fullName", FA_FULL, pt, 0));
-    d.push(F (PG_M +     c + 1.5, iy, c - 3, 7, "nationalCode", FA_NID, pt, 0));
-    d.push(F (PG_M         + 1.5, iy, c - 3, 7, "mobile", FA_PHONE, pt, 0)); iy += 7.6;
-    d.push(F (PG_M + 2 * c + 1.5, iy, c - 3, 7, "insurance", FA_INS, pt, 0));
-    d.push(F (PG_M +     c + 1.5, iy, c - 3, 7, "suppInsurance", FA_SUPP, pt, 0));
-    d.push(F (PG_M         + 1.5, iy, c - 3, 7, "patientType", FA_PTYPE, pt, 0)); iy += 7.6;
-    d.push(F (PG_M + 2 * c + 1.5, iy, c - 3, 7, "doctor", FA_DOCTOR, pt, 0));
-    d.push(F (PG_M +     c + 1.5, iy, c - 3, 7, "performer", FA_PERF, pt, 0));
-    d.push(F (PG_M         + 1.5, iy, c - 3, 7, "dept", FA_DEPT, pt, 0));
-    return y + h + 3;
-  }
-  /* v1.65.0: QR removed — family 6 already prints the receipt barcode in its
-     footer, so the QR duplicated the same code on the page. */
-  function patientPhoto(d, y, pt) {
-    var pw = 24, ph = 30, gx, gw, c;
-    d.push(PHOTO(PG_M, y, pw, ph));
-    d.push(L(PG_M, y + ph + 0.5, pw, 4, "عکس بیمار", 7.5, false, 1));
-    gx = PG_M + pw + 4; gw = PG_CW - pw - 4;
-    c = gw / 2;
-    d.push(FB(gx + c, y, c - 2, 7, "fullName", FA_FULL, pt, 0));
-    d.push(F (gx    , y, c - 2, 7, "nationalCode", FA_NID, pt, 0));
-    d.push(F (gx + c, y + 7.8, c - 2, 7, "fatherName", FA_FATHER, pt, 0));
-    d.push(F (gx    , y + 7.8, c - 2, 7, "birthDate", FA_BIRTH, pt, 0));
-    d.push(F (gx + c, y + 15.6, c - 2, 7, "insurance", FA_INS, pt, 0));
-    d.push(F (gx    , y + 15.6, c - 2, 7, "mobile", FA_PHONE, pt, 0));
-    d.push(F (gx + c, y + 23.4, c - 2, 7, "doctor", FA_DOCTOR, pt, 0));
-    d.push(F (gx    , y + 23.4, c - 2, 7, "dept", FA_DEPT, pt, 0));
-    return y + ph + 6;
-  }
-
-  /* ================================= SERVICES BLOCK — the centrepiece ==== */
-  function servicesBlockAt(d, x, w, y, pt, preset, headFill, bw, rowH,
-                           reserve, caption, footY) {
-    var h, headerH;
-    if (caption) {
-      d.push(L(x, y, w * 0.60, 6.5, FA_SVCLIST, pt + 1, true, 0));
-      d.push(F(x + w * 0.60, y, w * 0.40, 6.5, "servicescount", FA_ROWS, pt - 0.5, 2));
-      y += 8;
-    }
-    h = footY - reserve - y;
-    if (h < 18) h = 18;
-    headerH = rowH + 0.8;
-    d.push(SERVICES(x, y, w, h, pt - 0.5, preset, headFill, bw, rowH, headerH));
-    return y + h + 3;
-  }
-  function servicesBlock(d, y, pt, preset, headFill, bw, rowH, reserve, caption, footY) {
-    return servicesBlockAt(d, PG_M, PG_CW, y, pt, preset, headFill, bw, rowH,
-                           reserve, caption, footY);
-  }
-
-  /* ========================================================= totals blocks */
-  function totalsRow(d, y, pt) {
-    var c = PG_CW / 3;
-    d.push(HL(PG_M, y, PG_CW, 0.35)); y += 2.5;
-    d.push(F (PG_M + 2 * c, y, c, 8, "total", FA_TOTAL, pt + 0.5, 0));
-    d.push(F (PG_M +     c, y, c, 8, "patientshare", FA_PATIENT, pt + 0.5, 1));
-    d.push(FB(PG_M        , y, c, 8, "paid", FA_PAID, pt + 1.0, 2));
-    return y + 10.5;
-  }
-  function totalsBox(d, y, pt, tint, border, accent) {
-    var bw_ = PG_CW * 0.46, bx = PG_M, h = 28, iy = y + 1.5, sx, sw;
-    d.push(TINT(bx, y, bw_, h, tint, border, 0.35, 1.5));
-    d.push(F (bx + 1.5, iy, bw_ - 3, 6, "total", FA_TOTAL, pt, 0));       iy += 6.2;
-    d.push(F (bx + 1.5, iy, bw_ - 3, 6, "discount", FA_DISCOUNT, pt, 0)); iy += 6.2;
-    d.push(F (bx + 1.5, iy, bw_ - 3, 6, "insshare", FA_INSSHARE, pt, 0)); iy += 6.2;
-    d.push(HL(bx + 1.5, iy - 0.6, bw_ - 3, 0.4, border));
-    d.push(FB(bx + 1.5, iy, bw_ - 3, 7, "paid", FA_FINAL, pt + 1.5, 0));
-    sx = PG_M + PG_CW * 0.54; sw = PG_CW * 0.46;
-    d.push(LC(sx, y + 1, sw, 6, FA_KEEP, 8.5, false, 2, accent));
-    d.push(HL(sx + sw * 0.30, y + 18, sw * 0.70, 0.3));
-    d.push(L (sx + sw * 0.30, y + 18.5, sw * 0.70, 5, FA_SIGN, 8.5, false, 1));
-    return y + h + 3;
-  }
-  function totalsLadder(d, y, pt, accent) {
-    var lw = PG_CW * 0.44, lx, R, i, last, f, sx, sw;
-    d.push(HL(PG_M, y, PG_CW, 0.8, accent)); y += 2.5;
-    lx = PG_M + PG_CW - lw;
-    R = [[FA_TOTAL, "total"], [FA_DISCOUNT, "discount"], [FA_INSSHARE, "insshare"],
-         [FA_PATIENT, "patientshare"], [FA_PAID, "paid"]];
-    for (i = 0; i < 5; i++) {
-      last = (i === 4);
-      if (last) d.push(HL(lx, y - 0.5, lw, 0.5, accent));
-      f = F(lx, y, lw, 6.4, R[i][1], R[i][0], last ? (pt + 1.5) : pt, 0);
-      f.bold = last; if (last) f.textColor = accent;
-      d.push(f);
-      y += 6.4;
-    }
-    sx = PG_M; sw = PG_CW - lw - 6;
-    d.push(L(sx, y - 31, sw, 5.5, FA_KEEP, 8.5, false, 0));
-    d.push(HL(sx, y - 9, sw * 0.62, 0.3));
-    d.push(L(sx, y - 8.5, sw * 0.62, 5, FA_SIGNPAT, 8.5, false, 1));
-    return y + 3;
-  }
-  function totalsBar(d, y, pt, accent) {
-    var c = PG_CW / 4, f0, f1, f2, f3;
-    d.push(BAND(PG_M, y, PG_CW, 11, accent));
-    f0 = F(PG_M + 3 * c + 1.5, y + 2, c - 3, 7, "total", FA_TOTAL, pt, 0);
-    f1 = F(PG_M + 2 * c + 1.5, y + 2, c - 3, 7, "discount", FA_DISCOUNT, pt, 0);
-    f2 = F(PG_M +     c + 1.5, y + 2, c - 3, 7, "insshare", FA_INSSHARE, pt, 0);
-    f3 = F(PG_M         + 1.5, y + 2, c - 3, 7, "paid", FA_FINAL, pt + 1, 0);
-    f0.textColor = f1.textColor = f2.textColor = f3.textColor = "#ffffff";
-    f3.bold = true;
-    d.push(f0); d.push(f1); d.push(f2); d.push(f3);
-    y += 13.5;
-    d.push(HL(PG_M + PG_CW * 0.58, y + 3, PG_CW * 0.42, 0.3));
-    d.push(L(PG_M + PG_CW * 0.58, y + 3.5, PG_CW * 0.42, 5, FA_SIGN, 8.5, false, 1));
-    return y + 9;
-  }
-
-  /* ================================================================ footers */
-  function footBarcode(d, footY) {
-    var y = footY, bcW = PG_CW * 0.40, bcH = 15, bcX = PG_M + PG_CW - bcW;
-    d.push(HL(PG_M, y - 3, PG_CW, 0.3));
-    d.push(BARCODE(bcX, y, bcW, bcH));
-    d.push(L(bcX, y + bcH + 0.5, bcW, 4, FA_BARCODE, 8, false, 1));
-    d.push(F(PG_M, y + 1, PG_CW * 0.52, 6, "clinicphone", FA_PHONE, 8.5, 0));
-    d.push(F(PG_M, y + 7.5, PG_CW * 0.52, 6, "clinicaddr", "نشانی: ", 8.5, 0));
-  }
-  function footCentered(d, footY) {
-    var y = footY, bcW = PG_CW * 0.46, bcX = PG_M + (PG_CW - bcW) / 2;
-    d.push(HL(PG_M, y - 3, PG_CW, 0.3));
-    d.push(BARCODE(bcX, y, bcW, 14));
-    d.push(F(PG_M, y + 15, PG_CW, 5.5, "clinicaddr", "", 8.5, 1));
-    d.push(F(PG_M, y + 20.5, PG_CW, 5.5, "clinicphone", FA_PHONE, 8.5, 1));
-  }
-  /* v1.65.0: the QR was removed — one deterministic barcode per page. */
-  function footDual(d, footY, tint, border) {
-    var y = footY - 1, bcW = PG_CW * 0.42, bcX = PG_M + PG_CW - bcW - 2.5;
-    d.push(TINT(PG_M, y, PG_CW, 30, tint, border, 0.3, 1.5));
-    d.push(BARCODE(bcX, y + 3, bcW, 15));
-    d.push(L(bcX, y + 18.5, bcW, 4, FA_BARCODE, 8, false, 1));
-    d.push(F(PG_M + 2.5, y + 3, PG_CW - bcW - 10, 6, "clinicphone", FA_PHONE, 8.5, 0));
-    d.push(F(PG_M + 2.5, y + 10, PG_CW - bcW - 10, 6, "clinicaddr", "نشانی: ", 8.5, 0));
-    d.push(L(PG_M + 2.5, y + 18, PG_CW - bcW - 10, 5, FA_KEEP, 8, false, 0));
-  }
-  function footMinimal(d, footY) {
-    var y = footY + 4, bcW = PG_CW * 0.32, bcX = PG_M + PG_CW - bcW;
-    d.push(HL(PG_M, y - 3, PG_CW, 0.25));
-    d.push(BARCODE(bcX, y, bcW, 13));
-    d.push(L(PG_M, y + 3, PG_CW * 0.60, 5.5, FA_KEEP, 8.5, false, 0));
-  }
-  /* v1.69.0 — NO code carrier. Clean professional footer: hairline + clinic
-     contact left + keep-note / signature right. One deterministic code per page
-     is still the rule — here it is simply zero, never two. */
-  function footClean(d, footY, accent) {
-    var y = footY;
-    d.push(HL(PG_M, y - 3, PG_CW, 0.3));
-    d.push(F(PG_M, y + 1, PG_CW * 0.55, 6, "clinicphone", FA_PHONE, 8.5, 0));
-    d.push(F(PG_M, y + 7.5, PG_CW * 0.55, 6, "clinicaddr", "نشانی: ", 8.5, 0));
-    d.push(LC(PG_M + PG_CW * 0.58, y + 1, PG_CW * 0.42, 6, FA_KEEP, 8.5, false, 2, accent));
-    d.push(HL(PG_M + PG_CW * 0.58, y + 9, PG_CW * 0.42, 0.3));
-    d.push(L(PG_M + PG_CW * 0.58, y + 9.5, PG_CW * 0.42, 5, FA_SIGN, 8.5, false, 1));
-  }
+  /* ----- medical receipt geometry (8 mm margins, portrait A4) ------------- */
+  var R_M   = 8.0;
+  var R_CW  = PG_W - 2 * R_M;        /* 194 */
+  var FR_M  = 5.0;                   /* page-frame margin (outside the box) */
+  var R_INK   = "#000000";
+  var R_SHADE = "#ECECEC";           /* very light gray (monochrome shading) */
 
   /* ============================================ 30 designs / 10 families == */
   /* family, variant, svc preset, accent, tint, headFill(0=line-art), bw, rowH, frame */
   var TPL = [
-    { f: 0, v: 0, s: SVC4_ROW,  a: "#1F6FEB", t: "#F2F6FC", hf: "#E8EDF4", bw: 0.40, rh: 4.4, fr: false },
-    { f: 0, v: 1, s: SVC5,      a: "#0B5ED7", t: "#F1F5FB", hf: "#E4EBF5", bw: 0.40, rh: 4.3, fr: false },
-    { f: 0, v: 2, s: SVC3,      a: "#2F6F4E", t: "#F1F7F3", hf: 0,         bw: 0.30, rh: 4.6, fr: false },
-    { f: 1, v: 0, s: SVC5,      a: "#0B5ED7", t: "#F3F7FD", hf: "#DDE7F6", bw: 0.40, rh: 4.3, fr: false },
-    { f: 1, v: 1, s: SVC6_INS,  a: "#1F6FEB", t: "#F2F6FC", hf: "#E1E9F5", bw: 0.40, rh: 4.2, fr: false },
-    { f: 1, v: 2, s: SVC4_CAT,  a: "#6A0DAD", t: "#F6F2FA", hf: "#EAE1F4", bw: 0.40, rh: 4.4, fr: false },
-    { f: 2, v: 0, s: SVC7,      a: "#14532D", t: "#F2F7F3", hf: "#E6EDE8", bw: 0.35, rh: 4.1, fr: true  },
-    { f: 2, v: 1, s: SVC6_FIN,  a: "#0B5ED7", t: "#F2F6FC", hf: "#E4EBF5", bw: 0.35, rh: 4.1, fr: true  },
-    { f: 2, v: 2, s: SVC5_CODE, a: "#8A2E2E", t: "#FAF2F2", hf: "#F0E3E3", bw: 0.35, rh: 4.2, fr: true  },
-    { f: 3, v: 0, s: SVC5,      a: "#0284C7", t: "#EFF7FC", hf: "#DCEEF8", bw: 0.35, rh: 4.3, fr: false },
-    { f: 3, v: 1, s: SVC4_ROW,  a: "#0F766E", t: "#EFF7F6", hf: "#E0EEEC", bw: 0.35, rh: 4.4, fr: false },
-    { f: 3, v: 2, s: SVC6_FIN,  a: "#6A0DAD", t: "#F5F1FA", hf: "#E9E0F3", bw: 0.35, rh: 4.2, fr: false },
-    { f: 4, v: 0, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0,         bw: 0.30, rh: 4.5, fr: false },
-    { f: 4, v: 1, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,         bw: 0.45, rh: 4.4, fr: true  },
-    { f: 4, v: 2, s: SVC7,      a: "#000000", t: "#FFFFFF", hf: 0,         bw: 0.30, rh: 4.1, fr: false },
-    { f: 5, v: 0, s: SVC5,      a: "#4F46E5", t: "#F2F2FC", hf: "#E2E1F7", bw: 0.35, rh: 4.3, fr: false },
-    { f: 5, v: 1, s: SVC4_CAT,  a: "#0F766E", t: "#F0F7F6", hf: "#E1EFEC", bw: 0.35, rh: 4.4, fr: false },
-    { f: 5, v: 2, s: SVC6_INS,  a: "#B45309", t: "#FDF6EC", hf: "#F6E9D2", bw: 0.35, rh: 4.2, fr: false },
-    { f: 6, v: 0, s: SVC4_CAT,  a: "#0E7490", t: "#EFF8FA", hf: "#DFF0F4", bw: 0.40, rh: 4.4, fr: false },
-    { f: 6, v: 1, s: SVC5,      a: "#14532D", t: "#F1F6F2", hf: "#E4EDE7", bw: 0.40, rh: 4.3, fr: false },
-    { f: 6, v: 2, s: SVC3,      a: "#6A0DAD", t: "#F6F2FA", hf: 0,         bw: 0.30, rh: 4.6, fr: false },
-    { f: 7, v: 0, s: SVC6_FIN,  a: "#0B5ED7", t: "#F2F6FC", hf: "#E2EAF5", bw: 0.35, rh: 4.2, fr: false },
-    { f: 7, v: 1, s: SVC6_INS,  a: "#8A2E2E", t: "#FAF2F2", hf: "#EFE2E2", bw: 0.35, rh: 4.2, fr: false },
-    { f: 7, v: 2, s: SVC7,      a: "#14532D", t: "#F1F6F2", hf: "#E3ECE6", bw: 0.30, rh: 4.0, fr: true  },
-    { f: 8, v: 0, s: SVC4_ROW,  a: "#334155", t: "#F4F6F8", hf: "#E5E9EE", bw: 0.40, rh: 4.3, fr: false },
-    { f: 8, v: 1, s: SVC5,      a: "#0F766E", t: "#EFF7F6", hf: "#DEEDEA", bw: 0.40, rh: 4.2, fr: false },
-    { f: 8, v: 2, s: SVC3,      a: "#6A0DAD", t: "#F6F2FA", hf: "#E9E0F3", bw: 0.40, rh: 4.4, fr: false },
-    { f: 9, v: 0, s: SVC5,      a: "#1F6FEB", t: "#F2F6FC", hf: "#E4ECF7", bw: 0.40, rh: 4.3, fr: false },
-    { f: 9, v: 1, s: SVC6_FIN,  a: "#B45309", t: "#FDF6EC", hf: "#F6E9D2", bw: 0.40, rh: 4.2, fr: false },
-    { f: 9, v: 2, s: SVC5_CODE, a: "#6A0DAD", t: "#F6F2FA", hf: "#E9E0F3", bw: 0.40, rh: 4.3, fr: true  }
+    { f: 0, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 6.2, fr: false },
+    { f: 0, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.2, fr: false },
+    { f: 0, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 6.2, fr: false },
+    { f: 1, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 1, v: 1, s: SVC4_CAT,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 1, v: 2, s: SVC5_CODE, a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 2, v: 0, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.6, fr: true  },
+    { f: 2, v: 1, s: SVC6_INS,  a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.6, fr: true  },
+    { f: 2, v: 2, s: SVC7,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.6, fr: true  },
+    { f: 3, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.8, fr: false },
+    { f: 3, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.8, fr: false },
+    { f: 3, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.8, fr: false },
+    { f: 4, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.25, rh: 6.0, fr: false },
+    { f: 4, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.25, rh: 6.0, fr: true  },
+    { f: 4, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.25, rh: 6.0, fr: false },
+    { f: 5, v: 0, s: SVC3,      a: "#000000", t: "#ECECEC", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 5, v: 1, s: SVC4_CAT,  a: "#000000", t: "#ECECEC", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 5, v: 2, s: SVC6_INS,  a: "#000000", t: "#ECECEC", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 6, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 6.0, fr: false },
+    { f: 6, v: 1, s: SVC4_CAT,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 6, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 6.0, fr: false },
+    { f: 7, v: 0, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 5.6, fr: false },
+    { f: 7, v: 1, s: SVC6_INS,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 5.6, fr: false },
+    { f: 7, v: 2, s: SVC7,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.6, fr: true  },
+    { f: 8, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.2, fr: false },
+    { f: 8, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 5.2, fr: false },
+    { f: 8, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0,          bw: 0.30, rh: 5.2, fr: false },
+    { f: 9, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 9, v: 1, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: false },
+    { f: 9, v: 2, s: SVC5_CODE, a: "#000000", t: "#FFFFFF", hf: "#ECECEC",  bw: 0.30, rh: 6.0, fr: true  }
   ];
 
   var NAMES = [
-    "۰۱) کلاسیک — جدول خدمات بلند",
-    "۰۲) کلاسیک — لوگو کنار عنوان + مبلغ سطری",
-    "۰۳) کلاسیک — تک‌رنگ وسط‌چین",
-    "۰۴) باند رنگی — قبض پذیرش آبی",
-    "۰۵) باند رنگی — سهم بیمه و بیمار",
-    "۰۶) باند رنگی — بنفش با نوع خدمت",
-    "۰۷) فاکتور — هفت‌ستونه کامل",
-    "۰۸) فاکتور — ریز مالی با تخفیف",
-    "۰۹) فاکتور — کد خدمت و مبلغ",
-    "۱۰) ستون کناری — آبی آسمانی",
-    "۱۱) ستون کناری — سبز آبی",
-    "۱۲) ستون کناری — ریز مالی",
-    "۱۳) خط‌کشی — تک‌رنگ چهارستونه",
-    "۱۴) خط‌کشی — قاب‌دار پنج‌ستونه",
-    "۱۵) خط‌کشی — هفت‌ستونه فشرده",
-    "۱۶) کارتی — گرد نیلی",
-    "۱۷) کارتی — فیروزه‌ای نوع خدمت",
-    "۱۸) کارتی — کهربایی سهم بیمه",
-    "۱۹) عکس بیمار — سبز دریایی نوع خدمت",
-    "۲۰) عکس بیمار — باند سبز",
-    "۲۱) عکس بیمار — بنفش تک‌رنگ",
-    "۲۲) مالی — تخفیف و مبلغ واحد",
-    "۲۳) مالی — سهم بیمه و بیمار",
-    "۲۴) مالی — هفت‌ستونه قاب‌دار",
-    "۲۵) فشرده — ته‌برگ دودی",
-    "۲۶) فشرده — ته‌برگ فیروزه‌ای",
-    "۲۷) فشرده — ته‌برگ سه‌ستونه",
-    "۲۸) دو بلوکی — باند آبی",
-    "۲۹) دو بلوکی — ریز مالی کهربایی",
-    "۳۰) دو بلوکی — بنفش قاب‌دار"
+    "۰۱) قبض پزشک — کلاسیک",
+    "۰۲) رسید بیمه — کلاسیک باند خاکستری",
+    "۰۳) قبض و رسید — کلاسیک دوخطی",
+    "۰۴) قبض پزشک — باند سرتیتر",
+    "۰۵) رسید بیمه — باند سرتیتر",
+    "۰۶) قبض و رسید — باند سرتیتر",
+    "۰۷) قبض پزشک — فاکتور فشرده",
+    "۰۸) رسید بیمه — فاکتور فشرده",
+    "۰۹) قبض و رسید — فاکتور فشرده",
+    "۱۰) قبض پزشک — ستون کناری",
+    "۱۱) رسید بیمه — ستون کناری",
+    "۱۲) قبض و رسید — ستون کناری",
+    "۱۳) قبض پزشک — خط‌کشی تک‌رنگ",
+    "۱۴) رسید بیمه — خط‌کشی قاب‌دار",
+    "۱۵) قبض و رسید — خط‌کشی",
+    "۱۶) قبض پزشک — کارتی سایه‌دار",
+    "۱۷) رسید بیمه — کارتی سایه‌دار",
+    "۱۸) قبض و رسید — کارتی سایه‌دار",
+    "۱۹) قبض پزشک — عکس بیمار",
+    "۲۰) رسید بیمه — عکس بیمار",
+    "۲۱) قبض و رسید — عکس بیمار",
+    "۲۲) قبض پزشک — مالی کامل",
+    "۲۳) رسید بیمه — مالی کامل",
+    "۲۴) قبض و رسید — مالی کامل قاب‌دار",
+    "۲۵) قبض پزشک — فشرده ته‌برگ",
+    "۲۶) رسید بیمه — فشرده ته‌برگ",
+    "۲۷) قبض و رسید — فشرده ته‌برگ",
+    "۲۸) قبض پزشک — دو بلوکی",
+    "۲۹) رسید بیمه — دو بلوکی",
+    "۳۰) قبض و رسید — دو بلوکی قاب‌دار"
   ];
 
-  function buildTemplate(idx) {
-    var sp = TPL[idx], d = [], pt = 10.5, y = PG_M, footY = FOOT_Y;
-    var doc, c, sbW, sbX, mainX, mainW, my, ly, lw, lx, f;
-    var gw, rx, lx2, bh, ry, ly2, tear, sy, pwB, phB;
+  /* push a labelled data field into a cell; align 0 = right (RTL cell start) */
+  function putF(d, x, y, w, h, field, prefix, pt, bold, align) {
+    if (bold) d.push(FB(x, y, w, h, field, prefix, pt, align || 0));
+    else      d.push(F (x, y, w, h, field, prefix, pt, align || 0));
+  }
 
-    if (sp.fr) d.push(FRAME(PG_W, PG_H, 8, sp.a, 0.8));
+  /* ============== SHARED MEDICAL-RECEIPT SECTION BUILDERS ================= */
+  /* Each appends to the item array and returns the next free y (mm). The    */
+  /* whole receipt body sits inside ONE bordered box (drawn last by          */
+  /* renderReceipt) so every internal rule meets a continuous thin outline.  */
 
-    switch (sp.f) {
-
-    /* ---------------- 0 — کلاسیک ---------------------------------------- */
-    case 0:
-      if (sp.v === 0)      y = hdrPlain(d, FA_CLINIC, 18, true, 0.7);
-      else if (sp.v === 1) y = hdrLogoRight(d, FA_CLINIC, 17, true, 0.7);
-      else                 y = hdrCenterLogo(d, FA_CLINIC, 18, false, 0.5);
-      if (sp.v === 0)      y = metaStrip4(d, y, pt - 0.5);
-      else if (sp.v === 1) y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      if (sp.v === 0)      y = patient2x3(d, y, pt);
-      else if (sp.v === 1) y = patient3x3(d, y, pt);
-      else                 y = patientCard(d, y, pt - 0.5, sp.t, sp.a, sp.a);
-      d.push(HL(PG_M, y - 1, PG_CW, 0.25));
-      var reserve0 = (sp.v === 2) ? 32 : 15;
-      y = servicesBlock(d, y + 1.5, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve0, true, footY);
-      if (sp.v === 2) totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      else            totalsRow(d, footY - 13, pt);
-      if (sp.v === 0)      footBarcode(d, footY + 2);
-      else if (sp.v === 1) footCentered(d, footY + 3);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 1 — باند رنگی ------------------------------------- */
-    case 1:
-      doc = (sp.v === 0) ? "قبض پذیرش و صورت‌حساب خدمات"
-          : (sp.v === 1) ? "صورت‌حساب خدمات درمانی"
-                         : "رسید پذیرش بیمار";
-      y = hdrBand(d, FA_CLINIC, sp.a, sp.v !== 2, doc);
-      if (sp.v === 0)      y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else if (sp.v === 1) y = metaStrip4(d, y, pt - 0.5);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      y = patientCard(d, y, pt - 0.5, sp.t, sp.a, sp.a);
-      var reserve1 = (sp.v === 1) ? 36 : (sp.v === 2) ? 32 : 24;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve1, true, footY);
-      if (sp.v === 0)      totalsBar(d, footY - 22, pt, sp.a);
-      else if (sp.v === 1) totalsLadder(d, footY - 34, pt, sp.a);
-      else                 totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      if (sp.v === 0)      footCentered(d, footY + 3);
-      else if (sp.v === 1) footBarcode(d, footY + 2);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 2 — فاکتور --------------------------------------- */
-    case 2:
-      doc = (sp.v === 0) ? "فاکتور خدمات درمانی"
-          : (sp.v === 1) ? "فاکتور رسمی خدمات"
-                         : "صورت‌حساب تفصیلی خدمات";
-      y = hdrSplit(d, FA_CLINIC, sp.a, doc);
-      if (sp.v === 0)      y = metaGrid6(d, y, pt - 1, sp.a);
-      else if (sp.v === 1) y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else                 y = metaStrip4(d, y, pt - 0.5);
-      c = PG_CW / 3;
-      d.push(FB(PG_M + 2 * c, y, c - 2, 7, "fullName", FA_FULL, pt, 0));
-      d.push(F (PG_M +     c, y, c - 2, 7, "nationalCode", FA_NID, pt, 0));
-      d.push(F (PG_M        , y, c - 2, 7, "insurance", FA_INS, pt, 0)); y += 8;
-      d.push(FB(PG_M + 2 * c, y, c - 2, 7, "doctor", FA_DOCTOR, pt, 0));
-      d.push(F (PG_M +     c, y, c - 2, 7, "performer", FA_PERF, pt, 0));
-      d.push(F (PG_M        , y, c - 2, 7, "patientType", FA_PTYPE, pt, 0)); y += 10;
-      var reserve2 = (sp.v === 0) ? 36 : (sp.v === 1) ? 24 : 32;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve2, true, footY);
-      if (sp.v === 0)      totalsLadder(d, footY - 34, pt, sp.a);
-      else if (sp.v === 1) totalsBar(d, footY - 22, pt, sp.a);
-      else                 totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      if (sp.v === 0)      footMinimal(d, footY + 2);
-      else if (sp.v === 1) footBarcode(d, footY + 2);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 3 — ستون کناری ----------------------------------- */
-    case 3:
-      sbW = 44; sbX = PG_M; mainX = PG_M + sbW + 5; mainW = PG_CW - sbW - 5;
-      d.push(TINT(sbX, PG_M, sbW, footY - PG_M - 2, sp.t, sp.a, 0.35, 2.0));
-      d.push(LOGO(sbX + (sbW - 26) / 2, PG_M + 4, 26, 26));
-      d.push(LC(sbX + 2, PG_M + 33, sbW - 4, 10, FA_CLINIC, 10, true, 1, sp.a));
-      /* v1.65.0: the sidebar QR was removed (double code carrier); the freed
-         space carries the clinic contact block. ONE barcode remains. */
-      d.push(HL(sbX + 3, PG_M + 45, sbW - 6, 0.35, sp.a));
-      d.push(F(sbX + 2, PG_M + 48, sbW - 4, 6, "receiptNo", FA_RECEIPT, 9, 1));
-      d.push(F(sbX + 2, PG_M + 54.5, sbW - 4, 6, "date", FA_DATE, 9, 1));
-      d.push(F(sbX + 2, PG_M + 61, sbW - 4, 6, "time", FA_TIME, 9, 1));
-      d.push(F(sbX + 2, PG_M + 67.5, sbW - 4, 6, "shift", FA_SHIFT, 9, 1));
-      d.push(HL(sbX + 3, PG_M + 76, sbW - 6, 0.3, sp.a));
-      d.push(F(sbX + 2, PG_M + 79, sbW - 4, 6, "dept", FA_DEPT, 9, 1));
-      d.push(F(sbX + 2, PG_M + 85.5, sbW - 4, 6, "userName", FA_USER, 9, 1));
-      d.push(HL(sbX + 3, PG_M + 94, sbW - 6, 0.3, sp.a));
-      d.push(F(sbX + 2, PG_M + 97, sbW - 4, 6, "clinicphone", FA_PHONE, 8.5, 1));
-      d.push(F(sbX + 2, PG_M + 103.5, sbW - 4, 10, "clinicaddr", "نشانی: ", 8.5, 1));
-      d.push(L(sbX + 2, PG_M + 115, sbW - 4, 10, FA_KEEP, 8, false, 1));
-      d.push(BARCODE(sbX + 2, footY - 48, sbW - 4, 26));
-      d.push(L(sbX + 2, footY - 19, sbW - 4, 4, FA_BARCODE, 7.5, false, 1));
-      my = PG_M + 1;
-      doc = (sp.v === 0) ? "قبض پذیرش و خدمات"
-          : (sp.v === 1) ? "صورت‌حساب خدمات"
-                         : "فاکتور خدمات درمانی";
-      d.push(LC(mainX, my, mainW, 9, doc, 15, true, 0, sp.a)); my += 11;
-      d.push(HL(mainX, my, mainW, 0.7, sp.a)); my += 3.5;
-      if (sp.v === 0) {                 /* plain two-column identity grid */
-        c = mainW / 2;
-        d.push(FB(mainX + c, my, c - 2, 7, "fullName", FA_FULL, pt, 0));
-        d.push(F (mainX    , my, c - 2, 7, "nationalCode", FA_NID, pt, 0)); my += 7.8;
-        d.push(F (mainX + c, my, c - 2, 7, "fatherName", FA_FATHER, pt, 0));
-        d.push(F (mainX    , my, c - 2, 7, "birthDate", FA_BIRTH, pt, 0)); my += 7.8;
-        d.push(F (mainX + c, my, c - 2, 7, "insurance", FA_INS, pt, 0));
-        d.push(F (mainX    , my, c - 2, 7, "suppInsurance", FA_SUPP, pt, 0)); my += 7.8;
-        d.push(F (mainX + c, my, c - 2, 7, "doctor", FA_DOCTOR, pt, 0));
-        d.push(F (mainX    , my, c - 2, 7, "mobile", FA_PHONE, pt, 0)); my += 10;
-      } else if (sp.v === 1) {          /* three-column identity grid */
-        c = mainW / 3;
-        d.push(FB(mainX + 2 * c, my, c - 2, 7, "fullName", FA_FULL, pt, 0));
-        d.push(F (mainX +     c, my, c - 2, 7, "nationalCode", FA_NID, pt, 0));
-        d.push(F (mainX        , my, c - 2, 7, "fatherName", FA_FATHER, pt, 0)); my += 7.8;
-        d.push(F (mainX + 2 * c, my, c - 2, 7, "birthDate", FA_BIRTH, pt, 0));
-        d.push(F (mainX +     c, my, c - 2, 7, "insurance", FA_INS, pt, 0));
-        d.push(F (mainX        , my, c - 2, 7, "suppInsurance", FA_SUPP, pt, 0)); my += 7.8;
-        d.push(F (mainX + 2 * c, my, c - 2, 7, "doctor", FA_DOCTOR, pt, 0));
-        d.push(F (mainX +     c, my, c - 2, 7, "mobile", FA_PHONE, pt, 0));
-        d.push(F (mainX        , my, c - 2, 7, "dept", FA_DEPT, pt, 0)); my += 10;
-      } else {                          /* boxed tinted identity card */
-        c = mainW / 2; var bh3 = 34;
-        d.push(TINT(mainX, my, mainW, bh3, sp.t, sp.a, 0.3, 1.5));
-        d.push(BAND(mainX, my, mainW, 6.5, sp.a));
-        d.push(LC(mainX + 2, my + 0.6, mainW - 4, 5, "مشخصات بیمار", 9, true, 0, "#ffffff"));
-        var py = my + 8;
-        d.push(FB(mainX + c, py, c - 2, 6.5, "fullName", FA_FULL, pt, 0));
-        d.push(F (mainX    , py, c - 2, 6.5, "nationalCode", FA_NID, pt, 0)); py += 7;
-        d.push(F (mainX + c, py, c - 2, 6.5, "fatherName", FA_FATHER, pt, 0));
-        d.push(F (mainX    , py, c - 2, 6.5, "birthDate", FA_BIRTH, pt, 0)); py += 7;
-        d.push(F (mainX + c, py, c - 2, 6.5, "insurance", FA_INS, pt, 0));
-        d.push(F (mainX    , py, c - 2, 6.5, "mobile", FA_PHONE, pt, 0)); py += 7;
-        d.push(F (mainX + c, py, c - 2, 6.5, "doctor", FA_DOCTOR, pt, 0));
-        d.push(F (mainX    , py, c - 2, 6.5, "dept", FA_DEPT, pt, 0));
-        my += bh3 + 4;
-      }
-      my = servicesBlockAt(d, mainX, mainW, my, pt, sp.s, sp.hf, sp.bw, sp.rh,
-                           30, true, footY - 2);
-      ly = footY - 30; lw = mainW * 0.60; lx = mainX + mainW - lw;
-      d.push(HL(mainX, ly, mainW, 0.6, sp.a)); ly += 2;
-      d.push(F(lx, ly, lw, 6.2, "total", FA_TOTAL, pt, 0));       ly += 6.2;
-      d.push(F(lx, ly, lw, 6.2, "insshare", FA_INSSHARE, pt, 0)); ly += 6.2;
-      d.push(F(lx, ly, lw, 6.2, "discount", FA_DISCOUNT, pt, 0)); ly += 6.2;
-      d.push(HL(lx, ly - 0.5, lw, 0.5, sp.a));
-      f = FB(lx, ly, lw, 7, "paid", FA_FINAL, pt + 1.5, 0);
-      f.textColor = sp.a; d.push(f);
-      d.push(HL(mainX, footY - 10, mainW * 0.34, 0.3));
-      d.push(L(mainX, footY - 9.5, mainW * 0.34, 5, FA_SIGN, 8.5, false, 1));
-      break;
-
-    /* ---------------- 4 — خط‌کشی (mono) -------------------------------- */
-    case 4:
-      if (sp.v === 0)      y = hdrPlain(d, FA_CLINIC, 17, false, 0.9);
-      else if (sp.v === 1) y = hdrPlain(d, FA_CLINIC, 19, true, 1.2);
-      else                 y = hdrLogoRight(d, FA_CLINIC, 16, false, 0.9);
-      if (sp.v === 0) {                 /* ruled meta line (pure line-art) */
-        c = PG_CW / 4;
-        d.push(FB(PG_M + 3 * c, y, c, 6.5, "receiptNo", FA_RECEIPT, pt - 0.5, 0));
-        d.push(F (PG_M + 2 * c, y, c, 6.5, "date", FA_DATE, pt - 0.5, 1));
-        d.push(F (PG_M +     c, y, c, 6.5, "time", FA_TIME, pt - 0.5, 1));
-        d.push(F (PG_M        , y, c, 6.5, "shift", FA_SHIFT, pt - 0.5, 2));
-        y += 7.5;
-        d.push(HL(PG_M, y, PG_CW, 0.25)); y += 3;
-      } else if (sp.v === 1) {
-        y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      } else {
-        y = metaGrid6(d, y, pt - 1, sp.a);
-      }
-      if (sp.v === 0)      y = patient3x3(d, y, pt);
-      else if (sp.v === 1) y = patient2x3(d, y, pt);
-      else                 y = patientCard(d, y, pt - 0.5, sp.t, sp.a, sp.a);
-      d.push(HL(PG_M, y - 1, PG_CW, 0.25)); y += 2;
-      var reserve4 = (sp.v === 0) ? 16 : (sp.v === 1) ? 24 : 32;
-      y = servicesBlock(d, y, pt, sp.s, 0, sp.bw, sp.rh, reserve4, true, footY);
-      if (sp.v === 0)      totalsRow(d, footY - 14, pt);
-      else if (sp.v === 1) totalsBar(d, footY - 22, pt, sp.a);
-      else                 totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      if (sp.v === 0)      footMinimal(d, footY + 1);
-      else if (sp.v === 1) footClean(d, footY + 2, sp.a);
-      else                 footBarcode(d, footY + 2);
-      break;
-
-    /* ---------------- 5 — کارتی ---------------------------------------- */
-    case 5:
-      d.push(RECT(PG_M - 2, PG_M - 2, PG_CW + 4, PG_H - 2 * PG_M + 4, 0.5, 4.0, sp.a));
-      y = PG_M + 2;
-      if (sp.v === 0) {
-        d.push(LOGO(PG_M + PG_CW - 22, y, 20, 20));
-        d.push(LC(PG_M + 2, y + 1, PG_CW - 26, 10, FA_CLINIC, 16.5, true, 0, sp.a));
-        d.push(L(PG_M + 2, y + 11.5, PG_CW - 26, 6, FA_SUBTITLE, 8.5, false, 0));
-        y += 23;
-      } else if (sp.v === 1) {
-        d.push(LC(PG_M + 2, y, PG_CW - 4, 10, FA_CLINIC, 17, true, 1, sp.a));
-        d.push(L(PG_M + 2, y + 11, PG_CW - 4, 6, FA_SUBTITLE, 8.5, false, 1));
-        y += 20;
-      } else {
-        d.push(BAND(PG_M, y, PG_CW, 15, sp.a));
-        d.push(LC(PG_M + 3, y + 3.2, PG_CW - 6, 8, FA_CLINIC, 15, true, 0, "#ffffff"));
-        y += 18;
-      }
-      if (sp.v === 0)      y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else if (sp.v === 1) y = metaStrip4(d, y, pt - 0.5);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      y = patientCard(d, y, pt - 0.5, sp.t, sp.a, sp.a);
-      var reserve5 = (sp.v === 0) ? 32 : (sp.v === 1) ? 24 : 36;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve5, true, footY);
-      if (sp.v === 0)      totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      else if (sp.v === 1) totalsBar(d, footY - 22, pt, sp.a);
-      else                 totalsLadder(d, footY - 34, pt, sp.a);
-      if (sp.v === 0)      footDual(d, footY + 1, sp.t, sp.a);
-      else if (sp.v === 1) footBarcode(d, footY + 2);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 6 — عکس و هویت ----------------------------------- */
-    case 6:
-      if (sp.v === 0)      y = hdrLogoRight(d, FA_CLINIC, 17, true, 0.7);
-      else if (sp.v === 1) y = hdrBand(d, FA_CLINIC, sp.a, true, "پروندهٔ پذیرش بیمار");
-      else                 y = hdrCenterLogo(d, FA_CLINIC, 17, true, 0.5);
-      if (sp.v === 0)      y = metaStrip4(d, y, pt - 0.5);
-      else if (sp.v === 1) y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      y = patientPhoto(d, y, pt - 0.5);
-      d.push(HL(PG_M, y - 1, PG_CW, 0.4, sp.a)); y += 2;
-      var reserve6 = (sp.v === 0) ? 32 : (sp.v === 1) ? 36 : 24;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve6, true, footY);
-      if (sp.v === 0)      totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      else if (sp.v === 1) totalsLadder(d, footY - 34, pt, sp.a);
-      else                 totalsBar(d, footY - 22, pt, sp.a);
-      if (sp.v === 0)      footBarcode(d, footY + 2);
-      else if (sp.v === 1) footCentered(d, footY + 3);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 7 — مالی ----------------------------------------- */
-    case 7:
-      doc = (sp.v === 0) ? "صورت‌حساب مالی خدمات"
-          : (sp.v === 1) ? "ریز صورت‌حساب و سهم بیمه"
-                         : "صورت‌حساب تفصیلی مالی";
-      y = hdrSplit(d, FA_CLINIC, sp.a, doc);
-      if (sp.v === 0)      y = metaStripBoxed(d, y, pt - 0.5, sp.t, sp.a);
-      else if (sp.v === 1) y = metaStrip4(d, y, pt - 0.5);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      c = PG_CW / 3;
-      d.push(FB(PG_M + 2 * c, y, c - 2, 7, "fullName", FA_FULL, pt, 0));
-      d.push(F (PG_M +     c, y, c - 2, 7, "nationalCode", FA_NID, pt, 0));
-      d.push(F (PG_M        , y, c - 2, 7, "patientType", FA_PTYPE, pt, 0)); y += 8;
-      d.push(F (PG_M + 2 * c, y, c - 2, 7, "insurance", FA_INS, pt, 0));
-      d.push(F (PG_M +     c, y, c - 2, 7, "ins_percent", "درصد پایه: ", pt, 0));
-      d.push(F (PG_M        , y, c - 2, 7, "insNo", "شماره بیمه: ", pt, 0)); y += 8;
-      d.push(F (PG_M + 2 * c, y, c - 2, 7, "suppInsurance", FA_SUPP, pt, 0));
-      d.push(F (PG_M +     c, y, c - 2, 7, "supp_percent", "درصد مکمل: ", pt, 0));
-      d.push(F (PG_M        , y, c - 2, 7, "doctor", FA_DOCTOR, pt, 0)); y += 10;
-      var reserve7 = (sp.v === 0) ? 36 : (sp.v === 1) ? 24 : 32;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve7, true, footY);
-      if (sp.v === 0)      totalsLadder(d, footY - 34, pt, sp.a);
-      else if (sp.v === 1) totalsBar(d, footY - 22, pt, sp.a);
-      else                 totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      if (sp.v === 0)      footBarcode(d, footY + 2);
-      else if (sp.v === 1) footCentered(d, footY + 3);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
-
-    /* ---------------- 8 — فشرده + ته‌برگ ------------------------------- */
-    case 8:
-      tear = 196.0;
-      if (sp.v === 0)      y = hdrPlain(d, FA_CLINIC, 16.5, false, 0.6);
-      else if (sp.v === 1) y = hdrLogoRight(d, FA_CLINIC, 16, false, 0.6);
-      else                 y = hdrBand(d, FA_CLINIC, sp.a, true, "");
-      if (sp.v === 0)      y = metaStrip4(d, y, pt - 1);
-      else if (sp.v === 1) y = metaStripBoxed(d, y, pt - 1, sp.t, sp.a);
-      else                 y = metaGrid6(d, y, pt - 1, sp.a);
-      if (sp.v === 0)      y = patient2x3(d, y, pt - 0.5);
-      else if (sp.v === 1) y = patient3x3(d, y, pt - 0.5);
-      else                 y = patientCard(d, y, pt - 0.5, sp.t, sp.a, sp.a);
-      var reserve8 = (sp.v === 0) ? 15 : (sp.v === 1) ? 24 : 32;
-      y = servicesBlock(d, y, pt - 0.5, sp.s, sp.hf, sp.bw, sp.rh, reserve8, true, tear - 4);
-      if (sp.v === 0)      totalsRow(d, tear - 17, pt - 0.5);
-      else if (sp.v === 1) totalsBar(d, tear - 24, pt - 0.5, sp.a);
-      else                 totalsBox(d, tear - 33, pt - 0.5, sp.t, sp.a, sp.a);
-      d.push(HL(PG_M, tear, PG_CW, 0.3));
-      d.push(L(PG_M, tear + 0.8, PG_CW, 5, "— — — محل جدا کردن — — —", 8, false, 1));
-      sy = tear + 8;
-      d.push(LC(PG_M, sy, PG_CW, 8, "نسخهٔ بیمار — رسید پرداخت", 12.5, true, 1, sp.a));
-      sy += 10;
-      d.push(TINT(PG_M, sy, PG_CW, 26, sp.t, sp.a, 0.35, 1.5));
-      c = PG_CW / 3;
-      d.push(FB(PG_M + 2 * c + 1.5, sy + 2, c - 3, 6.5, "fullName", FA_FULL, pt - 0.5, 0));
-      d.push(F (PG_M +     c + 1.5, sy + 2, c - 3, 6.5, "receiptNo", FA_RECEIPT, pt - 0.5, 0));
-      d.push(F (PG_M         + 1.5, sy + 2, c - 3, 6.5, "date", FA_DATE, pt - 0.5, 0));
-      d.push(F (PG_M + 2 * c + 1.5, sy + 9.5, c - 3, 6.5, "servicescount", FA_ROWS, pt - 0.5, 0));
-      d.push(F (PG_M +     c + 1.5, sy + 9.5, c - 3, 6.5, "total", FA_TOTAL, pt - 0.5, 0));
-      d.push(F (PG_M         + 1.5, sy + 9.5, c - 3, 6.5, "insshare", FA_INSSHARE, pt - 0.5, 0));
-      f = FB(PG_M + 1.5, sy + 17, PG_CW - 3, 7, "paid", FA_FINAL, pt + 1, 0);
-      f.textColor = sp.a; d.push(f);
-      /* v1.65.0: barcode is part of the patient stub now (used to float alone
-         at the very bottom, detached from both copies). v1.69.0: variant 1
-         carries NO code — a clean contact + keep-note line instead. */
-      ly = footY - 20;
-      if (sp.v !== 1) {
-        lw = PG_CW * 0.40; lx = PG_M + PG_CW - lw;
-        d.push(BARCODE(lx, ly, lw, 14));
-        d.push(L(lx, ly + 14.5, lw, 4, FA_BARCODE, 8, false, 1));
-        d.push(F(PG_M, ly + 1, PG_CW * 0.52, 6, "clinicphone", FA_PHONE, 8.5, 0));
-        d.push(F(PG_M, ly + 8, PG_CW * 0.52, 6, "clinicaddr", "نشانی: ", 8.5, 0));
-      } else {
-        d.push(F(PG_M, ly + 1, PG_CW * 0.60, 6, "clinicphone", FA_PHONE, 8.5, 0));
-        d.push(F(PG_M, ly + 8, PG_CW * 0.60, 6, "clinicaddr", "نشانی: ", 8.5, 0));
-        d.push(LC(PG_M + PG_CW * 0.62, ly + 1, PG_CW * 0.38, 6, FA_KEEP, 8.5, false, 2, sp.a));
-      }
-      break;
-
-    /* ---------------- 9 — دو بلوکی ------------------------------------- */
-    default:
-      if (sp.v === 0)      y = hdrBand(d, FA_CLINIC, sp.a, true, "");
-      else if (sp.v === 1) y = hdrPlain(d, FA_CLINIC, 18, true, 0.8);
-      else                 y = hdrCenterLogo(d, FA_CLINIC, 17, true, 0.6);
-      gw = PG_CW / 2 - 3; lx2 = PG_M; rx = PG_M + gw + 6; bh = 38;
-      d.push(TINT(rx, y, gw, bh, sp.t, sp.a, 0.35, 1.5));
-      d.push(BAND(rx, y, gw, 6.5, sp.a));
-      d.push(LC(rx + 2, y + 0.6, gw - 4, 5, "مشخصات بیمار", 9, true, 0, "#ffffff"));
-      ry = y + 8;
-      d.push(FB(rx + 2, ry, gw - 4, 6.5, "fullName", FA_FULL, pt - 0.5, 0)); ry += 7;
-      d.push(F (rx + 2, ry, gw - 4, 6.5, "nationalCode", FA_NID, pt - 0.5, 0)); ry += 7;
-      d.push(F (rx + 2, ry, gw - 4, 6.5, "birthDate", FA_BIRTH, pt - 0.5, 0)); ry += 7;
-      d.push(F (rx + 2, ry, gw - 4, 6.5, "mobile", FA_PHONE, pt - 0.5, 0));
-      d.push(TINT(lx2, y, gw, bh, sp.t, sp.a, 0.35, 1.5));
-      d.push(BAND(lx2, y, gw, 6.5, sp.a));
-      d.push(LC(lx2 + 2, y + 0.6, gw - 4, 5, "اطلاعات پذیرش", 9, true, 0, "#ffffff"));
-      ly2 = y + 8;
-      d.push(FB(lx2 + 2, ly2, gw - 4, 6.5, "receiptNo", FA_RECEIPT, pt - 0.5, 0)); ly2 += 7;
-      d.push(F (lx2 + 2, ly2, gw - 4, 6.5, "date", FA_DATE, pt - 0.5, 0)); ly2 += 7;
-      d.push(F (lx2 + 2, ly2, gw - 4, 6.5, "shift", FA_SHIFT, pt - 0.5, 0)); ly2 += 7;
-      d.push(F (lx2 + 2, ly2, gw - 4, 6.5, "doctor", FA_DOCTOR, pt - 0.5, 0));
-      y += bh + 4;
-      c = PG_CW / 3;
-      d.push(F(PG_M + 2 * c, y, c - 2, 7, "insurance", FA_INS, pt, 0));
-      d.push(F(PG_M +     c, y, c - 2, 7, "suppInsurance", FA_SUPP, pt, 0));
-      d.push(F(PG_M        , y, c - 2, 7, "patientType", FA_PTYPE, pt, 0));
-      y += 9;
-      var reserve9 = (sp.v === 0) ? 24 : (sp.v === 1) ? 36 : 32;
-      y = servicesBlock(d, y, pt, sp.s, sp.hf, sp.bw, sp.rh, reserve9, true, footY);
-      if (sp.v === 0)      totalsBar(d, footY - 22, pt, sp.a);
-      else if (sp.v === 1) totalsLadder(d, footY - 34, pt, sp.a);
-      else                 totalsBox(d, footY - 31, pt, sp.t, sp.a, sp.a);
-      if (sp.v === 0)      footBarcode(d, footY + 3);
-      else if (sp.v === 1) footCentered(d, footY + 3);
-      else                 footClean(d, footY + 2, sp.a);
-      break;
+  /* Section 1 — clinic header (centered name + address + phone).            */
+  /* hdrMode: 0 plain, 1 gray band behind the name, 2 double rule below.     */
+  /* photo: a small patient-photo box tucked into the top-right corner.      */
+  function medHeader(d, x, y, w, pt, hdrMode, photo) {
+    var pw = 15.0, ph = 18.0, tw = w;
+    if (photo) tw = w - pw - 3.0;
+    var yy = y + 0.8, namePt = pt + 3.0;
+    if (hdrMode === 1 && !photo) {
+      d.push(BAND(x, y + 0.4, w, 7.0, R_SHADE));
+      d.push(L(x + 1, y + 0.7, w - 2, 6.2, FA_CLINIC, namePt, true, 1));
+      yy = y + 0.4 + 7.0 + 0.6;
+    } else {
+      d.push(L(x, yy, tw, 6.4, FA_CLINIC, namePt, true, 1)); yy += 7.0;
     }
+    d.push(F(x, yy, tw, 4.4, "clinicaddr",  FA_ADDR,  pt - 2.0, 1)); yy += 5.0;
+    d.push(F(x, yy, tw, 4.2, "clinicphone", FA_PHONE, pt - 2.0, 1));
+    if (photo) d.push(PHOTO(x + w - pw, y + 0.8, pw, ph));
+    var bottom = y + (photo ? 19.0 : 18.0);
+    d.push(HL(x, bottom, w, 0.3));
+    if (hdrMode === 2 && !photo) { d.push(HL(x, bottom + 1.3, w, 0.3)); bottom += 1.3; }
+    return bottom;
+  }
 
-    /* silence unused-var linters in ES5 strict mode */
-    pwB = PG_W; phB = PG_H; if (pwB && phB) { /* noop */ }
+  /* Section 2 — wide, short barcode (centered) + divider rule. */
+  function medBarcode(d, x, y, w) {
+    var bcW = w * 0.82, bcH = 11.0;
+    d.push(BARCODE(x + (w - bcW) / 2.0, y + 0.5, bcW, bcH));
+    var bottom = y + bcH + 1.5;
+    d.push(HL(x, bottom, w, 0.3));
+    return bottom;
+  }
+
+  /* Section 3 — document title (bold, centered) + divider rule. */
+  function medTitle(d, x, y, w, pt, title) {
+    d.push(L(x, y + 0.4, w, 6.0, title, pt + 2.0, true, 1));
+    var bottom = y + 7.5;
+    d.push(HL(x, bottom, w, 0.3));
+    return bottom;
+  }
+
+  /* Section 4 — the ruled info box: 6 rows × 2 columns, split by a center   */
+  /* vertical line and separated by horizontal rules. The last row leaves its */
+  /* bottom rule to the services table's top border. Right cell = first       */
+  /* (right-most) field; rows a & c carry two concatenated fields in one cell.*/
+  function medInfo(d, x, y, w, rH, pt, bw) {
+    var half = w / 2.0, vx = x + half, fh = rH - 0.6;
+    var RR = x + w - 1.0, LR = x + half - 1.0, cy = y;
+    function vline() { d.push(VL(vx, cy, rH, bw)); }
+    function rule()  { cy += rH; d.push(HL(x, cy, w, bw)); }
+    function r1(f, p, b) { putF(d, x + half + 1.0, cy + 0.3, half - 2.0, fh, f, p, pt, b, 0); }
+    function l1(f, p, b) { putF(d, x + 1.0, cy + 0.3, half - 2.0, fh, f, p, pt, b, 0); }
+
+    /* a: تاریخ نوبت: {apptdate} {appttime}  |  نوبت: {queue} */
+    vline();
+    var sw = half * 0.50, pw2 = half * 0.28, g = 1.0;
+    putF(d, RR - sw, cy + 0.3, sw, fh, "apptdate", FA_APPT, pt, true, 0);
+    putF(d, RR - sw - g - pw2, cy + 0.3, pw2, fh, "appttime", "", pt, false, 0);
+    l1("queue", FA_QUEUE, false);
+    rule();
+    /* b: کد ملی: {nid}  |  بارکد: {barcode} */
+    vline(); r1("nid", FA_NID, true); l1("barcode", FA_BARCODE, false); rule();
+    /* c: بیمه پایه: {ins}  |  مکمل: {supp} {supp_percent} */
+    vline(); r1("ins", FA_BASEINS, false);
+    sw = half * 0.52; pw2 = half * 0.30; g = 1.0;
+    putF(d, LR - sw, cy + 0.3, sw, fh, "supp", FA_SUPP, pt, false, 0);
+    putF(d, LR - sw - g - pw2, cy + 0.3, pw2, fh, "supp_percent", "", pt, false, 0);
+    rule();
+    /* d: نام بیمار: {full}  |  سن: {age} */
+    vline(); r1("full", FA_FULL, true); l1("age", FA_AGE, false); rule();
+    /* e: دکتر: {doctor}  |  کد نظام پزشکی: {doctorcode} */
+    vline(); r1("doctor", FA_DOCTOR, false); l1("doctorcode", FA_DOCCODE, false); rule();
+    /* f: کد تخصص: {specialtycode}  |  شرح تخصص: {specialty}   (no bottom rule) */
+    vline(); r1("specialtycode", FA_SPECCODE, false); l1("specialty", FA_SPECIALTY, false);
+    cy += rH;
+    return cy;
+  }
+  /* Section 6 — financial section. mode 0: 4 rows (a 2col, b 2col, c 1col,  */
+  /* d 2col); mode 1: full (adds سهم بیمار / مبلغ نهایی / سهم بیمه پایه);     */
+  /* mode 2: dual-block — two side-by-side sub-boxes with gray caption strips.*/
+  /* Ends with a full-width rule dividing financial from e-prescription.     */
+  function medFinancial(d, x, y, w, rH, pt, bw, mode) {
+    var half = w / 2.0, vx = x + half, fh = rH - 0.6, cy = y;
+    if (mode === 2) {
+      var gap = 3.0, bw2 = (w - gap) / 2.0, lx = x, rx = x + bw2 + gap, capH = 5.0;
+      var iy = y + capH;
+      d.push(BAND(lx, y, bw2, capH, R_SHADE));
+      d.push(L(lx + 1, y + 0.4, bw2 - 2, capH - 0.6, FA_PAYLBL, pt - 0.5, true, 1));
+      d.push(BAND(rx, y, bw2, capH, R_SHADE));
+      d.push(L(rx + 1, y + 0.4, bw2 - 2, capH - 0.6, FA_SHARELBL, pt - 0.5, true, 1));
+      /* left block: paid / total / discount */
+      putF(d, lx + 1, iy + 0.3, bw2 - 2, fh, "paid", FA_PAID, pt, true, 0);
+      d.push(HL(lx, iy + rH, bw2, bw));
+      putF(d, lx + 1, iy + rH + 0.3, bw2 - 2, fh, "total", FA_TOTAL, pt, false, 0);
+      d.push(HL(lx, iy + 2 * rH, bw2, bw));
+      putF(d, lx + 1, iy + 2 * rH + 0.3, bw2 - 2, fh, "discount", FA_DISCOUNT, pt, false, 0);
+      /* right block: insshare / supppay / pos / cash */
+      putF(d, rx + 1, iy + 0.3, bw2 - 2, fh, "insshare", FA_INSSHARE, pt, false, 0);
+      d.push(HL(rx, iy + rH, bw2, bw));
+      putF(d, rx + 1, iy + rH + 0.3, bw2 - 2, fh, "supppay", FA_SUPPPAY, pt, false, 0);
+      d.push(HL(rx, iy + 2 * rH, bw2, bw));
+      putF(d, rx + 1, iy + 2 * rH + 0.3, bw2 - 2, fh, "pos", FA_POS, pt, false, 0);
+      d.push(HL(rx, iy + 3 * rH, bw2, bw));
+      putF(d, rx + 1, iy + 3 * rH + 0.3, bw2 - 2, fh, "cash", FA_CASH, pt, true, 0);
+      var bottom = y + capH + 4 * rH;
+      d.push(RECT(lx, y, bw2, capH + 4 * rH, bw, 0));
+      d.push(RECT(rx, y, bw2, capH + 4 * rH, bw, 0));
+      d.push(HL(x, bottom, w, bw));                 /* fin/epres divider */
+      return bottom;
+    }
+    function vline() { d.push(VL(vx, cy, rH, bw)); }
+    function rule()  { cy += rH; d.push(HL(x, cy, w, bw)); }
+    function r1(f, p, b) { putF(d, x + half + 1.0, cy + 0.3, half - 2.0, fh, f, p, pt, b, 0); }
+    function l1(f, p, b) { putF(d, x + 1.0, cy + 0.3, half - 2.0, fh, f, p, pt, b, 0); }
+    function row2(f1, p1, f2, p2, b1, b2) { vline(); r1(f1, p1, b1); l1(f2, p2, b2); rule(); }
+    function row1(f, p, b) { putF(d, x + 1.0, cy + 0.3, w - 2.0, fh, f, p, pt, b, 0); rule(); }
+    row2("paid", FA_PAID, "total", FA_TOTAL, true, false);                 /* a */
+    row2("insshare", FA_INSSHARE, "supppay", FA_SUPPPAY, false, false);     /* b */
+    row1("discount", FA_DISCOUNT, false);                                   /* c (full width) */
+    row2("pos", FA_POS, "cash", FA_CASH, false, false);                     /* d */
+    if (mode === 1) {
+      row2("patientshare", FA_PATSHARE, "finaltotal", FA_FINAL, false, true); /* e */
+      row1("basepay", "سهم بیمه پایه: ", false);                              /* f */
+    }
+    return cy;
+  }
+
+  /* Sections 7 & 8 — e-prescription + referral (full-width ruled rows, the  */
+  /* last one leaving its bottom rule to the outer box border).              */
+  function medEpresReferral(d, x, y, w, rH, pt, bw) {
+    var fh = rH - 0.6, cy = y;
+    putF(d, x + 1.0, cy + 0.3, w - 2.0, fh, "eprescription", FA_EPRESC, pt, false, 0);
+    cy += rH; d.push(HL(x, cy, w, bw));
+    putF(d, x + 1.0, cy + 0.3, w - 2.0, fh, "referralno", FA_REFERRAL, pt, false, 0);
+    cy += rH;
+    return cy;
+  }
+
+  /* Sections 9 / 10 / 11 — below the box: پذیرش | صندوق , ش.ص , print ts.   */
+  function medBelow(d, x, y, w, pt) {
+    var fh = 5.5, gap = 2.2, half = w / 2.0;
+    d.push(HL(x, y, w, 0.25));
+    putF(d, x + half + 1.0, y + 1.0, half - 2.0, fh, "receptionist", FA_RECEPTION, pt - 1.0, false, 0);
+    putF(d, x + 1.0, y + 1.0, half - 2.0, fh, "cashier", FA_CASHIER, pt - 1.0, false, 0);
+    y += fh + gap;
+    putF(d, x + 1.0, y, w - 2.0, fh, "scnum", FA_SC, pt - 1.0, false, 0);
+    y += fh + gap;
+    var sw = w * 0.30, pw2 = w * 0.22, g = 1.0;
+    putF(d, x + w - 1.0 - sw, y, sw, fh, "date", FA_PRINTTS, pt - 1.0, false, 0);
+    putF(d, x + w - 1.0 - sw - g - pw2, y, pw2, fh, "time", " ساعت: ", pt - 1.0, false, 0);
+    y += fh + gap;
+    return y;
+  }
+
+  /* Family 8 — compact tear-off: a rule + a mini «نسخهٔ بیمار» stub (name /  */
+  /* receipt / total / insshare / paid). No second barcode: the main receipt  */
+  /* already carries the one deterministic Code128 in section 2.              */
+  function medStub(d, x, y, w, pt) {
+    d.push(HL(x, y, w, 0.3));
+    d.push(L(x, y + 0.6, w, 4, FA_TEAR, pt - 1.0, false, 1));
+    y += 6.0;
+    d.push(LC(x, y, w, 6, FA_STUB, pt + 1.0, true, 1, R_INK));
+    y += 7.0;
+    var rH = 5.0, fh = 4.4, half = w / 2.0;
+    d.push(RECT(x, y, w, 3 * rH, 0.3, 0));
+    d.push(VL(x + half, y, 3 * rH, 0.3));
+    putF(d, x + half + 1.0, y + 0.3, half - 2.0, fh, "full", FA_FULL, pt - 1.0, true, 0);
+    putF(d, x + 1.0, y + 0.3, half - 2.0, fh, "receiptNo", FA_RECEIPT, pt - 1.0, false, 0);
+    d.push(HL(x, y + rH, w, 0.3));
+    putF(d, x + half + 1.0, y + rH + 0.3, half - 2.0, fh, "total", FA_TOTAL, pt - 1.0, false, 0);
+    putF(d, x + 1.0, y + rH + 0.3, half - 2.0, fh, "insshare", FA_INSSHARE, pt - 1.0, false, 0);
+    d.push(HL(x, y + 2 * rH, w, 0.3));
+    d.push(FB(x + 1.0, y + 2 * rH + 0.3, w - 2.0, fh, "paid", FA_FINAL, pt, 0));
+    y += 3 * rH + 2.0;
+    d.push(HL(x + w * 0.55, y, w * 0.45, 0.3));
+    d.push(L(x + w * 0.55, y + 0.4, w * 0.45, 4, "امضا و مهر صندوق", pt - 2.0, false, 1));
+    return y + 6.0;
+  }
+
+  /* Family 3 — sidebar: a narrow left panel (logo + clinic identity +       */
+  /* barcode) and a main column carrying the title + the ruled receipt box +  */
+  /* below lines.                                                             */
+  function renderSidebar(d, sp, pt, rH, bw, svcH, title) {
+    var sbW = 42.0, sbX = R_M, mainX = sbX + sbW + 4.0, mainW = R_CW - sbW - 4.0;
+    if (sp.fr) d.push(FRAME(PG_W, PG_H, FR_M, R_INK, 0.3));
+    /* sidebar panel: sections 1 (clinic header) + 2 (barcode) */
+    var sbTop = R_M, sy = sbTop + 1.2;
+    d.push(LOGO(sbX + (sbW - 22.0) / 2.0, sy, 22.0, 22.0)); sy += 24.0;
+    d.push(L(sbX + 1.0, sy, sbW - 2.0, 8.0, FA_CLINIC, pt + 1.0, true, 1)); sy += 9.0;
+    d.push(F(sbX + 1.0, sy, sbW - 2.0, 10.0, "clinicaddr", FA_ADDR, pt - 2.0, 1)); sy += 11.0;
+    d.push(F(sbX + 1.0, sy, sbW - 2.0, 5.0, "clinicphone", FA_PHONE, pt - 2.0, 1)); sy += 6.0;
+    d.push(HL(sbX + 1.0, sy, sbW - 2.0, 0.3)); sy += 3.0;
+    var bcH = 12.0;
+    d.push(BARCODE(sbX + 2.0, sy, sbW - 4.0, bcH));
+    var sbBottom = sy + bcH + 2.0;
+    d.push(RECT(sbX, sbTop, sbW, sbBottom - sbTop, bw, 0));
+    /* main column: section 3 title + sections 4..8 box + sections 9..11 */
+    var mx = mainX, mw = mainW, boxTop = R_M, y = boxTop + 1.2;
+    d.push(L(mx, y, mw, 6.0, title, pt + 2.0, true, 1)); y += 7.5;
+    d.push(HL(mx, y, mw, 0.3)); y += 2.0;
+    y = medInfo(d, mx, y, mw, rH, pt, bw);
+    d.push(SERVICES(mx, y, mw, svcH, pt - 0.5, sp.s, 0, bw, rH - 1.0, rH - 0.8));
+    y += svcH;
+    y = medFinancial(d, mx, y, mw, rH, pt, bw, 0);
+    y = medEpresReferral(d, mx, y, mw, rH, pt, bw);
+    d.push(RECT(mx, boxTop, mw, y - boxTop, bw, 0));
+    medBelow(d, mx, y + 2.0, mw, pt);
+  }
+
+  /* ===================== renderReceipt — one medical receipt ============== */
+  function renderReceipt(d, sp) {
+    var fam = sp.f;
+    var pt = (fam === 2 || fam === 7) ? 9.0 : (fam === 8) ? 8.5 : 9.5;
+    var rH = sp.rh, bw = sp.bw;
+    var svcH = (fam === 2 || fam === 7) ? 40.0 : (fam === 3) ? 38.0
+            : (fam === 8) ? 30.0 : (fam === 5) ? 32.0 : 34.0;
+    /* v1.95: variants within each family get distinct service-table heights */
+    if (sp.v === 1) svcH += 2.0;
+    else if (sp.v === 2) svcH += 4.0;
+    var finMode = (fam === 7) ? 1 : (fam === 9) ? 2 : 0;
+    var photo = (fam === 6), sidebar = (fam === 3), tearoff = (fam === 8), shadeBars = (fam === 5);
+    var svcHdr = sp.hf; if (fam === 4) svcHdr = 0;
+    var base = (fam === 1 || fam === 5) ? 1 : (fam === 2) ? 2 : 0;
+    var hdrMode = (base + sp.v) % 3;
+    if (fam === 4) hdrMode = 0;                  /* line-art: plain header, hairline */
+    if (photo && hdrMode === 1) hdrMode = 2;     /* never a gray band over the photo */
+
+    var title = (sp.v === 0) ? FA_DOC_REC : (sp.v === 1) ? FA_INS_REC : FA_DOC_BOTH;
+    if (sidebar) { renderSidebar(d, sp, pt, rH, bw, svcH, title); return; }
+
+    var x = R_M, w = R_CW, boxTop = R_M, y = boxTop + 1.2;
+    if (sp.fr) d.push(FRAME(PG_W, PG_H, FR_M, R_INK, 0.3));
+
+    /* 1 clinic header */
+    y = medHeader(d, x, y, w, pt, hdrMode, photo);
+    /* 2 barcode */
+    y = medBarcode(d, x, y, w);
+    /* 3 document title */
+    y = medTitle(d, x, y, w, pt, title);
+
+    /* optional shaded section caption bars (card family) */
+    if (shadeBars) {
+      d.push(BAND(x, y, w, 5.0, R_SHADE));
+      d.push(L(x + 1, y + 0.4, w - 2, 4.4, "مشخصات بیمار", pt - 1.0, true, 1));
+      y += 5.0;
+    }
+    /* 4 ruled info box */
+    y = medInfo(d, x, y, w, rH, pt, bw);
+
+    if (shadeBars) {
+      d.push(BAND(x, y, w, 5.0, R_SHADE));
+      d.push(L(x + 1, y + 0.4, w - 2, 4.4, FA_SVCLIST, pt - 1.0, true, 1));
+      y += 5.0;
+    }
+    /* 5 services table (dynamic, PIT_SERVICES) */
+    d.push(SERVICES(x, y, w, svcH, pt - 0.5, sp.s, svcHdr, bw, rH - 1.0, rH - 0.8));
+    y += svcH;
+
+    if (shadeBars) {
+      d.push(BAND(x, y, w, 5.0, R_SHADE));
+      d.push(L(x + 1, y + 0.4, w - 2, 4.4, "مالی و پرداخت", pt - 1.0, true, 1));
+      y += 5.0;
+    }
+    /* 6 financial section */
+    y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
+    /* 7 e-prescription  +  8 referral */
+    y = medEpresReferral(d, x, y, w, rH, pt, bw);
+
+    /* the ONE bordered box around the whole receipt body (drawn last; content */
+    /* is inset from every edge so the outline never crosses the text) */
+    d.push(RECT(x, boxTop, w, y - boxTop, bw, 0));
+
+    /* 9 / 10 / 11 below the box */
+    y = medBelow(d, x, y + 2.0, w, pt);
+
+    /* compact tear-off stub */
+    if (tearoff) medStub(d, x, y + 2.0, w, pt);
+  }
+
+  function buildTemplate(idx) {
+    if (idx < 0 || idx >= 30) idx = 0;
+    var sp = TPL[idx], d = [];
+    renderReceipt(d, sp);
     return d;
   }
+
+
 
   var ALL = [];
   for (var i = 0; i < 30; i++) {

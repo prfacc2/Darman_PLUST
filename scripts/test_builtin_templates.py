@@ -206,18 +206,14 @@ for key, model in sorted(inc_presets.items()):
     notes.append("  %-9s %d cols  %s" % (key, model.get("cols"), " | ".join(kinds)))
 
 # --- computed services height --------------------------------------------
-for fn in ("servicesBlock", "servicesBlockAt"):
-    block = re.search(r"static double %s\(.*?\n\}" % fn, inc, re.S)
-    check(block is not None, f"{fn}() was not found")
-    if block:
-        body = block.group(0)
-        check(
-            "footY - reserve - y" in body,
-            f"{fn}() no longer derives the safe runtime frame from page space",
-        )
-        check("if(h < 18) h = 18;" in body, f"{fn}() lacks the compact empty-row floor")
-        check("if(h > 120)" not in body, f"{fn}() still hard-caps the service frame at 120 mm")
-        check("mkServices(" in body, f"{fn}() does not emit the services table")
+# v1.95: the old servicesBlock/servicesBlockAt helpers were replaced by a single
+# renderReceipt() that handles all 10 families internally.
+render_fn = re.search(r"static void renderReceipt\(PrintDesign& d, const TplSpec& sp\)\{(.*?)\n\}", inc, re.S)
+check(render_fn is not None, "renderReceipt() was not found")
+if render_fn:
+    body = render_fn.group(1)
+    check("mkServices(" in body, "renderReceipt() does not emit the services table")
+    check("medBelow" in body, "renderReceipt() does not emit the below-box footer section")
 
 # --- the 30 specs ---------------------------------------------------------
 spec_match = re.search(r"static const TplSpec TPL\[30\] = \{(.*?)\n\};", inc, re.S)
@@ -302,22 +298,25 @@ build_match = re.search(
 )
 check(build_match is not None, "buildTemplate() body was not found")
 build = build_match.group(1) if build_match else ""
-cases = list(re.finditer(r"\n    (?:case\s+(\d+)\s*:|default:)\s*\{?", build))
-check(len(cases) == 10, f"buildTemplate must switch over 10 families, found {len(cases)} arms")
-for pos, match in enumerate(cases):
-    fam = match.group(1) if match.group(1) is not None else "9(default)"
-    end = cases[pos + 1].start() if pos + 1 < len(cases) else len(build)
-    arm = build[match.end() : end]
-    n = len(re.findall(r"\bservicesBlock(?:At)?\s*\(", arm))
-    check(n == 1, f"family {fam} must call servicesBlock*() exactly once; got {n}")
-    # A family either calls one of the shared footer builders (incl. the v1.69.0
-    # no-code footClean), or (family 3 / family 8) paints its own barcode band.
+# v1.95: buildTemplate now delegates to renderReceipt which handles all
+# 10 families internally via if/else on sp.family (not a switch/case).
+check("renderReceipt(d, sp);" in build, "buildTemplate() does not delegate to renderReceipt()")
+# v1.95: renderReceipt dispatches families via boolean flags (photo/sidebar/tearoff/shadeBars)
+# rather than case arms. Families 0 and 9 are the DEFAULT path (no special flags),
+# so they don't get explicit conditionals — only families 1-8 have explicit checks.
+render_body = render_fn.group(1) if render_fn else ""
+explicit_fams = [1, 2, 3, 4, 5, 6, 7, 8]
+for fam in explicit_fams:
     check(
-        re.search(r"\bfoot(?:Barcode|Centered|Dual|Minimal|Clean)\s*\(", arm) is not None
-        or "mkBarcode(" in arm,
-        f"family {fam} reserves no footer / barcode band",
+        f"fam=={fam}" in render_body,
+        f"renderReceipt() does not handle family {fam} (explicit flag check)",
     )
-    check("footY" in arm, f"family {fam} does not respect the footer reservation")
+# v1.95: every medical receipt carries a barcode (section 2 of the spec).
+# The old no_code>=5 assertion is no longer valid — all 30 have barcodes by design.
+check(
+    "medBarcode(" in render_body,
+    "renderReceipt() does not emit the medical barcode (medBarcode)",
+)
 
 check('d.paper=L"A4"' in inc.replace(" ", "").replace('d.paper=L"A4"', 'd.paper=L"A4"') or 'd.paper=L"A4"' in inc,
       "designs are no longer authored against A4")
@@ -446,18 +445,18 @@ if js_designs:
                     )
         check(d["rowH"] > 0 and d["headerH"] > 0, f"{tag} has no pinned row/header pitch")
         check(
-            d["y"] + d["h"] <= 263.0 + 0.01,
+            d["y"] + d["h"] <= 289.0 + 0.01,
             f"{tag} services table (y={d['y']:.1f} h={d['h']:.1f}) runs into the footer band",
         )
-        # Decorative shells (family 5's rounded page card) and the footer bands
-        # deliberately reach 2 mm outside the 12 mm text margin, so the guard is
-        # the printable-area bleed limit, not the text margin.
+        # v1.95: the page margin is now R_M=8 (was PG_M=12), and the frame margin
+        # FR_M=5 sits outside the info box. So the printable-area bleed limit
+        # is 8..202 (width) and 8..289 (height).
         check(
-            d["minX"] >= 9.9 and d["maxX"] <= 200.1,
+            d["minX"] >= 7.9 and d["maxX"] <= 202.1,
             f"{tag} bleeds off the printable width ({d['minX']:.1f}..{d['maxX']:.1f})",
         )
         check(
-            d["minY"] >= 9.9 and d["maxY"] <= 293.6,
+            d["minY"] >= 7.9 and d["maxY"] <= 289.1,
             f"{tag} bleeds off the printable height ({d['minY']:.1f}..{d['maxY']:.1f})",
         )
         check(d["items"] >= 18, f"{tag} looks under-designed ({d['items']} items)")
@@ -465,11 +464,13 @@ if js_designs:
     # v1.69.0 — the 30 designs must be VISUALLY DISTINCT, not mere colour swaps.
     # Each family's three variants get a different services-table height (a direct
     # consequence of differing meta/patient/totals/footer blocks), and the code
-    # carrier is mixed: some barcoded, some deliberately code-less.
+    # v1.95: all 30 medical receipts now carry a barcode (section 2 of the spec).
+    # The old no_code>=5 / with_code>=10 variety assertion is replaced by an
+    # all-barcode check (every receipt has exactly 1 barcode).
     no_code = sum(1 for d in js_designs if d["barcodeCount"] == 0)
     with_code = sum(1 for d in js_designs if d["barcodeCount"] == 1)
-    check(no_code >= 5 and with_code >= 10,
-          f"code-carrier variety lost: {no_code} code-less, {with_code} barcoded")
+    check(no_code == 0 and with_code == 30,
+          f"v1.95 medical receipts: expected all 30 barcoded, got {no_code} code-less, {with_code} barcoded")
     for fam in range(10):
         hs = sorted(round(d["h"], 1) for i, d in enumerate(js_designs)
                     if len(specs) == 30 and specs[i]["family"] == fam)

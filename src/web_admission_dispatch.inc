@@ -19,13 +19,16 @@ bool WebAdmission_Available(){
 
 // v1.66.0 SERVERLESS BOOTSTRAP — replaces the old WebAdmission_EnsureHost().
 // Called once at startup (and defensively before the first view): registers
-// the multi-page verb handlers (ping / client.log / client.metrics) and
-// pre-builds both inlined page variants so the first «پذیرش بیمار» click is
-// instant. No sockets, no ports, no loopback host.
+// the multi-page verb handlers (ping / client.log / client.metrics), pre-builds
+// both inlined page variants so the first «پذیرش بیمار» click is instant, and —
+// v1.95 PERF — pre-warms the shared WebView2 environment so the browser process
+// is already running by the time the user opens the first tab (that launch is
+// the 2-4s black-screen delay the user reported). No sockets, no ports.
 void WebAdmission_Prepare(){
     WebPages_RegisterBuiltins();
     AdmissionInlinePage(false);   // MSHTML variant (no @font-face)
     AdmissionInlinePage(true);    // WebView2 variant (data: URI font)
+    if(WV2_Available()) WV2_PreWarm();   // v1.95: warm the env at launch, not at first tab
 }
 
 HWND WebAdmission_CreateView(HWND parent){
