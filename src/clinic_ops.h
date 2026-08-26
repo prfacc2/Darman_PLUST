@@ -30,7 +30,10 @@ struct CashShift {
     long long income;
     std::wstring status;          // open | closed
     long long startEpoch, endEpoch;
-    CashShift():sectionId(0),subId(0),income(0),startEpoch(0),endEpoch(0){}
+    std::wstring jdate;           // accumulation day (Jalali) the income belongs to
+    long long carryIncome;        // income carried over from a previous same-day shift
+    CashShift():sectionId(0),subId(0),income(0),startEpoch(0),endEpoch(0),
+                carryIncome(0){}
 };
 
 struct CashScope {

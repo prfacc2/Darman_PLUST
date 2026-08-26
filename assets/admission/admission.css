@@ -5196,6 +5196,7 @@ body.surface-cash .cash-tab:hover{background:rgba(255,255,255,.14);}
 body.surface-cash .cash-tab{
   margin:2px 3px;padding:7px 16px;border:1px solid transparent;border-radius:10px;
   background:transparent;color:#2D3E54;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:'Vazirmatn','Tahoma','Segoe UI',sans-serif;
 }
 body.surface-cash .cash-tab:hover{background:rgba(45,95,230,.08);border-color:#B8C8DC;}
 body.surface-cash .cash-tab.active{
@@ -6528,6 +6529,7 @@ body.surface-portal .portal-panel{
   display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
   position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;overflow:hidden;
   padding:14px 18px 18px;
+  font-family:'Vazirmatn','Tahoma','Segoe UI',sans-serif;
   background:#E8EEF5;
   background:linear-gradient(150deg,#E8EEF5 0%,#DCE6F2 100%);
 }
@@ -6827,27 +6829,18 @@ body.surface-bl .bl-panel{
   display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
   position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;overflow:hidden;
   padding:14px 18px 18px;
+  font-family:'Vazirmatn','Tahoma','Segoe UI',sans-serif;
   background:#E8EEF5;background:linear-gradient(150deg,#E8EEF5 0%,#DCE6F2 100%);
 }
 /* glass top bar */
 .bl-topbar{
   display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
   padding:11px 14px;border-radius:18px;
-  background:linear-gradient(180deg,rgba(221,232,245,.92) 0%,rgba(197,210,229,.86) 100%);
-  border:1px solid #B8C8DC;
-  -webkit-box-shadow:0 2px 6px rgba(16,24,40,.08), 0 16px 36px rgba(220,38,38,.12), inset 0 1px 0 rgba(255,255,255,.92);
-  box-shadow:0 2px 6px rgba(16,24,40,.08), 0 16px 36px rgba(220,38,38,.12), inset 0 1px 0 rgba(255,255,255,.92);
+  background:linear-gradient(180deg,rgba(250,228,230,.94) 0%,rgba(236,200,205,.88) 100%);
+  border:1px solid #E6B8BF;
+  -webkit-box-shadow:0 2px 6px rgba(120,20,40,.10), 0 16px 36px rgba(220,38,38,.16), inset 0 1px 0 rgba(255,255,255,.92);
+  box-shadow:0 2px 6px rgba(120,20,40,.10), 0 16px 36px rgba(220,38,38,.16), inset 0 1px 0 rgba(255,255,255,.92);
 }
-.bl-burger{
-  width:44px;height:44px;-ms-flex:0 0 44px;flex:0 0 44px;margin-left:12px;
-  border-radius:14px;cursor:pointer;border:1px solid #B8C8DC;color:#2D3E54;
-  font-size:20px;line-height:1;
-  background:linear-gradient(180deg,#F8FBFD 0%,#EDF1F7 100%);
-  -webkit-box-shadow:inset 2px 3px 6px rgba(16,24,40,.10), inset -1px -1px 2px rgba(255,255,255,.85);
-  box-shadow:inset 2px 3px 6px rgba(16,24,40,.10), inset -1px -1px 2px rgba(255,255,255,.85);
-  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;
-}
-.bl-burger:hover{color:#dc2626;border-color:#dc2626;}
 .bl-titles{-ms-flex:0 0 auto;flex:0 0 auto;margin-left:12px;}
 .bl-title{font-size:19px;font-weight:900;color:#0A1520;}
 .bl-search-wrap{
@@ -6882,6 +6875,18 @@ body.surface-bl .bl-panel{
   -ms-flex:1 1 160px;flex:1 1 160px;min-width:140px;margin-right:8px;margin-bottom:6px;
 }
 .bl-add-form .btn-primary{height:38px;font-size:13px;font-weight:800;}
+/* v1.95: dedicated full-width «علت مسدودی» reason field (textarea) */
+.bl-reason-row{display:block;margin-bottom:12px;}
+.bl-reason-lbl{display:block;font-size:12.5px;font-weight:800;color:#7a1f2b;margin-bottom:5px;}
+.bl-reason{
+  display:block;width:100%;height:auto;min-height:54px;padding:9px 12px;border-radius:12px;resize:vertical;
+  background:#fff;border:1px solid #E6B8BF;color:#0D1B2A;font-size:13px;line-height:1.6;
+  -webkit-box-shadow:inset 2px 2px 5px rgba(120,20,40,.08);box-shadow:inset 2px 2px 5px rgba(120,20,40,.08);
+}
+.bl-reason:focus{
+  border-color:#dc2626;
+  -webkit-box-shadow:0 0 0 3px rgba(220,38,38,.16);box-shadow:0 0 0 3px rgba(220,38,38,.16);
+}
 .bl-history{
   padding:12px 14px;margin-bottom:12px;border:1px solid #B8C8DC;border-radius:16px;
   background:linear-gradient(180deg,rgba(248,251,253,.92) 0%,rgba(240,244,250,.82) 100%);
@@ -6905,13 +6910,14 @@ body.theme-dark.surface-bl .bl-panel{
   background:#0B0F15;background:linear-gradient(150deg,#0B0F15 0%,#0E131B 100%);
 }
 body.theme-dark .bl-topbar{
-  background:linear-gradient(180deg,rgba(29,37,49,.92) 0%,rgba(21,27,37,.88) 100%);border-color:#2C3645;
-  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.28), 0 16px 36px rgba(220,38,38,.16), inset 0 1px 0 rgba(255,255,255,.06);
-  box-shadow:0 2px 6px rgba(0,0,0,.28), 0 16px 36px rgba(220,38,38,.16), inset 0 1px 0 rgba(255,255,255,.06);
+  background:linear-gradient(180deg,rgba(40,18,22,.92) 0%,rgba(28,12,15,.88) 100%);border-color:#5b2230;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(220,38,38,.22), inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(220,38,38,.22), inset 0 1px 0 rgba(255,255,255,.06);
 }
-body.theme-dark .bl-burger{background:#151B25;border-color:#2C3645;color:#C2CCDC;-webkit-box-shadow:inset 2px 3px 6px rgba(0,0,0,.30);box-shadow:inset 2px 3px 6px rgba(0,0,0,.30);}
-body.theme-dark .bl-burger:hover{color:#fca5a5;border-color:#dc2626;}
-body.theme-dark .bl-title{color:#E8EEF6;}
+body.theme-dark .bl-title{color:#FDE8EC;}
+body.theme-dark .bl-reason-lbl{color:#fca5a5;}
+body.theme-dark.surface-bl .bl-add-form .bl-reason{background:#151B25;border:1px solid #3B1416;color:#E8EEF6;-webkit-box-shadow:inset 2px 2px 5px rgba(0,0,0,.30);box-shadow:inset 2px 2px 5px rgba(0,0,0,.30);}
+body.theme-dark.surface-bl .bl-add-form .bl-reason:focus{border-color:#dc2626;-webkit-box-shadow:0 0 0 3px rgba(220,38,38,.22);box-shadow:0 0 0 3px rgba(220,38,38,.22);}
 body.theme-dark .bl-search{background:#181F28;border-color:#2C3645;color:#E8EEF6;}
 body.theme-dark .bl-search:focus{border-color:#dc2626;-webkit-box-shadow:0 0 0 3px rgba(220,38,38,.22);box-shadow:0 0 0 3px rgba(220,38,38,.22);}
 body.theme-dark .bl-add-form{background:linear-gradient(180deg,rgba(29,37,49,.92) 0%,rgba(21,27,37,.85) 100%);border-color:#2C3645;}
@@ -6928,13 +6934,14 @@ body.theme-neon.surface-bl .bl-panel{
   background:#0A0E1A;background:linear-gradient(150deg,#0A0E1A 0%,#080812 100%);
 }
 body.theme-neon .bl-topbar{
-  background:linear-gradient(180deg,rgba(26,34,56,.92) 0%,rgba(18,24,40,.88) 100%);border-color:#2A3458;
-  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(255,0,102,.16), inset 0 1px 0 rgba(0,240,255,.10);
-  box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(255,0,102,.16), inset 0 1px 0 rgba(0,240,255,.10);
+  background:linear-gradient(180deg,rgba(42,12,26,.92) 0%,rgba(26,8,18,.88) 100%);border-color:#FF0066;
+  -webkit-box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(255,0,102,.20), inset 0 1px 0 rgba(255,0,102,.14);
+  box-shadow:0 2px 6px rgba(0,0,0,.40), 0 16px 36px rgba(255,0,102,.20), inset 0 1px 0 rgba(255,0,102,.14);
 }
-body.theme-neon .bl-burger{background:#121828;border-color:#2A3458;color:#FF0066;}
-body.theme-neon .bl-burger:hover{color:#FF6A88;border-color:#FF0066;}
-body.theme-neon .bl-title{color:#E0F0FF;}
+body.theme-neon .bl-title{color:#FFD0DC;}
+body.theme-neon .bl-reason-lbl{color:#FF6A88;}
+body.theme-neon.surface-bl .bl-add-form .bl-reason{background:#121828;border:1px solid #2A0A14;color:#E0F0FF;-webkit-box-shadow:inset 2px 2px 5px rgba(0,0,0,.40);box-shadow:inset 2px 2px 5px rgba(0,0,0,.40);}
+body.theme-neon.surface-bl .bl-add-form .bl-reason:focus{border-color:#FF0066;-webkit-box-shadow:0 0 0 3px rgba(255,0,102,.22);box-shadow:0 0 0 3px rgba(255,0,102,.22);}
 body.theme-neon .bl-search{background:#1A2438;border-color:#2A3458;color:#E0F0FF;}
 body.theme-neon .bl-search:focus{border-color:#FF0066;-webkit-box-shadow:0 0 0 3px rgba(255,0,102,.22);box-shadow:0 0 0 3px rgba(255,0,102,.22);}
 body.theme-neon .bl-add-form{background:linear-gradient(180deg,rgba(26,34,56,.92) 0%,rgba(18,24,40,.85) 100%);border-color:#2A3458;}
@@ -6945,3 +6952,260 @@ body.theme-neon.surface-bl .inp{background:#1A2438;border:1px solid #2A3458;colo
 body.theme-neon.surface-bl .tbl thead th{background:#1A2238;color:#E0F0FF;border-color:#2A3458;}
 body.theme-neon.surface-bl .tbl tbody td{color:#E0F0FF;border-color:#2A3458;}
 body.theme-neon.surface-bl .tbl tbody tr:nth-child(even){background:#0E1420;}
+
+/* ==========================================================================
+   v1.95.0 — THEME PARITY GAP FILLS (dark + neon, tools + admission surfaces)
+   The v1.94 dark/neon admission blocks raised the core surfaces to (0,3,1), but
+   the TOOLS surface and several admission sub-elements still fell through to the
+   UNGATED body.surface-{adm,tools} .X rules at (0,2,1). Worse, the v1.90 tools
+   block added body.surface-tools .X rules at (0,2,1)–(0,3,1) that BEAT the older
+   .theme-dark .X / .theme-neon .X rules at (0,2,0), so the tools burger, header
+   title, tile names and drawer rendered LIGHT/BLACK in dark + neon. This block
+   closes every remaining gap at (0,3,1)/(0,4,1):
+     • TOOLS surface: burger, header title, tile name/sub, drawer + items, tiles,
+       cards/heads/titles/icons, inputs, buttons (back/outline/primary/danger),
+       empty hint — full dark + neon.
+     • ADMISSION surface: explicit per-card heads (ins/doc/perf/patient/payment/
+       svc) with semantic accent stripes, per-card bodies, empty-state neon,
+       counter-strip + datetime/sf-cell/rx/tp labels.
+   Palette — dark: card #151B25 · head #1D2531→#151B25 · text #E8EEF6 · accent
+   #3B82F6 · border #2C3645.  neon: card #121828 · head #1A2238→#121828 · text
+   #E0F0FF · accent #00F0FF · border #2A3458. Trident-safe: no var()/calc()/grid/
+   gap/backdrop-filter.
+   ========================================================================== */
+
+/* ===================== DARK — TOOLS surface ===================== */
+body.theme-dark.surface-tools .tools-burger{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);
+  border:1px solid #2C3645;color:#E8EEF6;
+  -webkit-box-shadow:inset 2px 3px 6px rgba(0,0,0,.30);box-shadow:inset 2px 3px 6px rgba(0,0,0,.30);
+}
+body.theme-dark.surface-tools .tools-burger:hover{color:#fff;border-color:#3B82F6;}
+/* header title at (0,4,1) beats the ungated (0,3,1) tools-title */
+body.theme-dark.surface-tools .tools-topbar .tools-title{color:#E8EEF6;}
+body.theme-dark.surface-tools .tools-tile-name{color:#E8EEF6;}
+body.theme-dark.surface-tools .tools-tile-sub{color:#95A3B8;}
+body.theme-dark.surface-tools .tools-tile:hover .tools-tile-name{color:#60A5FA;}
+body.theme-dark.surface-tools .tools-drawer{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);border-left-color:#2C3645;
+}
+body.theme-dark.surface-tools .tools-drawer-head,
+body.theme-dark.surface-tools .tools-drawer-search{border-color:#2C3645;}
+body.theme-dark.surface-tools .tools-drawer-title{color:#E8EEF6;}
+body.theme-dark.surface-tools .tools-cat{color:#95A3B8;}
+body.theme-dark.surface-tools .tools-drawer-item{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);border-color:#2C3645;border-right-color:#2C3645;
+}
+body.theme-dark.surface-tools .tools-drawer-item:hover{border-right-color:#3B82F6;background:#181F28;}
+body.theme-dark.surface-tools .tools-dri-tx b{color:#E8EEF6;}
+body.theme-dark.surface-tools .tools-dri-tx small{color:#95A3B8;}
+/* receipt-search glass cards/heads/inputs (beat the ungated body.surface-tools .card) */
+body.theme-dark.surface-tools .card{
+  background:#151B25;border:1px solid #2C3645;color:#E8EEF6;
+  -webkit-box-shadow:0 4px 14px rgba(0,0,0,.34);box-shadow:0 4px 14px rgba(0,0,0,.34);
+}
+body.theme-dark.surface-tools .card-head{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);border-bottom:1px solid #2C3645;
+}
+body.theme-dark.surface-tools .card-title{color:#E8EEF6;}
+body.theme-dark.surface-tools .ct-ico{color:#3B82F6;}
+body.theme-dark.surface-tools .inp,
+body.theme-dark.surface-tools select.inp{
+  background:#181F28;border:1px solid #2C3645;color:#E8EEF6;
+}
+body.theme-dark.surface-tools .inp:hover{border-color:#3B5875;background:#1E2632;}
+body.theme-dark.surface-tools .inp:focus{
+  border-color:#3B82F6;background:#181F28;
+  -webkit-box-shadow:0 0 0 3px rgba(59,130,246,.22);box-shadow:0 0 0 3px rgba(59,130,246,.22);
+}
+body.theme-dark.surface-tools .tools-search-wrap .inp:focus{
+  border-color:#3B82F6;background:#181F28;
+  -webkit-box-shadow:0 0 0 3px rgba(59,130,246,.22);box-shadow:0 0 0 3px rgba(59,130,246,.22);
+}
+/* back button (#toolsBack / #rcBack) + outline/print/erx family on the tools surface */
+body.theme-dark.surface-tools .btn-outline,
+body.theme-dark.surface-tools .btn-print,
+body.theme-dark.surface-tools .btn-erx{
+  background:#1D2531;border:1px solid #2C3645;color:#C2CCDC;
+}
+body.theme-dark.surface-tools .btn-outline:hover,
+body.theme-dark.surface-tools .btn-print:hover,
+body.theme-dark.surface-tools .btn-erx:hover{border-color:#3B82F6;color:#E8EEF6;background:#222C3B;}
+body.theme-dark.surface-tools .btn-primary{
+  border:1px solid #2563eb;color:#fff;
+  background:linear-gradient(180deg,#3B82F6 0%,#1d4ed8 100%);
+}
+body.theme-dark.surface-tools .btn-primary:hover{background:linear-gradient(180deg,#60a5fa 0%,#2563eb 100%);}
+body.theme-dark.surface-tools .btn-danger{
+  border:1px solid #7f1d1d;color:#fca5a5;
+  background:linear-gradient(180deg,#3B1416 0%,#2A0F12 100%);
+}
+body.theme-dark.surface-tools .btn-danger:hover{color:#fff;border-color:#dc2626;background:linear-gradient(180deg,#dc2626 0%,#991b1b 100%);}
+body.theme-dark.surface-tools .tools-empty{color:#95A3B8;}
+body.theme-dark.surface-tools .rc-side-title,
+body.theme-dark.surface-tools .rc-side .fld > span{color:#95A3B8;}
+body.theme-dark.surface-tools .rc-ticks .chk{color:#C2CCDC;}
+body.theme-dark.surface-tools .rc-page-lbl{color:#C2CCDC;}
+
+/* ===================== NEON — TOOLS surface ===================== */
+body.theme-neon.surface-tools .tools-burger{
+  background:linear-gradient(180deg,#1A2238 0%,#121828 100%);
+  border:1px solid #2A3458;color:#00F0FF;
+  -webkit-box-shadow:inset 0 1px 0 rgba(0,240,255,.10);box-shadow:inset 0 1px 0 rgba(0,240,255,.10);
+}
+body.theme-neon.surface-tools .tools-burger:hover{color:#40FFFF;border-color:#00F0FF;}
+body.theme-neon.surface-tools .tools-topbar .tools-title{color:#E0F0FF;}
+body.theme-neon.surface-tools .tools-tile-name{color:#E0F0FF;}
+body.theme-neon.surface-tools .tools-tile-sub{color:#8090B0;}
+body.theme-neon.surface-tools .tools-tile:hover .tools-tile-name{color:#00F0FF;}
+body.theme-neon.surface-tools .tools-drawer{
+  background:linear-gradient(180deg,#1A2238 0%,#121828 100%);border-left-color:#2A3458;
+}
+body.theme-neon.surface-tools .tools-drawer-head,
+body.theme-neon.surface-tools .tools-drawer-search{border-color:#2A3458;}
+body.theme-neon.surface-tools .tools-drawer-title{color:#E0F0FF;}
+body.theme-neon.surface-tools .tools-cat{color:#8090B0;}
+body.theme-neon.surface-tools .tools-drawer-item{
+  background:linear-gradient(180deg,#1A2238 0%,#121828 100%);border-color:#2A3458;border-right-color:#2A3458;color:#B0C4E0;
+}
+body.theme-neon.surface-tools .tools-drawer-item:hover{border-right-color:#00F0FF;background:rgba(0,240,255,.10);}
+body.theme-neon.surface-tools .tools-dri-tx b{color:#E0F0FF;}
+body.theme-neon.surface-tools .tools-dri-tx small{color:#8090B0;}
+body.theme-neon.surface-tools .card{
+  background:#121828;border:1px solid #2A3458;color:#E0F0FF;
+  -webkit-box-shadow:0 4px 14px rgba(0,0,0,.40),0 0 0 1px rgba(0,240,255,.06);box-shadow:0 4px 14px rgba(0,0,0,.40),0 0 0 1px rgba(0,240,255,.06);
+}
+body.theme-neon.surface-tools .card-head{
+  background:linear-gradient(180deg,#1A2238 0%,#121828 100%);border-bottom:1px solid #2A3458;
+  -webkit-box-shadow:inset 0 2px 0 #00F0FF;box-shadow:inset 0 2px 0 #00F0FF;
+}
+body.theme-neon.surface-tools .card-title{color:#E0F0FF;}
+body.theme-neon.surface-tools .ct-ico{color:#00F0FF;}
+body.theme-neon.surface-tools .inp,
+body.theme-neon.surface-tools select.inp{
+  background:#1A2438;border:1px solid #2A3458;color:#E0F0FF;
+}
+body.theme-neon.surface-tools .inp:hover{border-color:#00F0FF;background:#1A2438;}
+body.theme-neon.surface-tools .inp:focus{
+  border-color:#00F0FF;
+  -webkit-box-shadow:0 0 0 3px rgba(0,240,255,.22);box-shadow:0 0 0 3px rgba(0,240,255,.22);
+}
+body.theme-neon.surface-tools .tools-search-wrap .inp:focus{
+  border-color:#00F0FF;
+  -webkit-box-shadow:0 0 0 3px rgba(0,240,255,.22);box-shadow:0 0 0 3px rgba(0,240,255,.22);
+}
+body.theme-neon.surface-tools .btn-outline,
+body.theme-neon.surface-tools .btn-print,
+body.theme-neon.surface-tools .btn-erx{
+  background:#1A2238;border:1px solid #2A3458;color:#B0C4E0;
+}
+body.theme-neon.surface-tools .btn-outline:hover,
+body.theme-neon.surface-tools .btn-print:hover,
+body.theme-neon.surface-tools .btn-erx:hover{border-color:#00F0FF;color:#00F0FF;background:rgba(0,240,255,.10);}
+body.theme-neon.surface-tools .btn-primary{
+  color:#0A0E1A;border:1px solid #00F0FF;font-weight:800;
+  background:linear-gradient(180deg,#00F0FF 0%,#0080FF 100%);
+}
+body.theme-neon.surface-tools .btn-primary:hover{background:linear-gradient(180deg,#40FFFF 0%,#00A0FF 100%);}
+body.theme-neon.surface-tools .btn-danger{
+  color:#fff;border:1px solid #FF0066;
+  background:linear-gradient(180deg,#FF0066 0%,#CC0044 100%);
+}
+body.theme-neon.surface-tools .btn-danger:hover{background:linear-gradient(180deg,#FF2277 0%,#DD1166 100%);}
+body.theme-neon.surface-tools .tools-empty{color:#8090B0;}
+body.theme-neon.surface-tools .rc-side-title,
+body.theme-neon.surface-tools .rc-side .fld > span{color:#8090B0;}
+body.theme-neon.surface-tools .rc-ticks .chk{color:#B0C4E0;}
+body.theme-neon.surface-tools .rc-page-lbl{color:#B0C4E0;}
+
+/* ===================== DARK — ADMISSION gap fills ===================== */
+/* explicit per-card heads with semantic accent stripes (mirrors the neon block) */
+body.theme-dark.surface-adm .patient-card .card-head{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);
+  -webkit-box-shadow:inset 0 3px 0 #3B82F6,inset -3px 0 0 #3B82F6;box-shadow:inset 0 3px 0 #3B82F6,inset -3px 0 0 #3B82F6;
+}
+body.theme-dark.surface-adm .patient-card .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .patient-card .ct-ico{color:#3B82F6;}
+body.theme-dark.surface-adm .ins-card .card-head{
+  background:linear-gradient(180deg,#10241a 0%,#151B25 100%);
+  -webkit-box-shadow:inset 0 3px 0 #10B981,inset -3px 0 0 #10B981;box-shadow:inset 0 3px 0 #10B981,inset -3px 0 0 #10B981;
+}
+body.theme-dark.surface-adm .ins-card .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .ins-card .ct-ico{color:#10B981;}
+body.theme-dark.surface-adm .doc-card .card-head,
+body.theme-dark.surface-adm .perf-card .card-head{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);
+  -webkit-box-shadow:inset 0 3px 0 #3B82F6,inset -3px 0 0 #3B82F6;box-shadow:inset 0 3px 0 #3B82F6,inset -3px 0 0 #3B82F6;
+}
+body.theme-dark.surface-adm .doc-card .card-title,
+body.theme-dark.surface-adm .perf-card .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .doc-card .ct-ico,
+body.theme-dark.surface-adm .perf-card .ct-ico{color:#3B82F6;}
+body.theme-dark.surface-adm .payment-card .card-head{
+  background:linear-gradient(180deg,#10241a 0%,#151B25 100%);
+  -webkit-box-shadow:inset 0 3px 0 #10B981,inset -3px 0 0 #10B981;box-shadow:inset 0 3px 0 #10B981,inset -3px 0 0 #10B981;
+}
+body.theme-dark.surface-adm .payment-card .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .svc-card > .card-head{
+  background:linear-gradient(180deg,#1D2531 0%,#151B25 100%);
+  -webkit-box-shadow:inset 0 3px 0 #6B7280,inset -3px 0 0 #6B7280;box-shadow:inset 0 3px 0 #6B7280,inset -3px 0 0 #6B7280;
+}
+body.theme-dark.surface-adm .svc-card > .card-head .card-title{color:#E8EEF6;}
+body.theme-dark.surface-adm .svc-card > .card-head .ct-ico{color:#9CA3AF;}
+/* explicit per-card bodies (robustness vs any ungated .X-card rule) */
+body.theme-dark.surface-adm .ins-card,
+body.theme-dark.surface-adm .doc-card,
+body.theme-dark.surface-adm .perf-card,
+body.theme-dark.surface-adm .svc-card,
+body.theme-dark.surface-adm .payment-card,
+body.theme-dark.surface-adm .status-card{background:#151B25;border-color:#2C3645;}
+/* empty services state (already partly covered at .theme-dark .svc-empty; surface-scoped here) */
+body.theme-dark.surface-adm .svc-empty{
+  border-color:#2a3a4f;background:#101924;color:#C2CCDC;
+}
+body.theme-dark.surface-adm .svc-empty b{color:#E8EEF6;}
+body.theme-dark.surface-adm .svc-empty .se-sub{color:#95A3B8;}
+/* form / counter labels that had only (0,2,0)–(0,3,0) dark rules beaten by ungated (0,3,0) */
+body.theme-dark.surface-adm .tp-lbl{color:#7fb0f5;}
+body.theme-dark.surface-adm .datetime-card .dt-fld > span{color:#C2CCDC;}
+body.theme-dark.surface-adm .sf-cell span{color:#95A3B8;}
+body.theme-dark.surface-adm .cs-cap{color:#b8cce1;}
+body.theme-dark.surface-adm .cs-val{color:#ecf6ff;}
+body.theme-dark.surface-adm .rx-lbl{color:#95A3B8;}
+body.theme-dark.surface-adm .rx-val{color:#E8EEF6;}
+body.theme-dark.surface-adm .svc-count{color:#95A3B8;}
+
+/* ===================== NEON — ADMISSION gap fills ===================== */
+/* per-card bodies + semantic icons/titles not in the v1.94 neon block */
+body.theme-neon.surface-adm .ins-card,
+body.theme-neon.surface-adm .doc-card,
+body.theme-neon.surface-adm .perf-card,
+body.theme-neon.surface-adm .svc-card,
+body.theme-neon.surface-adm .status-card{background:#121828;border-color:#2A3458;}
+body.theme-neon.surface-adm .ins-card .ct-ico{color:#00FF88;}
+body.theme-neon.surface-adm .payment-card .ct-ico{color:#00FF88;}
+body.theme-neon.surface-adm .svc-card > .card-head .ct-ico{color:#8090B0;}
+body.theme-neon.surface-adm .patient-card .card-title,
+body.theme-neon.surface-adm .ins-card .card-title,
+body.theme-neon.surface-adm .doc-card .card-title,
+body.theme-neon.surface-adm .perf-card .card-title,
+body.theme-neon.surface-adm .payment-card .card-title{color:#E0F0FF;}
+/* empty services state — was missing entirely for neon (rendered white) */
+body.theme-neon.surface-adm .svc-empty{
+  border-color:#2A3458;background:#0E1420;color:#B0C4E0;
+  -webkit-box-shadow:0 0 12px rgba(0,240,255,.08);box-shadow:0 0 12px rgba(0,240,255,.08);
+}
+body.theme-neon.surface-adm .svc-empty b{color:#E0F0FF;}
+body.theme-neon.surface-adm .svc-empty .se-sub{color:#8090B0;}
+body.theme-neon.surface-adm .svc-empty .se-ico{
+  background:#1A2438;border-color:#2A3458;color:#00F0FF;-webkit-box-shadow:none;box-shadow:none;
+}
+/* counter / form labels — neon had no cs-cap/cs-val override (dark text on dark = invisible) */
+body.theme-neon.surface-adm .cs-cap{color:#B0C4E0;}
+body.theme-neon.surface-adm .cs-val{color:#00F0FF;}
+body.theme-neon.surface-adm .tp-lbl{color:#00F0FF;}
+body.theme-neon.surface-adm .datetime-card .dt-fld > span{color:#B0C4E0;}
+body.theme-neon.surface-adm .sf-cell span{color:#8090B0;}
+body.theme-neon.surface-adm .rx-lbl{color:#8090B0;}
+body.theme-neon.surface-adm .rx-val{color:#E0F0FF;}
+body.theme-neon.surface-adm .svc-count{color:#8090B0;}

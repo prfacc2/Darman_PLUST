@@ -333,6 +333,8 @@ static std::vector<CashShift> shiftLoad(){
         s.startJalali=f[7]; s.startTime=f[8]; s.endJalali=f[9]; s.endTime=f[10];
         s.income=_wtoi64(f[11].c_str()); s.status=f[12];
         s.startEpoch=_wtoi64(f[13].c_str()); s.endEpoch=_wtoi64(f[14].c_str());
+        if(f.size()>=16) s.jdate=f[15];
+        if(f.size()>=17) s.carryIncome=_wtoi64(f[16].c_str());
         out.push_back(s);
     }
     return out;
@@ -340,23 +342,35 @@ static std::vector<CashShift> shiftLoad(){
 static bool shiftSave(const std::vector<CashShift>& rows){
     std::wstring all;
     for(const auto& s:rows){
-        wchar_t sid[16],suid[16],inc[32],se[32],ee[32];
+        wchar_t sid[16],suid[16],inc[32],se[32],ee[32],ci[32];
         swprintf(sid,16,L"%d",s.sectionId);
         swprintf(suid,16,L"%d",s.subId);
         swprintf(inc,32,L"%lld",s.income);
         swprintf(se,32,L"%lld",s.startEpoch);
         swprintf(ee,32,L"%lld",s.endEpoch);
+        swprintf(ci,32,L"%lld",s.carryIncome);
         all += opsEscPipe(s.id)+L"|"+opsEscPipe(s.username)+L"|"+opsEscPipe(s.fullname)+L"|"+
                sid+L"|"+opsEscPipe(s.sectionName)+L"|"+suid+L"|"+opsEscPipe(s.subName)+L"|"+
                opsEscPipe(s.startJalali)+L"|"+opsEscPipe(s.startTime)+L"|"+
                opsEscPipe(s.endJalali)+L"|"+opsEscPipe(s.endTime)+L"|"+
-               inc+L"|"+opsEscPipe(s.status)+L"|"+se+L"|"+ee+L"\r\n";
+               inc+L"|"+opsEscPipe(s.status)+L"|"+se+L"|"+ee+L"|"+
+               opsEscPipe(s.jdate)+L"|"+ci+L"\r\n";
     }
     return writeFileUtf8(opsShiftsPath(), all, false);
 }
 static CashShift* shiftFindOpen(std::vector<CashShift>& rows, const std::wstring& user){
     for(auto& s:rows) if(s.username==user && s.status==L"open") return &s;
     return nullptr;
+}
+// Most recent shift for a user (by start epoch), regardless of status. Used to
+// carry income forward when a new shift opens on the same calendar day.
+static CashShift* shiftFindRecent(std::vector<CashShift>& rows, const std::wstring& user){
+    CashShift* best=nullptr;
+    for(auto& s:rows){
+        if(s.username!=user) continue;
+        if(!best || s.startEpoch>best->startEpoch) best=&s;
+    }
+    return best;
 }
 
 bool Shift_Start(std::wstring& err){
@@ -374,11 +388,23 @@ bool Shift_Start(std::wstring& err){
     s.sectionId=sc.homeSectionId; s.sectionName=sc.homeSectionName;
     s.subId=sc.homeSubId; s.subName=sc.homeSubName;
     SYSTEMTIME st=iranNow();
-    s.startJalali=jalaliDateShort(st);
+    std::wstring today=jalaliDateShort(st);
+    // Income accumulates within the same calendar day: if the user already had
+    // a shift today, carry its income forward instead of starting at 0. Income
+    // only resets when the previous shift was on a different (Jalali) day.
+    CashShift* prev=shiftFindRecent(rows, g_session.user.username);
+    long long carry=0;
+    if(prev){
+        std::wstring prevDay = prev->jdate.empty()?prev->startJalali:prev->jdate;
+        if(prevDay==today) carry=prev->income;
+    }
+    s.startJalali=today;
     s.startTime=iranTimeStr(st,true);
     s.status=L"open";
     s.startEpoch=opsEpochMin();
-    s.income=0;
+    s.jdate=today;
+    s.income=carry;
+    s.carryIncome=carry;
     rows.push_back(s);
     if(!shiftSave(rows)){ err=L"ذخیره شیفت ناموفق بود."; return false; }
     return true;
@@ -393,6 +419,10 @@ bool Shift_End(std::wstring& err){
     cur->endJalali=jalaliDateShort(st);
     cur->endTime=iranTimeStr(st,true);
     cur->endEpoch=opsEpochMin();
+    // Income is intentionally preserved here (NOT reset) so a new shift opened
+    // later the same day can carry it forward. Reset only happens across days,
+    // decided in Shift_Start. Backfill the accumulation day for legacy rows.
+    if(cur->jdate.empty()) cur->jdate=cur->startJalali;
     cur->status=L"closed";
     if(!shiftSave(rows)){ err=L"ذخیره پایان شیفت ناموفق بود."; return false; }
     return true;
@@ -412,6 +442,8 @@ static std::string shiftJson(const CashShift& s, bool open){
     o+="\"endJalali\":"+opsJstr(s.endJalali)+",";
     o+="\"endTime\":"+opsJstr(s.endTime)+",";
     o+="\"income\":"+opsJnum(s.income)+",";
+    o+="\"jdate\":"+opsJstr(s.jdate)+",";
+    o+="\"carryIncome\":"+opsJnum(s.carryIncome)+",";
     o+="\"status\":"+opsJstr(s.status);
     o+="}";
     return o;

@@ -637,7 +637,7 @@
   <!-- PORTAL: Message Workdesk (کارتابل پیام) — v1.93 HTML surface -->
   <section class="portal-panel" id="portalPanel" aria-hidden="true">
     <header class="portal-topbar">
-      <button class="portal-burger" id="portalBurger" title="منو" aria-label="منو">☰</button>
+      <button class="portal-burger" id="portalBurger" title="منو" aria-label="منو"><svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M4 6h16v2.2H4V6zm0 4.9h16v2.2H4v-2.2zm0 4.9h16v2.2H4v-2.2z"/></svg></button>
       <div class="portal-titles"><div class="portal-title">کارتابل پیام</div></div>
       <div class="portal-search-wrap">
         <input class="inp portal-search" id="portalSearch" placeholder="جستجوی پیام…" />
@@ -659,7 +659,6 @@
   <!-- BLACKLIST: Patient Blacklist (لیست سیاه بیماران) — v1.94 HTML surface -->
   <section class="bl-panel" id="blPanel" aria-hidden="true">
     <header class="bl-topbar">
-      <button class="bl-burger" id="blBurger" title="منو">☰</button>
       <div class="bl-titles"><div class="bl-title">لیست سیاه بیماران</div></div>
       <div class="bl-search-wrap">
         <input class="inp bl-search" id="blSearch" placeholder="جستجوی بیمار مسدود…" />
@@ -681,7 +680,10 @@
             <option value="525600">یک سال</option>
             <option value="0">دائم</option>
           </select>
-          <input class="inp" id="blReason" placeholder="علت مسدودی" />
+        </div>
+        <div class="bl-reason-row">
+          <span class="bl-reason-lbl">علت مسدودی</span>
+          <textarea class="inp bl-reason" id="blReason" rows="2" placeholder="علت مسدودی بیمار را وارد کنید…"></textarea>
         </div>
         <button class="btn btn-primary" id="blAddBtn">ثبت مسدودی</button>
       </div>
