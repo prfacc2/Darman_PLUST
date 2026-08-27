@@ -33,6 +33,9 @@ namespace {
 #define IDC_DSG_PAPER   3005
 #define IDC_DSG_ORIENT  3006
 #define IDC_DSG_ZOOM    3007
+// v2.01 (Part E2): canvas tool toggle — «ابزار انتخاب» / «ابزار دست»
+#define IDC_DSG_TOOLSEL  3008
+#define IDC_DSG_TOOLHAND 3009
 
 #define IDC_RST_DROP    4001
 #define IDC_RST_PICK    4002
@@ -252,11 +255,18 @@ struct DesignerState {
     bool showGrid;
     bool dragging; POINT dragStart; double dragItemX0, dragItemY0;
     bool panning; POINT panStart; double pan0x, pan0y;
+    // v2.01 (Part E2): canvas tool — 0=SELECT (hit-test + drag items),
+    // 1=HAND (left-drag pans the paper). NOT persisted: every fresh open of
+    // the designer starts on the hand tool (see the ctor default).
+    int  toolMode;
     UndoStack<PrintDesign> undo;
     HWND hPaperCombo, hOrientCombo, hZoom;
+    HWND hToolSel, hToolHand;            // v2.01 (Part E2) tool buttons
     HWND hMain;
     DesignerState():selId(-1),zoom(1.0),panX(40),panY(70),dirty(false),
-        showGrid(true),dragging(false),panning(false),undo(100){}
+        showGrid(true),dragging(false),panning(false),toolMode(1),undo(100),
+        hPaperCombo(NULL),hOrientCombo(NULL),hZoom(NULL),
+        hToolSel(NULL),hToolHand(NULL),hMain(NULL){}
 };
 
 static double pxPerMm(DesignerState* st){ return 96.0/25.4 * st->zoom; }
@@ -1089,12 +1099,44 @@ static void addPaletteItem(DesignerState* st,int type){
 
 static void designer_save(HWND h,bool asNew);
 
+// ---------------------------------------------------------------------------
+//  v2.01 (Part E2) — canvas tool toggle. HAND (default) pans the paper with a
+//  left-drag anywhere on the canvas; SELECT restores the classic hit-test +
+//  item-drag behaviour. The ACTIVE tool's button is promoted to BS_PRIMARY in
+//  place (setFlatButtonStyle), the other demoted to BS_OUTLINE. The tool is
+//  session-only (DesignerState ctor defaults to HAND on every open).
+// ----------------------------------------------------------------------------
+static void designer_setTool(HWND h,int mode){
+    DesignerState* st=(DesignerState*)GetWindowLongPtrW(h,GWLP_USERDATA);
+    if(!st) return;
+    st->toolMode=(mode==0)?0:1;
+    if(st->hToolSel  && IsWindow(st->hToolSel))
+        setFlatButtonStyle(st->hToolSel,  st->toolMode==0?BS_PRIMARY:BS_OUTLINE);
+    if(st->hToolHand && IsWindow(st->hToolHand))
+        setFlatButtonStyle(st->hToolHand, st->toolMode==1?BS_PRIMARY:BS_OUTLINE);
+    // refresh the cursor immediately when the pointer is over the canvas
+    POINT pt; if(GetCursorPos(&pt)){
+        HWND under=WindowFromPoint(pt);
+        if(under==h) SetCursor(LoadCursor(NULL,st->toolMode==1?IDC_HAND:IDC_ARROW));
+    }
+    InvalidateRect(h,NULL,FALSE);
+}
+
 static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
     DesignerState* st=(DesignerState*)GetWindowLongPtrW(h,GWLP_USERDATA);
     switch(m){
     case WM_SIZE: if(st) designer_layout(h); return 0;
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: designer_paint(h); return 0;
+    case WM_SETCURSOR:
+        // v2.01 (Part E2): hand cursor while the HAND tool is active, arrow
+        // for SELECT — but only over the canvas client area (child controls
+        // keep their own cursors, the non-client area keeps the system's).
+        if(st && LOWORD(l)==HTCLIENT && (HWND)w==h){
+            SetCursor(LoadCursor(NULL,st->toolMode==1?IDC_HAND:IDC_ARROW));
+            return TRUE;
+        }
+        break;
     case WM_LBUTTONDOWN:{
         if(!st) break;
         int mx=GET_X_LPARAM(l),my=GET_Y_LPARAM(l);
@@ -1102,6 +1144,14 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
         int inspW=(int)(rc.right*0.30);
         if(mx>rc.right-inspW) break;          // inspector area
         if(my<S(44)+S(60)) break;             // top bar/strip
+        // v2.01 (Part E2): with the HAND tool active (the default) a left-drag
+        // ALWAYS pans — items are moved with the SELECT tool instead.
+        if(st->toolMode==1){
+            st->panning=true; st->panStart.x=mx; st->panStart.y=my;
+            st->pan0x=st->panX; st->pan0y=st->panY;
+            SetCapture(h);
+            return 0;
+        }
         int id=hitTest(st,mx,my);
         bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
         if(id<0){
@@ -1330,6 +1380,8 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
             return 0;
         }
         case IDC_DSG_EXIT: SendMessageW(h,WM_CLOSE,0,0); return 0;
+        case IDC_DSG_TOOLSEL:  designer_setTool(h,0); return 0;   // v2.01 (E2)
+        case IDC_DSG_TOOLHAND: designer_setTool(h,1); return 0;   // v2.01 (E2)
         case IDC_DSG_PAPER:
             if(HIWORD(w)==CBN_SELCHANGE){
                 int sel=(int)SendMessageW(st->hPaperCombo,CB_GETCURSEL,0,0);
@@ -1338,6 +1390,9 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
                     st->design.paper=b;
                     st->design.paperW=(st->design.orientation==1)?ph:pw;
                     st->design.paperH=(st->design.orientation==1)?pw:ph;
+                    // v2.01 (Part E1): proportionally rescale the layout onto
+                    // the new paper size instead of leaving items stranded.
+                    reflowDesign(st->design);
                     commit(st); InvalidateRect(h,NULL,FALSE);
                 }
             }
@@ -1348,6 +1403,7 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
                 if(sel!=st->design.orientation){
                     st->design.orientation=sel;
                     std::swap(st->design.paperW,st->design.paperH);
+                    reflowDesign(st->design);   // v2.01 (Part E1)
                     commit(st); InvalidateRect(h,NULL,FALSE);
                 }
             }

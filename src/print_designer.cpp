@@ -35,7 +35,41 @@ PrintItem::PrintItem()
 
 PrintDesign::PrintDesign()
     : id(0), kind(L"user"), paper(L"A5"), paperW(148), paperH(210),
-      orientation(0) {}
+      orientation(0),
+      // v2.01 (Part E1): 0/0 = authored size unknown — reflowDesign() adopts
+      // the current paper size on first use (no scaling) so legacy and
+      // freshly-built template layouts are never rescaled spuriously.
+      baseW(0), baseH(0) {}
+
+// ============================================================================
+//  v2.01 (Part E1) — responsive reflow. Proportionally re-scales all item
+//  positions and sizes when the paper size changes: x/w by newW/oldW, y/h by
+//  newH/oldH, then clamps each item inside the printable area. baseW/baseH
+//  track the paper size the current layout was authored for and follow the
+//  paper after every reflow.
+// ============================================================================
+void reflowDesign(PrintDesign& d){
+    if(d.paperW<=0 || d.paperH<=0) return;
+    if(d.baseW<=0 || d.baseH<=0){           // legacy/unknown base: adopt, no scale
+        d.baseW=d.paperW; d.baseH=d.paperH; return;
+    }
+    if(d.baseW==d.paperW && d.baseH==d.paperH) return;   // no size change
+    double sx=d.paperW/d.baseW, sy=d.paperH/d.baseH;
+    for(auto& it : d.items){
+        it.x*=sx; it.w*=sx;
+        it.y*=sy; it.h*=sy;
+        if(it.w<1) it.w=1;
+        if(it.h<1) it.h=1;
+        // clamp within the printable area (keep the whole item on the page)
+        if(it.w>d.paperW) it.w=d.paperW;
+        if(it.h>d.paperH) it.h=d.paperH;
+        if(it.x<0) it.x=0;
+        if(it.y<0) it.y=0;
+        if(it.x+it.w>d.paperW) it.x=d.paperW-it.w;
+        if(it.y+it.h>d.paperH) it.y=d.paperH-it.h;
+    }
+    d.baseW=d.paperW; d.baseH=d.paperH;
+}
 
 // ============================================================================
 //  paper presets (portrait mm)
@@ -99,6 +133,12 @@ std::string Design_ToJson(const PrintDesign& d){
     o << "\"paper\":\"" << js_esc(d.paper) << "\",";
     o << "\"paperW\":" << num(d.paperW) << ",";
     o << "\"paperH\":" << num(d.paperH) << ",";
+    // v2.01 (Part E1): authored-for paper size (reflow base). Older parsers
+    // skip unknown keys; older files simply lack them (base stays 0 = adopt).
+    if(d.baseW>0 && d.baseH>0){
+        o << "\"baseW\":" << num(d.baseW) << ",";
+        o << "\"baseH\":" << num(d.baseH) << ",";
+    }
     o << "\"orientation\":" << inum(d.orientation) << ",";
     o << "\"items\":[";
     for(size_t i=0;i<d.items.size();++i){
@@ -207,6 +247,8 @@ bool Design_FromJson(const std::string& json, PrintDesign& out, std::wstring& er
         else if(key=="paper") out.paper=js_utf8_to_w(jp.str());
         else if(key=="paperW") out.paperW=jp.dbl();
         else if(key=="paperH") out.paperH=jp.dbl();
+        else if(key=="baseW") out.baseW=jp.dbl();   // v2.01 (Part E1)
+        else if(key=="baseH") out.baseH=jp.dbl();   // v2.01 (Part E1)
         else if(key=="orientation") out.orientation=(int)jp.dbl();
         else if(key=="items"){
             jp.match('[');
@@ -280,6 +322,10 @@ bool Design_FromJson(const std::string& json, PrintDesign& out, std::wstring& er
     if(!jp.ok){ err=L"\u062e\u0637\u0627 \u062f\u0631 \u062a\u062c\u0632\u06cc\u0647 JSON"; return false; }
     // resolve paper dims if a preset
     double pw,ph; if(Paper_Dims(out.paper,pw,ph)){ out.paperW=pw; out.paperH=ph; }
+    // v2.01 (Part E1): a file without a stored reflow base was authored for
+    // the paper it was saved on — adopt it so the first paper switch scales
+    // from the correct reference instead of guessing.
+    if(out.baseW<=0 || out.baseH<=0){ out.baseW=out.paperW; out.baseH=out.paperH; }
     return true;
 }
 

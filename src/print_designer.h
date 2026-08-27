@@ -100,9 +100,20 @@ struct PrintDesign {
     std::wstring paper;         // "A4","A5","A6","B5","Letter","R80","R58","A3","custom"
     double       paperW, paperH;// mm (for custom / resolved)
     int          orientation;   // 0=portrait 1=landscape
+    // v2.01 (Part E1): the paper size the current item layout was AUTHORED
+    // for. reflowDesign() scales items from baseW/baseH to paperW/paperH.
+    // 0 = unknown (legacy design) — the first reflow adopts the current
+    // paper size as the base WITHOUT scaling, so old layouts never jump.
+    double       baseW, baseH;
     std::vector<PrintItem> items;
     PrintDesign();
 };
+
+// v2.01 (Part E1) — responsive reflow: proportionally re-scale every item's
+// position/size when the paper size changes (x/w by newW/oldW, y/h by
+// newH/oldH), then clamp each item inside the printable area. Called by the
+// designer UI from the paper-size and orientation change handlers.
+void reflowDesign(PrintDesign& d);
 
 // ---------------------------------------------------------------------------
 //  v1.55.0 — DATA-BINDING TOKEN VOCABULARY (resolved in printer.cpp

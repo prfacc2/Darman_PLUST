@@ -154,6 +154,9 @@ HWND  createFlatButton(HWND parent, int id, const wchar_t* text,
                        int icon, int style,
                        int x,int y,int w,int h, const wchar_t* sub=NULL);
 void  setFlatButtonIcon(HWND btn, int icon);   // in-place icon swap (v1.1.0)
+//  v2.01 (Part E2): in-place STYLE swap (BS_PRIMARY ⇄ BS_OUTLINE, …) for tool
+//  toggles — repaints the button without recreating it.
+void  setFlatButtonStyle(HWND btn, int style);
 //  v1.4.0: tell a flat button what colour sits BEHIND its rounded corners so
 //  the antialiased corners blend into the real surface (fixes the "white
 //  corners in dark mode" bug on header/bar buttons). Pass CLR_INVALID to let

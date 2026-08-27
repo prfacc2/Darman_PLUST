@@ -990,6 +990,21 @@ void setFlatButtonIcon(HWND btn, int icon){
     BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
     if(d){ d->icon = icon; InvalidateRect(btn,NULL,TRUE); }
 }
+//  v2.01 (Part E2): swap a flat button's STYLE in place (BS_PRIMARY ⇄
+//  BS_OUTLINE etc.) — used by the print designer's tool toggle («ابزار انتخاب»
+//  / «ابزار دست») so the active tool repaints as primary without destroying
+//  and recreating the button mid-click.
+void setFlatButtonStyle(HWND btn, int style){
+    if(!btn || !IsWindow(btn)) return;
+    BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
+    if(!d || d->style==style) return;
+    // A BS_GHOST button owns a rounded window region (see WM_SIZE); dropping
+    // the ghost style must also drop that clip or the new style would paint
+    // clipped to the old silhouette.
+    if(d->style==BS_GHOST && style!=BS_GHOST) SetWindowRgn(btn,NULL,TRUE);
+    d->style=style;
+    InvalidateRect(btn,NULL,TRUE);
+}
 void setFlatButtonBg(HWND btn, COLORREF bg){
     if(!btn || !IsWindow(btn)) return;
     BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
