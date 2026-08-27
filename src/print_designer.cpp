@@ -35,7 +35,7 @@ PrintItem::PrintItem()
 
 PrintDesign::PrintDesign()
     : id(0), kind(L"user"), paper(L"A5"), paperW(148), paperH(210),
-      orientation(0) {}
+      baseW(0), baseH(0), orientation(0) {}
 
 // ============================================================================
 //  paper presets (portrait mm)

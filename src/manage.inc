@@ -31,7 +31,7 @@
 // It was previously only reachable from the hidden-admin panel, which was the
 // wrong surface. The hidden-admin patients tab is removed (see admin.cpp).
 enum { PG_DASH=0, PG_PATIENTS=1, PG_SECTS=2, PG_SERVICES=3, PG_DOCS=4, PG_EMPS=5,
-       PG_MSG=6, PG_REQS=7, PG_SAVED=8, PG_BACKUP=9, PG_PRINTCFG=10, PG_COUNT=11 };
+       PG_MSG=6, PG_REQS=7, PG_SAVED=8, PG_BACKUP=9, PG_PRINTCFG=10, PG_SHIFTS=11, PG_COUNT=12 };
 
 // control ids
 enum {
@@ -105,6 +105,9 @@ enum {
     MG_DC_CLEAR,           // فرم جدید (پاک کردن)
     MG_DC_SEARCH,          // جستجو
     MG_DC_LIST,            // جدول پزشکان (ListView)
+    // v2.01 (Part F2): shift management page controls
+    MG_SH_NAME=2900, MG_SH_START, MG_SH_END, MG_SH_SAVE, MG_SH_DELETE, MG_SH_CLEAR,
+    MG_SH_LIST,
 };
 
 struct EmpRow {
@@ -178,6 +181,13 @@ struct ManageState {
     bool                    dcPerfVal=true;   // v1.78.0: «تعریف به عنوان انجام دهنده» (default ON)
     bool                    dcSiteVal=true, dcOnlineVal=false, dcAnesVal=false; // v2.01 Part B
     bool                    dcLoaded=false;
+    // v2.01 (Part F2): shift management page state
+    std::vector<ShiftDef>    shAll;       // all shift definitions (cached)
+    HWND                    shList=nullptr; // shift list ListView
+    HWND                    shName=nullptr, shStart=nullptr, shEnd=nullptr;
+    HWND                    shSave=nullptr, shDelete=nullptr, shClear=nullptr;
+    int                     shEditId=-1;     // id being edited (-1 = new)
+    bool                    shLoaded=false;
     // v1.66.0: dashboard summary cache — the dash calls loadAllPatients(),
     // loadUsers(), loadDepts(), countTodayReceptions(), unseen*Count() on
     // every WM_PAINT (several times per frame with GDI+), and every call
@@ -2208,13 +2218,15 @@ enum {
     NE_E_FULL=3401, NE_E_USER, NE_E_PASS, NE_E_NID, NE_E_FATHER, NE_E_POS,
     NE_E_MOBILE, NE_E_LAND, NE_E_EMAIL, NE_E_SFROM, NE_E_STO, NE_E_HOURS,
     NE_E_HIRE, NE_E_ADDR, NE_E_EMPID, NE_E_UID, NE_CB_DEPT, NE_CB_ROLE,
+    NE_CB_SHIFT,    // v2.01 (Part F2): شیفت کاری combo
     NE_B_OK, NE_B_CANCEL, NE_CB_AUTOID, NE_B_PHOTO, NE_B_IDCARD
 };
 struct NewEmpState {
     HWND eFull,eUser,ePass,eNid,eFather,ePos,eMobile,eLand,eEmail,
          eSfrom,eSto,eHours,eHire,eAddr,eEmpId,eUid,cDept,cRole,bOk,bCancel,bAutoId,
-         bPhoto,bIdCard;
+         bPhoto,bIdCard,cShift;   // v2.01: cShift = شیفت کاری combo
     std::vector<DeptCat> depts;
+    std::vector<ShiftDef> shiftDefs;  // v2.01: shift definitions for the combo
     bool autoId;
     std::wstring photoPath, idCardPath;   // chosen image files (copied on save)
 };
@@ -2258,6 +2270,8 @@ static void neLayout(HWND h){
     row(s_nes->eFather,yR, rCol, rColL, fh);
     row(s_nes->cDept,  yR, rCol, rColL, S(200));
     row(s_nes->cRole,  yR, rCol, rColL, S(160));
+    // v2.01 (Part F2): «شیفت کاری» combo in the right column
+    row(s_nes->cShift, yR, rCol, rColL, S(200));
     row(s_nes->eMobile,yR, rCol, rColL, fh);
     // LEFT column
     row(s_nes->eEmpId, yL, lColR, lColL, fh);
@@ -2329,6 +2343,13 @@ static void neDoCreate(HWND h){
     u.dept=deptName;
     int roleSel=(int)SendMessageW(s_nes->cRole,CB_GETCURSEL,0,0);
     u.role=(roleSel==1)?1:0;
+    // v2.01 (Part F2): read the assigned shift from the combo.
+    int shiftSel=(int)SendMessageW(s_nes->cShift,CB_GETCURSEL,0,0);
+    if(shiftSel>0 && shiftSel-1<(int)s_nes->shiftDefs.size()){
+        u.shift=s_nes->shiftDefs[shiftSel-1].id;
+    } else {
+        u.shift=-1;  // not assigned
+    }
     std::wstring err;
     if(!addUser(u,err)){ MessageBoxW(h,err.c_str(),L"افزودن کارمند",MB_OK|MB_ICONERROR); return; }
     EmpProfile p; p.username=un; p.deptId=deptId;
@@ -2367,8 +2388,21 @@ static LRESULT CALLBACK neProc(HWND h, UINT m, WPARAM w, LPARAM l){
         SendMessageW(s_nes->eHire,EM_SETCUEBANNER,TRUE,(LPARAM)L"۱۴۰۴/۰۳/۲۸");
         s_nes->cDept=createThemedCombo(h,NE_CB_DEPT);
         s_nes->cRole=createThemedCombo(h,NE_CB_ROLE);
+        // v2.01 (Part F2): «شیفت کاری» combo — populated from shift definitions.
+        s_nes->cShift=createThemedCombo(h,NE_CB_SHIFT);
         SendMessageW(s_nes->cDept,WM_SETFONT,(WPARAM)g_fUI,TRUE);
         SendMessageW(s_nes->cRole,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        SendMessageW(s_nes->cShift,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        // Populate shift combo: «— انتخاب نشده —» then each shift def.
+        s_nes->shiftDefs=loadShiftDefs();
+        SendMessageW(s_nes->cShift,CB_ADDSTRING,0,(LPARAM)L"— انتخاب نشده —");
+        for(const auto& sd : s_nes->shiftDefs){
+            int sm=sd.startMin, em=sd.endMin;
+            wchar_t lbl[128]; swprintf(lbl,128,L"%s  (%02d:%02d - %02d:%02d)",
+                sd.name.c_str(), sm/60, sm%60, em/60, em%60);
+            SendMessageW(s_nes->cShift,CB_ADDSTRING,0,(LPARAM)lbl);
+        }
+        SendMessageW(s_nes->cShift,CB_SETCURSEL,0,0);
         s_nes->depts=loadDepts();
         for(auto&d:s_nes->depts) SendMessageW(s_nes->cDept,CB_ADDSTRING,0,(LPARAM)d.name.c_str());
         // preselect current section if any
@@ -3278,11 +3312,11 @@ static int  mgHeadH(){ return S(64); }      // content header height
 static const wchar_t* MG_NAV_LABELS[PG_COUNT] = {
     L"داشبورد", L"بیماران", L"بخش‌ها", L"مدیریت خدمات", L"پزشکان", L"کارمندان",
     L"پیام به کارمندان", L"درخواست‌ها", L"پیام‌های ذخیره‌شده",
-    L"پشتیبان‌گیری", L"تنظیمات چاپ"
+    L"پشتیبان‌گیری", L"تنظیمات چاپ", L"تعریف شیفت کاری"
 };
 static int MG_NAV_ICONS[PG_COUNT] = {
     ICO_TAB, ICO_ID, ICO_SHIELD, ICO_PLUS, ICO_CROSS_MED, ICO_USER, ICO_BELL,
-    ICO_GEAR, ICO_SAVE, ICO_REFRESH, ICO_GEAR
+    ICO_GEAR, ICO_SAVE, ICO_REFRESH, ICO_GEAR, ICO_CLOCK
 };
 //  content area to the LEFT of the RTL nav rail (rail is on the RIGHT)
 static RECT mgContentRect(HWND h){
@@ -3424,7 +3458,10 @@ static void mgLayout(HWND h){
         s_mg->dcEmail,s_mg->dcAddress,s_mg->dcFranchise,s_mg->dcPrintChk,
         s_mg->dcSpec,s_mg->dcInsSpec,s_mg->dcDegree,s_mg->dcContract,s_mg->dcEmerg,
         s_mg->dcPerfChk,s_mg->dcAcct,s_mg->dcSave,s_mg->dcEdit,s_mg->dcDelete,s_mg->dcClear,
-        s_mg->dcSearch,s_mg->dcList};
+        s_mg->dcSearch,s_mg->dcList,
+        // v2.01 (Part F2): shift management controls
+        s_mg->shName,s_mg->shStart,s_mg->shEnd,s_mg->shSave,s_mg->shDelete,
+        s_mg->shClear,s_mg->shList};
     for(HWND w:all) if(w) ShowWindow(w,SW_HIDE);
 
     if(s_mg->page==PG_PATIENTS){
@@ -3666,6 +3703,7 @@ static const wchar_t* mgCardTitle(int page){
         case PG_SAVED: return L"پیام‌های ذخیره‌شده";
         case PG_BACKUP:return L"پشتیبان‌گیری و بازیابی";
         case PG_PRINTCFG: return L"تنظیمات چاپ بخش‌ها";
+        case PG_SHIFTS:  return L"تعریف شیفت کاری";
     }
     return L"";
 }
@@ -4298,6 +4336,101 @@ static void mgPaintServices(HDC dc, HWND h){
 //  the search row. The doctor TABLE itself is the LVS_OWNERDATA child (dcList),
 //  themed by applyThemedListView; it paints its own rows. Geometry mirrors the
 //  mgLayout PG_DOCS branch exactly so labels line up with their controls.
+// ============================================================================
+//  v2.01 (Part F2) — «تعریف شیفت کاری» shift management helpers (file scope)
+// ============================================================================
+static void mgShiftsReload(){
+    if(!s_mg) return;
+    s_mg->shAll=loadShiftDefs();
+    s_mg->shLoaded=true;
+    if(s_mg->shList){
+        ListView_SetItemCountEx(s_mg->shList,(int)s_mg->shAll.size(),
+            LVSICF_NOINVALIDATEALL|LVSICF_NOSCROLL);
+        InvalidateRect(s_mg->shList,NULL,FALSE);
+    }
+}
+static void mgShiftsClearForm(){
+    if(!s_mg) return;
+    SetWindowTextW(s_mg->shName,L"");
+    SetWindowTextW(s_mg->shStart,L"");
+    SetWindowTextW(s_mg->shEnd,L"");
+    s_mg->shEditId=-1;
+}
+static void mgShiftsSave(HWND h){
+    if(!s_mg) return;
+    wchar_t name[128]={0}, start[16]={0}, end[16]={0};
+    GetWindowTextW(s_mg->shName,name,128);
+    GetWindowTextW(s_mg->shStart,start,16);
+    GetWindowTextW(s_mg->shEnd,end,16);
+    std::wstring nm=trim(name);
+    if(nm.empty()){ s_mg->msg=L"نام شیفت الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return; }
+    auto parseTime=[&](const wchar_t* s)->int{
+        std::wstring t=trim(s);
+        for(auto& c : t) if(c>=L'\u06F0'&&c<=L'\u06F9') c=L'0'+(c-L'\u06F0');
+        int hh=0,mm=0;
+        size_t cp=t.find(L':');
+        if(cp!=std::wstring::npos){ hh=_wtoi(t.substr(0,cp).c_str()); mm=_wtoi(t.substr(cp+1).c_str()); }
+        else { hh=_wtoi(t.c_str()); }
+        if(hh<0)hh=0; if(hh>23)hh=23; if(mm<0)mm=0; if(mm>59)mm=59;
+        return hh*60+mm;
+    };
+    int sm=parseTime(start), em=parseTime(end);
+    if(s_mg->shEditId>=0){
+        auto defs=loadShiftDefs();
+        for(auto& d : defs) if(d.id==s_mg->shEditId){
+            d.name=nm; d.startMin=sm; d.endMin=em;
+            saveShiftDefs(defs);
+            s_mg->msg=L"شیفت «"+nm+L"» ویرایش شد."; s_mg->msgCol=g_theme.success;
+            break;
+        }
+    } else {
+        int id=addShiftDef(nm,sm,em);
+        if(id<0){ s_mg->msg=L"افزودن شیفت ناموفق بود."; s_mg->msgCol=g_theme.danger; }
+        else { s_mg->msg=L"شیفت «"+nm+L"» اضافه شد."; s_mg->msgCol=g_theme.success; }
+    }
+    mgShiftsClearForm();
+    mgShiftsReload();
+    InvalidateRect(h,NULL,TRUE);
+}
+static void mgShiftsDelete(HWND h){
+    if(!s_mg || !s_mg->shList) return;
+    int sel=ListView_GetNextItem(s_mg->shList,-1,LVNI_SELECTED);
+    if(sel<0 || sel>=(int)s_mg->shAll.size()){
+        s_mg->msg=L"ابتدا یک شیفت را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    const ShiftDef& sd=s_mg->shAll[sel];
+    if(sd.id<3){
+        s_mg->msg=L"شیفت‌های پیش‌فرض (صبح، عصر، شب) قابل حذف نیستند."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    std::wstring q=L"حذف شیفت «"+sd.name+L"»؟";
+    if(MessageBoxW(h,q.c_str(),L"تأیید حذف",MB_YESNO|MB_ICONWARNING)!=IDYES) return;
+    deleteShiftDef(sd.id);
+    s_mg->msg=L"شیفت حذف شد."; s_mg->msgCol=g_theme.success;
+    mgShiftsClearForm();
+    mgShiftsReload();
+    InvalidateRect(h,NULL,TRUE);
+}
+static void mgShiftsEditSelected(HWND h){
+    if(!s_mg || !s_mg->shList) return;
+    int sel=ListView_GetNextItem(s_mg->shList,-1,LVNI_SELECTED);
+    if(sel<0 || sel>=(int)s_mg->shAll.size()){
+        s_mg->msg=L"ابتدا یک شیفت را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    const ShiftDef& sd=s_mg->shAll[sel];
+    s_mg->shEditId=sd.id;
+    SetWindowTextW(s_mg->shName,sd.name.c_str());
+    wchar_t t[16];
+    swprintf(t,16,L"%02d:%02d",sd.startMin/60,sd.startMin%60);
+    SetWindowTextW(s_mg->shStart,toFaDigits(std::wstring(t)).c_str());
+    swprintf(t,16,L"%02d:%02d",sd.endMin/60,sd.endMin%60);
+    SetWindowTextW(s_mg->shEnd,toFaDigits(std::wstring(t)).c_str());
+    InvalidateRect(h,NULL,TRUE);
+    SetFocus(s_mg->shName);
+}
 static void mgPaintDocs(HDC dc, HWND h){
     if(!s_mg) return;
     RECT a=mgContentRect(h);
@@ -4365,6 +4498,67 @@ static void mgPaintDocs(HDC dc, HWND h){
         DrawTextW(dc, s_mg->dcAll.empty()?L"هنوز پزشکی ثبت نشده است":L"موردی یافت نشد",
             -1,&er,DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
     }
+}
+//  (Helper functions mgShiftsReload/Save/Delete/etc. are at file scope above.)
+// ============================================================================
+static void mgPaintShifts(HDC dc, HWND h){
+    if(!s_mg) return;
+    RECT a=mgContentRect(h);
+    if(!s_mg->shLoaded) mgShiftsReload();
+    // Form card (top section): title + fields.
+    int top=a.top+S(16), formW=a.right-a.left-S(48);
+    int fh=S(30), lh=S(24), gap=S(10), cgap=S(12);
+    int colW=(formW-3*cgap)/4;
+    auto cx=[&](int c){ return a.right-S(24)-(c+1)*colW-c*cgap; };
+    auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+gap); };
+    int by=cy(0)+fh+S(6);
+    int cardBot=by+S(40)+S(10);
+    RECT card={a.left+S(20),top-S(2),a.right-S(24),cardBot};
+    gpShadow(dc,card,S(12),S(7),g_dark?58:40);
+    gpGradRoundRectBg(dc,card,S(12),g_theme.surfaceTop,g_theme.surface,g_theme.border,g_theme.bg);
+    // card title
+    int ttop=top+S(2), th=S(24), med=S(22), mcy=ttop+th/2;
+    RECT mdr={a.right-S(24)-med-S(4),mcy-med/2,a.right-S(24)-S(4),mcy+med/2};
+    gpRoundRectBg(dc,mdr,med/2,blendColor(g_theme.surface,g_infoAccent,g_dark?22:16),
+                  blendColor(g_theme.border,g_infoAccent,46),g_theme.surface);
+    { RECT ir={mdr.left+S(5),mdr.top+S(5),mdr.right-S(5),mdr.bottom-S(5)};
+      drawIcon(dc,ICO_CLOCK,ir,blendColor(g_infoAccent,g_theme.text,12),S(2)); }
+    SelectObject(dc,g_fSection); SetTextColor(dc,g_theme.sectionInk);
+    { RECT tr={a.left+S(30),ttop,mdr.left-S(10),ttop+th};
+      DrawTextW(dc,L"تعریف شیفت کاری",-1,&tr,
+        DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
+    // fade separator under title
+    { int sy=ttop+th, x0=a.left+S(30), x1=a.right-S(34), span=x1-x0;
+      if(span>0){ int seg=S(6); if(seg<2)seg=2;
+        for(int x=x0;x<x1;x+=seg){ int xe=x+seg; if(xe>x1)xe=x1;
+            int al=150-(140*(x1-x))/span; if(al<8)al=8; if(al>255)al=255;
+            gpLine(dc,x,sy,xe,sy,blendColor(g_theme.border,g_infoAccent,32),1.0f,al); } } }
+    // field labels
+    auto lbl=[&](int x,int ly,int w,const wchar_t* txt){
+        SelectObject(dc,g_fLabel); SetTextColor(dc,g_theme.labelInk);
+        RECT lr={x,ly,x+w,ly+S(16)};
+        DrawTextW(dc,txt,-1,&lr,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
+    };
+    lbl(cx(0),cy(0)-lh,colW,L"نام شیفت");
+    lbl(cx(1),cy(0)-lh,colW,L"ساعت شروع");
+    lbl(cx(2),cy(0)-lh,colW,L"ساعت پایان");
+    // action buttons row
+    MoveWindow(s_mg->shSave,  cx(0), by, colW, S(36), TRUE); ShowWindow(s_mg->shSave,SW_SHOW);
+    MoveWindow(s_mg->shDelete,cx(1), by, colW, S(36), TRUE); ShowWindow(s_mg->shDelete,SW_SHOW);
+    MoveWindow(s_mg->shClear, cx(2), by, colW, S(36), TRUE); ShowWindow(s_mg->shClear,SW_SHOW);
+    // status / empty hint
+    if(!s_mg->msg.empty()){
+        SelectObject(dc,g_fSmall); SetTextColor(dc,s_mg->msgCol);
+        RECT mr={a.left+S(30),by+S(40),a.right-S(34),by+S(40)+S(22)};
+        DrawTextW(dc,s_mg->msg.c_str(),-1,&mr,DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    }
+    // table below the form card
+    int srchTop=cardBot+S(8), ly=srchTop+S(10);
+    MoveWindow(s_mg->shList, a.left+S(20), ly, formW, a.bottom-ly-S(8), TRUE);
+    ShowWindow(s_mg->shList,SW_SHOW);
+    // Show/hide form fields
+    HWND show[]={s_mg->shName,s_mg->shStart,s_mg->shEnd};
+    for(HWND e:show) ShowWindow(e,SW_SHOW);
 }
 
 // ---- the dashboard shell: nav rail (right) + content card (left) -----------
@@ -4469,6 +4663,7 @@ static void mgPaintShell(HDC dc, HWND h){
             case PG_REQS:  mgPaintReqs(dc,h);  break;
             case PG_SAVED: mgPaintSaved(dc,h); break;
             case PG_BACKUP:mgPaintBackup(dc,h);break;
+            case PG_SHIFTS:mgPaintShifts(dc,h);break;
         }
         if(!s_mg->msg.empty()){
             SetTextColor(dc,s_mg->msgCol); SelectObject(dc,g_fSmall);
@@ -4532,6 +4727,7 @@ static void mgGoPage(HWND h, int page){
     else if(page==PG_PATIENTS){ mgPatientsLoadAsync(h); }
     else if(page==PG_SERVICES){ mgServicesClearForm(); mgServicesReload(); }
     else if(page==PG_DOCS){ mgDocsClearForm(); mgDocsReload(); }
+    else if(page==PG_SHIFTS){ mgShiftsClearForm(); mgShiftsReload(); }  // v2.01 Part F2
     // v1.69.0: replay the subtle dashboard entrance each time the dash is shown;
     // stop it (and the timer) whenever we navigate away.
     if(page==PG_DASH) mgDashAnimStart(h); else mgDashAnimStop(h);
@@ -4602,6 +4798,34 @@ static void mgBuildDocsPage(HWND h){
             ListView_InsertColumn(s_mg->dcList,i,&lc); }
     }
     applyThemedListView(s_mg->dcList);
+    // v2.01 (Part F2): shift management page controls
+    {
+        DWORD es=WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL;
+        s_mg->shName  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_NAME,g_hInst,0);
+        s_mg->shStart =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_START,g_hInst,0);
+        s_mg->shEnd   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_END,g_hInst,0);
+        s_mg->shSave  =createFlatButton(h,MG_SH_SAVE,  L"ذخیره",ICO_SAVE,BS_PRIMARY,0,0,10,10);
+        s_mg->shDelete=createFlatButton(h,MG_SH_DELETE,L"حذف",ICO_TRASH,BS_DANGER,0,0,10,10);
+        s_mg->shClear =createFlatButton(h,MG_SH_CLEAR,L"فرم جدید",ICO_PLUS,BS_OUTLINE,0,0,10,10);
+        s_mg->shList  =CreateWindowExW(0,WC_LISTVIEWW,L"",
+            WS_CHILD|WS_TABSTOP|LVS_OWNERDATA|LVS_REPORT|LVS_SHOWSELALWAYS|LVS_SINGLESEL,
+            0,0,10,10,h,(HMENU)MG_SH_LIST,g_hInst,0);
+        ListView_SetExtendedListViewStyle(s_mg->shList,
+            LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER);
+        SendMessageW(s_mg->shList,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        {   // RTL columns: # | نام شیفت | ساعت شروع | ساعت پایان
+            struct { const wchar_t* t; int w; } shcols[]={
+                {L"#",S(44)},{L"نام شیفت",S(200)},{L"ساعت شروع",S(120)},{L"ساعت پایان",S(120)} };
+            LVCOLUMNW lc={0}; lc.mask=LVCF_TEXT|LVCF_WIDTH|LVCF_FMT; lc.fmt=LVCFMT_RIGHT;
+            for(int i=0;i<4;i++){ lc.pszText=(LPWSTR)shcols[i].t; lc.cx=shcols[i].w;
+                ListView_InsertColumn(s_mg->shList,i,&lc); }
+        }
+        applyThemedListView(s_mg->shList);
+        HWND shEds[]={s_mg->shName,s_mg->shStart,s_mg->shEnd};
+        for(HWND e:shEds){ SendMessageW(e,WM_SETFONT,(WPARAM)g_fUI,TRUE); enableEnterNavigation(e); }
+        SendMessageW(s_mg->shStart,EM_SETCUEBANNER,TRUE,(LPARAM)L"HH:MM");
+        SendMessageW(s_mg->shEnd,EM_SETCUEBANNER,TRUE,(LPARAM)L"HH:MM");
+    }
     SendMessageW(s_mg->dcSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
     // type combo: پزشک / پرستار
     SendMessageW(s_mg->dcType,CB_ADDSTRING,0,(LPARAM)L"پزشک");
@@ -4905,6 +5129,29 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             }
             if(nh->code==NM_DBLCLK){ mgDocsEditSelected(h); return 0; }
         }
+        // v2.01 (Part F2): shift management table
+        if(nh && nh->hwndFrom==s_mg->shList){
+            if(nh->code==LVN_GETDISPINFOW){
+                NMLVDISPINFOW* di=(NMLVDISPINFOW*)l;
+                int vi=di->item.iItem;
+                if(vi>=0 && vi<(int)s_mg->shAll.size() && (di->item.mask & LVIF_TEXT)){
+                    const ShiftDef& sd=s_mg->shAll[vi];
+                    static wchar_t shcell[128];
+                    switch(di->item.iSubItem){
+                        case 0: wcsncpy(shcell,toFaDigits(std::to_wstring(vi+1)).c_str(),127); break;
+                        case 1: wcsncpy(shcell,sd.name.c_str(),127); break;
+                        case 2: { wchar_t t[16]; swprintf(t,16,L"%02d:%02d",sd.startMin/60,sd.startMin%60);
+                                 wcsncpy(shcell,toFaDigits(std::wstring(t)).c_str(),127); } break;
+                        case 3: { wchar_t t[16]; swprintf(t,16,L"%02d:%02d",sd.endMin/60,sd.endMin%60);
+                                 wcsncpy(shcell,toFaDigits(std::wstring(t)).c_str(),127); } break;
+                        default: shcell[0]=0; break;
+                    }
+                    shcell[127]=0; di->item.pszText=shcell;
+                }
+                return 0;
+            }
+            if(nh->code==NM_DBLCLK){ mgShiftsEditSelected(h); return 0; }
+        }
         break; }
     case WM_COMMAND:{
         if(!s_mg) return 0;
@@ -4955,6 +5202,11 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
             case MG_DC_ANES:   s_mg->dcAnesVal=!s_mg->dcAnesVal;
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            // v2.01 (Part F2): shift management command handlers
+            case MG_SH_SAVE:   mgShiftsSave(h); return 0;
+            case MG_SH_DELETE: mgShiftsDelete(h); return 0;
+            case MG_SH_CLEAR:  mgShiftsClearForm(); s_mg->msg.clear();
+                               InvalidateRect(h,NULL,TRUE); return 0;
         }
         if(id==MG_CB_DEPT && HIWORD(w)==CBN_SELCHANGE){
             int sel=(int)SendMessageW(s_mg->cDept,CB_GETCURSEL,0,0);

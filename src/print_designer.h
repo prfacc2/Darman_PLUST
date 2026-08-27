@@ -99,6 +99,9 @@ struct PrintDesign {
     std::wstring kind;          // "builtin" | "user"
     std::wstring paper;         // "A4","A5","A6","B5","Letter","R80","R58","A3","custom"
     double       paperW, paperH;// mm (for custom / resolved)
+    double       baseW, baseH;  // E1: paper size (mm) the current item layout was
+                                // authored/reflowed for — the proportional-reflow
+                                // baseline. 0 = not yet synced (reflow is a no-op).
     int          orientation;   // 0=portrait 1=landscape
     std::vector<PrintItem> items;
     PrintDesign();

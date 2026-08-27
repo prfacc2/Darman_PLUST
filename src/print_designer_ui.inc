@@ -33,6 +33,8 @@ namespace {
 #define IDC_DSG_PAPER   3005
 #define IDC_DSG_ORIENT  3006
 #define IDC_DSG_ZOOM    3007
+#define IDC_DSG_TOOLSEL  3008   // E2: «ابزار انتخاب» (select tool)
+#define IDC_DSG_TOOLHAND 3009   // E2: «ابزار دست» (hand tool)
 
 #define IDC_RST_DROP    4001
 #define IDC_RST_PICK    4002
@@ -252,11 +254,14 @@ struct DesignerState {
     bool showGrid;
     bool dragging; POINT dragStart; double dragItemX0, dragItemY0;
     bool panning; POINT panStart; double pan0x, pan0y;
+    int  toolMode;                       // E2: 0=SELECT (ابزار انتخاب), 1=HAND (ابزار دست)
     UndoStack<PrintDesign> undo;
     HWND hPaperCombo, hOrientCombo, hZoom;
+    HWND hToolSelect, hToolHand;         // E2: toolbar tool toggles
     HWND hMain;
     DesignerState():selId(-1),zoom(1.0),panX(40),panY(70),dirty(false),
-        showGrid(true),dragging(false),panning(false),undo(100){}
+        showGrid(true),dragging(false),panning(false),toolMode(1),undo(100),
+        hToolSelect(NULL),hToolHand(NULL){}
 };
 
 static double pxPerMm(DesignerState* st){ return 96.0/25.4 * st->zoom; }
@@ -272,6 +277,68 @@ static int nextItemId(DesignerState* st){
     int mx=0; for(auto& it:st->design.items) if(it.id>mx) mx=it.id; return mx+1;
 }
 static void commit(DesignerState* st){ st->dirty=true; st->undo.push(st->design); }
+
+// ---------------------------------------------------------------------------
+//  E1 — reflowDesign(): when the user changes «سایز کاغذ» (paper size) or
+//  orientation, proportionally re-scale EVERY item from the paper size the
+//  layout was authored for (baseW/baseH) to the design's current paperW/paperH,
+//  then clamp each item inside the printable area so nothing overflows the new
+//  page. This is what keeps a user-saved design (loaded from disk) laid out for
+//  one paper size from breaking when it is re-targeted at another.
+//
+//  The services table («جدول خدمات», PIT_SERVICES) stores its column widths as
+//  RELATIVE FRACTIONS in the item's text JSON (e.g. "widths":[0.34,0.10,...]),
+//  and both the canvas preview and the print engine derive the column edges from
+//  the item's outer width — so the columns re-proportion automatically and never
+//  collapse, overlap, or lose their borders. Only the item's outer width is
+//  clamped here (to the printable width), and a services table is recognised by
+//  either its type or its JSON signature (mirroring drawItemGdip), so old designs
+//  whose type id was degraded still reflow correctly.
+// ---------------------------------------------------------------------------
+static bool pdIsServicesItem(const PrintItem& it){
+    if(it.type==PIT_SERVICES) return true;
+    if(it.type==PIT_TABLE) return false;
+    return it.text.find(L"\"labels\"")!=std::wstring::npos &&
+           it.text.find(L"\"widths\"")!=std::wstring::npos;
+}
+static void reflowDesign(PrintDesign& d){
+    if(d.paperW<=0 || d.paperH<=0) return;
+    // No baseline recorded yet (e.g. a design that bypassed the open sync) —
+    // adopt the current paper as the baseline and leave geometry untouched.
+    if(d.baseW<=0 || d.baseH<=0){ d.baseW=d.paperW; d.baseH=d.paperH; return; }
+    const double sx = d.paperW / d.baseW;   // horizontal scale (new/old)
+    const double sy = d.paperH / d.baseH;   // vertical   scale (new/old)
+    // printable inset — the same width-based scale the built-in templates use
+    // (paperMargin): 3mm for thermal rolls, 6mm for A5/A6-class, 8mm otherwise.
+    const double mg = (d.paperW<=80.0)?3.0:(d.paperW<=148.0)?6.0:8.0;
+    const double maxRight  = d.paperW - mg;   // x + w must stay at or below this
+    const double maxBottom = d.paperH - mg;   // y + h must stay at or below this
+    const double printableW = (d.paperW - 2*mg > 1.0) ? (d.paperW - 2*mg) : 1.0;
+    for(auto& it : d.items){
+        it.x *= sx; it.w *= sx;
+        it.y *= sy; it.h *= sy;
+        if(it.w < 0.1) it.w = 0.1;
+        if(it.h < 0.1) it.h = 0.1;
+        if(it.x < 0) it.x = 0;
+        if(it.y < 0) it.y = 0;
+        // services table: clamp outer width to the full printable width so its
+        // relative column fractions keep their proportions and never collapse.
+        if(pdIsServicesItem(it) && it.w > printableW) it.w = printableW;
+        // keep the right/bottom edge inside the printable area
+        if(it.x + it.w > maxRight){
+            if(it.x >= maxRight){ it.x = 0; it.w = maxRight; }
+            else it.w = maxRight - it.x;
+        }
+        if(it.y + it.h > maxBottom){
+            if(it.y >= maxBottom){ it.y = 0; it.h = maxBottom; }
+            else it.h = maxBottom - it.y;
+        }
+        if(it.w < 0.1) it.w = 0.1;
+        if(it.h < 0.1) it.h = 0.1;
+    }
+    d.baseW = d.paperW;
+    d.baseH = d.paperH;
+}
 
 // map paper-mm -> canvas px
 static POINT mmToPx(DesignerState* st,double mx,double my){
@@ -1023,6 +1090,14 @@ static void designer_layout(HWND h){
     if(st->hPaperCombo) MoveWindow(st->hPaperCombo,rc.right/2-S(110),by,S(110),S(200),TRUE);
     if(st->hOrientCombo) MoveWindow(st->hOrientCombo,rc.right/2+S(4),by,S(100),S(200),TRUE);
     if(st->hZoom) MoveWindow(st->hZoom,rc.right-S(180),by,S(170),bh,TRUE);
+    // E2: «ابزار انتخاب» / «ابزار دست» toggles sit just left of the zoom slider.
+    if(st->hToolHand && st->hToolSelect){
+        int tw=S(116), gap=S(6);
+        int hx=rc.right-S(180)-S(8)-tw;        // hand (right-most of the pair)
+        int tx=hx-gap-tw;                      // select (left of hand)
+        MoveWindow(st->hToolHand,hx,by,tw,bh,TRUE);
+        MoveWindow(st->hToolSelect,tx,by,tw,bh,TRUE);
+    }
     designer_buildInspector(h);
 }
 
@@ -1092,6 +1167,21 @@ static void designer_save(HWND h,bool asNew);
 static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
     DesignerState* st=(DesignerState*)GetWindowLongPtrW(h,GWLP_USERDATA);
     switch(m){
+    case WM_CREATE:
+        // E2: the default tool is the hand tool — show the hand cursor from the
+        // very first frame (state is attached right after CreateWindowExW, so
+        // set it here too; WM_SETCURSOR keeps it in sync afterwards).
+        SetCursor(LoadCursor(NULL,IDC_HAND));
+        return 0;
+    case WM_SETCURSOR:{
+        // E2: cursor tracks the active tool. Only override over the canvas
+        // (HTCLIENT of this window); child controls keep their own cursors.
+        if(st && LOWORD(l)==HTCLIENT){
+            SetCursor(LoadCursor(NULL, st->toolMode==1 ? IDC_HAND : IDC_ARROW));
+            return TRUE;
+        }
+        return DefWindowProcW(h,m,w,l);
+    }
     case WM_SIZE: if(st) designer_layout(h); return 0;
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: designer_paint(h); return 0;
@@ -1102,6 +1192,16 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
         int inspW=(int)(rc.right*0.30);
         if(mx>rc.right-inspW) break;          // inspector area
         if(my<S(44)+S(60)) break;             // top bar/strip
+        // E2: «ابزار دست» (hand tool) always pans the canvas, regardless of
+        // whether an item is under the cursor. «ابزار انتخاب» (select tool)
+        // keeps the existing hit-test + select + drag behaviour.
+        if(st->toolMode==1){
+            st->panning=true; st->panStart.x=mx; st->panStart.y=my;
+            st->pan0x=st->panX; st->pan0y=st->panY;
+            SetCapture(h);
+            InvalidateRect(h,NULL,FALSE);
+            return 0;
+        }
         int id=hitTest(st,mx,my);
         bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
         if(id<0){
@@ -1330,6 +1430,20 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
             return 0;
         }
         case IDC_DSG_EXIT: SendMessageW(h,WM_CLOSE,0,0); return 0;
+        // E2: tool toggles. Each fresh open starts on «ابزار دست» (toolMode=1,
+        // set in the DesignerState ctor); the last-used tool is NOT remembered.
+        case IDC_DSG_TOOLHAND:
+            st->toolMode=1;
+            setFlatButtonStyle(st->hToolHand,BS_PRIMARY);
+            setFlatButtonStyle(st->hToolSelect,BS_OUTLINE);
+            SetCursor(LoadCursor(NULL,IDC_HAND));
+            return 0;
+        case IDC_DSG_TOOLSEL:
+            st->toolMode=0;
+            setFlatButtonStyle(st->hToolSelect,BS_PRIMARY);
+            setFlatButtonStyle(st->hToolHand,BS_OUTLINE);
+            SetCursor(LoadCursor(NULL,IDC_ARROW));
+            return 0;
         case IDC_DSG_PAPER:
             if(HIWORD(w)==CBN_SELCHANGE){
                 int sel=(int)SendMessageW(st->hPaperCombo,CB_GETCURSEL,0,0);
@@ -1338,6 +1452,7 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
                     st->design.paper=b;
                     st->design.paperW=(st->design.orientation==1)?ph:pw;
                     st->design.paperH=(st->design.orientation==1)?pw:ph;
+                    reflowDesign(st->design);   // E1: scale layout to new paper
                     commit(st); InvalidateRect(h,NULL,FALSE);
                 }
             }
@@ -1348,6 +1463,7 @@ static LRESULT CALLBACK DesignerProc(HWND h,UINT m,WPARAM w,LPARAM l){
                 if(sel!=st->design.orientation){
                     st->design.orientation=sel;
                     std::swap(st->design.paperW,st->design.paperH);
+                    reflowDesign(st->design);   // E1: scale layout to swapped dims
                     commit(st); InvalidateRect(h,NULL,FALSE);
                 }
             }
@@ -1452,7 +1568,10 @@ static void OpenDesignerWindow(HWND owner,const DesignerLaunch& launch,
                                const PrintDesign* initial){
     static bool reg=false; const wchar_t* CLS=L"AzPrintDesigner";
     if(!reg){ WNDCLASSW wc={0}; wc.lpfnWndProc=DesignerProc; wc.hInstance=g_hInst;
-        wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.lpszClassName=CLS;
+        // E2: class cursor defaults to the hand tool (toolMode=1 on open), so the
+        // hand cursor shows from the first frame; WM_SETCURSOR flips to the arrow
+        // when the select tool is active.
+        wc.hCursor=LoadCursor(NULL,IDC_HAND); wc.lpszClassName=CLS;
         wc.hbrBackground=g_brBg; wc.style=CS_HREDRAW|CS_VREDRAW;
         RegisterClassW(&wc); reg=true; }
     // §1.14.2 hardening: the inspector child-handle table is process-global and
@@ -1494,6 +1613,12 @@ static void OpenDesignerWindow(HWND owner,const DesignerLaunch& launch,
         if(it.w<=0)             it.w=1;       // zero-size items confuse hit-test/paint
         if(it.h<=0)             it.h=1;
     }
+    // E1: the loaded layout already fits its current paper, so adopt that paper
+    // as the proportional-reflow baseline. (Templates are regenerated from PW/PH
+    // by Design_BuiltinTemplate(), so their coordinates are already correct and
+    // reflow only ever applies on a later USER paper/orientation change.)
+    st->design.baseW = st->design.paperW;
+    st->design.baseH = st->design.paperH;
     st->undo.seed(st->design);
 
     // §D.2: designer header shows «طراح چاپ — {نام بخش}» for the chosen section.
@@ -1541,6 +1666,17 @@ static void OpenDesignerWindow(HWND owner,const DesignerLaunch& launch,
         WS_CHILD|WS_VISIBLE|TBS_HORZ,0,0,10,10,h,(HMENU)IDC_DSG_ZOOM,g_hInst,NULL);
     SendMessageW(st->hZoom,TBM_SETRANGE,TRUE,MAKELONG(25,400));
     SendMessageW(st->hZoom,TBM_SETPOS,TRUE,100);
+    // E2: tool toggles. «ابزار دست» is active by default (BS_PRIMARY); the
+    // select tool starts as BS_OUTLINE. Positions are finalised in
+    // designer_layout(); sizes here are placeholders (0,0,10,10) like the others.
+    st->hToolSelect=createFlatButton(h,IDC_DSG_TOOLSEL,
+        L"\u0627\u0628\u0632\u0627\u0631 \u0627\u0646\u062a\u062e\u0627\u0628",
+        ICO_NONE,BS_OUTLINE,0,0,10,10);
+    st->hToolHand=createFlatButton(h,IDC_DSG_TOOLHAND,
+        L"\u0627\u0628\u0632\u0627\u0631 \u062f\u0633\u062a",
+        ICO_NONE,BS_PRIMARY,0,0,10,10);
+    setFlatButtonBg(st->hToolSelect,g_theme.bg);
+    setFlatButtonBg(st->hToolHand,g_theme.bg);
 
     designer_layout(h);
     ShowWindow(h,SW_SHOW);

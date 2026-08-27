@@ -990,6 +990,13 @@ void setFlatButtonIcon(HWND btn, int icon){
     BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
     if(d){ d->icon = icon; InvalidateRect(btn,NULL,TRUE); }
 }
+// E2: swap a flat button's visual style in place (e.g. PRIMARY<->OUTLINE to
+// show the active tool toggle) without destroying/recreating the window.
+void setFlatButtonStyle(HWND btn, int style){
+    if(!btn || !IsWindow(btn)) return;
+    BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
+    if(d){ d->style = style; InvalidateRect(btn,NULL,TRUE); }
+}
 void setFlatButtonBg(HWND btn, COLORREF bg){
     if(!btn || !IsWindow(btn)) return;
     BtnData* d=(BtnData*)GetWindowLongPtrW(btn,GWLP_USERDATA);
