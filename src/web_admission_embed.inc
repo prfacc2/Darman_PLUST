@@ -191,7 +191,8 @@ static std::string AdmissionPageForHost(bool withFont, HWND host){
         if(it!=g_adInject.end()){ surf=it->second.first; ticket=it->second.second; }
     }
     if(surf!="tools" && surf!="cashier" && surf!="queue" && surf!="receipts"
-       && surf!="dash" && surf!="portal" && surf!="blacklist") surf="admission";  // v1.88: receipts; v1.89: dash; v1.93: portal; v1.94: blacklist
+       && surf!="dash" && surf!="portal" && surf!="blacklist"
+       && surf!="svreport") surf="admission";  // v2.01: svreport
     if(ticket.find("</")!=std::string::npos) ticket.clear();
     std::string inj="<script>window.__azSurface=\"";
     inj+=surf;

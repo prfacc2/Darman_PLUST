@@ -122,3 +122,19 @@ bool Receipt_DeleteMany(const std::vector<std::wstring>& ids, std::wstring& err)
 bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out);
 bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err);
 std::string Receipt_SectionsJson();
+
+// v2.01 (Part D): «به تفکیک خدمات» — per-service breakdown report.
+// Returns JSON: {ok, totalRecords, blocks:[{serviceName, serviceCode, rows:[{seq,
+// name, nid, insBase, insSupp, insCombo, paid}], total, paidCount}], footer:{shift, time, date}}
+// Filters: fromJalali/toJalali (YYYY/MM/DD), shiftId (-1=all), sectionId (-1=all),
+// doctorName (empty=all), serviceCode (empty=all), payStatus (-1=all, 0=unpaid, 1=paid)
+struct SvReportQuery {
+    std::wstring fromJalali, toJalali;
+    int shiftId;          // -1 = all
+    int sectionId;        // -1 = all
+    std::wstring doctorName;
+    std::wstring serviceCode;  // empty = all services
+    int payStatus;        // -1 = all, 0 = unpaid, 1 = paid
+    SvReportQuery():shiftId(-1),sectionId(-1),payStatus(-1){}
+};
+std::string SvReport_Json(const SvReportQuery& q);

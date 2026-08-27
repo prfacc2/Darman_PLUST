@@ -261,12 +261,23 @@ static void mgServicesFilter(){
     for(int i=0;i<(int)s_mg->svAll.size();++i){
         const ServiceDef& s=s_mg->svAll[i];
         if(q.empty()){ s_mg->svView.push_back(i); continue; }
-        std::wstring code=uikit::NormalizeFa(s.code);
-        std::wstring name=uikit::NormalizeFa(s.name);
-        std::wstring cat =uikit::NormalizeFa(s.category);
-        if(code.find(q)!=std::wstring::npos ||
-           name.find(q)!=std::wstring::npos ||
-           cat.find(q)!=std::wstring::npos)
+        // v2.01 (Part C): search across every visible catalogue column.
+        std::wstring code  =uikit::NormalizeFa(s.code);
+        std::wstring name  =uikit::NormalizeFa(s.name);
+        std::wstring sh    =uikit::NormalizeFa(s.shortName);
+        std::wstring loving=uikit::NormalizeFa(s.lovingCode);
+        std::wstring equiv =uikit::NormalizeFa(s.equivCode);
+        std::wstring sid   =uikit::NormalizeFa(s.serviceId);
+        std::wstring rev   =uikit::NormalizeFa(s.revenueGroup);
+        std::wstring hnid  =uikit::NormalizeFa(s.healthNationalId);
+        if(code.find(q)!=std::wstring::npos   ||
+           name.find(q)!=std::wstring::npos   ||
+           sh.find(q)!=std::wstring::npos     ||
+           loving.find(q)!=std::wstring::npos ||
+           equiv.find(q)!=std::wstring::npos  ||
+           sid.find(q)!=std::wstring::npos    ||
+           rev.find(q)!=std::wstring::npos    ||
+           hnid.find(q)!=std::wstring::npos)
             s_mg->svView.push_back(i);
     }
     if(s_mg->svList){
@@ -281,16 +292,28 @@ static void mgServicesReload(){
     if(!s_mg) return;
     s_mg->svAll=loadServices();
     s_mg->svLoaded=true;
-    // department combo: «— همه —»/blank first, then each section.
+    // department combo: «—»/blank first, then each section + subsection from
+    // the live section tree (v2.01 Part B/C — same pattern as the doctor form).
     if(s_mg->svDept){
         std::wstring cur; { wchar_t b[128]={0}; GetWindowTextW(s_mg->svDept,b,128); cur=b; }
         SendMessageW(s_mg->svDept,CB_RESETCONTENT,0,0);
-        auto cats=loadDepts();
         SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)L"—");
-        for(auto&c:cats) SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)c.name.c_str());
+        std::vector<Section> secs; Sections_All(secs);
+        for(const auto& s : secs){
+            if(!s.is_active) continue;
+            std::wstring label=s.name_fa;
+            if(s.parent_id>0){
+                for(const auto& p : secs)
+                    if(p.id==s.parent_id){ label=p.name_fa+L" ← "+s.name_fa; break; }
+            }
+            SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)label.c_str());
+        }
         int idx=0;
         if(!cur.empty()){
-            for(int i=0;i<(int)cats.size();++i) if(cats[i].name==cur){ idx=i+1; break; }
+            int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0);
+            for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
+                if(cur==b){ idx=i; break; } }
         }
         SendMessageW(s_mg->svDept,CB_SETCURSEL,idx,0);
     }
@@ -304,6 +327,17 @@ static void mgServicesClearForm(){
     SetWindowTextW(s_mg->svCat, L"");
     SetWindowTextW(s_mg->svPrice,L"");
     SetWindowTextW(s_mg->svDesc,L"");
+    // v2.01 (Part C) fields
+    SetWindowTextW(s_mg->svShort,L"");
+    SetWindowTextW(s_mg->svLoving,L"");
+    SetWindowTextW(s_mg->svEquiv,L"");
+    SetWindowTextW(s_mg->svSrvId,L"");
+    SetWindowTextW(s_mg->svRevGrp,L"");
+    SetWindowTextW(s_mg->svHnId,L"");
+    SetWindowTextW(s_mg->svFree,L"");
+    SetWindowTextW(s_mg->svGov,L"");
+    SetWindowTextW(s_mg->svFreeOld,L"");
+    SetWindowTextW(s_mg->svGovOld,L"");
     if(s_mg->svDept)   SendMessageW(s_mg->svDept,CB_SETCURSEL,0,0);
     if(s_mg->svIns)    SendMessageW(s_mg->svIns,CB_SETCURSEL,0,0);
     if(s_mg->svStatus) SendMessageW(s_mg->svStatus,CB_SETCURSEL,0,0);
@@ -331,6 +365,29 @@ static void mgServicesFormatPriceLive(){
     }
     s_svPriceFormatting=false;
 }
+//  v2.01 (Part C): the four tariff boxes (نرخ آزاد / دولتی + قدیم) get the same
+//  live thousands-separator formatting as «قیمت». Each box owns a static
+//  re-entrancy guard so the EN_CHANGE fired while rewriting does not loop.
+static bool s_svFreeFmt=false, s_svGovFmt=false, s_svFreeOldFmt=false, s_svGovOldFmt=false;
+static void mgServicesFormatMoneyLive(HWND box,bool& guard){
+    if(!s_mg || !box) return;
+    if(guard) return;
+    guard=true;
+    wchar_t b[64]={0}; GetWindowTextW(box,b,64);
+    long long v=parseMoney(b);
+    std::wstring fmt=formatMoney(v);
+    if(fmt!=b){
+        int sl0=0, sl1=0; SendMessageW(box,EM_GETSEL,(WPARAM)&sl0,(LPARAM)&sl1);
+        SetWindowTextW(box,fmt.c_str());
+        int len=(int)fmt.size();
+        SendMessageW(box,EM_SETSEL,len,len);
+    }
+    guard=false;
+}
+static void mgServicesFormatFreeLive()   { if(s_mg) mgServicesFormatMoneyLive(s_mg->svFree,   s_svFreeFmt); }
+static void mgServicesFormatGovLive()    { if(s_mg) mgServicesFormatMoneyLive(s_mg->svGov,    s_svGovFmt); }
+static void mgServicesFormatFreeOldLive(){ if(s_mg) mgServicesFormatMoneyLive(s_mg->svFreeOld,s_svFreeOldFmt); }
+static void mgServicesFormatGovOldLive() { if(s_mg) mgServicesFormatMoneyLive(s_mg->svGovOld, s_svGovOldFmt); }
 //  Load a record into the form (for editing).
 static void mgServicesLoadForm(const ServiceDef& s){
     if(!s_mg) return;
@@ -339,12 +396,40 @@ static void mgServicesLoadForm(const ServiceDef& s){
     SetWindowTextW(s_mg->svCat, s.category.c_str());
     { std::wstring ps=formatMoney(s.price); SetWindowTextW(s_mg->svPrice,ps.c_str()); }
     SetWindowTextW(s_mg->svDesc,s.desc.c_str());
-    // department combo by name
+    // v2.01 (Part C) fields
+    SetWindowTextW(s_mg->svShort, s.shortName.c_str());
+    SetWindowTextW(s_mg->svLoving,s.lovingCode.c_str());
+    SetWindowTextW(s_mg->svEquiv, s.equivCode.c_str());
+    SetWindowTextW(s_mg->svSrvId, s.serviceId.c_str());
+    SetWindowTextW(s_mg->svRevGrp,s.revenueGroup.c_str());
+    SetWindowTextW(s_mg->svHnId,  s.healthNationalId.c_str());
+    { std::wstring f=formatMoney(s.priceFree);     SetWindowTextW(s_mg->svFree,   f.c_str()); }
+    { std::wstring g=formatMoney(s.priceGov);      SetWindowTextW(s_mg->svGov,    g.c_str()); }
+    { std::wstring fo=formatMoney(s.priceFreeOld); SetWindowTextW(s_mg->svFreeOld,fo.c_str()); }
+    { std::wstring go=formatMoney(s.priceGovOld);  SetWindowTextW(s_mg->svGovOld, go.c_str()); }
+    // department combo by sectionId: build the «parent ← sub» label for the
+    // matching section (or its plain name) and select that combo entry.
     if(s_mg->svDept){
-        int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0), sel=0;
-        for(int i=0;i<n;i++){ wchar_t b[128]={0};
-            SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
-            if(s.dept==b){ sel=i; break; } }
+        int sel=0;
+        if(s.sectionId>0){
+            std::vector<Section> secs; Sections_All(secs);
+            std::wstring want;
+            for(const auto& sec:secs){
+                if(sec.id!=s.sectionId) continue;
+                want=sec.name_fa;
+                if(sec.parent_id>0){
+                    for(const auto& p:secs)
+                        if(p.id==sec.parent_id){ want=p.name_fa+L" ← "+sec.name_fa; break; }
+                }
+                break;
+            }
+            if(!want.empty()){
+                int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0);
+                for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                    SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
+                    if(want==b){ sel=i; break; } }
+            }
+        }
         SendMessageW(s_mg->svDept,CB_SETCURSEL,sel,0);
     }
     if(s_mg->svIns){
@@ -367,30 +452,109 @@ static ServiceDef mgServicesReadForm(){
     ServiceDef s;
     if(!s_mg) return s;
     wchar_t b[512]={0};
-    GetWindowTextW(s_mg->svCode,b,512);  s.code=trim(b);
-    GetWindowTextW(s_mg->svName,b,512);  s.name=trim(b);
-    GetWindowTextW(s_mg->svPrice,b,512); s.price=parseMoney(b);
+    GetWindowTextW(s_mg->svCode,b,512);   s.code=trim(b);
+    GetWindowTextW(s_mg->svName,b,512);   s.name=trim(b);
+    GetWindowTextW(s_mg->svPrice,b,512);  s.price=parseMoney(b);   // legacy base price
+    // v2.01 (Part C) fields
+    GetWindowTextW(s_mg->svShort,b,512);  s.shortName=trim(b);
+    GetWindowTextW(s_mg->svLoving,b,512); s.lovingCode=trim(b);
+    GetWindowTextW(s_mg->svEquiv,b,512);  s.equivCode=trim(b);
+    GetWindowTextW(s_mg->svSrvId,b,512);  s.serviceId=trim(b);
+    GetWindowTextW(s_mg->svRevGrp,b,512); s.revenueGroup=trim(b);
+    GetWindowTextW(s_mg->svHnId,b,512);   s.healthNationalId=trim(b);
+    // tariff money fields — parseMoney already strips thousand separators.
+    GetWindowTextW(s_mg->svFree,b,64);    s.priceFree   =parseMoney(b);
+    GetWindowTextW(s_mg->svGov,b,64);     s.priceGov    =parseMoney(b);
+    GetWindowTextW(s_mg->svFreeOld,b,64); s.priceFreeOld=parseMoney(b);
+    GetWindowTextW(s_mg->svGovOld,b,64);  s.priceGovOld =parseMoney(b);
     s.category.clear();
     s.dept.clear();
     s.insType.clear();
     s.desc.clear();
-    s.status = 1;   // always active
+    // department: resolve the selected «parent ← sub» label back to a sectionId.
+    s.sectionId=0;
+    if(s_mg->svDept){
+        int sel=(int)SendMessageW(s_mg->svDept,CB_GETCURSEL,0,0);
+        if(sel>0){
+            wchar_t lb[128]={0}; SendMessageW(s_mg->svDept,CB_GETLBTEXT,sel,(LPARAM)lb);
+            std::wstring label=lb;
+            std::vector<Section> secs; Sections_All(secs);
+            for(const auto& sec:secs){
+                if(!sec.is_active) continue;
+                std::wstring lab=sec.name_fa;
+                if(sec.parent_id>0){
+                    for(const auto& p:secs)
+                        if(p.id==sec.parent_id){ lab=p.name_fa+L" ← "+sec.name_fa; break; }
+                }
+                if(lab==label){ s.sectionId=sec.id; break; }
+            }
+        }
+    }
+    // status combo (فعال / غیرفعال)
+    s.status = 1;
+    if(s_mg->svStatus){
+        int sel=(int)SendMessageW(s_mg->svStatus,CB_GETCURSEL,0,0);
+        if(sel==1) s.status=0;
+    }
     return s;
 }
 //  «ذخیره» — insert a new service or update the one loaded in the form.
 static void mgServicesSave(HWND h){
     if(!s_mg) return;
     ServiceDef s=mgServicesReadForm();
+    // ---- required-field validation (v2.01 Part C) ----
+    if(s.shortName.empty()){
+        s_mg->msg=L"نام اختصار الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    if(s.name.empty()){
+        s_mg->msg=L"نام کامل الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    if(s.code.empty()){
+        s_mg->msg=L"کد خدمت الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // code must be unique (exclude the record currently loaded for editing)
+    for(const auto& e:s_mg->svAll){
+        if(!s_mg->svEditCode.empty() && e.code==s_mg->svEditCode) continue;
+        if(e.code==s.code){
+            s_mg->msg=L"این کد خدمت تکراری است."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // ---- historical-rate migration (قدیم) ----
+    // When the operator changes «نرخ آزاد» / «نرخ دولتی» and the matching قدیم
+    // box is still empty, offer to archive the previous value there.
+    const ServiceDef* prev=nullptr;
+    for(const auto& e:s_mg->svAll) if(e.code==s_mg->svEditCode){ prev=&e; break; }
+    if(prev){
+        if(s.priceFree!=prev->priceFree && s.priceFreeOld==0 && prev->priceFree!=0){
+            if(MessageBoxW(h,L"نرخ آزاد تغییر کرد. مقدار قبلی به «نرخ آزاد قدیم» منتقل شود؟",
+                L"بایگانی نرخ قدیم",MB_YESNO|MB_ICONQUESTION)==IDYES)
+                s.priceFreeOld=prev->priceFree;
+        }
+        if(s.priceGov!=prev->priceGov && s.priceGovOld==0 && prev->priceGov!=0){
+            if(MessageBoxW(h,L"نرخ دولتی تغییر کرد. مقدار قبلی به «نرخ دولتی قدیم» منتقل شود؟",
+                L"بایگانی نرخ قدیم",MB_YESNO|MB_ICONQUESTION)==IDYES)
+                s.priceGovOld=prev->priceGov;
+        }
+    }
     std::wstring err; bool ok;
     if(!s_mg->svEditCode.empty() && s.code==s_mg->svEditCode){
-        // EDIT: preserve the hidden columns from the existing record so an old
-        // service that already carried a category/dept/insurance/description
-        // does not silently lose them just because the form no longer shows them.
+        // EDIT: preserve the hidden/legacy columns from the existing record so a
+        // service that already carried a category/dept/insurance/description or
+        // the professional tariff columns does not silently lose them. Status is
+        // now edited via the combo, so it is NOT overwritten here.
         for(const auto& e:s_mg->svAll){
             if(e.code==s.code){
                 s.category=e.category; s.dept=e.dept;
                 s.insType =e.insType;  s.desc=e.desc;
-                s.status  =e.status;   s.created=e.created;
+                s.created =e.created;
+                s.insName=e.insName; s.multiplier=e.multiplier;
+                s.priceFreeNew=e.priceFreeNew; s.priceGovNew=e.priceGovNew;
+                s.priceIns=e.priceIns; s.priceInsNew=e.priceInsNew;
+                s.extra=e.extra;
                 break;
             }
         }
@@ -3251,7 +3415,9 @@ static void mgLayout(HWND h){
         s_mg->eNote,s_mg->bNoteAttach,s_mg->bNoteSend,
         s_mg->ptSearch,s_mg->ptList,s_mg->ptAdd,
         s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svDept,s_mg->svPrice,
-        s_mg->svIns,s_mg->svStatus,s_mg->svDesc,s_mg->svSave,s_mg->svEdit,
+        s_mg->svIns,s_mg->svStatus,s_mg->svDesc,s_mg->svShort,s_mg->svLoving,
+        s_mg->svEquiv,s_mg->svSrvId,s_mg->svRevGrp,s_mg->svHnId,s_mg->svFree,
+        s_mg->svGov,s_mg->svFreeOld,s_mg->svGovOld,s_mg->svSave,s_mg->svEdit,
         s_mg->svDelete,s_mg->svClear,s_mg->svSearch,s_mg->svList,
         s_mg->dcDept,s_mg->dcType,s_mg->dcCode,s_mg->dcActiveChk,s_mg->dcMedId,
         s_mg->dcPrefix,s_mg->dcFirst,s_mg->dcLast,s_mg->dcNid,s_mg->dcMobile,
@@ -3338,40 +3504,57 @@ static void mgLayout(HWND h){
         ShowWindow(s_mg->bNoteSend,SW_SHOW);
     } else if(s_mg->page==PG_SERVICES){
         // ---- service-management form (top) + services table (fills rest) ----
-        //  Simplified (v1.49.0): the service form now has EXACTLY three fields —
-        //  «نام خدمت», «کد خدمت», «قیمت». Category / department / insurance /
-        //  status / description are gone from the UI; their controls are still
-        //  created (kept hidden) so the data layer and any legacy .dat records
-        //  keep working, but the operator only ever fills these three boxes.
+        //  v2.01 (Part C): the service form is now a full 4-column RTL grid
+        //  covering the whole service definition — بخش/زیربخش (combo), codes,
+        //  short + full names, tariffs (current نرخ آزاد/دولتی + قدیم), revenue
+        //  group and status (combo). The retired controls (svCat / svPrice /
+        //  svIns / svDesc) are kept (RULE 6) but stay hidden; svPrice still
+        //  mirrors s.price for backward compatibility with legacy billing data.
         int lh=S(20), fgap=S(14);
-        int formL=a.left+S(12), formR=rEdge;
-        int formW=formR-formL;
+        int formL=a.left+S(12), formR=rEdge, formW=formR-formL;
+        const int cols=4;
         int cgap=S(12);
-        int colW=(formW-2*cgap)/3;               // 3 columns (single row)
+        int colW=(formW-(cols-1)*cgap)/cols;
         auto cx=[&](int c){ return formR-(c+1)*colW-c*cgap; };  // RTL col left edge
-        int y=top+S(28);                          // room for the card title
-        // single row (RTL):  نام خدمت | کد خدمت | قیمت (ریال)
-        int r1c=y+lh;
-        MoveWindow(s_mg->svName,  cx(0), r1c, colW, fh, TRUE);
-        MoveWindow(s_mg->svCode,  cx(1), r1c, colW, fh, TRUE);
-        MoveWindow(s_mg->svPrice, cx(2), r1c, colW, fh, TRUE);
-        // action buttons row
-        int by=r1c+fh+fgap+S(4);
+        auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+fgap); };
+        int comboH=S(200);               // tall so the dropdown shows several rows
+        // Row 0: بخش/زیربخش (combo) | کد خدمت | نام اختصار | نام کامل
+        MoveWindow(s_mg->svDept,   cx(0), cy(0), colW, comboH, TRUE);
+        MoveWindow(s_mg->svCode,   cx(1), cy(0), colW, fh, TRUE);
+        MoveWindow(s_mg->svShort,  cx(2), cy(0), colW, fh, TRUE);
+        MoveWindow(s_mg->svName,   cx(3), cy(0), colW, fh, TRUE);
+        // Row 1: کد لوینگ | کد معادل | شناسه خدمت | کد ملی سلامت
+        MoveWindow(s_mg->svLoving, cx(0), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svEquiv,  cx(1), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svSrvId,  cx(2), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svHnId,   cx(3), cy(1), colW, fh, TRUE);
+        // Row 2: نرخ آزاد | نرخ دولتی | نرخ آزاد قدیم | نرخ دولتی قدیم
+        MoveWindow(s_mg->svFree,   cx(0), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svGov,    cx(1), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svFreeOld,cx(2), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svGovOld, cx(3), cy(2), colW, fh, TRUE);
+        // Row 3: گروه درآمد | وضعیت (combo)
+        MoveWindow(s_mg->svRevGrp, cx(0), cy(3), colW, fh, TRUE);
+        MoveWindow(s_mg->svStatus, cx(1), cy(3), colW, comboH, TRUE);
+        // action buttons row (right→left): ذخیره | ویرایش | حذف | فرم جدید
+        int by=cy(3)+fh+S(6);
         int bw=S(120), bgap=S(10), bx=formR;
         MoveWindow(s_mg->svSave,   bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svEdit,   bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svDelete, bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svClear,  bx-bw, by, bw, S(40), TRUE);
-        // search box (left) below the form card
-        int listTop = by+S(40)+S(16);
-        int srchH=fh, srchTop=listTop;
-        int srchW=S(320);
+        // search box (left) below the form card + table fills the rest
+        int cardBot=by+S(40)+S(10);
+        int srchTop=cardBot+S(8), srchH=fh, srchW=S(320);
         MoveWindow(s_mg->svSearch, formL, srchTop, srchW, srchH, TRUE);
         int ly=srchTop+srchH+S(10);
         MoveWindow(s_mg->svList, formL, ly, formW, a.bottom-ly-S(8), TRUE);
-        // Only the three fields + action buttons + search + list are shown; the
-        // retired controls (svCat/svDept/svIns/svStatus/svDesc) stay hidden.
-        HWND show[]={s_mg->svName,s_mg->svCode,s_mg->svPrice,
+        // Only the new fields + dept/status combos + buttons + search + list are
+        // shown; the retired controls (svCat/svPrice/svIns/svDesc) stay hidden.
+        HWND show[]={s_mg->svDept,s_mg->svCode,s_mg->svShort,s_mg->svName,
+            s_mg->svLoving,s_mg->svEquiv,s_mg->svSrvId,s_mg->svHnId,
+            s_mg->svFree,s_mg->svGov,s_mg->svFreeOld,s_mg->svGovOld,
+            s_mg->svRevGrp,s_mg->svStatus,
             s_mg->svSave,s_mg->svEdit,s_mg->svDelete,s_mg->svClear,
             s_mg->svSearch,s_mg->svList};
         for(HWND w:show) if(w) ShowWindow(w,SW_SHOW);
@@ -4063,12 +4246,12 @@ static void mgPaintServices(HDC dc, HWND h){
     int top=a.top+mgHeadH()+S(12);
     int lh=S(20), fgap=S(14);
     int formL=a.left+S(12), formR=rEdge, formW=formR-formL;
+    const int cols=4;
     int cgap=S(12);
-    int colW=(formW-2*cgap)/3;
+    int colW=(formW-(cols-1)*cgap)/cols;
     auto cx=[&](int c){ return formR-(c+1)*colW-c*cgap; };
-    int y=top+S(28);
-    int r1c=y+lh;                 // single field row
-    int by=r1c+fh+fgap+S(4);      // action-button row (right below the one row)
+    auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+fgap); };
+    int by=cy(3)+fh+S(6);
     int cardBot=by+S(40)+S(10);
     // ---- form card background ----
     RECT card={formL-S(4),top-S(2),formR+S(4),cardBot};
@@ -4083,10 +4266,14 @@ static void mgPaintServices(HDC dc, HWND h){
         RECT lr={x,ly,x+w,ly+S(16)};
         DrawTextW(dc,txt,-1,&lr,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
     };
-    // Exactly three labels, matching the three fields (RTL: name | code | price)
-    lbl(cx(0),r1c-lh,colW,L"نام خدمت");
-    lbl(cx(1),r1c-lh,colW,L"کد خدمت (خودکار در صورت خالی)");
-    lbl(cx(2),r1c-lh,colW,L"قیمت (ریال)");
+    // 4-column × 4-row grid of labels (RTL), matching the field layout exactly.
+    struct Lb{int r,c; const wchar_t* t;};
+    const Lb lbs[]={
+        {0,0,L"بخش/زیربخش"},{0,1,L"کد خدمت"},{0,2,L"نام اختصار"},{0,3,L"نام کامل"},
+        {1,0,L"کد لوینگ"},{1,1,L"کد معادل"},{1,2,L"شناسه خدمت"},{1,3,L"کد ملی سلامت"},
+        {2,0,L"نرخ آزاد"},{2,1,L"نرخ دولتی"},{2,2,L"نرخ آزاد قدیم"},{2,3,L"نرخ دولتی قدیم"},
+        {3,0,L"گروه درآمد"},{3,1,L"وضعیت"}};
+    for(const auto& lb:lbs) lbl(cx(lb.c),cy(lb.r)-lh,colW,lb.t);
     // ---- status message (below the buttons) ----
     if(!s_mg->msg.empty()){
         SelectObject(dc,g_fSmall); SetTextColor(dc,s_mg->msgCol);
@@ -4096,7 +4283,8 @@ static void mgPaintServices(HDC dc, HWND h){
     // ---- empty-state hint for the table ----
     if(s_mg->svView.empty()){
         SelectObject(dc,g_fUI); SetTextColor(dc,g_theme.textDim);
-        RECT er={formL,by+S(40)+S(70),formR,by+S(40)+S(110)};
+        int srchTop=cardBot+S(8), srchH=fh, lt=srchTop+srchH+S(10);
+        RECT er={formL,lt+S(30),formR,lt+S(70)};
         DrawTextW(dc,L"هنوز خدمتی ثبت نشده است — فرم بالا را پر کنید و «ذخیره» را بزنید.",
             -1,&er,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
     }
@@ -4501,6 +4689,17 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         s_mg->svDesc  =CreateWindowExW(0,L"EDIT",L"",
             WS_CHILD|WS_TABSTOP|ES_AUTOVSCROLL|ES_MULTILINE|WS_VSCROLL,
             0,0,10,10,h,(HMENU)MG_SV_DESC,g_hInst,0);
+        // v2.01 (Part C) service-definition fields
+        s_mg->svShort  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_SHORT, g_hInst,0);
+        s_mg->svLoving =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_LOVING,g_hInst,0);
+        s_mg->svEquiv  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_EQUIV, g_hInst,0);
+        s_mg->svSrvId  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_SRVID, g_hInst,0);
+        s_mg->svRevGrp =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_REVGRP,g_hInst,0);
+        s_mg->svHnId   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_HNID,  g_hInst,0);
+        s_mg->svFree   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_FREE,  g_hInst,0);
+        s_mg->svGov    =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_GOV,   g_hInst,0);
+        s_mg->svFreeOld=CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_FREEOLD,g_hInst,0);
+        s_mg->svGovOld =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_GOVCOLD,g_hInst,0);
         s_mg->svSave  =createFlatButton(h,MG_SV_SAVE,  L"ذخیره",  ICO_SAVE, BS_PRIMARY,0,0,10,10);
         s_mg->svEdit  =createFlatButton(h,MG_SV_EDIT,  L"ویرایش", ICO_GEAR, BS_OUTLINE,0,0,10,10);
         s_mg->svDelete=createFlatButton(h,MG_SV_DELETE,L"حذف",    ICO_TRASH,BS_DANGER, 0,0,10,10);
@@ -4522,17 +4721,22 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         ListView_SetExtendedListViewStyle(s_mg->svList,
             LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER);
         SendMessageW(s_mg->svList,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-        {   // RTL columns (rightmost first): کد | نام | دسته | مبلغ | وضعیت | ویرایش
+        {   // RTL columns (rightmost first): ردیف | کد خدمات | کد معادل | نام اختصار |
+            // نام کامل | کد ملی خدمت | نرخ آزاد | نرخ دولتی
             struct { const wchar_t* t; int w; } cols[]={
-                {L"کد خدمت",S(90)},{L"نام خدمت",S(230)},{L"دسته",S(130)},
-                {L"مبلغ (ریال)",S(130)},{L"وضعیت",S(90)},{L"آخرین ویرایش",S(120)} };
+                {L"ردیف",S(50)},{L"کد خدمات",S(90)},{L"کد معادل",S(90)},
+                {L"نام اختصار",S(130)},{L"نام کامل",S(220)},{L"کد ملی خدمت",S(120)},
+                {L"نرخ آزاد",S(120)},{L"نرخ دولتی",S(120)} };
             LVCOLUMNW lc={0}; lc.mask=LVCF_TEXT|LVCF_WIDTH|LVCF_FMT; lc.fmt=LVCFMT_RIGHT;
-            for(int i=0;i<6;i++){ lc.pszText=(LPWSTR)cols[i].t; lc.cx=cols[i].w;
+            for(int i=0;i<8;i++){ lc.pszText=(LPWSTR)cols[i].t; lc.cx=cols[i].w;
                 ListView_InsertColumn(s_mg->svList,i,&lc); }
         }
         applyThemedListView(s_mg->svList);
         SendMessageW(s_mg->svSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-        { HWND se[]={s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svPrice,s_mg->svDesc};
+        { HWND se[]={s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svPrice,s_mg->svDesc,
+                     s_mg->svShort,s_mg->svLoving,s_mg->svEquiv,s_mg->svSrvId,
+                     s_mg->svRevGrp,s_mg->svHnId,s_mg->svFree,s_mg->svGov,
+                     s_mg->svFreeOld,s_mg->svGovOld};
           for(HWND e:se){ SendMessageW(e,WM_SETFONT,(WPARAM)g_fUI,TRUE); enableEnterNavigation(e); }
           HWND sc[]={s_mg->svDept,s_mg->svIns,s_mg->svStatus};
           for(HWND c:sc) SendMessageW(c,WM_SETFONT,(WPARAM)g_fUI,TRUE);
@@ -4663,12 +4867,14 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
                     const ServiceDef& s=s_mg->svAll[s_mg->svView[vi]];
                     static wchar_t cell[256];
                     switch(di->item.iSubItem){
-                        case 0: wcsncpy(cell,toFaDigits(s.code).c_str(),255); break;
-                        case 1: wcsncpy(cell,s.name.c_str(),255); break;
-                        case 2: wcsncpy(cell,s.category.c_str(),255); break;
-                        case 3: wcsncpy(cell,toFaDigits(formatMoney(s.price)).c_str(),255); break;
-                        case 4: wcsncpy(cell,s.status?L"فعال":L"غیرفعال",255); break;
-                        case 5: wcsncpy(cell,toFaDigits(s.modified).c_str(),255); break;
+                        case 0: wcsncpy(cell,toFaDigits(std::to_wstring(vi+1)).c_str(),255); break;            // ردیف
+                        case 1: wcsncpy(cell,toFaDigits(s.code).c_str(),255); break;                           // کد خدمات
+                        case 2: wcsncpy(cell,toFaDigits(s.equivCode).c_str(),255); break;                      // کد معادل
+                        case 3: wcsncpy(cell,s.shortName.c_str(),255); break;                                  // نام اختصار
+                        case 4: wcsncpy(cell,s.name.c_str(),255); break;                                       // نام کامل
+                        case 5: wcsncpy(cell,toFaDigits(s.healthNationalId).c_str(),255); break;               // کد ملی خدمت
+                        case 6: wcsncpy(cell,toFaDigits(formatMoney(s.priceFree)).c_str(),255); break;         // نرخ آزاد
+                        case 7: wcsncpy(cell,toFaDigits(formatMoney(s.priceGov)).c_str(),255); break;          // نرخ دولتی
                         default: cell[0]=0; break;
                     }
                     cell[255]=0; di->item.pszText=cell;
@@ -4716,6 +4922,10 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             mgServicesFormatPriceLive();
             return 0;
         }
+        if(id==MG_SV_FREE && HIWORD(w)==EN_CHANGE){    mgServicesFormatFreeLive();    return 0; }
+        if(id==MG_SV_GOV && HIWORD(w)==EN_CHANGE){     mgServicesFormatGovLive();     return 0; }
+        if(id==MG_SV_FREEOLD && HIWORD(w)==EN_CHANGE){ mgServicesFormatFreeOldLive(); return 0; }
+        if(id==MG_SV_GOVCOLD && HIWORD(w)==EN_CHANGE){ mgServicesFormatGovOldLive();  return 0; }
         if(id==MG_DC_SEARCH && HIWORD(w)==EN_CHANGE){
             wchar_t b[256]={0}; GetWindowTextW(s_mg->dcSearch,b,256);
             s_mg->dcQuery=b; mgDocsFilter();

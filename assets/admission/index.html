@@ -395,6 +395,13 @@
             </span>
             <span class="tools-tile-name">صندوق نرفته‌ها و صف پذیرش</span>
           </button>
+          <!-- v2.01 (Part D): «به تفکیک خدمات» — per-service breakdown report -->
+          <button type="button" class="tools-tile" id="toolsSvReport">
+            <span class="tools-appico tools-appico-report" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M5 2h10l4 4v16H5V2zm2 2v16h10V7h-3V4H7zm2 6h6v2H9v-2zm0 4h6v2H9v-2z"/></svg>
+            </span>
+            <span class="tools-tile-name">به تفکیک خدمات</span>
+          </button>
         </div>
         <div class="tools-empty" id="toolsEmpty" style="display:none">ابزاری با این نام پیدا نشد</div>
       </div>
@@ -946,6 +953,115 @@
     <button type="button" class="portal-ctx-item" data-pact="save">ذخیره</button>
     <button type="button" class="portal-ctx-item" data-pact="print">چاپ</button>
     <button type="button" class="portal-ctx-item portal-ctx-del" data-pact="delete">حذف</button>
+  </div>
+
+  <!-- SVREPORT: «به تفکیک خدمات» — v2.01 per-service breakdown report -->
+  <section class="svr-panel" id="svrPanel" aria-hidden="true">
+    <header class="svr-toolbar" id="svrToolbar">
+      <div class="svr-tb-row">
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">از تاریخ</label>
+          <input type="text" class="inp svr-date" id="svrFrom" placeholder="۱۴۰۵/۰۶/۰۱" />
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">تا تاریخ</label>
+          <input type="text" class="inp svr-date" id="svrTo" placeholder="۱۴۰۵/۰۶/۰۱" />
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">شیفت</label>
+          <select class="inp svr-select" id="svrShift"><option value="-1">همه</option></select>
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">بخش / زیربخش</label>
+          <select class="inp svr-select" id="svrSection"><option value="-1">همه</option></select>
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">پزشک</label>
+          <input type="text" class="inp svr-select" id="svrDoctor" placeholder="همه" />
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">خدمت</label>
+          <select class="inp svr-select" id="svrService"><option value="">همه</option></select>
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">وضعیت پرداخت</label>
+          <select class="inp svr-select" id="svrPayStatus">
+            <option value="-1">همه</option>
+            <option value="1">پرداخت شده</option>
+            <option value="0">پرداخت نشده</option>
+          </select>
+        </div>
+        <div class="svr-tb-group">
+          <input type="text" class="inp svr-search" id="svrSearch" placeholder="جستجو…" />
+        </div>
+      </div>
+      <div class="svr-tb-row">
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">سایز کاغذ</label>
+          <select class="inp svr-select" id="svrPaper">
+            <option value="R80">رول حرارتی ۸۰ میلی‌متر</option>
+            <option value="R58">رول حرارتی ۵۷ میلی‌متر</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+        </div>
+        <div class="svr-tb-group svr-orient-group" id="svrOrientGroup">
+          <label class="svr-tb-lbl">جهت کاغذ</label>
+          <select class="inp svr-select" id="svrOrient">
+            <option value="0">عمودی</option>
+            <option value="1">افقی</option>
+          </select>
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">حاشیه‌ها</label>
+          <input type="number" class="inp svr-num" id="svrMargin" value="5" min="0" max="30" />
+        </div>
+        <div class="svr-tb-group">
+          <label class="svr-tb-lbl">مقیاس</label>
+          <input type="number" class="inp svr-num" id="svrScale" value="100" min="50" max="200" />
+        </div>
+        <div class="svr-tb-group svr-chk-group">
+          <label class="svr-chk"><input type="checkbox" id="svrMono" /> چاپ تک‌رنگ</label>
+        </div>
+        <div class="svr-tb-group svr-chk-group">
+          <label class="svr-chk"><input type="checkbox" id="svrRepeatHeader" checked /> تکرار سربرگ در هر صفحه</label>
+        </div>
+        <div class="svr-tb-actions">
+          <button type="button" class="btn btn-sm" id="svrRefresh">بروزرسانی</button>
+          <button type="button" class="btn btn-sm" id="svrExcel">خروجی اکسل</button>
+          <button type="button" class="btn btn-sm" id="svrPreview">پیش‌نمایش چاپ</button>
+          <button type="button" class="btn btn-sm btn-primary" id="svrPrint">چاپ</button>
+          <button type="button" class="btn btn-sm" id="svrSettings">تنظیمات</button>
+        </div>
+      </div>
+      <div class="svr-tb-row svr-tb-info">
+        <span class="svr-pagecount" id="svrPageCount"></span>
+      </div>
+    </header>
+    <div class="svr-body" id="svrBody">
+      <div class="svr-loading" id="svrLoading">
+        <div class="svr-loading-box">
+          <div class="svr-loading-spin"></div>
+          <div class="svr-loading-text" id="svrLoadingText">در حال آماده‌سازی گزارش</div>
+          <div class="svr-loading-prog" id="svrLoadingProg"></div>
+        </div>
+      </div>
+      <div class="svr-pages" id="svrPages"></div>
+    </div>
+  </section>
+
+  <!-- SVREPORT SETTINGS DIALOG (hidden by default) -->
+  <div class="svr-settings-dlg" id="svrSettingsDlg" style="display:none">
+    <div class="svr-settings-card">
+      <div class="svr-settings-title">تنظیمات گزارش</div>
+      <label class="svr-chk"><input type="checkbox" id="svrSetHighlight" checked /> هایلایت بیماران دارای بیمه تکمیلی</label>
+      <label class="svr-chk"><input type="checkbox" id="svrSetFont" /> افزایش اندازه فونت</label>
+      <label class="svr-chk"><input type="checkbox" id="svrSetDensity" /> تراکم ردیف‌های فشرده</label>
+      <label class="svr-chk"><input type="checkbox" id="svrSetExcelMulti" /> اکسل: یک شیت به ازای هر خدمت</label>
+      <div class="svr-settings-btns">
+        <button type="button" class="btn btn-sm" id="svrSetClose">بستن</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast"></div>

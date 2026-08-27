@@ -975,6 +975,58 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return Receipt_SearchJson(q);
     }
     if(verb=="receipt.sections") return Receipt_SectionsJson();
+
+    // ---- v2.01 (Part D): «به تفکیک خدمات» report verbs ------------------
+    if(verb=="svreport.data"){
+        SvReportQuery rq;
+        std::string tmp;
+        if(jsonGetString(body,"from",tmp)) rq.fromJalali=u82w(tmp);
+        if(jsonGetString(body,"to",tmp))   rq.toJalali=u82w(tmp);
+        double dN;
+        if(jsonGetNumber(body,"shiftId",dN)) rq.shiftId=(int)llround(dN);
+        if(jsonGetNumber(body,"sectionId",dN)) rq.sectionId=(int)llround(dN);
+        if(jsonGetString(body,"doctor",tmp)) rq.doctorName=u82w(tmp);
+        if(jsonGetString(body,"serviceCode",tmp)) rq.serviceCode=u82w(tmp);
+        if(jsonGetNumber(body,"payStatus",dN)) rq.payStatus=(int)llround(dN);
+        // Default dates to today if empty.
+        if(rq.fromJalali.empty()||rq.toJalali.empty()){
+            SYSTEMTIME st=iranNow();
+            std::wstring today=jalaliDateShort(st);
+            if(rq.fromJalali.empty()) rq.fromJalali=today;
+            if(rq.toJalali.empty()) rq.toJalali=today;
+        }
+        return SvReport_Json(rq);
+    }
+    if(verb=="svreport.sections"){
+        // Same as receipt.sections — active top-level sections for the filter.
+        return Receipt_SectionsJson();
+    }
+    if(verb=="svreport.shifts"){
+        // List shift definitions for the filter dropdown.
+        auto defs=loadShiftDefs();
+        std::string o="{\"ok\":true,\"rows\":[";
+        bool first=true;
+        for(const auto& d : defs){
+            if(!first) o+=","; first=false;
+            o+="{\"id\":"+std::to_string(d.id)+",\"name\":"+jstr(d.name)+"}";
+        }
+        o+="]}";
+        return o;
+    }
+    if(verb=="svreport.services"){
+        // List all active services for the filter dropdown.
+        auto svcs=loadServices();
+        std::string o="{\"ok\":true,\"rows\":[";
+        bool first=true;
+        for(const auto& s : svcs){
+            if(s.status!=1) continue;
+            if(!first) o+=","; first=false;
+            o+="{\"code\":"+jstr(s.code)+",\"name\":"+jstr(s.name)+"}";
+        }
+        o+="]}";
+        return o;
+    }
+
     if(verb=="receipt.get"){
         std::string idU; jsonGetString(body,"id",idU);
         return Cash_GetJson(u82w(idU));
@@ -1280,6 +1332,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="receipts")   RunOnUiThread([](){ Reception_OpenReceipts(); });
         else if(kind=="portal")     RunOnUiThread([](){ Reception_OpenPortal(); });
         else if(kind=="blacklist")  RunOnUiThread([](){ Reception_OpenBlacklist(); });
+        else if(kind=="svreport")   RunOnUiThread([](){ Reception_OpenSvReport(); });
         else if(kind=="empty")      RunOnUiThread([](){ Reception_OpenNewTab(); });
         else if(kind=="admission")  RunOnUiThread([](){ Reception_OpenAdmissionNew(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
