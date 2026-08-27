@@ -597,6 +597,7 @@ void Reception_OpenQueue();
 void Reception_OpenReceipts();
 void Reception_OpenPortal();
 void Reception_OpenBlacklist();
+void Reception_OpenSvReport();   // v2.01: «به تفکیک خدمات» report
 void Reception_OpenNewTab();
 void Reception_OpenAdmissionNew();
 void Reception_OpenAdmissionTicket(const std::string& ticketJson);

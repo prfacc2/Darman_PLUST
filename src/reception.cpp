@@ -125,7 +125,8 @@ enum TabKind {
     TK_QUEUE       = 5,   // v1.85: native «صندوق نرفته‌ها و صف پذیرش» web surface
     TK_RECEIPTS    = 6,   // v1.88: native «جستجوی قبض» web surface (was in-page)
     TK_DASH        = 7,   // v1.89: native «داشبورد» — the permanent landing tab
-    TK_BLACKLIST   = 8    // v1.94: لیست سیاه بیماران — HTML surface
+    TK_BLACKLIST   = 8,   // v1.94: لیست سیاه بیماران — HTML surface
+    TK_SVREPORT    = 9    // v2.01: «به تفکیک خدمات» — per-service breakdown report
 };
 struct TabPage {
     HWND page;                // container window (child of reception)
@@ -564,6 +565,7 @@ static int tabIconFor(int kind){
     if(kind==TK_RECEIPTS) return ICO_RECEIPT; // جستجوی قبض — receipt glyph
     if(kind==TK_DASH)    return ICO_HOME;     // داشبورد — home glyph
     if(kind==TK_BLACKLIST) return ICO_ID;     // لیست سیاه — national-id card glyph
+    if(kind==TK_SVREPORT) return ICO_RECEIPT; // به تفکیک خدمات — report glyph
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
@@ -2783,6 +2785,7 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             else if(t->kind==TK_DASH) surf="dash";
             else if(t->kind==TK_PORTAL) surf="portal";
             else if(t->kind==TK_BLACKLIST) surf="blacklist";
+            else if(t->kind==TK_SVREPORT) surf="svreport";
             HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
             if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
         }
@@ -4798,6 +4801,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_RECEIPTS)  t->title=L"جستجوی قبض";
     else if(kind==TK_DASH)      t->title=L"داشبورد";
     else if(kind==TK_BLACKLIST) t->title=L"لیست سیاه بیماران";
+    else if(kind==TK_SVREPORT) t->title=L"به تفکیک خدمات";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5611,6 +5615,11 @@ void Reception_OpenBlacklist(){
     if(!h) h=createReceptionScreen(g_hFrame);
     if(!h) return;
     activateKind(h, TK_BLACKLIST);
+}
+// v2.01 (Part D): «به تفکیک خدمات» — per-service breakdown report.
+void Reception_OpenSvReport(){
+    HWND h=recWnd(); if(!h) return;
+    activateKind(h, TK_SVREPORT);
 }
 // v1.89.0: dashboard app-icon actions — portal / new empty tab / fresh
 // admission (the «پذیرش بیمار» behaviour that used to live in the removed

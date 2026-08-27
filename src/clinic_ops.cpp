@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <map>
 
 // ---------------------------------------------------------------------------
 //  small local helpers
@@ -1385,3 +1386,149 @@ static std::string opsPickBak(bool save){
 }
 std::string OpsBackup_PickSave(){ return opsPickBak(true); }
 std::string OpsBackup_PickOpen(){ return opsPickBak(false); }
+
+// ===========================================================================
+//  v2.01 (Part D) — «به تفکیک خدمات» per-service breakdown report
+// ===========================================================================
+
+// Parse a ticket's servicesJson into {code, name} pairs.
+struct SvcLineLite { std::wstring code, name; };
+static std::vector<SvcLineLite> parseTicketServices(const std::wstring& js){
+    std::vector<SvcLineLite> out;
+    size_t p=0;
+    while(true){
+        size_t c=js.find(L"\"code\":\"",p); if(c==std::wstring::npos) break;
+        c+=8; size_t ce=js.find(L'"',c); if(ce==std::wstring::npos) break;
+        SvcLineLite s; s.code=js.substr(c,ce-c);
+        size_t n=js.find(L"\"name\":\"",ce); if(n==std::wstring::npos) break;
+        n+=8; size_t ne=js.find(L'"',n); if(ne==std::wstring::npos) break;
+        s.name=js.substr(n,ne-n);
+        out.push_back(s);
+        p=ne+1;
+    }
+    return out;
+}
+
+std::string SvReport_Json(const SvReportQuery& q){
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto tickets=cashLoad();
+
+    struct ReportRow {
+        int seq;
+        std::wstring name, nid, insBase, insSupp, insCombo;
+        bool paid;
+    };
+    struct ReportBlock {
+        std::wstring serviceName, serviceCode;
+        std::vector<ReportRow> rows;
+        int paidCount=0;
+    };
+
+    std::vector<ReportBlock> blocks;
+    std::map<std::wstring,int> blockIdx;
+
+    auto inDateRange=[&](const std::wstring& d)->bool{
+        if(d.empty()) return false;
+        if(!q.fromJalali.empty() && d<q.fromJalali) return false;
+        if(!q.toJalali.empty() && d>q.toJalali) return false;
+        return true;
+    };
+
+    auto shiftMatches=[&](const std::wstring& tShift)->bool{
+        if(q.shiftId<0) return true;
+        int sid=shiftIdByStoredName(tShift);
+        if(sid>=0) return sid==q.shiftId;
+        return tShift==shiftDisplayName(q.shiftId);
+    };
+
+    int totalRecords=0;
+
+    for(const auto& t : tickets){
+        if(t.status==L"cancelled") continue;
+        std::wstring d=t.jdate.empty()?t.apptDate:t.jdate;
+        if(!inDateRange(d)) continue;
+        if(!shiftMatches(t.shift)) continue;
+        if(q.sectionId>0){
+            if(t.sectionId!=q.sectionId && t.subId!=q.sectionId) continue;
+        }
+        if(!q.doctorName.empty() && t.doctor!=q.doctorName) continue;
+        bool isPaid = (t.paid>0);
+        if(q.payStatus==0 && isPaid) continue;
+        if(q.payStatus==1 && !isPaid) continue;
+
+        auto svcs=parseTicketServices(t.servicesJson);
+        for(const auto& s : svcs){
+            if(!q.serviceCode.empty() && s.code!=q.serviceCode) continue;
+
+            auto it=blockIdx.find(s.code);
+            if(it==blockIdx.end()){
+                ReportBlock blk;
+                blk.serviceName=s.name;
+                blk.serviceCode=s.code;
+                blocks.push_back(blk);
+                blockIdx[s.code]=(int)blocks.size()-1;
+                it=blockIdx.find(s.code);
+            }
+            ReportBlock& blk=blocks[it->second];
+            if(!s.name.empty()) blk.serviceName=s.name;
+
+            std::wstring insBase=t.insBase.empty()?L"آزاد":t.insBase;
+            std::wstring combo;
+            if(t.insSupp.empty() || t.insSupp==L"ندارد"){
+                combo=insBase;
+            } else {
+                combo=insBase+L"/"+t.insSupp;
+            }
+
+            ReportRow row;
+            row.seq=_wtoi(t.turn.c_str());
+            if(row.seq<=0) row.seq=(int)t.receiptNo.empty()?0:_wtoi(t.receiptNo.c_str());
+            row.name=t.first+L" "+t.last;
+            row.nid=t.nid;
+            row.insBase=insBase;
+            row.insSupp=t.insSupp;
+            row.insCombo=combo;
+            row.paid=isPaid;
+
+            blk.rows.push_back(row);
+            if(isPaid) blk.paidCount++;
+            totalRecords++;
+        }
+    }
+
+    std::string o="{\"ok\":true,";
+    o+="\"totalRecords\":"+opsJnum(totalRecords)+",";
+    o+="\"blocks\":[";
+    for(size_t i=0;i<blocks.size();++i){
+        const auto& blk=blocks[i];
+        if(i) o+=",";
+        o+="{\"serviceName\":"+opsJstr(blk.serviceName)+",";
+        o+="\"serviceCode\":"+opsJstr(blk.serviceCode)+",";
+        o+="\"total\":"+opsJnum((long long)blk.rows.size())+",";
+        o+="\"paidCount\":"+opsJnum((long long)blk.paidCount)+",";
+        o+="\"rows\":[";
+        for(size_t j=0;j<blk.rows.size();++j){
+            const auto& r=blk.rows[j];
+            if(j) o+=",";
+            o+="{\"seq\":"+opsJnum((long long)r.seq)+",";
+            o+="\"name\":"+opsJstr(r.name)+",";
+            o+="\"nid\":"+opsJstr(r.nid)+",";
+            o+="\"insBase\":"+opsJstr(r.insBase)+",";
+            o+="\"insSupp\":"+opsJstr(r.insSupp)+",";
+            o+="\"insCombo\":"+opsJstr(r.insCombo)+",";
+            o+="\"paid\":"+std::string(r.paid?"true":"false")+"}";
+        }
+        o+="]}";
+    }
+    o+="],";
+    SYSTEMTIME st=iranNow();
+    std::wstring shiftLabel=shiftDisplayName(g_session.shift);
+    std::wstring timeStr=iranTimeStr(st,false);
+    std::wstring dateStr=jalaliDateShort(st);
+    o+="\"footer\":{\"shift\":"+opsJstr(shiftLabel)+",";
+    o+="\"time\":"+opsJstr(timeStr)+",";
+    o+="\"date\":"+opsJstr(dateStr)+",";
+    o+="\"user\":"+opsJstr(g_session.user.fullname)+"}";
+    o+="}";
+    return o;
+}

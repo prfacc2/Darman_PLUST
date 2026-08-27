@@ -1693,6 +1693,9 @@
     on($('toolsQueue'), 'click', function () {
       Bridge.call('ui.openTab', { kind: 'queue' });
     });
+    on($('toolsSvReport'), 'click', function () {
+      Bridge.call('ui.openTab', { kind: 'svreport' });
+    });
     /* v1.87: tools hamburger drawer (categorised, searchable) + grid filter. */
     (function () {
       var drawer = $('toolsDrawer'), bk = $('toolsDrawerBk');
@@ -2026,16 +2029,6 @@
     zoomIndicatorTimer = setTimeout(function () {
       el.className = 'zoom-indicator';
     }, 1200);
-  }
-  function toFa(n) {
-    var s = String(n);
-    var fa = '۰۱۲۳۴۵۶۷۸۹';
-    var o = '';
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charAt(i);
-      o += (c >= '0' && c <= '9') ? fa.charAt(+c) : c;
-    }
-    return o;
   }
 
   /* v1.79.0: TRIDENT SCROLL-REPAINT FIX. The clinic reported that after
@@ -3953,6 +3946,296 @@
     '</tr>';
   }
 
+  /* =========================================================================
+     v2.01 (Part D) — «به تفکیک خدمات» per-service breakdown report
+     Progressive loading, paper-size pagination, Excel export, live sync.
+     ====================================================================== */
+  var svr = {
+    data: null,
+    paper: 'R80', orient: 0, margin: 5, scale: 100,
+    mono: false, repeatHdr: true, highlight: true,
+    fontLarge: false, dense: false, excelMulti: false,
+    building: false, buildToken: 0
+  };
+  var svrPaperDims = { R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
+
+  function svrFa(n) {
+    var s = String(n || ''), fa = '۰۱۲۳۴۵۶۷۸۹', o = '';
+    for (var i = 0; i < s.length; i++) { var c = s.charAt(i); o += (c >= '0' && c <= '9') ? fa.charAt(+c) : c; }
+    return o;
+  }
+  function svrEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function svrSelVal(id) { var el = $(id); return (el && el.tagName === 'SELECT') ? parseInt(el.value, 10) : -1; }
+
+  function svReportInit() {
+    if (state.surface !== 'svreport') return;
+    // Load filter dropdowns.
+    Bridge.call('svreport.shifts', {}).then(function (d) {
+      if (d && d.rows) {
+        var sel = $('svrShift'); if (sel) { sel.innerHTML = '<option value="-1">همه</option>';
+          for (var i = 0; i < d.rows.length; i++) sel.innerHTML += '<option value="' + d.rows[i].id + '">' + d.rows[i].name + '</option>'; }
+      }
+    });
+    Bridge.call('svreport.sections', {}).then(function (d) {
+      if (d && d.rows) {
+        var sel = $('svrSection'); if (sel) { sel.innerHTML = '<option value="-1">همه</option>';
+          for (var i = 0; i < d.rows.length; i++) sel.innerHTML += '<option value="' + d.rows[i].id + '">' + d.rows[i].name + '</option>'; }
+      }
+    });
+    Bridge.call('svreport.services', {}).then(function (d) {
+      if (d && d.rows) {
+        var sel = $('svrService'); if (sel) { sel.innerHTML = '<option value="">همه</option>';
+          for (var i = 0; i < d.rows.length; i++) sel.innerHTML += '<option value="' + d.rows[i].code + '">' + d.rows[i].name + '</option>'; }
+      }
+    });
+    if (state.date) { var fd = $('svrFrom'), td = $('svrTo');
+      if (fd && !fd.value) fd.value = state.date; if (td && !td.value) td.value = state.date; }
+    // Wire actions.
+    on($('svrRefresh'), 'click', function () { svrBuild(); });
+    on($('svrFrom'), 'change', function () { svrBuild(); });
+    on($('svrTo'), 'change', function () { svrBuild(); });
+    on($('svrShift'), 'change', function () { svrBuild(); });
+    on($('svrSection'), 'change', function () { svrBuild(); });
+    on($('svrService'), 'change', function () { svrBuild(); });
+    on($('svrPayStatus'), 'change', function () { svrBuild(); });
+    on($('svrSearch'), 'keyup', function () { svrRender(); });
+    on($('svrPaper'), 'change', function () { svr.paper = $('svrPaper').value;
+      var og = $('svrOrientGroup'); if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
+      svrRender(); });
+    on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10); svrRender(); });
+    on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; svrRender(); });
+    on($('svrScale'), 'change', function () { svr.scale = parseInt($('svrScale').value, 10) || 100; svrRender(); });
+    on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; svrRender(); });
+    on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; svrRender(); });
+    on($('svrExcel'), 'click', function () { svrExportExcel(); });
+    on($('svrPreview'), 'click', function () { svrPrint(true); });
+    on($('svrPrint'), 'click', function () { svrPrint(false); });
+    on($('svrSettings'), 'click', function () { svrToggleSettings(); });
+    on($('svrSetClose'), 'click', function () { svrToggleSettings(); });
+    on($('svrSetHighlight'), 'change', function () { svr.highlight = $('svrSetHighlight').checked; svrRender(); });
+    on($('svrSetFont'), 'change', function () { svr.fontLarge = $('svrSetFont').checked; svrRender(); });
+    on($('svrSetDensity'), 'change', function () { svr.dense = $('svrSetDensity').checked; svrRender(); });
+    on($('svrSetExcelMulti'), 'change', function () { svr.excelMulti = $('svrSetExcelMulti').checked; });
+    // Live sync: refresh on cashier/queue/shift events.
+    Bridge.on('cashier.changed', function () { if (state.surface === 'svreport') svrBuild(); });
+    Bridge.on('queue.update', function () { if (state.surface === 'svreport') svrBuild(); });
+    Bridge.on('shift.changed', function () { if (state.surface === 'svreport') svrBuild(); });
+    svrBuild();
+  }
+
+  function svrToggleSettings() { var dlg = $('svrSettingsDlg'); if (dlg) dlg.style.display = dlg.style.display === 'none' ? '' : 'none'; }
+
+  function svrBuild() {
+    if (state.surface !== 'svreport') return;
+    var token = ++svr.buildToken;
+    svr.building = true;
+    var loading = $('svrLoading');
+    if (loading) loading.style.display = 'flex';
+    var lt = $('svrLoadingText'); if (lt) lt.textContent = 'در حال آماده‌سازی گزارش';
+    var lp = $('svrLoadingProg'); if (lp) lp.style.width = '0%';
+    var from = $('svrFrom'), to = $('svrTo');
+    var q = {
+      from: from ? from.value : '', to: to ? to.value : '',
+      shiftId: svrSelVal('svrShift'), sectionId: svrSelVal('svrSection'),
+      doctor: $('svrDoctor') ? $('svrDoctor').value : '',
+      serviceCode: $('svrService') ? $('svrService').value : '',
+      payStatus: svrSelVal('svrPayStatus')
+    };
+    Bridge.call('svreport.data', q).then(function (d) {
+      if (token !== svr.buildToken) return;
+      svr.data = d; svr.building = false;
+      svrRenderProgressive(token);
+    }).fail(function () {
+      if (token !== svr.buildToken) return;
+      svr.building = false;
+      if (loading) loading.style.display = 'none';
+      var pages = $('svrPages'); if (pages) pages.innerHTML = '<div class="svr-error">خطا در آماده‌سازی گزارش</div>';
+    });
+  }
+
+  function svrRenderProgressive(token) {
+    var d = svr.data;
+    if (!d || !d.ok) { var loading = $('svrLoading'); if (loading) loading.style.display = 'none'; return; }
+    var blocks = d.blocks || [];
+    var lt = $('svrLoadingText'), lp = $('svrLoadingProg'), pages = $('svrPages');
+    if (pages) pages.innerHTML = '';
+    var i = 0;
+    function buildChunk() {
+      if (token !== svr.buildToken) return;
+      var chunk = 3;
+      while (i < blocks.length && chunk > 0) { pages.appendChild(svrBlockHtml(blocks[i], d)); i++; chunk--; }
+      if (i < blocks.length) {
+        if (lt) lt.textContent = 'در حال آماده‌سازی صفحه ' + svrFa(i) + ' از ' + svrFa(blocks.length);
+        if (lp) lp.style.width = Math.round(i / blocks.length * 100) + '%';
+        setTimeout(buildChunk, 0);
+      } else {
+        if (lp) lp.style.width = '100%';
+        var l2 = $('svrLoading'); if (l2) { l2.style.opacity = '0'; setTimeout(function () { if (l2) l2.style.display = 'none'; }, 300); }
+        var body = $('svrBody'); if (body) body.scrollTop = 0;
+        svrUpdatePageCount();
+      }
+    }
+    if (blocks.length === 0) {
+      if (pages) pages.innerHTML = '<div class="svr-empty">در بازهٔ زمانی انتخاب‌شده موردی یافت نشد</div>';
+      if (loading) loading.style.display = 'none'; svrUpdatePageCount();
+    } else { buildChunk(); }
+  }
+
+  function svrBlockHtml(blk, d) {
+    var rows = blk.rows || [], total = blk.total || 0, paidCount = blk.paidCount || 0;
+    var searchQ = ($('svrSearch') && $('svrSearch').value || '').toLowerCase();
+    var showHl = svr.highlight && !svr.mono;
+    var div = document.createElement('div'); div.className = 'svr-block';
+    var html = '<div class="svr-block-title">' + svrEsc(blk.serviceName) + '</div>';
+    html += '<table class="svr-tbl' + (svr.mono ? ' svr-mono' : '') + (svr.dense ? ' svr-dense' : '') + '">';
+    html += '<thead><tr><th class="svr-c-seq">ردیف</th><th class="svr-c-name">نام بیمار</th><th class="svr-c-ins">بیمه پایه / تکمیلی</th><th class="svr-c-status">وضعیت</th></tr></thead><tbody>';
+    for (var j = 0; j < rows.length; j++) {
+      var r = rows[j];
+      if (searchQ) { var hay = (r.name + ' ' + r.nid + ' ' + r.insCombo + ' ' + blk.serviceName).toLowerCase(); if (hay.indexOf(searchQ) < 0) continue; }
+      var hasSupp = r.insSupp && r.insSupp !== 'ندارد' && r.insSupp !== '';
+      var cls = (showHl && hasSupp) ? 'svr-row-hl' : '';
+      var st = r.paid ? '<span class="svr-paid">پرداخت &#10003;</span>' : '<span class="svr-unpaid">پرداخت نشده &#10007;</span>';
+      if (svr.mono) st = r.paid ? 'پرداخت [✓]' : 'پرداخت نشده [✕]';
+      html += '<tr class="' + cls + '">';
+      html += '<td class="svr-c-seq">' + svrFa(r.seq) + '</td>';
+      html += '<td class="svr-c-name">' + svrEsc(r.name) + '</td>';
+      html += '<td class="svr-c-ins">' + svrEsc(r.insCombo) + '</td>';
+      html += '<td class="svr-c-status">' + st + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody><tfoot><tr class="svr-totals">';
+    html += '<td colspan="2" class="svr-total-cell">تعداد کل ' + svrFa(total) + '</td>';
+    html += '<td colspan="2" class="svr-total-cell">پرداخت شده ' + svrFa(paidCount) + '</td>';
+    html += '</tr></tfoot></table>';
+    div.innerHTML = html;
+    return div;
+  }
+
+  function svrRender() {
+    if (!svr.data) return;
+    svr.buildToken++;
+    var pages = $('svrPages'); if (pages) pages.innerHTML = '';
+    var blocks = svr.data.blocks || [];
+    if (blocks.length === 0) {
+      if (pages) pages.innerHTML = '<div class="svr-empty">در بازهٔ زمانی انتخاب‌شده موردی یافت نشد</div>';
+      svrUpdatePageCount(); return;
+    }
+    // Report header (از تاریخ / تا تاریخ + count badge).
+    var hdr = document.createElement('div'); hdr.className = 'svr-report-hdr';
+    hdr.innerHTML = '<div class="svr-hdr-dates"><div>از تاریخ :  ' + svrEsc($('svrFrom') ? $('svrFrom').value : '') + '</div>'
+      + '<div>تا تاریخ :  ' + svrEsc($('svrTo') ? $('svrTo').value : '') + '</div></div>'
+      + '<div class="svr-hdr-count">(' + svrFa(svr.data.totalRecords || 0) + ')</div>';
+    pages.appendChild(hdr);
+    for (var i = 0; i < blocks.length; i++) pages.appendChild(svrBlockHtml(blocks[i], svr.data));
+    // Footer.
+    if (svr.data.footer) {
+      var f = svr.data.footer, ft = document.createElement('div'); ft.className = 'svr-footer';
+      ft.innerHTML = 'زمان و تاریخ چاپ :  ' + svrEsc(f.shift || '') + '  ' + svrEsc(f.time || '') + '  ' + svrEsc(f.date || '') +
+        (f.user ? '  کاربر :  ' + svrEsc(f.user) : '');
+      pages.appendChild(ft);
+    }
+    svrUpdatePageCount();
+  }
+
+  function svrUpdatePageCount() {
+    var el = $('svrPageCount'); if (!el) return;
+    var dims = svrPaperDims[svr.paper] || svrPaperDims.R80;
+    var pw = svr.orient ? dims[1] : dims[0];
+    if (svr.paper === 'R80' || svr.paper === 'R58') {
+      var pages = $('svrPages'); var h = pages ? pages.offsetHeight : 0;
+      var mm = Math.round(h / 3.78); el.textContent = 'طول رول: ' + svrFa((mm / 1000).toFixed(1)) + ' متر';
+    } else {
+      var pages2 = $('svrPages'); var h2 = pages2 ? pages2.offsetHeight : 0;
+      var phm = svr.orient ? dims[0] : dims[1]; var usableH = (phm - 2 * svr.margin);
+      var pxPerPage = usableH * 3.78; var pc = Math.max(1, Math.ceil(h2 / pxPerPage));
+      el.textContent = svrFa(pc) + ' برگ ' + svr.paper;
+    }
+  }
+
+  function svrPrint(previewOnly) {
+    var pages = $('svrPages'); if (!pages) return;
+    var css = svrGetPrintCss();
+    var html = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><style>' + css + '</style></head><body class="svr-print-body">' + pages.innerHTML + '</body></html>';
+    var w = window.open('', '_blank'); if (!w) { toast('باز کردن پنجره چاپ ناموفق بود', 'err'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+    if (!previewOnly) setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
+  }
+
+  function svrGetPrintCss() {
+    var dims = svrPaperDims[svr.paper] || svrPaperDims.R80;
+    var pw = svr.orient ? dims[1] : dims[0], ph = svr.orient ? dims[0] : dims[1], m = svr.margin;
+    var fs = svr.fontLarge ? 14 : 12;
+    var c = '';
+    c += '@page{size:' + pw + 'mm ' + (svr.paper === 'R80' || svr.paper === 'R58' ? 'auto' : ph + 'mm') + ';margin:' + m + 'mm;}';
+    c += 'body{font-family:Vazirmatn,Tahoma,sans-serif;direction:rtl;font-size:' + fs + 'px;color:#1A2435;}';
+    c += '.svr-block{margin-bottom:8px;page-break-inside:avoid;}';
+    c += '.svr-block-title{background:' + (svr.mono ? '#f0f0f0' : '#E8EDF5') + ';border:1px solid #A8B5CC;padding:6px 10px;font-weight:700;text-align:center;border-radius:4px 4px 0 0;}';
+    c += '.svr-tbl{width:100%;border-collapse:collapse;}';
+    c += '.svr-tbl th,.svr-tbl td{border:1px solid #A8B5CC;padding:' + (svr.dense ? '2px 4px' : '4px 6px') + ';}';
+    c += '.svr-tbl th{background:' + (svr.mono ? '#f0f0f0' : '#DDE4EF') + ';font-weight:700;text-align:center;}';
+    c += '.svr-c-seq{text-align:center;width:40px;white-space:nowrap;}';
+    c += '.svr-c-name{text-align:right;}';
+    c += '.svr-c-ins{text-align:center;}';
+    c += '.svr-c-status{text-align:center;white-space:nowrap;}';
+    c += '.svr-row-hl{background:' + (svr.mono ? 'transparent' : '#E8F5E9') + ';}';
+    c += '.svr-paid{color:' + (svr.mono ? '#000' : '#059669') + ';font-weight:700;}';
+    c += '.svr-unpaid{color:' + (svr.mono ? '#000' : '#DC2626') + ';font-weight:700;}';
+    c += '.svr-totals{background:' + (svr.mono ? '#f0f0f0' : '#F5E6C8') + ';font-weight:700;}';
+    c += '.svr-total-cell{text-align:center;}';
+    c += '.svr-report-hdr{display:flex;justify-content:space-between;margin-bottom:8px;}';
+    c += '.svr-hdr-dates{text-align:right;}';
+    c += '.svr-hdr-count{font-weight:700;}';
+    c += '.svr-footer{margin-top:10px;padding-top:6px;border-top:1px solid #A8B5CC;text-align:center;font-size:' + (fs - 1) + 'px;}';
+    if (svr.repeatHdr) { c += '.svr-block{page-break-inside:auto;}.svr-block-title{page-break-after:avoid;}'; }
+    return c;
+  }
+
+  function svrExportExcel() {
+    if (!svr.data || !svr.data.ok) { toast('داده‌ای برای خروجی وجود ندارد', 'err'); return; }
+    var d = svr.data, blocks = d.blocks || [];
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>';
+    if (svr.excelMulti) {
+      for (var i = 0; i < blocks.length; i++) html += '<x:ExcelWorksheet><x:Name>' + svrSheetName(blocks[i].serviceName) + '</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/></x:WorksheetOptions></x:ExcelWorksheet>';
+    } else {
+      html += '<x:ExcelWorksheet><x:Name>گزارش</x:Name><x:WorksheetOptions><x:DisplayRightToLeft/></x:WorksheetOptions></x:ExcelWorksheet>';
+    }
+    html += '</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+    html += '<style>td,th{border:1px solid #A8B5CC;font-family:Vazirmatn,Tahoma;}.hl{background:#E8F5E9;}.tot{background:#F5E6C8;font-weight:bold;}.title{background:#E8EDF5;font-weight:bold;text-align:center;}.hdr{font-weight:bold;background:#DDE4EF;text-align:center;}</style>';
+    html += '</head><body dir="rtl">';
+    var fromV = $('svrFrom') ? $('svrFrom').value : '', toV = $('svrTo') ? $('svrTo').value : '';
+    if (!svr.excelMulti) html += '<table border="1"><tr><td colspan="4" style="text-align:right">از تاریخ :  ' + fromV + ' &nbsp; تا تاریخ :  ' + toV + ' &nbsp; (' + svrFa(d.totalRecords) + ')</td></tr></table><br/>';
+    for (var b = 0; b < blocks.length; b++) {
+      var blk = blocks[b];
+      if (svr.excelMulti && b > 0) html += '<br style="page-break-before:always"/>';
+      html += '<table border="1">';
+      html += '<tr><td colspan="4" class="title">' + svrEsc(blk.serviceName) + '</td></tr>';
+      html += '<tr><th class="hdr">ردیف</th><th class="hdr">نام بیمار</th><th class="hdr">بیمه پایه / تکمیلی</th><th class="hdr">وضعیت</th></tr>';
+      for (var r = 0; r < blk.rows.length; r++) {
+        var row = blk.rows[r], hasSupp = row.insSupp && row.insSupp !== 'ندارد' && row.insSupp !== '';
+        var cls = (svr.highlight && hasSupp) ? ' class="hl"' : '';
+        var st = row.paid ? 'پرداخت ✓' : 'پرداخت نشده ✕';
+        html += '<tr' + cls + '><td style="text-align:center">' + svrFa(row.seq) + '</td><td>' + svrEsc(row.name) + '</td><td style="text-align:center">' + svrEsc(row.insCombo) + '</td><td style="text-align:center">' + st + '</td></tr>';
+      }
+      html += '<tr class="tot"><td colspan="2" style="text-align:center">تعداد کل ' + svrFa(blk.total) + '</td><td colspan="2" style="text-align:center">پرداخت شده ' + svrFa(blk.paidCount) + '</td></tr>';
+      html += '</table>';
+      if (!svr.excelMulti) html += '<br/>';
+    }
+    if (d.footer) {
+      var f = d.footer;
+      html += '<table border="1"><tr><td colspan="4" style="text-align:center">زمان و تاریخ چاپ :  ' + svrEsc(f.shift || '') + '  ' + svrEsc(f.time || '') + '  ' + svrEsc(f.date || '') + (f.user ? '  کاربر :  ' + svrEsc(f.user) : '') + '</td></tr></table>';
+    }
+    html += '</body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'به_تفکیک_خدمات_' + (fromV || 'گزارش') + '.xls';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('خروجی اکسل آماده شد', 'ok');
+  }
+
+  function svrSheetName(name) { return String(name || '').replace(/[\\\/\?\*\[\]:]/g, '').substring(0, 31) || 'خدمت'; }
+
   function blacklistLoad() {
     var body = $('blBody');
     function fail() { if (body) body.innerHTML = '<tr><td colspan="7" class="bl-empty">بارگذاری ناموفق بود</td></tr>'; }
@@ -4072,11 +4355,11 @@
     var surf = window.__azSurface || 'admission';
     /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
        grid); the same HTML file renders it full-page via body.surface-rc. */
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal' && surf !== 'blacklist') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal' && surf !== 'blacklist' && surf !== 'svreport') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal|bl)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal|bl|svr)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
@@ -4084,6 +4367,7 @@
     else if (surf === 'dash') cls += ' surface-dash';
     else if (surf === 'portal') cls += ' surface-portal';
     else if (surf === 'blacklist') cls += ' surface-bl';
+    else if (surf === 'svreport') cls += ' surface-svr';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -4307,6 +4591,11 @@
         /* v1.94: blacklist management surface — wire buttons + load the table */
         blacklistWire();
         blacklistLoad();
+        return;
+      }
+      if (state.surface === 'svreport') {
+        /* v2.01: «به تفکیک خدمات» — per-service breakdown report */
+        svReportInit();
         return;
       }
       if (state.surface === 'dash') {
