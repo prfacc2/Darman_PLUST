@@ -192,8 +192,13 @@ bool SectionDesign_Resolve(int sectionId, PrintDesign& out);
 // Returns the number of stale bindings/files removed.
 int  SectionDesign_Cleanup();
 
+// v1.99: print design is per-MACHINE, not per-section.
+int  MachineDesign_Get();
+bool MachineDesign_Set(int designId);
+bool MachineDesign_Resolve(PrintDesign& out); // bound design or builtin Default
+
 // -------------------------------------------------------------- UI entries ---
-//  Management → "دیزاین چاپگر": opens the section picker then the editor.
+//  Management → "دیزاین چاپگر": opens the editor for THIS machine's printer.
 void PrintDesigner_Open(HWND hMain);
 //  Management → "بازگردانی دیزاین چاپ": import an .aztpl and apply to sections.
 void RestoreDesign_Open(HWND hMain);

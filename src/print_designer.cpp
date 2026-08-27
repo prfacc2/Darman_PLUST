@@ -483,5 +483,24 @@ int SectionDesign_Cleanup(){
     return removed;
 }
 
+int MachineDesign_Get(){
+    std::wstring s=getSetting(L"machine_design_id", L"0");
+    return _wtoi(s.c_str());
+}
+bool MachineDesign_Set(int designId){
+    wchar_t b[24]; swprintf(b,24,L"%d", designId);
+    setSetting(L"machine_design_id", b);
+    return true;
+}
+bool MachineDesign_Resolve(PrintDesign& out){
+    Designs_Init();
+    int did=MachineDesign_Get();
+    if(did>0 && Designs_Get(did,out) && !out.items.empty()) return true;
+    std::vector<PrintDesign> b; Designs_Builtins(b);
+    if(b.empty()){ out=Design_BuiltinTemplate(0); return !out.items.empty(); }
+    out=b[0];
+    return !out.items.empty();
+}
+
 #include "print_designer_templates.inc"
 #include "print_designer_ui.inc"

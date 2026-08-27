@@ -7812,3 +7812,166 @@ body.theme-neon .ticket-mini-rcpt,body.theme-neon .pay-mini-rcpt{color:#00F0FF;}
 .pay-mini.pay-mini-main .pay-mini-bar{display:none;}
 .pay-mini.pay-mini-main .pay-btn-disc{display:none;}
 .pay-mini.pay-mini-main .pay-mini-disc{display:none;}
+
+/* ==========================================================================
+   v1.99 — neon leak overrides. APPEND ONLY. Trident-safe: no custom properties.
+   Specificity body.theme-neon.surface-* (0,3,1) so ungated white/black loses.
+   ========================================================================== */
+
+/* ---- admission invoice / مبلغ نهایی: light ink, not black ---- */
+body.theme-neon.surface-adm .invoice-card{
+  background:#121828;border:1px solid #2A3458;color:#E8F6FF;
+}
+body.theme-neon.surface-adm .invoice-card .card-title,
+body.theme-neon.surface-adm .invoice-card .ct-ico{
+  color:#E8F6FF;
+}
+body.theme-neon.surface-adm .inv-line,
+body.theme-neon.surface-adm .inv-line span,
+body.theme-neon.surface-adm .inv-line b{
+  color:#E8F6FF;
+}
+body.theme-neon.surface-adm .inv-gtitle{
+  color:#00F0FF;border-bottom-color:#00F0FF;
+}
+body.theme-neon.surface-adm .inv-remain{
+  background:#0E1628;border:1px solid #00F0FF;color:#00F0FF;
+}
+body.theme-neon.surface-adm .inv-remain span,
+body.theme-neon.surface-adm .inv-remain b,
+body.theme-neon.surface-adm #invRemain{
+  color:#00F0FF;
+}
+body.theme-neon.surface-adm .payable-card{
+  background:#0E1628;border:1px solid #00F0FF;color:#E8F6FF;
+  background:linear-gradient(180deg,#151B2C 0%,#0E1628 100%);
+  -webkit-box-shadow:0 8px 22px rgba(0,240,255,.18);box-shadow:0 8px 22px rgba(0,240,255,.18);
+}
+body.theme-neon.surface-adm .payable-caption{
+  color:#00F0FF;
+}
+body.theme-neon.surface-adm .payable-value,
+body.theme-neon.surface-adm .payable-value b,
+body.theme-neon.surface-adm .payable-value span{
+  color:#E8F6FF;text-shadow:none;
+}
+
+/* ---- cashier table / wrap / thead / td: dark glass, light text ---- */
+body.theme-neon.surface-cash #cashWrap,
+body.theme-neon.surface-cash .tbl-wrap,
+body.theme-neon.surface-cash .queue-overlay-body .tbl-wrap{
+  background:#0E1628;border:1px solid #2A3458;color:#E8F6FF;
+}
+body.theme-neon.surface-cash .cash-tbl,
+body.theme-neon.surface-cash .q-tbl{
+  background:#0E1628;color:#E8F6FF;
+}
+body.theme-neon.surface-cash .cash-tbl thead,
+body.theme-neon.surface-cash .cash-tbl thead th,
+body.theme-neon.surface-cash .queue-overlay-body .tbl thead th,
+body.theme-neon.surface-cash .tbl thead th{
+  background:#151B2C;color:#E8F6FF;border-color:#2A3458;
+}
+body.theme-neon.surface-cash .cash-tbl tbody td,
+body.theme-neon.surface-cash .queue-overlay-body .tbl tbody td,
+body.theme-neon.surface-cash .tbl tbody td{
+  background:transparent;color:#E8F6FF;border-color:#2A3458;
+}
+body.theme-neon.surface-cash .cash-tbl tbody tr{background:#0E1628;}
+body.theme-neon.surface-cash .cash-tbl tbody tr:nth-child(even),
+body.theme-neon.surface-cash .queue-overlay-body .tbl tbody tr:nth-child(even){
+  background:#151B2C;
+}
+body.theme-neon.surface-cash .cash-tbl tbody tr:hover,
+body.theme-neon.surface-cash .queue-overlay-body .tbl tbody tr:hover{
+  background:#1A2438;
+}
+body.theme-neon.surface-cash .cash-tbl tbody tr.cash-unpaid{background:#2A2310;color:#E8F6FF;}
+body.theme-neon.surface-cash .cash-tbl tbody tr.cash-unpaid:hover{background:#3A2A10;}
+body.theme-neon.surface-cash .cash-tbl tbody td.empty,
+body.theme-neon.surface-cash .tbl tbody td.empty{color:#8090B0;background:#0E1628;}
+body.theme-neon.surface-cash .cash-manual,
+body.theme-neon.surface-cash #cashManualBox{
+  background:#151B2C;border:1px solid #2A3458;color:#E8F6FF;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.theme-neon.surface-cash .cash-manual .inp{
+  background:#0E1628;border:1px solid #2A3458;color:#E8F6FF;
+}
+body.theme-neon.surface-cash #cashManualBtn,
+body.theme-neon.surface-cash #cashManualBtn.btn,
+body.theme-neon.surface-cash #cashManualBtn.btn-primary{
+  background:#151B2C;border:1px solid #00F0FF;color:#E8F6FF;
+}
+
+/* ---- receipts header / toolbar / pager: dark glass, not white ---- */
+body.theme-neon.surface-rc .rc-header,
+body.theme-neon.surface-rc .tools-topbar{
+  background:#121828;border:1px solid #2A3458;color:#E8F6FF;
+  -webkit-box-shadow:0 8px 20px rgba(0,0,0,.40), inset 0 1px 0 rgba(0,240,255,.10);
+  box-shadow:0 8px 20px rgba(0,0,0,.40), inset 0 1px 0 rgba(0,240,255,.10);
+}
+body.theme-neon.surface-rc .rc-head-titles .tools-title,
+body.theme-neon.surface-rc .tools-title{color:#E8F6FF;}
+body.theme-neon.surface-rc .rc-head-sub{color:#8090B0;}
+body.theme-neon.surface-rc .rc-header .btn,
+body.theme-neon.surface-rc .rc-head-acts .btn,
+body.theme-neon.surface-rc .rc-pager,
+body.theme-neon.surface-rc .rc-pager .btn{
+  background:#151B2C;border:1px solid #2A3458;color:#E8F6FF;
+  -webkit-box-shadow:inset 0 1px 0 rgba(0,240,255,.08);box-shadow:inset 0 1px 0 rgba(0,240,255,.08);
+}
+body.theme-neon.surface-rc .rc-header .btn-danger,
+body.theme-neon.surface-rc .rc-head-acts .btn-danger{
+  color:#fff;border:1px solid #FF0066;
+  background:linear-gradient(180deg,#FF0066 0%,#CC0044 100%);
+}
+body.theme-neon.surface-rc .rc-page-lbl{color:#E8F6FF;}
+body.theme-neon.surface-rc .rc-pager{
+  background:#151B2C;border:1px solid #2A3458;
+}
+
+/* ---- queue overlay: list / search / table / hover dark, not white ---- */
+body.theme-neon.surface-queue .queue-overlay,
+body.theme-neon.surface-queue #queuePanel{
+  background:#0E1628;color:#E8F6FF;border:1px solid #2A3458;
+}
+body.theme-neon.surface-queue .queue-overlay-body,
+body.theme-neon.surface-queue .tbl-wrap,
+body.theme-neon.surface-queue #queueWrap{
+  background:#0E1628;border-color:#2A3458;color:#E8F6FF;
+}
+body.theme-neon.surface-queue .queue-overlay-head .head-tools .inp,
+body.theme-neon.surface-queue .q-search-wrap .inp,
+body.theme-neon.surface-queue #qSearch,
+body.theme-neon.surface-queue #qMinutes{
+  background:#151B2C;border:1px solid #2A3458;color:#E8F6FF;
+}
+body.theme-neon.surface-queue .tab{
+  background:transparent;color:#B0C4E0;
+}
+body.theme-neon.surface-queue .tab.active{
+  background:#151B2C;color:#00F0FF;
+  -webkit-box-shadow:none;box-shadow:none;
+}
+body.theme-neon.surface-queue .tbl thead th,
+body.theme-neon.surface-queue .queue-overlay-body .tbl thead th{
+  background:#151B2C;color:#E8F6FF;border-color:#2A3458;
+}
+body.theme-neon.surface-queue .tbl tbody td,
+body.theme-neon.surface-queue .queue-overlay-body .tbl tbody td{
+  color:#E8F6FF;border-color:#2A3458;
+}
+body.theme-neon.surface-queue .tbl tbody tr,
+body.theme-neon.surface-queue .queue-overlay-body .tbl tbody tr{background:#0E1628;}
+body.theme-neon.surface-queue .tbl tbody tr:nth-child(even),
+body.theme-neon.surface-queue .queue-overlay-body .tbl tbody tr:nth-child(even){
+  background:#151B2C;
+}
+body.theme-neon.surface-queue .tbl tbody tr:hover,
+body.theme-neon.surface-queue .queue-overlay-body .tbl tbody tr:hover{
+  background:#1A2438;
+}
+body.theme-neon.surface-queue .qov-sum-card{
+  background:#151B2C;border:1px solid #2A3458;
+}

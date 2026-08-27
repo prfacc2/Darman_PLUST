@@ -2409,7 +2409,7 @@ enum { PC_LIST=3601, PC_B_DOWNLOAD, PC_B_UPLOAD, PC_B_APPLY, PC_B_ENLARGE,
 struct PrintCfgState {
     HWND list, bDownload, bUpload, bApply, bEnlarge, bDesign, bClose;
     HWND bZoomIn, bZoomOut;
-    std::vector<Section> sects;     // active sections
+    std::vector<PrintDesign> designs; // v1.99 طرح‌های تعریف‌شده (Default first)
     int  sel = -1;                  // selected list index
     PrintDesign preview;            // currently-resolved design for sel
     bool havePreview = false;
@@ -2741,11 +2741,9 @@ static void pcLoadPreview(){
     if(!s_pcs) return;
     s_pcs->havePreview=false; s_pcs->havePending=false; s_pcs->enlarged=false;
     s_pcs->zoom=1.0;
-    if(s_pcs->sel<0 || s_pcs->sel>=(int)s_pcs->sects.size()) return;
-    PrintDesign d;
-    if(SectionDesign_Resolve(s_pcs->sects[s_pcs->sel].id, d)){
-        s_pcs->preview=d; s_pcs->havePreview=true;
-    }
+    if(s_pcs->sel<0 || s_pcs->sel>=(int)s_pcs->designs.size()) return;
+    s_pcs->preview=s_pcs->designs[s_pcs->sel];
+    s_pcs->havePreview=true;
 }
 static void pcLayout(HWND h){
     if(!s_pcs) return; RECT c=pcCard(h);
@@ -2774,7 +2772,7 @@ static void pcDownload(HWND h){
     if(!s_pcs||!s_pcs->havePreview){
         MessageBoxW(h,L"ابتدا یک بخش را انتخاب کنید.",L"دانلود طرح",MB_OK|MB_ICONINFORMATION); return; }
     const PrintDesign& d = s_pcs->havePending? s_pcs->pending : s_pcs->preview;
-    std::wstring suggest = (s_pcs->sel>=0? s_pcs->sects[s_pcs->sel].name_fa : L"design")+L".aztpl";
+    std::wstring suggest = (s_pcs->sel>=0? s_pcs->designs[s_pcs->sel].name : L"design")+L".aztpl";
     wchar_t fn[MAX_PATH]={0}; wcsncpy(fn,suggest.c_str(),MAX_PATH-1);
     OPENFILENAMEW ofn={sizeof(ofn)}; ofn.hwndOwner=h;
     ofn.lpstrFilter=L"طرح چاپ درمان‌پلاس\0*.aztpl\0همه\0*.*\0";
@@ -2827,20 +2825,21 @@ static void pcUpload(HWND h){
     InvalidateRect(h,NULL,FALSE);
 }
 static void pcApply(HWND h){
-    if(!s_pcs||s_pcs->sel<0||s_pcs->sel>=(int)s_pcs->sects.size()){
-        MessageBoxW(h,L"ابتدا یک بخش را انتخاب کنید.",L"اعمال طرح",MB_OK|MB_ICONINFORMATION); return; }
-    if(!s_pcs->havePending){
-        MessageBoxW(h,L"ابتدا یک طرح بارگذاری کنید.",L"اعمال طرح",MB_OK|MB_ICONINFORMATION); return; }
-    PrintDesign d=s_pcs->pending;
-    d.id=0;   // force a NEW design row (never overwrite a built-in/existing one)
-    if(d.name.empty()) d.name=s_pcs->sects[s_pcs->sel].name_fa+L" — وارداتی";
-    int newId=Designs_Insert(d);
-    if(newId<=0){ MessageBoxW(h,L"ثبت طرح ناموفق بود.",L"اعمال طرح",MB_OK|MB_ICONERROR); return; }
-    if(!SectionDesign_Set(s_pcs->sects[s_pcs->sel].id,newId)){
-        MessageBoxW(h,L"اتصال طرح به بخش ناموفق بود.",L"اعمال طرح",MB_OK|MB_ICONERROR); return; }
-    s_pcs->havePending=false;
-    pcLoadPreview();   // re-resolve to confirm
-    MessageBoxW(h,L"طرح روی بخش انتخاب‌شده اعمال شد. از این پس چاپ این بخش با طرح جدید انجام می‌شود.",
+    if(!s_pcs||s_pcs->sel<0||s_pcs->sel>=(int)s_pcs->designs.size()){
+        MessageBoxW(h,L"ابتدا یک طرح را انتخاب کنید.",L"اعمال طرح",MB_OK|MB_ICONINFORMATION); return; }
+    PrintDesign d = s_pcs->havePending ? s_pcs->pending : s_pcs->designs[s_pcs->sel];
+    if(s_pcs->havePending){
+        d.id=0;
+        if(d.name.empty()) d.name=L"طرح وارداتی";
+        int newId=Designs_Insert(d);
+        if(newId<=0){ MessageBoxW(h,L"ثبت طرح ناموفق بود.",L"اعمال طرح",MB_OK|MB_ICONERROR); return; }
+        MachineDesign_Set(newId);
+        s_pcs->havePending=false;
+    } else {
+        MachineDesign_Set(d.id);
+    }
+    pcLoadPreview();
+    MessageBoxW(h,L"این طرح روی چاپگر همین دستگاه اعمال شد.",
         L"اعمال طرح",MB_OK|MB_ICONINFORMATION);
     InvalidateRect(h,NULL,FALSE);
 }
@@ -2851,12 +2850,17 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         s_pcs->list=CreateWindowExW(WS_EX_CLIENTEDGE,L"LISTBOX",L"",
             WS_CHILD|WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY,0,0,10,10,h,(HMENU)PC_LIST,g_hInst,0);
         SendMessageW(s_pcs->list,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-        Sections_All(s_pcs->sects);
-        // keep only active sections
-        { std::vector<Section> act; for(auto&s:s_pcs->sects) if(s.is_active) act.push_back(s);
-          s_pcs->sects.swap(act); }
-        for(auto&s:s_pcs->sects)
-            SendMessageW(s_pcs->list,LB_ADDSTRING,0,(LPARAM)s.name_fa.c_str());
+        Designs_Init();
+        std::vector<PrintDesign> b; Designs_Builtins(b);
+        std::vector<PrintDesign> u; Designs_User(u);
+        if(!b.empty()){
+            PrintDesign def=b[0]; def.name=L"پیش‌فرض";
+            s_pcs->designs.push_back(def);
+            for(size_t i=1;i<b.size();++i) s_pcs->designs.push_back(b[i]);
+        }
+        for(auto& d:u) s_pcs->designs.push_back(d);
+        for(auto& d:s_pcs->designs)
+            SendMessageW(s_pcs->list,LB_ADDSTRING,0,(LPARAM)d.name.c_str());
         s_pcs->bZoomOut =createFlatButton(h,PC_B_ZOOMOUT, L"−",         ICO_NONE,   BS_OUTLINE,0,0,10,10);
         s_pcs->bZoomIn  =createFlatButton(h,PC_B_ZOOMIN,  L"+",         ICO_NONE,   BS_OUTLINE,0,0,10,10);
         s_pcs->bEnlarge =createFlatButton(h,PC_B_ENLARGE, L"تمام‌صفحه", ICO_REFRESH,BS_OUTLINE,0,0,10,10);
@@ -2868,7 +2872,7 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         HWND cardBtns[]={s_pcs->bZoomOut,s_pcs->bZoomIn,s_pcs->bEnlarge,
             s_pcs->bDesign,s_pcs->bDownload,s_pcs->bUpload,s_pcs->bApply,s_pcs->bClose};
         for(HWND b:cardBtns) setFlatButtonBg(b,g_theme.surface);
-        if(!s_pcs->sects.empty()){  SendMessageW(s_pcs->list,LB_SETCURSEL,0,0);
+        if(!s_pcs->designs.empty()){  SendMessageW(s_pcs->list,LB_SETCURSEL,0,0);
             s_pcs->sel=0; pcLoadPreview(); }
         pcLayout(h);
         return 0; }
@@ -2894,7 +2898,7 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         } else if(id==PC_B_APPLY){ pcApply(h);
         } else if(id==PC_B_DESIGN){
             // open the full visual designer for this section, then refresh
-            if(s_pcs->sel>=0 && s_pcs->sel<(int)s_pcs->sects.size()){
+            if(s_pcs->sel>=0 && s_pcs->sel<(int)s_pcs->designs.size()){
                 HWND owner=g_hFrame; pcClose();
                 PrintDesigner_Open(owner);
                 return 0;
@@ -2917,7 +2921,7 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
         SetBkMode(dc,TRANSPARENT);
         SelectObject(dc,g_fTitle); SetTextColor(dc,g_theme.accent);
         RECT tr={c.left+S(28),c.top+S(16),c.right-S(28),c.top+S(46)};
-        DrawTextW(dc,L"تنظیمات چاپ — انتخاب بخش و طرح",-1,&tr,
+        DrawTextW(dc,L"تنظیمات چاپ — طرح‌های تعریف‌شده",-1,&tr,
             DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
         // preview pane background
         RECT pr=pcPreviewRect(h);
@@ -2932,7 +2936,7 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
             DrawTextW(dc,toFaDigits(zb).c_str(),-1,&zr,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
         } else {
             SelectObject(dc,g_fUI); SetTextColor(dc,g_theme.textDim);
-            DrawTextW(dc,L"یک بخش را انتخاب کنید تا پیش‌نمایش طرح آن نمایش داده شود.",-1,&pr,
+            DrawTextW(dc,L"یک طرح را انتخاب کنید تا پیش‌نمایش آن نمایش داده شود.",-1,&pr,
                 DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
         }
         // list caption
@@ -2940,7 +2944,7 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
             SelectObject(dc,g_fSmall); SetTextColor(dc,g_theme.textDim);
             int listW=S(260), listX=c.right-S(20)-listW;
             RECT lc={listX,c.top+S(44),listX+listW,c.top+S(62)};
-            DrawTextW(dc,L"بخش‌های تعریف‌شده",-1,&lc,
+            DrawTextW(dc,L"طرح‌های تعریف‌شده",-1,&lc,
                 DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
             if(s_pcs&&s_pcs->havePending){
                 SetTextColor(dc,g_theme.warn);

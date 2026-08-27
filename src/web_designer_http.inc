@@ -54,6 +54,7 @@ static std::string apiHandle(const std::string& verb, const std::string& bodyJso
         int sid; wdLock(); sid=g_wdSectionId; wdUnlock();
         PrintDesign d; bool ok=false;
         if(sid>0) ok=SectionDesign_Resolve(sid,d);
+        if(!ok) ok=MachineDesign_Resolve(d);
         if(!ok){ std::vector<PrintDesign> b; Designs_Builtins(b); if(!b.empty()){ d=b[0]; ok=true; } }
         std::wstring secName;
         if(sid>0){ std::vector<Section> all; Sections_All(all);
@@ -78,7 +79,11 @@ static std::string apiHandle(const std::string& verb, const std::string& bodyJso
     if(verb=="delete"){
         double idd=0; if(!jsonGetNumber(bodyJson,"id",idd) || idd<=0)
             return "{\"ok\":false,\"err\":\"no id\"}";
-        bool ok=Designs_Delete((int)idd);
+        int delId=(int)idd;
+        std::vector<PrintDesign> b; Designs_Builtins(b);
+        if(!b.empty() && b[0].id==delId)
+            return "{\"ok\":false,\"err\":\"طرح پیش‌فرض قابل حذف نیست.\"}";
+        bool ok=Designs_Delete(delId);
         return ok?"{\"ok\":true}":"{\"ok\":false,\"err\":\"delete failed\"}";
     }
     if(verb=="save"){
@@ -92,6 +97,7 @@ static std::string apiHandle(const std::string& verb, const std::string& bodyJso
         int id;
         if(d.id<=0){ id=Designs_Insert(d); d.id=id; }
         else { Designs_Update(d); id=d.id; }
+        MachineDesign_Set(id);
         if(sid>0) SectionDesign_Set(sid,id);
         wdLock(); g_wdLastSaved=d; g_wdHaveSaved=true; wdUnlock();
         // notify the app so reception picks up the new design immediately

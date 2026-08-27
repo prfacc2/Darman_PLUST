@@ -595,7 +595,9 @@
     medBelow(d, mx, y + 2.0, mw, pt);
   }
 
-  /* ============== renderReceipt — one medical receipt (v1.98 orders) === */
+  /* ============== renderReceipt — one medical receipt (v1.99 orders) === */
+  /* Basic insurance is {ins} name only — never {ins_percent}. Supplementary
+     is {supp} + {supp_percent}. One Code128 sits below the services table. */
   function renderReceipt(d, sp) {
     var fam = sp.f;
     var pt = (fam === 2 || fam === 7) ? 9.0 : (fam === 8) ? 8.5 : 9.5;

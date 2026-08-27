@@ -62,12 +62,16 @@ static std::wstring classifyFile(const std::wstring& name){
         return L"images";
     if(n.find(L"patient")!=std::wstring::npos|| n.find(L"reception")!=std::wstring::npos||
        n.find(L"guest")!=std::wstring::npos  || n.find(L"appoint")!=std::wstring::npos ||
-       n.find(L"visit")!=std::wstring::npos)
+       n.find(L"visit")!=std::wstring::npos  || n.find(L"blacklist")!=std::wstring::npos)
         return L"patients";
     if(n.find(L"bill")!=std::wstring::npos   || n.find(L"invoice")!=std::wstring::npos||
        n.find(L"receipt")!=std::wstring::npos|| n.find(L"insur")!=std::wstring::npos ||
-       n.find(L"tariff")!=std::wstring::npos || n.find(L"pay")!=std::wstring::npos)
+       n.find(L"tariff")!=std::wstring::npos || n.find(L"pay")!=std::wstring::npos ||
+       n.find(L"cashier")!=std::wstring::npos|| n.find(L"shift")!=std::wstring::npos)
         return L"billing";
+    if(n.find(L"message")!=std::wstring::npos|| n.find(L"kartabl")!=std::wstring::npos||
+       n.find(L"saved_msg")!=std::wstring::npos)
+        return L"other";
     return L"other";
 }
 

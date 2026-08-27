@@ -2440,11 +2440,9 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     { static bool s_printSeeded=false;
       if(!s_printSeeded){ Sections_Init(); Designs_Init(); s_printSeeded=true; } }
     PrintDesign d;
-    if(!SectionDesign_Resolve(sectionId, d)){
-        // Last resort (design store unwritable → nothing could be seeded):
-        // build template #1 ENTIRELY IN MEMORY. The receipt still prints with
-        // the live services table instead of degrading to the label-only
-        // legacy layout.
+    // v1.99: design is bound to THIS machine's printer, not a clinic section.
+    (void)sectionId;
+    if(!MachineDesign_Resolve(d)){
         d = Design_BuiltinTemplate(0);
     }
     if(d.items.empty()) return false;

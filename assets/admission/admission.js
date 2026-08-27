@@ -111,6 +111,7 @@
     rcHits: [],
     rcPage: 'home',
     rcPageNo: 1,
+    shiftOpen: false,
     surface: 'admission'
   };
 
@@ -1845,10 +1846,16 @@
       refreshCash();
     });
     on($('cashShiftStart'), 'click', function () {
-      cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود');
+      cashCall('شیفت صندوق شروع شود؟', 'cashier.shift.start', {}, 'شیفت شروع شد', 'شروع شیفت ناموفق بود', function (r) {
+        applyShiftFrom(r);
+        if (!(r && r.shift && typeof r.shift === 'object')) state.shiftOpen = true;
+      });
     });
     on($('cashShiftEnd'), 'click', function () {
-      cashCall('پایان شیفت ثبت شود؟', 'cashier.shift.end', {}, 'شیفت بسته شد', 'پایان شیفت ناموفق بود');
+      cashCall('پایان شیفت ثبت شود؟', 'cashier.shift.end', {}, 'شیفت بسته شد', 'پایان شیفت ناموفق بود', function (r) {
+        applyShiftFrom(r);
+        if (!(r && r.shift && typeof r.shift === 'object') && r && r.open !== true) state.shiftOpen = false;
+      });
     });
     on($('cashManualBtn'), 'click', function () {
       if (!state.canCashEdit) { toast('دسترسی تغییر صندوق ندارید', 'err'); return; }
@@ -2304,12 +2311,17 @@
     if (r) r.className = 'tools-receipts show';
     ensureReceiptDefaults();
     loadReceiptSections();
+    searchReceipts();
   }
 
   function ensureReceiptDefaults() {
-    var today = state.todayJalali || '';
-    if ($('rcTo') && !$('rcTo').value) $('rcTo').value = toFa(today);
-    if ($('rcFrom') && !$('rcFrom').value) $('rcFrom').value = toFa(jalaliYesterday(today) || today);
+    /* v1.99: do not force yesterday/today. Empty from/to → C++ last 30. */
+  }
+  function receiptsViewOpen() {
+    if (state.surface === 'receipts') return true;
+    if (state.rcPage === 'receipts') return true;
+    var r = $('toolsReceiptsView');
+    return !!(r && (' ' + String(r.className || '') + ' ').indexOf(' show ') >= 0);
   }
   function loadReceiptSections() {
     var sel = $('rcSect');
@@ -2376,12 +2388,14 @@
       archive: $('rcArch') ? $('rcArch').value : '',
       barcode: $('rcBar') ? $('rcBar').value : '',
       doctor: $('rcDoc') ? $('rcDoc').value : '',
-      from: $('rcFrom') ? toEn($('rcFrom').value) : '',
-      to: $('rcTo') ? toEn($('rcTo').value) : '',
       sectionId: $('rcSect') ? +$('rcSect').value || 0 : 0,
       onlyUser: $('rcOnlyUser') ? !!$('rcOnlyUser').checked : false,
       byAppt: $('rcByAppt') ? !!$('rcByAppt').checked : false
     };
+    var fromD = $('rcFrom') ? trimStr(toEn($('rcFrom').value)) : '';
+    var toD = $('rcTo') ? trimStr(toEn($('rcTo').value)) : '';
+    if (fromD) payload.from = fromD;
+    if (toD) payload.to = toD;
     Bridge.call('receipt.search', payload).then(function (d) {
       state.rcRows = (d && d.rows) || [];
       state.rcHits = receiptHits();
@@ -2638,6 +2652,21 @@
     $('cancelDlgNo').onclick = function () { dlg.style.display = 'none'; };
   }
 
+  function applyShiftFrom(d) {
+    if (!d) return;
+    if (d.shiftOpen === true || d.shiftOpen === false) {
+      state.shiftOpen = !!d.shiftOpen;
+      return;
+    }
+    if (d.shift && typeof d.shift === 'object') {
+      if (d.shift.open === true || d.shift.open === false) {
+        state.shiftOpen = !!d.shift.open;
+        return;
+      }
+    }
+    if (d.open === true || d.open === false) state.shiftOpen = !!d.open;
+  }
+
   function refreshCash() {
     if (!state.canCashView) return;
     Bridge.call('cashier.page', {
@@ -2698,6 +2727,7 @@
     setText($('cashStatUnpaid'), toFa(st.unpaid || 0));
     setText($('cashStatQ'), toFa(st.queue || 0));
     var sh = d.shift || {};
+    applyShiftFrom(d);
     /* v1.93: restructure the shift meta into TWO lines (date / time) and move
        #cashShiftMeta into the .cash-actions row so it sits beside the shift
        buttons. Done dynamically here because the JS owns layout on this surface. */
@@ -3120,6 +3150,11 @@
       Bridge.call('print.last', {});
       return;
     }
+    /* v1.99: shift gate — new admission only; do not clear the form. */
+    if (state.shiftOpen === false) {
+      toast('برای پذیرش بیمار ابتدا باید شیفت را شروع کنید.', 'err');
+      return;
+    }
     if (!rec.patient.nid) { toast('کد ملی بیمار الزامی است', 'err'); if ($('nid')) $('nid').focus(); return; }
     if (!rec.patient.first || !rec.patient.last) { toast('نام و نام خانوادگی الزامی است', 'err'); return; }
     if (!state.services.length) { toast('حداقل یک خدمت باید افزوده شود', 'err'); return; }
@@ -3280,7 +3315,19 @@
       if (k === 'F4') unlockCashForm();
     });
     Bridge.on('queue.update', function (d) { renderQueue(d.rows || []); updateTurnPreview(); });
-    Bridge.on('cashier.changed', function () {
+    Bridge.on('cashier.changed', function (d) {
+      applyShiftFrom(d);
+      if (typeof refreshCash === 'function') refreshCash();
+      if (receiptsViewOpen()) searchReceipts();
+    });
+    Bridge.on('cashier.shift.start', function (d) {
+      applyShiftFrom(d);
+      if (!(d && d.shift && typeof d.shift === 'object') && !(d && d.open === false)) state.shiftOpen = true;
+      if (typeof refreshCash === 'function') refreshCash();
+    });
+    Bridge.on('cashier.shift.end', function (d) {
+      applyShiftFrom(d);
+      if (!(d && d.shift && typeof d.shift === 'object') && !(d && d.open === true)) state.shiftOpen = false;
       if (typeof refreshCash === 'function') refreshCash();
     });
     Bridge.on('ps.update', function (d) { updatePS(d); });
@@ -4139,7 +4186,15 @@
       if (!light) {
         if ($('apptDate')) $('apptDate').value = toFa(r.date || '');
         if ($('rxDate') && !$('rxDate').value) $('rxDate').value = toFa(r.date || '');
-        if ($('apptShift') && r.shift) { var si; for(si=0;si<$('apptShift').options.length;si++) if($('apptShift').options[si].text===r.shift){$('apptShift').selectedIndex=si;break;} }
+        if ($('apptShift') && r.shift && typeof r.shift === 'string') { var si; for(si=0;si<$('apptShift').options.length;si++) if($('apptShift').options[si].text===r.shift){$('apptShift').selectedIndex=si;break;} }
+      }
+      applyShiftFrom(r);
+      if ((state.surface === 'admission' || state.surface === 'cashier' || state.surface === 'queue' || state.surface === 'receipts') &&
+          !(r.shift && typeof r.shift === 'object' && (r.shift.open === true || r.shift.open === false)) &&
+          r.open !== true && r.open !== false) {
+        Bridge.call('cashier.page', { q: '', tab: state.cashTab || 0, status: '' }).then(function (d) {
+          applyShiftFrom(d || {});
+        }, function () {});
       }
       state.todayJalali = r.date || '';
       state.role = Number(r.role) || 0;

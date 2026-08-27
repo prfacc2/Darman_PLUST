@@ -695,9 +695,9 @@ static void renderSidebar(PrintDesign& d,const TplSpec& sp,double pt,double rH,
 
 // ===========================================================================
 //  renderReceipt — build one medical receipt for TPL[idx] (non-sidebar path).
-//  v1.98.0: each family uses a DISTINCT section order so the 30 gallery
+//  v1.99.0: each family uses a DISTINCT section order so the 30 gallery
 //  cards are not clones. The single Code128 always sits next to / after
-//  the services table.
+//  the services table. Basic insurance prints as {ins} name only.
 // ===========================================================================
 static void renderReceipt(PrintDesign& d, const TplSpec& sp){
     std::vector<PrintItem>& v = d.items;
@@ -827,6 +827,7 @@ void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
     const int N = 30;
     auto stamp=[](){
+        setSetting(L"tpl_migration_1_99", L"1");
         setSetting(L"tpl_migration_1_98", L"1");
         setSetting(L"tpl_migration_1_97", L"1");
         setSetting(L"tpl_migration_1_67", L"1");
@@ -845,9 +846,10 @@ void Designs_Init(){
         stamp();
         return;
     }
-    // v1.98.0 migration: rebuild all builtins — ten distinct section orders
-    // so the gallery is not 30 copies of one page. Preserve ids / bindings.
-    if(getSetting(L"tpl_migration_1_98", L"0") != L"1"){
+    // v1.99.0 migration: rebuild all 30 builtins (10 families × 3 variants,
+    // B&W, one barcode below services, basic insurance = name only). Preserve
+    // ids / bindings.
+    if(getSetting(L"tpl_migration_1_99", L"0") != L"1"){
         for(int i=0;i<N;i++){
             PrintDesign fresh=buildTemplate(i);
             if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }

@@ -1470,6 +1470,7 @@ static void OpenDesignerWindow(HWND owner,const DesignerLaunch& launch,
         // load active design of first section, else T01
         if(!launch.sectionIds.empty())
             resolved=SectionDesign_Resolve(launch.sectionIds[0],st->design);
+        if(!resolved) resolved=MachineDesign_Resolve(st->design);
         if(!resolved){ std::vector<PrintDesign> b; Designs_Builtins(b);
             if(!b.empty()){ st->design=b[0]; resolved=true; } }
     }
@@ -1604,27 +1605,8 @@ static void PrintDesigner_OpenCore(HWND hMain){
     uikit::Az_RegisterControls();
     Breadcrumb(L"print designer: init stores");
     Sections_Init(); Designs_Init();
-    Breadcrumb(L"print designer: reconcile section bindings");
-    SectionDesign_Cleanup();                 // §7: drop stale/orphaned mappings
     DesignerLaunch launch;
-    Breadcrumb(L"print designer: section picker");
-    if(!RunSectionPicker(hMain,launch)){
-        Breadcrumb(L"print designer: picker cancelled");
-        return;
-    }
-    // validate that every chosen section still exists (defensive: the picker
-    // already reads the live store, but a delete could race a long-open picker).
-    {
-        std::vector<Section> all; Sections_All(all);
-        std::vector<int> valid;
-        for(int sid : launch.sectionIds)
-            for(const auto& s : all) if(s.id==sid){ valid.push_back(sid); break; }
-        launch.sectionIds=valid;
-        if(launch.sectionIds.empty()){
-            Breadcrumb(L"print designer: no valid section after picker");
-            return;
-        }
-    }
+    Breadcrumb(L"print designer: machine design (no section picker)");
     // §1.19.0 (restored v1.68.0): PREFER the HTML/CSS/JS designer opened in the
     // operator's DEFAULT BROWSER (loopback host + ShellExecute). The real design
     // editor runs in the browser process — crash-proof, universal (every Windows

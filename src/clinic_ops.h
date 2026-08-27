@@ -95,6 +95,7 @@ std::vector<CashTicket> Accounting_Recent(int limit=30);
 
 bool Shift_Start(std::wstring& err);
 bool Shift_End(std::wstring& err);
+bool Shift_IsOpen();
 std::string Shift_StatusJson();
 std::string Calendar_ListJson(const std::wstring& fromJalali,
                               const std::wstring& toJalali,

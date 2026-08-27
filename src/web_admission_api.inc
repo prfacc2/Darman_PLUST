@@ -661,6 +661,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+="\"date\":"+jstr(adTodayJalali())+",";
         o+="\"time\":"+jstr(adNowTime())+",";
         o+="\"shift\":"+jstr(shiftName(g_session.shift))+",";
+        o+="\"shiftOpen\":"; o+=(Shift_IsOpen()?"true":"false"); o+=",";
         o+="\"mode\":"+jstr(mode)+",";
         o+="\"zoom\":"+jnum(zoom)+",";
         o+="\"theme\":"+jstr(getSetting(L"theme",L"light"))+",";
@@ -1130,9 +1131,12 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(isBlocked && overrideBlock)
             Blacklist_AuditOverride(blocked,g_session.user.username);
 
+        if(!Shift_IsOpen())
+            return "{\"ok\":false,\"needShift\":true,\"err\":\"برای پذیرش بیمار ابتدا باید شیفت را شروع کنید.\"}";
         ReceptionRecord r=adBuildRecord(body);
-        if(r.total<=0)
-            return "{\"ok\":false,\"err\":\"حداقل یک خدمت با مبلغ لازم است\"}";
+        if(r.services.empty())
+            return "{\"ok\":false,\"err\":\"حداقل یک خدمت لازم است\"}";
+        if(r.total<0) r.total=0;
 
         int q=saveReception(r);   // assigns queue no + persists CSV
         if(r.receiptNo<=0) r.receiptNo = (q>0)? (long long)q : 1;

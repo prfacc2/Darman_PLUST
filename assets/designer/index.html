@@ -39,6 +39,9 @@
       <input type="checkbox" id="chkReflow" checked> واکنش‌گرا
     </label>
     <span class="tb-sep"></span>
+    <button class="btn btn-sm btn-outline tool-btn active" id="btnToolSelect" title="انتخاب (کادر کششی)">انتخاب</button>
+    <button class="btn btn-sm btn-outline tool-btn" id="btnToolHand" title="دست (جابه‌جایی صفحه)">دست</button>
+    <span class="tb-sep"></span>
     <button class="btn btn-sm btn-outline" id="btnUndo" title="بازگشت (Ctrl+Z)">↶</button>
     <button class="btn btn-sm btn-outline" id="btnRedo" title="جلو (Ctrl+Y)">↷</button>
     <span class="tb-sep"></span>
@@ -91,10 +94,11 @@
             <span class="handle h-w"></span><span class="handle h-e"></span>
             <span class="handle h-rot"></span>
           </div>
+          <div id="rubberBand" class="rubber-band hidden"></div>
         </div>
       </div>
     </div>
-    <div id="canvasHint">پیش‌نمایش زنده · فضای خالی را بکشید تا صفحه جابه‌جا شود · چرخ ماوس = اسکرول · Ctrl+چرخ = زوم · کلیدهای جهت = جابه‌جایی دقیق</div>
+    <div id="canvasHint">انتخاب: کادر کششی روی فضای خالی · دست: جابه‌جایی صفحه · چرخ ماوس = اسکرول · Ctrl+چرخ = زوم · جهت‌ها = ۱mm (Shift=۵mm)</div>
   </main>
 </div>
 

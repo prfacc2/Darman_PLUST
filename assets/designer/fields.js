@@ -24,7 +24,7 @@ window.AZ_FIELD_CATS = [
     { key:"{landline}", label:"تلفن ثابت", sample:"۰۲۱۰۰۰۰۰۰۰" },
     { key:"{address}",  label:"آدرس", sample:"تهران، خیابان…" },
     { key:"{ptype}",    label:"نوع بیمار", sample:"سرپایی" },
-    { key:"{barcode}",  label:"بارکد/کد ملی", sample:"۰۰۱۲۳۴۵۶۷۸" },
+    { key:"{barcode}",  label:"بارکد قبض", sample:"۱۲۳۴۵۶۷۸۹۰۱۲" },
   ]},
   { title:"بیمه", items:[
     { key:"{ins}",      label:"بیمه اصلی", sample:"تأمین اجتماعی" },
@@ -105,7 +105,7 @@ window.AZ_FIELD_CATS = [
     { key:"{regtime}",      label:"ساعت ثبت", sample:"۱۰:۳۱" },
   ]},
   { title:"شناسهٔ رسید و بارکد (v1.55)", items:[
-    { key:"{receiptbarcode}", label:"بارکد رسید (عدد قابل اسکن)", sample:"۴۶۴۹۰۰۱" },
+    { key:"{receiptbarcode}", label:"بارکد قبض", sample:"۱۲۳۴۵۶۷۸۹۰۱۲" },
     { key:"{receiptcode}",    label:"کد کوتاه رسید", sample:"۵۶Y" },
     { key:"{eprescription}",  label:"کد رهگیری نسخهٔ الکترونیک", sample:"۸۸۷۷۶۶۵" },
     { key:"{referralno}",     label:"شماره معرفی‌نامه", sample:"۱۴۲۵۳۶" },

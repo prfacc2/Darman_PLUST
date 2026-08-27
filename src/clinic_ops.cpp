@@ -82,6 +82,7 @@ static bool opsNextLine(const std::wstring& all, size_t& pos, std::wstring& line
 }
 
 static std::mutex g_opsMx;
+static void shiftAddIncome(long long amount);
 
 bool Ops_IsReception(const Section& s){
     if(s.kind==L"reception") return true;
@@ -353,6 +354,7 @@ bool Cash_CreateFromReception(const ReceptionRecord& r, std::wstring& err, CashT
     auto rows=cashLoad();
     rows.push_back(t);
     if(!cashSave(rows)){ err=L"نوشتن بلیت صندوق ناموفق بود."; return false; }
+    if(t.hasPos && t.paid>0) shiftAddIncome(t.paid);
     created=t;
     return true;
 }
@@ -490,16 +492,21 @@ static std::string shiftJson(const CashShift& s, bool open){
     o+="}";
     return o;
 }
+bool Shift_IsOpen(){
+    std::lock_guard<std::mutex> lk(g_opsMx);
+    auto rows=shiftLoad();
+    return shiftFindOpen(rows, g_session.user.username)!=nullptr;
+}
 std::string Shift_StatusJson(){
     std::lock_guard<std::mutex> lk(g_opsMx);
     auto rows=shiftLoad();
     CashShift* cur=shiftFindOpen(rows, g_session.user.username);
     if(!cur) return "{\"ok\":true,\"open\":false,\"income\":0}";
-    return std::string("{\"ok\":true,")+ "\"shift\":"+shiftJson(*cur,true)+
+    return std::string("{\"ok\":true,\"open\":true,")+ "\"shift\":"+shiftJson(*cur,true)+
            ",\"income\":"+opsJnum(cur->income)+"}";
 }
 
-// Caller MUST already hold g_opsMx.
+// Caller MUST already hold g_opsMx (non-recursive mutex).
 static void shiftAddIncome(long long amount){
     if(amount<=0) return;
     auto srows=shiftLoad();
@@ -838,6 +845,7 @@ std::string Receipt_SearchJson(const ReceiptQuery& q){
     std::wstring user=g_session.user.username;
     std::string list="[";
     bool first=true;
+    int nOut=0;
     for(int i=(int)rows.size()-1;i>=0;--i){
         const CashTicket& t=rows[i];
         std::wstring day=opsNormDigits(t.jdate);
@@ -862,6 +870,9 @@ std::string Receipt_SearchJson(const ReceiptQuery& q){
         if(!first) list+=",";
         first=false;
         list+=ticketRowJson(t);
+        nOut++;
+        bool noDates = fromN.empty() && toN.empty();
+        if(noDates && nOut>=30) break;
     }
     list+="]";
     return std::string("{\"ok\":true,\"rows\":")+list+"}";

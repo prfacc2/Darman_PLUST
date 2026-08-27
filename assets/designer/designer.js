@@ -127,14 +127,18 @@
     if (typeof newOrient === "number") S.design.orientation = newOrient;
     var newDims = paperDims(S.design.paper, S.design.orientation);
     pushUndo();
-    if (S.reflowOnResize !== false)
-      reflowItems(oldDims[0], oldDims[1], newDims[0], newDims[1]);
+    // v1.99: always scale item x,y,w,h by newW/oldW and newH/oldH so the
+    // relative layout is kept. Print-side calcPscale still fits the authored
+    // design onto the physical printer paper.
+    reflowItems(oldDims[0], oldDims[1], newDims[0], newDims[1]);
+    compactForNarrow(S.design);
     renderAll(); fitZoom();
   }
 
   /* ---------------------------------------------------------- app state --- */
   var S = {
-    design: null, selId: 0,
+    design: null, selId: 0, selIds: [],
+    tool: "select",                       // v1.99: select | hand  (item drag is transient)
     pxPerMM: 3.7795, scale: 1,
     undo: [], redo: [], dirty: false,
     reflowOnResize: true,                 // v1.22.0 responsive paper resize
@@ -168,12 +172,12 @@
   }
   function doUndo() {
     if (!S.undo.length) return;
-    S.redo.push(clone(S.design)); S.design = S.undo.pop(); S.selId = 0;
+    S.redo.push(clone(S.design)); S.design = S.undo.pop(); S.selId = 0; S.selIds = [];
     renderAll(); updateUndoButtons(); toast("بازگشت");
   }
   function doRedo() {
     if (!S.redo.length) return;
-    S.undo.push(clone(S.design)); S.design = S.redo.pop(); S.selId = 0;
+    S.undo.push(clone(S.design)); S.design = S.redo.pop(); S.selId = 0; S.selIds = [];
     renderAll(); updateUndoButtons(); toast("جلو");
   }
   function updateUndoButtons() {
@@ -221,6 +225,7 @@
   function displayText(it) {
     if (it.type === "label") return it.text || "";
     if (it.type === "field") {
+      // v1.99: field items always show [token], never a live sample name.
       return (it.prefix || "") + "[" + fieldTokenLabel(it.field) + "]" + (it.suffix || "");
     }
     // v1.55.0: a barcode item keeps its symbology model (JSON) in it.text — never
@@ -337,9 +342,10 @@
     return PSC.NONE;
   }
   // DESIGN-TIME preview uses field tokens, never example service names
-  // («ویزیت عمومی»). Print time still fills live ReceptionRecord.services.
-  var SVC_SAMPLES = [{}, {}, {}];
-  function svcSample(kind) {
+  // («ویزیت»). Print time still fills live ReceptionRecord.services.
+  // v1.99: exactly TWO placeholder rows; every cell is a [token], never blank.
+  var SVC_PLACEHOLDER_ROWS = 2;
+  function svcSample(kind, label) {
     switch (kind) {
       case PSC.NAME:  return "[نام خدمت]";
       case PSC.DESC:  return "[شرح خدمت]";
@@ -352,7 +358,9 @@
       case PSC.DISC:  return "[تخفیف]";
       case PSC.INS:   return "[سهم بیمه]";
       case PSC.PAT:   return "[سهم بیمار]";
-      default:        return "";
+      default:
+        if (label) return "[" + label + "]";
+        return "[نام خدمت]";
     }
   }
   // preview: header row (from labels) + sample rows so the designer looks real.
@@ -380,13 +388,8 @@
 
     var hHpx = (it.headerH > 0) ? mm(it.headerH) : 0;
     var rHpx = (it.rowH > 0) ? mm(it.rowH) : 0;
-    // how many sample rows fit in the box when a fixed row height is set
-    var nRows = SVC_SAMPLES.length;
-    if (rHpx > 0) {
-      var avail = mm(it.h || 0) - hHpx;
-      var fit = Math.floor(avail / rHpx);
-      if (fit >= 1) nRows = Math.min(6, Math.max(1, fit));
-    }
+    // v1.99: always two token placeholder rows — never pad the box with blanks.
+    var nRows = SVC_PLACEHOLDER_ROWS;
 
     var html = "<table class='svc-tbl' style='font-size:" + ptPx(it.pt || 8.5) +
       "px;color:" + ink + ";direction:rtl;table-layout:fixed;width:100%'>";
@@ -408,8 +411,8 @@
       html += "<tr" + (rHpx > 0 ? " style='height:" + rHpx.toFixed(2) + "px'" : "") + ">";
       for (var cc = 0; cc < m.cols; cc++) {
         var wpc2 = ((m.widths[cc] || 1) / sum * 100).toFixed(3);
-        var v = svcSample(kinds[cc]);
-        if (kinds[cc] === PSC.NAME && !v) v = "[نام خدمت]";
+        var v = svcSample(kinds[cc], m.labels[cc]);
+        if (!v) v = "[" + (m.labels[cc] || "نام خدمت") + "]";
         var prose = (kinds[cc] === PSC.NAME || kinds[cc] === PSC.DESC || kinds[cc] === PSC.CAT);
         html += "<td style='width:" + wpc2 + "%;" + (bg ? "background:" + bg + ";" : "") +
           "border-color:" + rule + ";text-align:" + (prose ? "right" : "center") + "'>" +
@@ -598,6 +601,7 @@
   }
   function addTableGrips(el, it) {
     if (it.id !== S.selId) return;               // only the selected item
+    if (S.selIds && S.selIds.length > 1) return; // v1.99: no grips while multi-select
     var m = gripModelOf(it);
     var cols = m.cols || 1;
     var sum = 0; (m.widths || []).forEach(function (w) { sum += (w || 0); });
@@ -631,7 +635,7 @@
       gh.title = "کشیدن برای تغییر ارتفاع سرستون";
       host.appendChild(gh);
     }
-    var nData = (it.type === "services") ? SVC_SAMPLES.length
+    var nData = (it.type === "services") ? SVC_PLACEHOLDER_ROWS
                                          : Math.max(1, (m.rows || 1) - (hasHeader ? 1 : 0));
     var rHpx = (it.rowH > 0) ? mm(it.rowH) : Math.max(3, (Hpx - hHpx) / Math.max(1, nData));
     var rowY = hHpx + rHpx;
@@ -694,9 +698,31 @@
     el.appendChild(host);
   }
 
+  function itemIsSelected(id) {
+    if (S.selIds && S.selIds.length) {
+      var i;
+      for (i = 0; i < S.selIds.length; i++) if (S.selIds[i] === id) return true;
+      return false;
+    }
+    return id === S.selId;
+  }
+  function selectedItems() {
+    var out = [], i, it;
+    if (S.selIds && S.selIds.length) {
+      for (i = 0; i < S.selIds.length; i++) {
+        it = findItem(S.selIds[i]);
+        if (it) out.push(it);
+      }
+      return out;
+    }
+    it = selItem();
+    if (it) out.push(it);
+    return out;
+  }
+
   function buildItemEl(it) {
     var el = document.createElement("div");
-    el.className = "pi pi-" + it.type + (it.id === S.selId ? " sel" : "") +
+    el.className = "pi pi-" + it.type + (itemIsSelected(it.id) ? " sel" : "") +
       (it.fmt === "nowrap" ? " nowrap" : "");
     el.dataset.id = it.id;
     styleItem(el, it);
@@ -828,7 +854,8 @@
 
   function updateSelBox() {
     var it = selItem();
-    if (!it) { $selBox.classList.add("hidden"); return; }
+    var multi = S.selIds && S.selIds.length > 1;
+    if (!it || multi) { $selBox.classList.add("hidden"); return; }
     $selBox.classList.remove("hidden");
     $selBox.style.left = mm(it.x) + "px";
     $selBox.style.top = mm(it.y) + "px";
@@ -839,12 +866,41 @@
 
   function select(id) {
     S.selId = id;
-    Array.prototype.slice.call($paper.querySelectorAll(".pi")).forEach(function (e) {
-      e.classList.toggle("sel", +e.dataset.id === id);
-    });
+    S.selIds = id ? [id] : [];
+    syncSelClass();
     updateSelBox();
     renderInspector(); renderLayers();
     if (id) switchTab("inspector");
+  }
+  function selectMany(ids) {
+    S.selIds = ids ? ids.slice() : [];
+    S.selId = S.selIds.length ? S.selIds[S.selIds.length - 1] : 0;
+    syncSelClass();
+    updateSelBox();
+    renderInspector(); renderLayers();
+    if (S.selId) switchTab("inspector");
+  }
+  function syncSelClass() {
+    if (!$paper) return;
+    Array.prototype.slice.call($paper.querySelectorAll(".pi")).forEach(function (e) {
+      e.classList.toggle("sel", itemIsSelected(+e.dataset.id));
+    });
+  }
+  function setTool(tool) {
+    S.tool = (tool === "hand") ? "hand" : "select";
+    if ($scroll) {
+      if (S.tool === "hand") {
+        $scroll.classList.add("tool-hand");
+        $scroll.classList.remove("tool-select");
+      } else {
+        $scroll.classList.add("tool-select");
+        $scroll.classList.remove("tool-hand");
+      }
+    }
+    var bs = document.getElementById("btnToolSelect");
+    var bh = document.getElementById("btnToolHand");
+    if (bs) { if (S.tool === "select") bs.classList.add("active"); else bs.classList.remove("active"); }
+    if (bh) { if (S.tool === "hand") bh.classList.add("active"); else bh.classList.remove("active"); }
   }
 
   /* -------------------------------------------------------- new items ----- */
@@ -921,6 +977,10 @@
     if (i < 0) return;
     pushUndo(); S.design.items.splice(i, 1);
     if (S.selId === id) S.selId = 0;
+    if (S.selIds && S.selIds.length) {
+      S.selIds = S.selIds.filter(function (x) { return x !== id; });
+      if (!S.selId && S.selIds.length) S.selId = S.selIds[S.selIds.length - 1];
+    }
     renderAll(); renderInspector(); renderLayers();
   }
   function duplicateItem(id) {
@@ -1240,7 +1300,7 @@
     var items = (S.design.items || []).slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); });
     items.forEach(function (it) {
       var r = document.createElement("div");
-      r.className = "lyr" + (it.id === S.selId ? " sel" : "");
+      r.className = "lyr" + (itemIsSelected(it.id) ? " sel" : "");
       var nm = it.type === "label" ? (it.text || "متن") :
         it.type === "field" ? (window.AZ_FIELDS[it.field] ? window.AZ_FIELDS[it.field].label : "فیلد") :
           (ITEM_LABELS[it.type] || it.type);
@@ -1316,11 +1376,55 @@
   function wireCanvas() {
     var panning = false, panSX = 0, panSY = 0, scL = 0, scT = 0, moved = false;
     var drag = null;
+    var rubber = false, rubberA = null, rubberB = null, rubberMoved = false;
+    var $rb = document.getElementById("rubberBand");
+
+    function hideRubber() {
+      rubber = false; rubberA = null; rubberB = null; rubberMoved = false;
+      if ($rb) $rb.classList.add("hidden");
+    }
+    function showRubberMM(a, b) {
+      if (!$rb || !a || !b) return;
+      var x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+      var w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+      $rb.classList.remove("hidden");
+      $rb.style.left = mm(x) + "px";
+      $rb.style.top = mm(y) + "px";
+      $rb.style.width = mm(w) + "px";
+      $rb.style.height = mm(h) + "px";
+    }
+    function idsInRect(a, b) {
+      var L = Math.min(a.x, b.x), R = Math.max(a.x, b.x);
+      var T = Math.min(a.y, b.y), B = Math.max(a.y, b.y);
+      var out = [], i, it, items = (S.design && S.design.items) || [];
+      for (i = 0; i < items.length; i++) {
+        it = items[i];
+        if (it.locked) continue;
+        if (it.isFrame || it.type === "frame") continue;
+        if (it.x + it.w < L || it.x > R || it.y + it.h < T || it.y > B) continue;
+        out.push(it.id);
+      }
+      return out;
+    }
+    function beginPan(e) {
+      panning = true; moved = false;
+      panSX = e.clientX; panSY = e.clientY;
+      scL = $scroll.scrollLeft; scT = $scroll.scrollTop;
+      $scroll.classList.add("panning");
+      e.preventDefault();
+    }
+    function beginRubber(p) {
+      rubber = true; rubberMoved = false; rubberA = p; rubberB = p;
+      showRubberMM(p, p);
+    }
 
     $scroll.addEventListener("mousedown", function (e) {
+      if (e.button) return;
       var pi = e.target.closest && e.target.closest(".pi");
       var handle = e.target.closest && e.target.closest(".handle");
-      if (pi || handle) return;
+      if (handle) return;
+      if (S.tool === "hand") { beginPan(e); return; }
+      if (pi) return;
       // v1.22.0: frames/transparent-rects have pointer-events:none in their
       // hollow center, so e.target won't be a .pi even when the click lands on
       // their border band. Hit-test by coordinate so the border is selectable.
@@ -1331,19 +1435,37 @@
         if (!hit.locked) drag = { mode: "move", it: hit, start: p, o: clone(hit) };
         pushUndo(); e.preventDefault(); return;
       }
-      panning = true; moved = false;
-      panSX = e.clientX; panSY = e.clientY; scL = $scroll.scrollLeft; scT = $scroll.scrollTop;
-      $scroll.classList.add("panning");
+      // v1.99 select tool: empty canvas starts a rubber-band rect
+      beginRubber(p);
       e.preventDefault();
     });
     window.addEventListener("mousemove", function (e) {
-      if (!panning) return;
-      var dx = e.clientX - panSX, dy = e.clientY - panSY;
-      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      $scroll.scrollLeft = scL - dx; $scroll.scrollTop = scT - dy;
+      if (panning) {
+        var dx = e.clientX - panSX, dy = e.clientY - panSY;
+        if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+        $scroll.scrollLeft = scL - dx; $scroll.scrollTop = scT - dy;
+        return;
+      }
+      if (rubber && rubberA) {
+        rubberB = clientToMM(e.clientX, e.clientY);
+        if (Math.abs(rubberB.x - rubberA.x) + Math.abs(rubberB.y - rubberA.y) > 0.4) rubberMoved = true;
+        showRubberMM(rubberA, rubberB);
+      }
     });
     window.addEventListener("mouseup", function () {
-      if (panning) { panning = false; $scroll.classList.remove("panning"); if (!moved) select(0); }
+      if (panning) {
+        panning = false; $scroll.classList.remove("panning");
+        if (!moved && S.tool === "select") select(0);
+      }
+      if (rubber) {
+        if (rubberMoved && rubberA && rubberB) {
+          var ids = idsInRect(rubberA, rubberB);
+          if (ids.length) selectMany(ids); else select(0);
+        } else {
+          select(0);
+        }
+        hideRubber();
+      }
     });
 
     $scroll.addEventListener("wheel", function (e) {
@@ -1351,6 +1473,8 @@
     }, { passive: false });
 
     $paper.addEventListener("mousedown", function (e) {
+      if (e.button) return;
+      if (S.tool === "hand") { beginPan(e); e.stopPropagation(); return; }
       var handle = e.target.closest(".handle");
       var piEl = e.target.closest(".pi");
       if (handle) {
@@ -1360,9 +1484,19 @@
         pushUndo(); e.stopPropagation(); e.preventDefault(); return;
       }
       if (piEl) {
-        var id = +piEl.dataset.id; select(id);
-        var it2 = findItem(id); if (!it2 || it2.locked) return;
+        var id = +piEl.dataset.id;
+        var it2 = findItem(id); if (!it2 || it2.locked) { select(id); return; }
+        var already = itemIsSelected(id);
+        if (!already) select(id);
         drag = { mode: "move", it: it2, start: clientToMM(e.clientX, e.clientY), o: clone(it2) };
+        if (already && S.selIds && S.selIds.length > 1) {
+          drag.group = [];
+          var gi, git;
+          for (gi = 0; gi < S.selIds.length; gi++) {
+            git = findItem(S.selIds[gi]);
+            if (git) drag.group.push({ it: git, o: clone(git) });
+          }
+        }
         pushUndo(); e.preventDefault(); return;
       }
       // v1.22.0: no .pi under cursor — could be a hollow frame/rect border.
@@ -1379,8 +1513,18 @@
       var p = clientToMM(e.clientX, e.clientY);
       var dx = p.x - drag.start.x, dy = p.y - drag.start.y;
       var it = drag.it, o = drag.o;
-      if (drag.mode === "move") { it.x = Math.max(0, Math.round((o.x + dx) * 2) / 2); it.y = Math.max(0, Math.round((o.y + dy) * 2) / 2); }
-      else if (drag.mode === "rotate") {
+      if (drag.mode === "move") {
+        if (drag.group && drag.group.length) {
+          var g;
+          for (g = 0; g < drag.group.length; g++) {
+            drag.group[g].it.x = Math.max(0, Math.round((drag.group[g].o.x + dx) * 2) / 2);
+            drag.group[g].it.y = Math.max(0, Math.round((drag.group[g].o.y + dy) * 2) / 2);
+          }
+        } else {
+          it.x = Math.max(0, Math.round((o.x + dx) * 2) / 2);
+          it.y = Math.max(0, Math.round((o.y + dy) * 2) / 2);
+        }
+      } else if (drag.mode === "rotate") {
         var cx = o.x + o.w / 2, cy = o.y + o.h / 2;
         it.rot = Math.round(Math.atan2(p.y - cy, p.x - cx) * 180 / Math.PI + 90);
       } else {
@@ -1396,7 +1540,6 @@
 
     window.addEventListener("keydown", function (e) {
       if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-      var it = selItem();
       var ctrl = e.ctrlKey || e.metaKey;
       // undo / redo (Ctrl+Z and Ctrl+Shift+Z or Ctrl+Y), save (Ctrl+S),
       // copy / paste (Ctrl+C / Ctrl+V / Ctrl+P). Redo must be checked BEFORE undo.
@@ -1407,13 +1550,38 @@
       if (ctrl && e.key.toLowerCase() === "c") { e.preventDefault(); copyItem(); return; }
       if (ctrl && e.key.toLowerCase() === "v") { e.preventDefault(); pasteItem(); return; }
       if (ctrl && e.key.toLowerCase() === "p") { e.preventDefault(); pasteItem(); return; }
-      if (!it) return;
+      var list = selectedItems();
+      if (!list.length) return;
       var step = e.shiftKey ? 5 : 1;
-      if (e.key === "Delete") { e.preventDefault(); deleteItem(it.id); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); pushUndo(); it.x -= step; renderAll(); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); pushUndo(); it.x += step; renderAll(); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); pushUndo(); it.y -= step; renderAll(); }
-      else if (e.key === "ArrowDown") { e.preventDefault(); pushUndo(); it.y += step; renderAll(); }
+      var i;
+      if (e.key === "Delete") {
+        e.preventDefault();
+        var ids = [];
+        for (i = 0; i < list.length; i++) ids.push(list[i].id);
+        pushUndo();
+        for (i = 0; i < ids.length; i++) {
+          var ix = S.design.items.findIndex(function (x) { return x.id === ids[i]; });
+          if (ix >= 0) S.design.items.splice(ix, 1);
+        }
+        S.selId = 0; S.selIds = [];
+        renderAll(); renderInspector(); renderLayers();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault(); pushUndo();
+        for (i = 0; i < list.length; i++) list[i].x -= step;
+        renderAll();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault(); pushUndo();
+        for (i = 0; i < list.length; i++) list[i].x += step;
+        renderAll();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault(); pushUndo();
+        for (i = 0; i < list.length; i++) list[i].y -= step;
+        renderAll();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault(); pushUndo();
+        for (i = 0; i < list.length; i++) list[i].y += step;
+        renderAll();
+      }
     });
   }
 
@@ -1815,7 +1983,7 @@
     d.kind = "user";
     if (!d.name) d.name = t.name || "طرح";
     var k = 1; (d.items || []).forEach(function (it) { it.id = k++; });
-    S.design = d; S.selId = 0;
+    S.design = d; S.selId = 0; S.selIds = [];
 
     if (S.reflowOnResize !== false && prevPaper && prevPaper !== d.paper) {
       // reflow the freshly-cloned template from its authored paper (t.paper) to
@@ -1897,6 +2065,10 @@
     populatePaperSelect();
     document.getElementById("paperSel").addEventListener("change", function () { changePaper(this.value, undefined); });
     document.getElementById("orientSel").addEventListener("change", function () { changePaper(undefined, +this.value); });
+    var bSel = document.getElementById("btnToolSelect");
+    var bHand = document.getElementById("btnToolHand");
+    if (bSel) bSel.addEventListener("click", function () { setTool("select"); });
+    if (bHand) bHand.addEventListener("click", function () { setTool("hand"); });
     var rf = document.getElementById("chkReflow");
     if (rf) { rf.checked = S.reflowOnResize; rf.addEventListener("change", function () { S.reflowOnResize = this.checked; }); }
     var mi = document.getElementById("marginInp");
@@ -1942,7 +2114,7 @@
       r.onload = function () {
         try {
           var d = JSON.parse(r.result);
-          pushUndo(); d.id = (S.design && S.design.id) || 0; S.design = d; S.selId = 0;
+          pushUndo(); d.id = (S.design && S.design.id) || 0; S.design = d; S.selId = 0; S.selIds = [];
           if (!S.design.paper) S.design.paper = "A5"; if (!S.design.items) S.design.items = [];
           document.getElementById("paperSel").value = S.design.paper;
           document.getElementById("orientSel").value = S.design.orientation || 0;
@@ -1995,7 +2167,7 @@
     $scroll = document.getElementById("canvasScroll");
     $selBox = document.getElementById("selBox");
     $stage = document.getElementById("canvasStage");
-    buildPalette(); wire(); wireCanvas();
+    buildPalette(); wire(); wireCanvas(); setTool("select");
     loadInitial(function () {
       renderAll(); fitZoom(); renderLayers(); updateUndoButtons();
       if (Bridge.has()) Bridge.request("ready", {}, function () {});
@@ -2021,6 +2193,8 @@
     EAN_A: EAN_A, EAN_B: EAN_B, EAN_C: EAN_C, EAN_PAR: EAN_PAR,
     // items / tables
     defaultItem: defaultItem, parseTable: parseTable, tableHtml: tableHtml,
-    reflowItems: reflowItems, compactForNarrow: compactForNarrow
+    reflowItems: reflowItems, compactForNarrow: compactForNarrow,
+    displayText: displayText, setTool: setTool, selectMany: selectMany,
+    SVC_PLACEHOLDER_ROWS: SVC_PLACEHOLDER_ROWS
   };
 })();
