@@ -5639,10 +5639,8 @@ void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
 void Reception_CloseReceipts(){ closeActiveKind(TK_RECEIPTS); }
 void Reception_ClosePortal(){ closeActiveKind(TK_PORTAL); }
 void Reception_ResetZoom(){
-    std::wstring user=g_session.user.username;
-    std::wstring suffix=user.empty()?L"":L"."+user;
-    setSetting(L"reception.zoom", L"80");
-    setSetting(L"reception.zoom"+suffix, L"80");
+    // v2.01 (Part H): zoom is session-scoped — no longer persisted. Just push
+    // the reset event to all live views so each tab resets its own zoom.
     WebAdmission_PushEvent("reception.settings", "{\"zoom\":80}");
 }
 

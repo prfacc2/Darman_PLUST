@@ -3503,26 +3503,23 @@ body.theme-dark,.theme-dark body{
 .theme-dark .payable-value span{color:#bbf7d0;}
 
 /* ============================================================================
-   v1.77.0 — UNZOOM READABILITY nudge.
-   When the user zooms OUT below the 80% default (Ctrl+scroll down) to fit all
-   items on screen, the CSS `zoom` shrinks text along with everything else. To
-   keep it legible, applyZoom() (admission.js) tags #appBody with `.az-unzoom`
-   and nudges the workspace base font up 1-3px; these companion rules bump the
-   explicit-size text elements (fields, labels, buttons, table, titles, invoice
-   lines) by ~1px so they shrink less than the layout. At >=80% the class is
-   absent, so zoom-in / the default are unchanged. Scoped to #appBody, so the
-   full-screen queue overlay (a sibling) is never affected.
-   Trident-safe: literal px sizes only — no custom properties / grid / gap.
+   v2.01 (Part H) — UNZOOM READABILITY nudge (revised).
+   When the user zooms OUT below the 80% default, applyZoom() now nudges the
+   body base font inline (1-3px graduated). The old .az-unzoom class rules
+   have been removed since zoom now targets document.body directly.
    ============================================================================ */
-.az-unzoom .inp{font-size:15px;}
-.az-unzoom .fld > span{font-size:13.5px;}
-.az-unzoom .btn{font-size:14.5px;}
-.az-unzoom .tbl{font-size:14px;}
-.az-unzoom .tbl thead th{font-size:13px;}
-.az-unzoom .card-title{font-size:15px;}
-.az-unzoom .inv-line{font-size:13.5px;}
-.az-unzoom .inv-line b{font-size:14.5px;}
-.az-unzoom .inv-gtitle{font-size:13px;}
+
+/* v2.01 (Part H): zoom-percentage indicator — brief overlay shown while
+   zooming. Fixed at top-center, semi-transparent dark pill, fades out. */
+.zoom-indicator{
+  position:fixed;top:50px;left:50%;z-index:99999;
+  padding:6px 18px;border-radius:24px;
+  background:rgba(13,23,38,.82);color:#fff;font-size:15px;font-weight:700;
+  -webkit-box-shadow:0 6px 20px rgba(0,0,0,.30);box-shadow:0 6px 20px rgba(0,0,0,.30);
+  opacity:0;pointer-events:none;
+  -webkit-transition:opacity .25s ease;transition:opacity .25s ease;
+}
+.zoom-indicator-show{opacity:1;}
 
 /* ============================================================================
    v1.78.0 — «SOFT CLINICAL» SURFACE REFRESH (light theme)

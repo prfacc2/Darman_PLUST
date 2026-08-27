@@ -652,12 +652,9 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring mode=getSetting(L"reception.mode"+suffix,
                            getSetting(L"reception.mode",L"simple"));
         if(mode!=L"full") mode=L"simple";
-        // v1.77.0: default zoom lowered 90% → 80%; unzoom floor lowered 80 → 50
-        // so the user can zoom OUT to see all items (the JS side adds a small
-        // font bump below 80% so text stays readable — see applyZoom).
-        int zoom=_wtoi(getSetting(L"reception.zoom"+suffix,
-                       getSetting(L"reception.zoom",L"80")).c_str());
-        if(zoom<50||zoom>200) zoom=80;
+        // v2.01 (Part H): zoom is session-scoped — always reset to the fitted
+        // default (80%) on every page build. Never restore a persisted value.
+        int zoom=80;
         o+="\"date\":"+jstr(adTodayJalali())+",";
         o+="\"time\":"+jstr(adNowTime())+",";
         o+="\"shift\":"+jstr(shiftName(g_session.shift))+",";
@@ -835,17 +832,13 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return adDoctorStatsJson(u82w(nameU));
     }
 
-    // ---- reception.zoom.save: persist user's Ctrl+scroll zoom choice --------
+    // ---- reception.zoom.save: validate only (session-scoped, NOT persisted) --
+    // v2.01 (Part H): zoom is no longer persisted across sessions. This verb
+    // remains for API compatibility but does not write to settings.ini.
     if(verb=="reception.zoom.save"){
-        double zN=0;
-        std::string zU;
-        int z=0;
+        double zN=0; int z=0;
         if(jsonGetNumber(body,"zoom",zN)) z=(int)llround(zN);
-        else if(jsonGetString(body,"zoom",zU)) z=atoi(zU.c_str());
         if(z<50) z=50; if(z>200) z=200;
-        std::wstring user=g_session.user.username;
-        std::wstring suffix=user.empty()?L"":L"."+user;
-        setSetting(L"reception.zoom"+suffix,std::to_wstring(z));
         return "{\"ok\":true}";
     }
 
