@@ -1982,21 +1982,62 @@
       }
     });
 
-    /* v1.70.0: Ctrl+scroll = zoom in/out. Persists the chosen zoom per-user
-       so it survives app restarts. v1.77.0: default lowered 90% → 80%, and the
-       unzoom floor lowered 80 → 50 so the user can zoom OUT to fit all items;
-       applyZoom() adds a small font bump below 80% so text stays readable. */
+    /* v2.01 (Part H): Ctrl+scroll = zoom in/out. Session-scoped ONLY — NOT
+       persisted across sessions. Each tab keeps its own independent zoom
+       factor (each tab is a separate browser instance). All tabs reset to
+       the fitted default (80%) on the next login / app start. Discrete 5%
+       steps, clamped 50%–200%. Ctrl+0 resets to 80%. A brief indicator shows
+       the current zoom percentage while zooming. */
     on(document, 'wheel', function (e) {
       e = e || window.event;
       if (!e.ctrlKey) return;
-      if (state.surface !== 'admission') return;
       if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
       var delta = e.wheelDelta || (e.detail ? -e.detail : 0);
       var z = state.zoom || 80;
       z += (delta > 0) ? 5 : -5;
       if (z < 50) z = 50; if (z > 200) z = 200;
-      if (applyZoom(z)) Bridge.call('reception.zoom.save', { zoom: z });
+      applyZoom(z);
+      showZoomIndicator(z);
     });
+    /* v2.01 (Part H): Ctrl+0 = reset zoom to the fitted default (80%). */
+    on(document, 'keydown', function (e) {
+      e = e || window.event;
+      if (e.ctrlKey && (e.keyCode === 48 || e.keyCode === 96)) {
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        applyZoom(80, true);
+        showZoomIndicator(80);
+      }
+    });
+  }
+
+  /* v2.01 (Part H): brief zoom-percentage indicator overlay. Shows the
+     current zoom value for ~1.2s then fades out. Creates the element
+     lazily on first use. */
+  var zoomIndicatorTimer = null;
+  function showZoomIndicator(z) {
+    var el = $('zoomIndicator');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'zoomIndicator';
+      el.className = 'zoom-indicator';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = toFa(z) + '%';
+    el.className = 'zoom-indicator zoom-indicator-show';
+    if (zoomIndicatorTimer) clearTimeout(zoomIndicatorTimer);
+    zoomIndicatorTimer = setTimeout(function () {
+      el.className = 'zoom-indicator';
+    }, 1200);
+  }
+  function toFa(n) {
+    var s = String(n);
+    var fa = '۰۱۲۳۴۵۶۷۸۹';
+    var o = '';
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      o += (c >= '0' && c <= '9') ? fa.charAt(+c) : c;
+    }
+    return o;
   }
 
   /* v1.79.0: TRIDENT SCROLL-REPAINT FIX. The clinic reported that after
@@ -2011,7 +2052,7 @@
     if (window.chrome && window.chrome.webview) return;   /* WebView2: fine */
     var t = null;
     function nudge() {
-      var host = $('appBody'); if (!host) return;
+      var host = document.body; if (!host) return;
       host.style.zoom = '';
       host.style.zoom = (state.zoom || 80) + '%';
     }
@@ -2048,21 +2089,21 @@
     var prev = state.zoom || 80;
     if (z < 50) z = 50; if (z > 200) z = 200;
     state.zoom = z;
-    var host = $('appBody');            /* the inner workspace (.body) */
+    /* v2.01 (Part H): zoom applies to document.body so it works on ALL
+       surfaces (admission, cashier, tools, dash, etc.), not just admission.
+       Each tab is a separate browser instance, so zoom is automatically
+       scoped to the active tab — other tabs keep their own zoom unchanged. */
+    var host = document.body;
     if (!host) return true;
     host.style.zoom = z + '%';          /* primary: CSS zoom scales content in place */
-    /* Detect whether `zoom` actually reflowed the element. A width:100% element
-       that honoured zoom reports a scaled offsetWidth; one that ignored it
-       reports the shell's full width. Fall back to transform:scale() then. */
-    var shell = $('app');
+    /* Detect whether `zoom` actually reflowed the element. Fall back to
+       transform:scale() if the browser ignored zoom (some MSHTML builds). */
     var took = false;
-    if (shell) {
-      var sw = shell.offsetWidth, hw = host.offsetWidth;
-      if (sw && hw) took = Math.round(hw) !== Math.round(sw);
-    }
-    host.style.webkitTransformOrigin = 'center center';
-    host.style.msTransformOrigin = 'center center';
-    host.style.transformOrigin = 'center center';
+    var sw = window.innerWidth, hw = document.documentElement.offsetWidth;
+    if (sw && hw) took = Math.round(hw) !== Math.round(sw);
+    host.style.webkitTransformOrigin = 'top center';
+    host.style.msTransformOrigin = 'top center';
+    host.style.transformOrigin = 'top center';
     if (took || z === 100) {
       host.style.webkitTransform = '';
       host.style.msTransform = '';
@@ -2074,40 +2115,26 @@
       host.style.transform = 'scale(' + f + ')';
     }
     /* v1.77.0: UNZOOM READABILITY — only when zoomed OUT below the 80% default.
-       Nudge the workspace base font up a little (1-3px, graduated) so text stays
-       legible even when shrunk to fit all items, and tag the workspace with the
-       `az-unzoom` class so admission.css can bump the explicit-size fields,
-       buttons, table cells and titles by ~1px as well. At >=80% (zoom-in / the
-       default) the class and inline font are cleared so behaviour is unchanged. */
+       Nudge the body base font up a little so text stays legible even when
+       shrunk to fit all items. At >=80% the inline font is cleared. */
     if (z < 80) {
       var fsBump = z < 60 ? 3 : (z < 70 ? 2 : 1);
       host.style.fontSize = (14 + fsBump) + 'px';
-      if ((' ' + host.className + ' ').indexOf(' az-unzoom ') < 0) {
-        host.className = String(host.className || '') + ' az-unzoom';
-      }
     } else {
       host.style.fontSize = '';
-      host.className = String(host.className || '').replace(/\s*az-unzoom\b/g, '');
     }
-    /* v1.84: first apply is wrap-checked too (do not skip when z === prev). */
-    if (!force && columnsWrapped()) {
+    /* v2.01: wrap-guard only for the admission surface (three-column layout).
+       Other surfaces don't have colRight/colCenter/colLeft, so skip the check. */
+    if (!force && state.surface === 'admission' && columnsWrapped()) {
       applyZoom(prev, true);
       return false;
     }
     return true;
   }
   function applySavedZoom(saved) {
-    var want = Number(saved);
-    if (!(want >= 50 && want <= 200)) want = 80;
+    /* v2.01 (Part H): always reset to the fitted default (80%) on load.
+       Zoom is session-scoped — never restored from a persisted value. */
     applyZoom(80, true);
-    var z = want;
-    var used = 80;
-    while (z >= 50) {
-      if (applyZoom(z)) { used = state.zoom || z; break; }
-      if (z <= 80) { applyZoom(80, true); used = 80; break; }
-      z -= 5;
-    }
-    if (used !== want) Bridge.call('reception.zoom.save', { zoom: used });
   }
   function applyMode(mode) {
     state.mode = mode === 'full' ? 'full' : 'simple';
