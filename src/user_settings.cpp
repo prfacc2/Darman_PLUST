@@ -87,7 +87,7 @@ static bool canAccess(int row, int mode){
     case ROW_RECEPTION: return false;
     case ROW_BLACKLIST: return false;
     case ROW_DESIGNER:  return true;
-    case ROW_BACKUP:    return true;
+    case ROW_BACKUP:    return mode==SM_ADMIN;   // admin-only — removed from «حساب پرسنل»
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
     case ROW_SAVED_MSG: return false;
     case ROW_UPDATE:    return true;
@@ -113,11 +113,15 @@ static void selfCheckMatrix(){
     // (moved to the HTML portal) so the matrix self-check stays accurate.
     // v1.94: ROW_BLACKLIST joins the same skip set — the patient blacklist
     // moves to the HTML dashboard and is unreachable from here.
+    // v2.01: ROW_BACKUP is admin-only — «پشتیبان‌گیری و بازیابی» removed from
+    // «حساب پرسنل» as it is an administrative function a «پذیرشگر» must not see.
     assert(!canAccess(ROW_EMP_SECT,SM_RECEPTION));
     assert( canAccess(ROW_EMP_SECT,SM_ADMIN));
+    assert(!canAccess(ROW_BACKUP,SM_RECEPTION));
+    assert( canAccess(ROW_BACKUP,SM_ADMIN));
     for(int r=0;r<ROW__COUNT;r++){
         if(r==ROW_EMP_SECT || r==ROW_RECEPTION || r==ROW_SAVED_MSG
-           || r==ROW_BLACKLIST) continue;
+           || r==ROW_BLACKLIST || r==ROW_BACKUP) continue;
         assert(canAccess(r,SM_RECEPTION) && "reception should access this row");
         assert(canAccess(r,SM_ADMIN)     && "admin should access this row");
     }

@@ -325,11 +325,14 @@ struct User {
     // "cashier_edit" (تغییر در صندوق), "settings" (تنظیمات).
     // Legacy "cashier" still means both view and edit.
     std::wstring perms;
+    // v2.01 (Part F2): assigned work shift. -1 = not assigned (falls back to
+    // detectShift() at login). 0=صبح, 1=عصر, 2=شب, or a custom shift index.
+    int shift;
     // §H forward-compat: any extra pipe-delimited columns written by a FUTURE
-    // version (fields 7,8,…) are captured verbatim here and written back
+    // version (fields 8,…) are captured verbatim here and written back
     // unchanged, so an older build never silently drops newer data.
     std::wstring extra;
-    User():role(0),id(0){}
+    User():role(0),id(0),shift(-1){}
 };
 // v1.79.0: does this account hold the given permission key? Empty perms = yes
 // (legacy full access). Management accounts (role>=1) always pass.
@@ -349,6 +352,27 @@ bool setUserPerms(const std::wstring& username, const std::wstring& perms,
 bool verifyLogin(const std::wstring& u, const std::wstring& p,
                  int wantRole, User& out, std::wstring& err);
 std::wstring hashPassword(const std::wstring& p);
+
+// --------------------------------------------------------- work shifts (F2) --
+// v2.01 (Part F2): managed shift definitions. The three built-in shifts
+// (0=صبح, 1=عصر, 2=شب) are always present; custom shifts take id ≥ 3.
+// startMin/endMin are minutes-from-midnight; endMin < startMin means the
+// shift crosses midnight (e.g. شب 22:30→06:00). Stored in data\shiftdefs.dat.
+struct ShiftDef {
+    int          id;         // 0,1,2 built-in; 3+ custom
+    std::wstring name;       // display name (صبح / عصر / شب / custom)
+    int          startMin;   // start time, minutes from midnight
+    int          endMin;     // end time (may be < startMin if crosses midnight)
+    ShiftDef():id(-1),startMin(0),endMin(0){}
+};
+std::vector<ShiftDef> loadShiftDefs();
+bool saveShiftDefs(const std::vector<ShiftDef>& defs);
+int  addShiftDef(const std::wstring& name, int startMin, int endMin);
+bool deleteShiftDef(int id);
+bool setUserShift(const std::wstring& username, int shift, std::wstring& err);
+std::wstring shiftDisplayName(int idx);
+void shiftDefHours(int idx, int& startMin, int& endMin);
+int  shiftIdByStoredName(const std::wstring& storedName);
 
 // -------------------------------------------------------------- insurance --
 struct InsuranceDef { const wchar_t* name; int pct; };
@@ -586,7 +610,7 @@ void Reception_ResetZoom();
 // ---------------------------------------------------------------- dialogs --
 // role: 0 پذیرش / 1 مدیریت / 2 admin (hidden, prf)
 bool showLoginDialog(HWND parent, int role, User& out);
-bool showShiftDialog(HWND parent, int& shift);
+// v2.01: showShiftDialog removed (Part F1) — shift comes from the user account.
 // profile edit (name + photo) — submits a ProfReq for management approval.
 // returns true if the user pressed «تأیید» and a request was queued.
 bool showProfileDialog(HWND parent);

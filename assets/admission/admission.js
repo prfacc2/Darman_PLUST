@@ -4093,6 +4093,7 @@
       }
       function openApp(kind) { Bridge.call('ui.openTab', { kind: kind }); }
       on($('dashNewPat'), 'click', function () { openApp('admission'); });
+      on($('dashTools'), 'click', function () { openApp('tools'); });
       on($('dashNewTab'), 'click', function () { openApp('empty'); });
       on($('dashPortal'), 'click', function () { openApp('portal'); });
       on($('dashMail'), 'click', function () { openApp('portal'); });
