@@ -1802,23 +1802,26 @@
     on($('rcBody'), 'click', function (e) {
       e = e || window.event;
       var tgt = e.target || e.srcElement;
-      if (tgt && (tgt.tagName || '').toLowerCase() === 'input' && tgt.type === 'checkbox') {
-        var cid = tgt.getAttribute('data-rchk');
-        if (!state.rcChecked) state.rcChecked = {};
-        if (cid) {
-          if (tgt.checked) state.rcChecked[cid] = true;
-          else delete state.rcChecked[cid];
-        }
-        return;
-      }
       var tr = findUp(tgt, 'data-rid', $('rcBody'));
       if (!tr) return;
-      state.rcSel = tr.getAttribute('data-rid');
-      var rows = $('rcBody').getElementsByTagName('tr'), i, r, cls;
+      var rid = tr.getAttribute('data-rid');
+      if (!state.rcChecked) state.rcChecked = {};
+      var multi = !!(e.ctrlKey || e.metaKey);
+      if (!multi) {
+        state.rcChecked = {};
+        state.rcChecked[rid] = true;
+        state.rcSel = rid;
+      } else {
+        if (state.rcChecked[rid]) delete state.rcChecked[rid];
+        else state.rcChecked[rid] = true;
+        state.rcSel = rid;
+      }
+      var rows = $('rcBody').getElementsByTagName('tr'), i, r, cls, id;
       for (i = 0; i < rows.length; i++) {
         r = rows[i];
+        id = r.getAttribute('data-rid');
         cls = String(r.className || '').replace(/\s*rc-sel/g, '');
-        if (r.getAttribute('data-rid') === state.rcSel) cls += ' rc-sel';
+        if (id && state.rcChecked[id]) cls += ' rc-sel';
         r.className = cls;
       }
     });
@@ -2431,32 +2434,39 @@
     var all = state.rcRows || [];
     updateReceiptPager();
     if (!all.length) {
-      body.innerHTML = '<tr><td colspan="13" class="empty">موردی یافت نشد</td></tr>';
+      body.innerHTML = '<tr><td colspan="14" class="empty">موردی یافت نشد</td></tr>';
       return;
     }
     var rows = receiptPageRows();
     var hits = state.rcHits || [];
-    var html = '', i, r, cls, paid, sel;
+    var html = '', i, r, cls, paid, sel, remain, st;
     for (i = 0; i < rows.length; i++) {
       r = rows[i];
       cls = receiptRowClass(r);
       paid = (+r.paid || 0) > 0 && String(r.status || '') !== 'cancelled';
+      remain = (+r.remain != null && r.remain !== '') ? +r.remain : ((+r.payable || 0) - (+r.paid || 0));
+      if (remain < 0) remain = 0;
+      st = String(r.status || '');
+      if (st === 'paid' || paid) st = 'پرداخت شده';
+      else if (st === 'cancelled' || st === 'refund') st = 'استرداد';
+      else if (st === 'free') st = 'رایگان';
+      else st = 'پرداخت نشده';
       sel = (state.rcSel && state.rcSel === r.id) ? ' rc-sel' : '';
       html += '<tr class="' + cls + sel + '" data-rid="' + esc(r.id) + '">' +
-        '<td class="c-chk"><input type="checkbox" data-rchk="' + esc(r.id) + '"' +
-          ((state.rcChecked && state.rcChecked[r.id]) ? ' checked="checked"' : '') + ' /></td>' +
         '<td>' + boldHits(r.barcode, hits) + '</td>' +
-        '<td>' + boldHits(r.fileNo, hits) + '</td>' +
-        '<td>' + boldHits(r.nid, hits) + '</td>' +
-        '<td>' + boldHits(r.name || ((r.first || '') + ' ' + (r.last || '')), hits) + '</td>' +
-        '<td>' + esc(r.insBase || '—') + '</td>' +
-        '<td>' + esc(r.insSupp || '—') + '</td>' +
         '<td>' + boldHits(r.receiptNo, hits) + '</td>' +
         '<td>' + toFa(r.date || '') + '</td>' +
-        '<td>' + toFa(r.apptDate || '') + '</td>' +
-        '<td>' + toFa(r.turn || '') + '</td>' +
-        '<td>' + esc(r.shift || '') + '</td>' +
-        '<td>' + (paid ? '<span class="rc-tickmark">✓</span>پرداخت' : '—') + '</td></tr>';
+        '<td>' + toFa(r.time || '') + '</td>' +
+        '<td>' + boldHits(r.name || ((r.first || '') + ' ' + (r.last || '')), hits) + '</td>' +
+        '<td>' + boldHits(r.nid, hits) + '</td>' +
+        '<td>' + esc(r.doctor || '—') + '</td>' +
+        '<td>' + esc(r.insBase || '—') + '</td>' +
+        '<td>' + esc(r.insSupp || '—') + '</td>' +
+        '<td>' + money(r.payable || r.total || 0) + '</td>' +
+        '<td>' + money(r.paid || 0) + '</td>' +
+        '<td>' + money(remain) + '</td>' +
+        '<td>' + esc(st) + '</td>' +
+        '<td>' + esc(r.user || r.paidUser || '—') + '</td></tr>';
     }
     body.innerHTML = html;
   }
@@ -3150,15 +3160,24 @@
       Bridge.call('print.last', {});
       return;
     }
-    /* v1.99: shift gate — new admission only; do not clear the form. */
-    if (state.shiftOpen === false) {
-      toast('برای پذیرش بیمار ابتدا باید شیفت را شروع کنید.', 'err');
-      return;
-    }
     if (!rec.patient.nid) { toast('کد ملی بیمار الزامی است', 'err'); if ($('nid')) $('nid').focus(); return; }
     if (!rec.patient.first || !rec.patient.last) { toast('نام و نام خانوادگی الزامی است', 'err'); return; }
     if (!state.services.length) { toast('حداقل یک خدمت باید افزوده شود', 'err'); return; }
     setSync('', 'در حال ثبت…');
+    Bridge.call('cashier.shift.status', {}).then(function (st) {
+      applyShiftFrom(st || {});
+      if (!st || st.open !== true) {
+        toast('برای پذیرش بیمار ابتدا باید شروع شیفت را بزنید', 'err');
+        setSync('ok', 'همگام');
+        return;
+      }
+      doAdmissionSave(rec);
+    }, function () {
+      toast('برای پذیرش بیمار ابتدا باید شروع شیفت را بزنید', 'err');
+      setSync('ok', 'همگام');
+    });
+  }
+  function doAdmissionSave(rec) {
     Bridge.call('admission.save', rec).then(function (r) {
       if (r && r.blocked) { state.pendingBlockedRecord=rec; showBlock(r.block); setSync('err','بیمار مسدود'); return; }
       if (r && r.ok) {
@@ -3315,19 +3334,24 @@
       if (k === 'F4') unlockCashForm();
     });
     Bridge.on('queue.update', function (d) { renderQueue(d.rows || []); updateTurnPreview(); });
-    Bridge.on('cashier.changed', function (d) {
-      applyShiftFrom(d);
+    Bridge.on('shift.changed', function (d) {
+      applyShiftFrom(d || {});
       if (typeof refreshCash === 'function') refreshCash();
-      if (receiptsViewOpen()) searchReceipts();
+    });
+    Bridge.on('cashier.changed', function (d) {
+      applyShiftFrom(d || {});
+      if (typeof refreshCash === 'function') refreshCash();
+      if (typeof receiptsViewOpen === 'function' && receiptsViewOpen()) searchReceipts();
+      if (typeof updateTurnPreview === 'function') updateTurnPreview();
     });
     Bridge.on('cashier.shift.start', function (d) {
-      applyShiftFrom(d);
-      if (!(d && d.shift && typeof d.shift === 'object') && !(d && d.open === false)) state.shiftOpen = true;
+      applyShiftFrom(d || {});
+      state.shiftOpen = true;
       if (typeof refreshCash === 'function') refreshCash();
     });
     Bridge.on('cashier.shift.end', function (d) {
-      applyShiftFrom(d);
-      if (!(d && d.shift && typeof d.shift === 'object') && !(d && d.open === true)) state.shiftOpen = false;
+      applyShiftFrom(d || {});
+      state.shiftOpen = false;
       if (typeof refreshCash === 'function') refreshCash();
     });
     Bridge.on('ps.update', function (d) { updatePS(d); });

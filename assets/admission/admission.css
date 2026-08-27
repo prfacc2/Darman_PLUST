@@ -7975,3 +7975,24 @@ body.theme-neon.surface-queue .queue-overlay-body .tbl tbody tr:hover{
 body.theme-neon.surface-queue .qov-sum-card{
   background:#151B2C;border:1px solid #2A3458;
 }
+
+/* v2.00 جستجوی قبض — selection / zebra / header (readable in every theme) */
+body.surface-rc .rc-tbl thead th{
+  background:#E8EEF8;color:#1A2435;font-weight:800;
+}
+body.surface-rc .rc-tbl tbody tr:nth-child(even) td{background:#F4F7FB;}
+body.surface-rc .rc-tbl tbody tr:nth-child(odd) td{background:#FFFFFF;}
+body.surface-rc .rc-tbl tbody tr:hover td{background:#DCE8FF;color:#0D1B2A;}
+body.surface-rc .rc-tbl tbody tr.rc-sel td{
+  background:#2D5FE6;color:#FFFFFF;
+}
+body.theme-dark.surface-rc .rc-tbl thead th{background:#1E2A3C;color:#E8F0FF;}
+body.theme-dark.surface-rc .rc-tbl tbody tr:nth-child(even) td{background:#162033;color:#E8F0FF;}
+body.theme-dark.surface-rc .rc-tbl tbody tr:nth-child(odd) td{background:#121A28;color:#E8F0FF;}
+body.theme-dark.surface-rc .rc-tbl tbody tr:hover td{background:#24344C;color:#FFFFFF;}
+body.theme-dark.surface-rc .rc-tbl tbody tr.rc-sel td{background:#3B82F6;color:#FFFFFF;}
+body.theme-neon.surface-rc .rc-tbl thead th{background:#121A2C;color:#00F0FF;}
+body.theme-neon.surface-rc .rc-tbl tbody tr:nth-child(even) td{background:#101828;color:#E8F6FF;}
+body.theme-neon.surface-rc .rc-tbl tbody tr:nth-child(odd) td{background:#0C121E;color:#E8F6FF;}
+body.theme-neon.surface-rc .rc-tbl tbody tr:hover td{background:#152238;color:#00F0FF;}
+body.theme-neon.surface-rc .rc-tbl tbody tr.rc-sel td{background:#00F0FF;color:#0A0E1A;}

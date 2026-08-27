@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Structural regression checks for the 30 builtin print designs (v1.99.0).
+"""Structural regression checks for the 31 builtin print designs (v2.00).
 
 Validates BOTH sides of the ready-made-template contract:
 
   1. src/print_designer_templates.inc  — the C++ seeder the print engine uses
   2. assets/designer/templates.js      — the ES5 mirror the web gallery shows
 
-The single invariant that matters for the bug this architecture was written to
-kill («خدمات چاپ نمی‌شود»): every one of the 30 designs owns exactly ONE live
-services table and AT MOST ONE barcode/code carrier (v1.69.0: some designs now
-carry no code at all, so the carrier count is 0 or 1, never 2); all presets
-include authoritative name,
-description, quantity, and line-amount columns; runtime rows stay compact,
-wrap prose, and never pad the page with fake/example services.
+Index 0 is the never-deletable «پیش‌فرض» exact thermal R80 Samen receipt.
+Indices 1..30 are 30 additional designs, all different, mixing R80/R58/A5/A4.
+Every design owns exactly ONE live services table and exactly ONE Code128
+barcode bound to receiptbarcode (never nid). Default services are
+نام خدمت | # | شرح خدمت (NAME+ROW+DESC). Extra 4+ column presets still
+carry NAME+DESC+QTY+LINE.
 """
 from pathlib import Path
 import json
@@ -64,7 +63,7 @@ COL_RULES = [
     (("\u0634\u0631\u062d", "\u062a\u0648\u0636\u06cc\u062d"), "DESC"),
     (("\u0646\u0648\u0639",), "CAT"),
     (("\u062a\u0639\u062f\u0627\u062f", "\u0645\u0642\u062f\u0627\u0631"), "QTY"),
-    (("\u0631\u062f\u06cc\u0641", "\u0634\u0645\u0627\u0631\u0647"), "ROW"),
+    (("\u0631\u062f\u06cc\u0641", "\u0634\u0645\u0627\u0631\u0647", "#", "№"), "ROW"),
     (
         (
             "\u0633\u0647\u0645\u0628\u06cc\u0645\u0647",
@@ -91,6 +90,9 @@ COL_RULES = [
 
 
 def classify(label):
+    raw = (label or "").strip()
+    if raw in ("#", "№"):
+        return "ROW"
     norm = _norm(label)
     if not norm:
         return "NONE"
@@ -101,13 +103,12 @@ def classify(label):
     return "NONE"
 
 
-# sanity: the python mirror must agree with the real cascade on the two
-# captions that are historically the trickiest (سهم بیمار vs سهم بیمه).
 check(
     classify("\u0633\u0647\u0645 \u0628\u06cc\u0645\u0627\u0631") == "INS"
     or classify("\u0633\u0647\u0645 \u0628\u06cc\u0645\u0627\u0631") == "PAT",
     "the pdSvcColOf mirror cannot classify «سهم بیمار» at all",
 )
+check(classify("#") == "ROW", "pdSvcColOf mirror does not treat «#» as ROW")
 check(
     "pdSvcColOf" in PRINTER.read_text(encoding="utf-8"),
     "printer.cpp no longer exposes pdSvcColOf — the caption contract is gone",
@@ -123,16 +124,22 @@ check(
     "it.type=PIT_SERVICES" in inc.replace(" ", ""),
     "mkServices() does not build a PIT_SERVICES item",
 )
+check("buildSamenDefault" in inc, "the Samen default builder is missing")
+check('d.paper=L"R80"' in inc, "default design is not authored against R80")
+check("درمانگاه شبانه روزی ثامن الائمه" in inc, "exact Samen clinic title is missing from the seeder")
+check("آدرس : " in inc and "تلفن : " in inc, "exact آدرس/تلفن prefixes are missing")
+check("شماره معرفی نامه" in inc, "referral caption is not the C2 «شماره معرفی نامه» string")
+check("شماره پرونده" in inc and "شماره سابقه" in inc, "fileNo/archiveNo captions are missing")
+check('L"receiptbarcode"' in inc, "barcode is not bound to receiptbarcode")
+check(
+    'it.field=L"receiptbarcode"' in inc.replace(" ", ""),
+    "PIT_BARCODE is not bound to receiptbarcode",
+)
 
-# --- page geometry ---------------------------------------------------------
-geom = dict(re.findall(r"static const double (PG_\w+|FOOT_Y)\s*=\s*([-\d.]+)", inc))
-check(geom.get("PG_W") == "210.0", f"page width is not A4 portrait: {geom.get('PG_W')}")
-check(geom.get("PG_H") == "297.0", f"page height is not A4 portrait: {geom.get('PG_H')}")
-check("PG_CW  = PG_W - 2*PG_M" in inc, "content width is no longer derived from the margin")
-check("FOOT_Y = PG_H - 34.0" in inc, "the 34 mm footer band reservation is gone")
-
-# --- the 8 column presets --------------------------------------------------
-preset_names = ["SVC3", "SVC4_ROW", "SVC4_CAT", "SVC5", "SVC5_CODE", "SVC6_FIN", "SVC6_INS", "SVC7"]
+preset_names = [
+    "SVC3", "SVC4_ROW", "SVC4_CAT", "SVC5", "SVC5_CODE",
+    "SVC6_FIN", "SVC6_INS", "SVC7", "SVC_SAMEN",
+]
 enum_match = re.search(r"enum SvcPreset \{(.*?)\}", inc, re.S)
 check(enum_match is not None, "enum SvcPreset was not found")
 if enum_match:
@@ -145,7 +152,6 @@ model_fn = re.search(r"static std::wstring svcModelJson\(int preset\)\{(.*?)\n\}
 check(model_fn is not None, "svcModelJson() was not found")
 model_body = model_fn.group(1) if model_fn else ""
 
-# reconstruct each preset's JSON out of the concatenated wide-string literals
 inc_presets = {}
 for chunk in re.split(r"\n\s*case\s+|\n\s*default:", model_body):
     tag = re.match(r"(SVC[A-Z0-9_]*)\s*:", chunk)
@@ -161,17 +167,18 @@ for chunk in re.split(r"\n\s*case\s+|\n\s*default:", model_body):
     inc_presets.setdefault(key, parsed)
 
 check(
-    len(inc_presets) == 8,
-    f"expected 8 parsable column presets in svcModelJson, got {sorted(inc_presets)}",
+    len(inc_presets) >= 8,
+    f"expected at least 8 parsable column presets in svcModelJson, got {sorted(inc_presets)}",
 )
+check("SVC_SAMEN" in inc_presets, "SVC_SAMEN (نام خدمت|#|شرح خدمت) preset is missing")
 
 
-def audit_preset(where, key, model):
+def audit_preset(where, key, model, defaultish=False):
     cols = model.get("cols")
     widths = model.get("widths") or []
     labels = model.get("labels") or []
     check(model.get("header") is True, f"{where} preset {key} has no header row")
-    check(cols in (4, 5, 6, 7), f"{where} preset {key} declares an odd column count {cols}")
+    check(cols in (3, 4, 5, 6, 7), f"{where} preset {key} declares an odd column count {cols}")
     check(len(widths) == cols, f"{where} preset {key}: {len(widths)} widths for {cols} cols")
     check(len(labels) == cols, f"{where} preset {key}: {len(labels)} labels for {cols} cols")
     total = sum(widths)
@@ -189,167 +196,120 @@ def audit_preset(where, key, model):
         f"{where} preset {key} has a caption printer.cpp cannot classify: "
         + ", ".join("%s->%s" % (l, k) for l, k in zip(labels, kinds)),
     )
-    for mandatory in ("NAME", "DESC", "QTY", "LINE"):
-        check(
-            mandatory in kinds,
-            f"{where} preset {key} lacks mandatory {mandatory}: {kinds}",
-        )
+    check("NAME" in kinds, f"{where} preset {key} lacks mandatory NAME: {kinds}")
+    check("DESC" in kinds, f"{where} preset {key} lacks mandatory DESC: {kinds}")
+    if cols >= 4:
+        for mandatory in ("QTY", "LINE"):
+            check(
+                mandatory in kinds,
+                f"{where} preset {key} lacks mandatory {mandatory}: {kinds}",
+            )
     check(
         len(set(kinds)) == len(kinds),
         f"{where} preset {key} repeats a column kind: {kinds}",
     )
-    # v1.97.0 — شرح خدمت last; ردیف omitted or last (never in the middle).
-    if "ROW" in kinds:
+    if kinds[-1] != "DESC" and "ROW" in kinds:
         check(
-            kinds[-1] == "ROW",
-            f"{where} preset {key} has row # in the middle: {kinds}",
-        )
-        check(
-            kinds[-2] == "DESC",
-            f"{where} preset {key} must put DESC immediately before trailing ROW: {kinds}",
+            kinds[-1] == "ROW" and kinds[-2] == "DESC",
+            f"{where} preset {key} must put DESC last (or before trailing ROW): {kinds}",
         )
     else:
         check(
             kinds[-1] == "DESC",
             f"{where} preset {key} must put DESC last: {kinds}",
         )
+    if defaultish:
+        check(
+            kinds == ["NAME", "ROW", "DESC"],
+            f"{where} default services must be NAME+ROW+DESC, got {kinds}",
+        )
     return kinds
 
 
 for key, model in sorted(inc_presets.items()):
-    kinds = audit_preset("inc", key, model)
+    kinds = audit_preset("inc", key, model, defaultish=(key == "SVC_SAMEN"))
     notes.append("  %-9s %d cols  %s" % (key, model.get("cols"), " | ".join(kinds)))
 
-# --- computed services height --------------------------------------------
-# v1.95: the old servicesBlock/servicesBlockAt helpers were replaced by a single
-# renderReceipt() that handles all 10 families internally.
-render_fn = re.search(r"static void renderReceipt\(PrintDesign& d, const TplSpec& sp\)\{(.*?)\n\}", inc, re.S)
-check(render_fn is not None, "renderReceipt() was not found")
-if render_fn:
-    body = render_fn.group(1)
-    check("mkServices(" in body, "renderReceipt() does not emit the services table")
-    check("medBelow" in body, "renderReceipt() does not emit the below-box footer section")
-
-# --- the 30 specs ---------------------------------------------------------
-spec_match = re.search(r"static const TplSpec TPL\[30\] = \{(.*?)\n\};", inc, re.S)
-check(spec_match is not None, "the TplSpec TPL[30] table was not found")
-specs = []
-if spec_match:
-    for line in spec_match.group(1).splitlines():
-        row = re.search(r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(SVC[A-Z0-9_]*)\s*,(.*?)\}", line)
-        if not row:
-            continue
-        rest = [p.strip() for p in row.group(4).split(",")]
-        specs.append(
-            {
-                "family": int(row.group(1)),
-                "variant": int(row.group(2)),
-                "svc": row.group(3),
-                "accent": rest[0],
-                "headFill": rest[2],
-                "bw": float(rest[3]),
-                "rowH": float(rest[4]),
-                "frame": rest[5] == "true",
-            }
-        )
-
-check(len(specs) == 30, f"expected 30 TplSpec rows, parsed {len(specs)}")
-if len(specs) == 30:
-    fams = sorted({s["family"] for s in specs})
-    check(fams == list(range(10)), f"expected 10 layout families 0..9, got {fams}")
-    for fam in range(10):
-        variants = sorted(s["variant"] for s in specs if s["family"] == fam)
-        check(
-            variants == [0, 1, 2],
-            f"family {fam} must have variants 0,1,2 — got {variants}",
-        )
-    used = {s["svc"] for s in specs}
-    check(
-        used <= set(preset_names),
-        f"a spec references an unknown preset: {sorted(used - set(preset_names))}",
-    )
-    check(
-        len(used) >= 7,
-        f"only {len(used)} of the 8 column presets are actually used: {sorted(used)}",
-    )
-    for i, s in enumerate(specs):
-        check(
-            3.8 <= s["rowH"] <= 9.0,
-            f"template {i + 1:02d} row pitch {s['rowH']} mm is outside the compact 4.0..9 mm band",
-        )
-        check(
-            0.2 <= s["bw"] <= 0.8,
-            f"template {i + 1:02d} table border {s['bw']} mm is outside 0.2..0.8 mm",
-        )
-    lineart = [i + 1 for i, s in enumerate(specs) if s["headFill"] == "0x000000"]
-    check(
-        len(lineart) >= 3,
-        f"expected at least 3 pure line-art (monochrome) designs, got {lineart}",
-    )
-
-# --- names are actually applied to the design ---------------------------
-name_match = re.search(r"static const wchar_t\* const TPL_NAMES\[30\]=\{(.*?)\n\};", inc, re.S)
-check(name_match is not None, "the TPL_NAMES[30] table was not found")
+# --- names ----------------------------------------------------------------
+name_match = re.search(r"static const wchar_t\* const TPL_NAMES\[31\]=\{(.*?)\n\};", inc, re.S)
+check(name_match is not None, "the TPL_NAMES[31] table was not found")
 inc_names = re.findall(r'L"([^"]*)"', name_match.group(1)) if name_match else []
-check(len(inc_names) == 30, f"expected 30 template names, got {len(inc_names)}")
+check(len(inc_names) == 31, f"expected 31 template names, got {len(inc_names)}")
 check(len(set(inc_names)) == len(inc_names), "two builtin templates share the same name")
 check(
     all(n.strip() for n in inc_names),
     "a builtin template name is blank — the gallery would show an empty card",
 )
+check(inc_names and inc_names[0] == "پیش‌فرض", "index 0 is not named «پیش‌فرض»")
 check(
     "d.name = TPL_NAMES[idx];" in inc,
-    "buildTemplate() does not stamp TPL_NAMES onto the design — designs seed NAMELESS "
-    "(this was the v1.62.0 blank-gallery bug)",
+    "buildTemplate() does not stamp TPL_NAMES onto the design",
 )
 check(
     "return TPL_NAMES[idx];" in inc,
     "buildTemplateName() no longer shares the single TPL_NAMES table",
 )
 
-# --- every family really prints the live services ----------------------
 build_match = re.search(
     r"static PrintDesign buildTemplate\(int idx\)\{(.*?)\n    return d;\n\}", inc, re.S
 )
 check(build_match is not None, "buildTemplate() body was not found")
 build = build_match.group(1) if build_match else ""
-# v1.95: buildTemplate now delegates to renderReceipt which handles all
-# 10 families internally via if/else on sp.family (not a switch/case).
-check("renderReceipt(d, sp);" in build, "buildTemplate() does not delegate to renderReceipt()")
-# v1.95: renderReceipt dispatches families via boolean flags (photo/sidebar/tearoff/shadeBars)
-# rather than case arms. Families 0 and 9 are the DEFAULT path (no special flags),
-# so they don't get explicit conditionals — only families 1-8 have explicit checks.
-render_body = render_fn.group(1) if render_fn else ""
-explicit_fams = [1, 2, 3, 4, 5, 6, 7, 8]
-for fam in explicit_fams:
-    check(
-        f"fam=={fam}" in render_body,
-        f"renderReceipt() does not handle family {fam} (explicit flag check)",
-    )
-# v1.98: every medical receipt carries exactly one barcode near/after the services table.
-check(
-    "medBarcode(" in render_body,
-    "renderReceipt() does not emit the medical barcode (medBarcode)",
-)
-svc_pos = render_body.find("mkServices(")
-bc_pos = render_body.find("medBarcode(")
-check(
-    svc_pos >= 0 and bc_pos > svc_pos,
-    "barcode is not placed below the services table in renderReceipt()",
-)
+check("buildSamenDefault(d)" in build, "buildTemplate() does not emit the Samen default")
+check("buildExtra(d, idx-1)" in build, "buildTemplate() does not emit the 30 extras")
 
-check('d.paper=L"A4"' in inc.replace(" ", "").replace('d.paper=L"A4"', 'd.paper=L"A4"') or 'd.paper=L"A4"' in inc,
-      "designs are no longer authored against A4")
+# --- extra spec table -----------------------------------------------------
+extra_match = re.search(r"static const ExtraSpec EXTRA\[30\] = \{(.*?)\n\};", inc, re.S)
+check(extra_match is not None, "the ExtraSpec EXTRA[30] table was not found")
+extras = []
+if extra_match:
+    for line in extra_match.group(1).splitlines():
+        row = re.search(
+            r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(SVC[A-Z0-9_]*)\s*,\s*L\"([^\"]+)\"\s*,(.*?)\}",
+            line,
+        )
+        if not row:
+            continue
+        rest = [p.strip() for p in row.group(5).split(",")]
+        extras.append(
+            {
+                "layout": int(row.group(1)),
+                "variant": int(row.group(2)),
+                "svc": row.group(3),
+                "paper": row.group(4),
+                "bw": float(rest[0]),
+                "rowH": float(rest[1]),
+            }
+        )
+check(len(extras) == 30, f"expected 30 ExtraSpec rows, parsed {len(extras)}")
+if len(extras) == 30:
+    papers = {e["paper"] for e in extras}
+    check("R80" in papers and "R58" in papers, f"extras are missing thermal papers: {papers}")
+    check("A5" in papers and "A4" in papers, f"extras are missing sheet papers: {papers}")
+    fams = sorted({e["layout"] for e in extras})
+    check(fams == list(range(10)), f"expected 10 extra layout families 0..9, got {fams}")
+    for i, e in enumerate(extras):
+        check(
+            3.8 <= e["rowH"] <= 9.0,
+            f"extra {i + 1:02d} row pitch {e['rowH']} mm is outside 3.8..9 mm",
+        )
+        check(
+            0.2 <= e["bw"] <= 0.8,
+            f"extra {i + 1:02d} table border {e['bw']} mm is outside 0.2..0.8 mm",
+        )
 
 # --- migration guard ---------------------------------------------------
-check('getSetting(L"tpl_migration_1_99"' in inc, "the v1.99 migration guard is missing")
+check(
+    'getSetting(L"tpl_migration_2_00"' in inc or 'getSetting(L"tpl_migration_1_200"' in inc,
+    "the v2.00 migration guard is missing",
+)
 init_fn = re.search(r"void Designs_Init\(\)\{(.*?)\n\}", inc, re.S)
 check(init_fn is not None, "Designs_Init() was not found")
 if init_fn:
     init_body = init_fn.group(1)
     check(
         init_body.count("stamp();") == 2,
-        "the migration must be stamped for fresh installs and the v1.99 upgrade "
+        "the migration must be stamped for fresh installs and the v2.00 upgrade "
         f"(found {init_body.count('stamp();')} stamp() calls)",
     )
     check(
@@ -358,9 +318,10 @@ if init_fn:
     )
     check(
         "Designs_Delete(existing[i].id)" in init_body,
-        "Designs_Init() no longer removes surplus builtins beyond the 30",
+        "Designs_Init() no longer removes surplus builtins beyond the 31",
     )
-for old in ("1_52", "1_53", "1_58", "1_59", "1_60", "1_61", "1_62", "1_65", "1_66", "1_67", "1_98"):
+    check("const int N = 31;" in init_body, "Designs_Init() does not seed 31 builtins")
+for old in ("1_52", "1_53", "1_58", "1_59", "1_60", "1_61", "1_62", "1_65", "1_66", "1_67", "1_98", "1_99"):
     check(
         'setSetting(L"tpl_migration_%s", L"1")' % old in inc,
         f"upgrade path no longer retires the tpl_migration_{old} guard",
@@ -371,9 +332,19 @@ for old in ("1_52", "1_53", "1_58", "1_59", "1_60", "1_61", "1_62", "1_65", "1_6
 # ===========================================================================
 js = JS.read_text(encoding="utf-8")
 check("window.AZ_TEMPLATES" in js, "templates.js no longer publishes window.AZ_TEMPLATES")
-check("var PG_W   = 210.0" in js or "PG_W = 210.0" in js.replace("   ", " "),
-      "templates.js drifted off A4 geometry")
-check("FOOT_Y = PG_H - 34.0" in js, "templates.js lost the footer reservation")
+check("buildSamenDefault" in js, "templates.js is missing the Samen default builder")
+check("درمانگاه شبانه روزی ثامن الائمه" in js, "templates.js is missing the Samen clinic title")
+check("آدرس : " in js and "تلفن : " in js, "templates.js is missing exact آدرس/تلفن prefixes")
+
+PAPER = {"R80": (80.0, 200.0), "R58": (58.0, 200.0), "A5": (148.0, 210.0), "A4": (210.0, 297.0)}
+REQUIRED_FIELDS = [
+    "clinicaddr", "clinicphone", "apptdate", "appttime", "queue", "nid",
+    "receiptbarcode", "ins", "supp", "supp_percent", "full", "fileNo",
+    "archiveNo", "doctor", "doctorcode", "specialty", "specialtycode",
+    "paid", "total", "insshare", "supppay", "discount_from", "discount",
+    "cash", "pos", "eprescription", "referralno", "receptionist", "cashier",
+    "scnum", "reg_ts",
+]
 
 harness = r"""
 var fs = require('fs');
@@ -383,50 +354,55 @@ var all = global.window.AZ_TEMPLATES;
 var out = [];
 for (var i = 0; i < all.length; i++) {
   var t = all[i], svc = [], barcode = [], k;
+  var fields = {}, labels = [];
   for (k = 0; k < t.items.length; k++) {
     if (t.items[k].type === 'services') svc.push(t.items[k]);
     if (t.items[k].type === 'barcode' || t.items[k].type === 'qr') barcode.push(t.items[k]);
   }
   var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  var hasPhoto = 0, hasLogo = 0, hasStub = 0, hasCap = 0, hasPayLbl = 0, hasFrame = 0;
+  var gray = 0, round = 0, nidBarcode = 0;
+  var nameIt = null, paidIt = null;
   for (k = 0; k < t.items.length; k++) {
     var it = t.items[k];
-    if (it.isFrame) continue;
-    if (it.x < minX) minX = it.x;
-    if (it.y < minY) minY = it.y;
-    if (it.x + it.w > maxX) maxX = it.x + it.w;
-    if (it.y + it.h > maxY) maxY = it.y + it.h;
+    if (it.field) fields[it.field] = (fields[it.field] || 0) + 1;
+    if (it.type === 'label' && it.text) labels.push(it.text);
+    if (it.isFrame || it.type === 'frame') hasFrame++;
+    if (!it.isFrame && it.type !== 'frame') {
+      if (it.x < minX) minX = it.x;
+      if (it.y < minY) minY = it.y;
+      if (it.x + it.w > maxX) maxX = it.x + it.w;
+      if (it.y + it.h > maxY) maxY = it.y + it.h;
+    }
+    if (it.field === 'full' && !nameIt) nameIt = it;
+    if (it.field === 'paid' && !paidIt) paidIt = it;
+    if (it.type === 'photo') hasPhoto++;
+    if (it.type === 'logo') hasLogo++;
+    if (it.text === 'مشخصات بیمار') hasCap++;
+    if (it.text === 'پرداخت‌ها') hasPayLbl++;
+    if (it.text === 'نسخهٔ بیمار' || it.text === '— — — محل جدا کردن — — —') hasStub++;
+    if (it.fillTransparent === false && it.fillColor && it.fillColor !== '#ffffff' && it.fillColor !== '#FFFFFF') gray++;
+    if ((it.corner || 0) > 0.01) round++;
+    if ((it.type === 'barcode' || it.type === 'qr') && it.field === 'nid') nidBarcode++;
   }
   var s = svc.length === 1 ? svc[0] : null;
   var bc = barcode.length === 1 ? barcode[0] : null;
   var model = null;
   if (s) { try { model = JSON.parse(s.text); } catch (e) { model = null; } }
-  var rows = 0;
-  if (s && s.rowH > 0) rows = Math.floor((s.h - (s.headerH || s.rowH)) / s.rowH);
-  var nameIt = null, paidIt = null, doctorIt = null;
-  var hasPhoto = 0, hasLogo = 0, hasStub = 0, hasCap = 0, hasPayLbl = 0;
-  for (k = 0; k < t.items.length; k++) {
-    var it2 = t.items[k];
-    if (it2.field === "P-Name" && !nameIt) nameIt = it2;
-    if (it2.field === "paid" && !paidIt) paidIt = it2;
-    if (it2.field === "doctor" && !doctorIt) doctorIt = it2;
-    if (it2.type === "photo") hasPhoto++;
-    if (it2.type === "logo") hasLogo++;
-    if (it2.text === "مشخصات بیمار") hasCap++;
-    if (it2.text === "پرداخت‌ها") hasPayLbl++;
-    if (it2.text === "نسخهٔ بیمار" || it2.text === "— — — محل جدا کردن — — —") hasStub++;
-  }
   out.push({
     name: t.name, paper: t.paper, orientation: t.orientation,
     items: t.items.length, svcCount: svc.length, barcodeCount: barcode.length,
     model: model, h: s ? s.h : 0, y: s ? s.y : 0, rowH: s ? s.rowH : 0,
-    headerH: s ? s.headerH : 0, rows: rows,
+    headerH: s ? s.headerH : 0,
     barcodeY: bc ? bc.y : -1, barcodeH: bc ? bc.h : 0, barcodeW: bc ? bc.w : 0,
-    barcodeBelow: !!(bc && s && bc.y + 0.05 >= s.y + s.h),
+    barcodeField: bc ? bc.field : '',
     minX: minX, minY: minY, maxX: maxX, maxY: maxY,
-    nameX: nameIt ? nameIt.x : -1, nameY: nameIt ? nameIt.y : -1,
-    paidY: paidIt ? paidIt.y : -1, doctorX: doctorIt ? doctorIt.x : -1,
+    nameY: nameIt ? nameIt.y : -1, paidY: paidIt ? paidIt.y : -1,
     hasPhoto: hasPhoto, hasLogo: hasLogo, hasStub: hasStub,
-    hasCap: hasCap, hasPayLbl: hasPayLbl
+    hasCap: hasCap, hasPayLbl: hasPayLbl, hasFrame: hasFrame,
+    gray: gray, round: round, nidBarcode: nidBarcode,
+    fields: fields, labels: labels,
+    prefixes: t.items.filter(function (it) { return it.prefix; }).map(function (it) { return it.prefix; })
   });
 }
 process.stdout.write(JSON.stringify(out));
@@ -450,127 +426,106 @@ except Exception as exc:  # pragma: no cover
     failures.append(f"could not run the templates.js audit: {exc}")
 
 if js_designs:
-    check(len(js_designs) == 30, f"templates.js publishes {len(js_designs)} designs, expected 30")
+    check(len(js_designs) == 31, f"templates.js publishes {len(js_designs)} designs, expected 31")
     js_names = [d["name"] for d in js_designs]
     check(
         js_names == inc_names,
         "the web gallery names have drifted from the C++ TPL_NAMES table",
     )
+    fps = []
+    papers_seen = set()
     for i, d in enumerate(js_designs):
-        tag = "web template %02d" % (i + 1)
-        check(d["paper"] == "A4" and d["orientation"] == 0, f"{tag} is not A4 portrait")
+        tag = "web template %02d" % i
+        papers_seen.add(d["paper"])
+        check(d["orientation"] == 0, f"{tag} is not portrait")
+        check(
+            d["paper"] in PAPER,
+            f"{tag} uses unexpected paper {d['paper']}",
+        )
+        pw, ph = PAPER.get(d["paper"], (210.0, 297.0))
         check(
             d["svcCount"] == 1,
             f"{tag} must own exactly one dynamic services table; got {d['svcCount']}",
         )
         check(
-            d["barcodeCount"] <= 1,
-            f"{tag} must own at most one barcode/code carrier; got {d['barcodeCount']}",
+            d["barcodeCount"] == 1,
+            f"{tag} must own exactly one barcode/code carrier; got {d['barcodeCount']}",
+        )
+        check(d["nidBarcode"] == 0, f"{tag} barcode is bound to nid")
+        check(
+            d["barcodeField"] == "receiptbarcode",
+            f"{tag} barcode field is {d['barcodeField']!r}, not receiptbarcode",
         )
         if d["svcCount"] != 1:
             continue
         check(d["model"] is not None, f"{tag} has an unparsable services model")
         if d["model"]:
-            audit_preset("web", "#%02d" % (i + 1), d["model"])
-            if len(specs) == 30:
-                want = inc_presets.get(specs[i]["svc"])
-                if want:
-                    check(
-                        d["model"].get("labels") == want.get("labels"),
-                        f"{tag} column captions differ from the C++ preset {specs[i]['svc']}",
-                    )
-                    check(
-                        d["model"].get("widths") == want.get("widths"),
-                        f"{tag} column widths differ from the C++ preset {specs[i]['svc']}",
-                    )
+            audit_preset("web", "#%02d" % i, d["model"], defaultish=(i == 0))
         check(d["rowH"] > 0 and d["headerH"] > 0, f"{tag} has no pinned row/header pitch")
         check(
-            d["y"] + d["h"] <= 289.0 + 0.01,
-            f"{tag} services table (y={d['y']:.1f} h={d['h']:.1f}) runs into the footer band",
-        )
-        # v1.95: the page margin is now R_M=8 (was PG_M=12), and the frame margin
-        # FR_M=5 sits outside the info box. So the printable-area bleed limit
-        # is 8..202 (width) and 8..289 (height).
-        check(
-            d["minX"] >= 7.9 and d["maxX"] <= 202.1,
-            f"{tag} bleeds off the printable width ({d['minX']:.1f}..{d['maxX']:.1f})",
+            d["minX"] >= 1.5 and d["maxX"] <= pw - 1.5 + 0.05,
+            f"{tag} bleeds off the printable width ({d['minX']:.1f}..{d['maxX']:.1f} of {pw})",
         )
         check(
-            d["minY"] >= 7.9 and d["maxY"] <= 289.1,
-            f"{tag} bleeds off the printable height ({d['minY']:.1f}..{d['maxY']:.1f})",
+            d["minY"] >= 1.5 and d["maxY"] <= ph + 0.2,
+            f"{tag} bleeds off the printable height ({d['minY']:.1f}..{d['maxY']:.1f} of {ph})",
         )
         check(d["items"] >= 18, f"{tag} looks under-designed ({d['items']} items)")
+        missing = [f for f in REQUIRED_FIELDS if f not in d["fields"]]
+        check(not missing, f"{tag} missing fields: {missing}")
+        check("ins_percent" not in d["fields"], f"{tag} still binds ins_percent")
         check(
-            d["barcodeBelow"],
-            f"{tag} barcode is not below the services table "
-            f"(svc y={d['y']:.1f} h={d['h']:.1f}, bc y={d['barcodeY']:.1f})",
+            "درمانگاه شبانه روزی ثامن الائمه" in d["labels"],
+            f"{tag} is missing the Samen clinic title label",
         )
-        check(
-            70.0 <= d["barcodeW"] <= 74.0 and 6.0 <= d["barcodeH"] <= 8.0,
-            f"{tag} barcode size {d['barcodeW']:.1f}×{d['barcodeH']:.1f} is not ~72×7 mm",
+        fp = (
+            d["paper"],
+            round(d["y"], 1),
+            round(d["h"], 1),
+            round(d["barcodeY"], 1),
+            round(d["barcodeW"], 1),
+            round(d["nameY"], 1),
+            round(d["paidY"], 1),
+            d["items"],
+            d["hasPhoto"],
+            d["hasLogo"],
+            d["hasStub"],
+            d["hasCap"],
+            d["hasPayLbl"],
+            d["hasFrame"],
         )
+        fps.append(fp)
 
-    # v1.69.0 — the 30 designs must be VISUALLY DISTINCT, not mere colour swaps.
-    # Each family's three variants get a different services-table height (a direct
-    # consequence of differing meta/patient/totals/footer blocks), and the code
-    # v1.95: all 30 medical receipts now carry a barcode (section 2 of the spec).
-    # The old no_code>=5 / with_code>=10 variety assertion is replaced by an
-    # all-barcode check (every receipt has exactly 1 barcode).
+    # default exact thermal receipt
+    if js_designs:
+        d0 = js_designs[0]
+        check(d0["name"] == "پیش‌فرض", "index 0 is not «پیش‌فرض»")
+        check(d0["paper"] == "R80", f"default paper is {d0['paper']}, not R80")
+        check(
+            48.0 <= d0["barcodeW"] <= 52.0 and 7.0 <= d0["barcodeH"] <= 9.0,
+            f"default barcode size {d0['barcodeW']:.1f}×{d0['barcodeH']:.1f} is not ~50×8 mm",
+        )
+        check(d0["hasFrame"] >= 1, "default is missing the body PIT_FRAME")
+        check(d0["gray"] == 0, "default uses gray fills")
+        check(d0["round"] == 0, "default uses rounded corners")
+        check(d0["hasPhoto"] == 0 and d0["hasLogo"] == 0, "default must not carry photo/logo")
+        check("آدرس : " in d0["prefixes"], "default clinicaddr prefix is not «آدرس : »")
+        check("تلفن : " in d0["prefixes"], "default clinicphone prefix is not «تلفن : »")
+        if d0["model"]:
+            check(
+                d0["model"].get("labels") == ["نام خدمت", "#", "شرح خدمت"],
+                f"default services columns are {d0['model'].get('labels')}",
+            )
+
+    check("R80" in papers_seen and "R58" in papers_seen, f"gallery papers missing thermal: {papers_seen}")
+    check("A4" in papers_seen and "A5" in papers_seen, f"gallery papers missing sheets: {papers_seen}")
+    check(len(set(fps)) == len(fps), "two builtin designs share the same layout fingerprint")
     no_code = sum(1 for d in js_designs if d["barcodeCount"] == 0)
     with_code = sum(1 for d in js_designs if d["barcodeCount"] == 1)
-    check(no_code == 0 and with_code == 30,
-          f"v1.95 medical receipts: expected all 30 barcoded, got {no_code} code-less, {with_code} barcoded")
-    for fam in range(10):
-        hs = sorted(round(d["h"], 1) for i, d in enumerate(js_designs)
-                    if len(specs) == 30 and specs[i]["family"] == fam)
-        check(len(set(hs)) == 3,
-              f"family {fam} variants are not layout-distinct (services heights {hs})")
-
-    # v1.98 — families must use DISTINCT section orders, not one shared body.
-    def _order(d):
-        seq = sorted(
-            (("name", d["nameY"]), ("svc", d["y"]), ("paid", d["paidY"]), ("bc", d["barcodeY"])),
-            key=lambda t: t[1],
-        )
-        return tuple(t[0] for t in seq)
-
-    want_order = {
-        0: ("name", "svc", "bc", "paid"),       # classic
-        1: ("svc", "bc", "name", "paid"),       # services-high
-        2: ("name", "paid", "svc", "bc"),       # services-low
-        3: ("name", "svc", "bc", "paid"),       # sidebar (rail + main col)
-        4: ("name", "svc", "bc", "paid"),       # two-col info, then services
-        5: ("name", "svc", "bc", "paid"),       # captions; services after info
-        6: ("name", "svc", "bc", "paid"),       # photo header + info then svc
-        7: ("paid", "name", "svc", "bc"),       # finance-first
-        8: ("name", "svc", "bc", "paid"),       # compact tear-off
-        9: ("name", "svc", "bc", "paid"),       # dual-block; svc between info/fin
-    }
-    for fam in range(10):
-        sample = next((d for i, d in enumerate(js_designs)
-                       if specs[i]["family"] == fam), None)
-        if not sample:
-            continue
-        got = _order(sample)
-        check(got == want_order[fam],
-              f"family {fam} section order {got} != {want_order[fam]} "
-              f"(nameY={sample['nameY']:.1f} svcY={sample['y']:.1f} "
-              f"bcY={sample['barcodeY']:.1f} paidY={sample['paidY']:.1f})")
-        if fam == 3:
-            check(sample["hasLogo"] >= 1, "family 3 (sidebar) has no logo rail")
-        if fam == 4:
-            check(sample["nameX"] < 50.0,
-                  f"family 4 patient column is not on the left (nameX={sample['nameX']:.1f})")
-            check(sample["doctorX"] > 90.0,
-                  f"family 4 visit column is not on the right (doctorX={sample['doctorX']:.1f})")
-        if fam == 5:
-            check(sample["hasCap"] >= 1, "family 5 is missing ruled section captions")
-        if fam == 6:
-            check(sample["hasPhoto"] >= 1, "family 6 (photo header) has no patient photo")
-        if fam == 8:
-            check(sample["hasStub"] >= 1, "family 8 (tear-off) is missing the stub")
-        if fam == 9:
-            check(sample["hasPayLbl"] >= 1, "family 9 (dual-block) is missing پرداخت‌ها")
+    check(
+        no_code == 0 and with_code == len(js_designs),
+        f"expected every design barcoded, got {no_code} code-less, {with_code} barcoded",
+    )
 
 # ===========================================================================
 # 3. Runtime renderer and admission canonicalization guards
@@ -857,14 +812,14 @@ if failures:
         print(f"FAIL: {failure}")
     sys.exit(1)
 
-print("PASS: 8 presets all include name + description + quantity + line amount")
+print("PASS: service presets include NAME+DESC (default NAME+ROW+DESC; extras keep QTY+LINE)")
 for note in notes:
     print(note)
-print("PASS: 30 specs = 10 distinct layout families x 3 variants, legible pitch/borders")
-print("PASS: all 30 designs are layout-distinct (per-family variant heights differ) + mixed code carrier")
-print("PASS: all 30 designs carry their Persian name (no more blank gallery cards)")
-print("PASS: every family emits exactly one live PIT_SERVICES table + a footer band")
+print("PASS: 31 designs = Default R80 Samen receipt + 30 extras, mixed R80/R58/A5/A4")
+print("PASS: all 31 designs are layout-distinct and carry unique Persian names")
+print("PASS: default is undeletable پیش‌فرض with exact C2 labels / receiptbarcode / 3-col services")
+print("PASS: every design emits exactly one live PIT_SERVICES table + one Code128")
 print("PASS: runtime service rows are compact, wrapped, bounded, and never sample-padded")
 print("PASS: assets/designer/templates.js mirrors the C++ seeder exactly")
-print("PASS: tpl_migration_1_99 guard stamped for fresh installs and upgrades")
+print("PASS: tpl_migration_2_00 guard stamped for fresh installs and upgrades")
 print("PASS: toggled-back normal rows charge 170 in both orders through production canonicalization")

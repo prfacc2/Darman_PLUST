@@ -1,42 +1,19 @@
 /* ===========================================================================
-   templates.js — DarmanPlus ready-made print designs  (v1.62.0 — FULL REWRITE)
+   templates.js — DarmanPlus ready-made print designs  (v2.00)
 
-   ★ این فایل دقیقاً همان ۳۰ قالب داخلی C++ (src/print_designer_templates.inc)
+   ★ این فایل دقیقاً همان ۳۱ قالب داخلی C++ (src/print_designer_templates.inc)
      است تا گالری دیزاینر وب با آنچه موتور چاپ واقعاً seed می‌کند یکی باشد.
      هر تغییری در .inc باید عیناً اینجا هم اعمال شود.
 
-   مرکز هر ۳۰ قالب: جدول پویای خدمات (type:"services") که هنگام چاپ از
-   ReceptionRecord.services پر می‌شود — ردیف/نام خدمت/شرح/تعداد/مبلغ، سطر به
-   سطر و زنده، مستقیم از مدیریت ← خدمات. نه لیبل ثابت، نه متن آزمایشی.
-
-   v1.62.0:
-     • ده خانوادهٔ چیدمان کاملاً متفاوت × ۳ گونه = ۳۰ طرح واقعاً متمایز
-     • قاب امن جدول از فضای آزاد صفحه محاسبه می‌شود؛ موتور چاپ فقط سطرهای
-       واقعی را می‌کشد و فضای استفاده‌نشدهٔ صفحه را خالی می‌گذارد
-     • هشت پیش‌تنظیم ستونی (۴ تا ۷ ستون) با عنوان‌های تأییدشده در pdSvcColOf
-
-   v1.69.0 (تمایز بصری هر ۳۰ طرح):
-     • هر گونه در هر خانواده حالا متا/بلاک بیمار/جمع‌بندی/پاورقی مخصوص خود
-       را دارد تا هر ۳۰ طرح اساسی متفاوت باشند، نه فقط تعویض رنگ.
-     • تنوع بارکد: ۲۱ طرح یک بارکد Code128 (چهار سبک پاورقی)، ۹ طرح بدون
-       کد (footClean). هر صفحه نهایتًا یک کد (۰ یا ۱، هرگز دو).
-     •compact و درون کادر A4 تا pscale موتور چاپ آن را روی A5/A6/رول کوچک
-       متناسب و بدون برش کوچک کند.
+   ایندکس ۰: «پیش‌فرض» — رسید حرارتی R80 درمانگاه شبانه روزی ثامن الائمه
+   ایندکس ۱..۳۰: سی طرح اضافی، همه متفاوت، مخلوط R80/R58/A5/A4
    =========================================================================== */
 (function () {
   "use strict";
 
   var INK      = "#000000";
   var RULE     = "#000000";
-  var RULE_DIM = "#8a8a8a";
   var PAPER_BG = "#ffffff";
-
-  /* ------------------------------------------------- A4 page geometry (mm) */
-  var PG_W   = 210.0;
-  var PG_H   = 297.0;
-  var PG_M   = 12.0;
-  var PG_CW  = PG_W - 2 * PG_M;      /* 186 */
-  var FOOT_Y = PG_H - 34.0;          /* 263 */
 
   var _uid = 0;
   function nid() { return ++_uid; }
@@ -61,13 +38,9 @@
   }
   function mk(o) { return extend(base(), o); }
 
-  /* ---------------------------------------------------------- primitives */
   function L(x, y, w, h, text, pt, bold, align, o) {
     return mk(extend({ type: "label", x: x, y: y, w: w, h: h, text: text,
       pt: pt, bold: !!bold, align: align, dir: (align === 1 ? 2 : 0) }, o || {}));
-  }
-  function LC(x, y, w, h, text, pt, bold, align, colour) {
-    return L(x, y, w, h, text, pt, bold, align, { textColor: colour });
   }
   function F(x, y, w, h, field, prefix, pt, align, o) {
     return mk(extend({ type: "field", x: x, y: y, w: w, h: h,
@@ -77,41 +50,34 @@
   function FB(x, y, w, h, field, prefix, pt, align, o) {
     return F(x, y, w, h, field, prefix, pt, align, extend({ bold: true }, o || {}));
   }
-  function HL(x, y, w, bw, col) {
+  function HL(x, y, w, bw) {
     return mk({ type: "hline", x: x, y: y, w: w, h: 0.2, borderWidth: bw,
-      borderColor: col || RULE });
+      borderColor: RULE });
   }
   function VL(x, y, h, bw) {
     return mk({ type: "vline", x: x, y: y, w: 0.2, h: h, borderWidth: bw });
   }
-  function RECT(x, y, w, h, bw, corner, border) {
+  function RECT(x, y, w, h, bw) {
     return mk({ type: "rect", x: x, y: y, w: w, h: h, borderWidth: bw,
-      corner: corner, fillTransparent: true, borderColor: border || RULE });
+      corner: 0, fillTransparent: true, borderColor: RULE });
   }
-  function BAND(x, y, w, h, fill) {
-    return mk({ type: "rect", x: x, y: y, w: w, h: h, fillColor: fill,
-      fillTransparent: false, borderColor: fill, borderWidth: 0 });
-  }
-  function TINT(x, y, w, h, fill, border, bw, corner) {
-    return mk({ type: "rect", x: x, y: y, w: w, h: h, fillColor: fill,
-      fillTransparent: false, borderColor: border, borderWidth: bw,
-      corner: corner });
-  }
-  function FRAME(pw, ph, m, col, bw) {
+  function FRAME(pw, ph, m, bw) {
     return mk({ type: "frame", x: m, y: m, w: pw - 2 * m, h: ph - 2 * m,
-      isFrame: true, borderColor: col, borderWidth: bw, fillTransparent: true });
+      isFrame: true, borderColor: RULE, borderWidth: bw, fillTransparent: true,
+      corner: 0 });
+  }
+  function FRAME_BOX(x, y, w, h, bw) {
+    return mk({ type: "frame", x: x, y: y, w: w, h: h,
+      isFrame: true, borderColor: RULE, borderWidth: bw, fillTransparent: true,
+      corner: 0 });
   }
   function LOGO(x, y, w, h) {
     return mk({ type: "logo", x: x, y: y, w: w, h: h,
-      borderColor: RULE_DIM, borderWidth: 0.3 });
-  }
-  function QR(x, y, s) {
-    return mk({ type: "qr", x: x, y: y, w: s, h: s, field: "receiptNo",
-      borderColor: RULE_DIM, borderWidth: 0.3 });
+      borderColor: RULE, borderWidth: 0.3 });
   }
   function PHOTO(x, y, w, h) {
     return mk({ type: "photo", x: x, y: y, w: w, h: h,
-      borderColor: RULE_DIM, borderWidth: 0.3 });
+      borderColor: RULE, borderWidth: 0.3 });
   }
   function BARCODE(x, y, w, h) {
     return mk({ type: "barcode", x: x, y: y, w: w, h: h,
@@ -120,11 +86,8 @@
       pt: 8, align: 1, dir: 1, textColor: INK, borderWidth: 0 });
   }
 
-  /* ------------------------------- THE CORE: live services table presets */
-  /*  عنوان هر ستون معنایش را تعیین می‌کند (printer.cpp::pdSvcColOf)، پس
-      کاربر می‌تواند ستون‌ها را جابه‌جا یا حذف کند و داده باز هم درست بنشیند. */
   var SVC3 = 0, SVC4_ROW = 1, SVC4_CAT = 2, SVC5 = 3, SVC5_CODE = 4,
-      SVC6_FIN = 5, SVC6_INS = 6, SVC7 = 7;
+      SVC6_FIN = 5, SVC6_INS = 6, SVC7 = 7, SVC_SAMEN = 8;
 
   function svcModel(preset) {
     switch (preset) {
@@ -150,156 +113,65 @@
         widths: [0.20, 0.10, 0.08, 0.12, 0.16, 0.26, 0.08],
         labels: ["نام خدمت", "کد خدمت", "تعداد", "مبلغ واحد", "مبلغ کل",
                  "شرح خدمت", "ردیف"] };
+      case SVC_SAMEN: return { cols: 3, header: true,
+        widths: [0.58, 0.10, 0.32],
+        labels: ["نام خدمت", "#", "شرح خدمت"] };
       default: return { cols: 4, header: true,
         widths: [0.34, 0.10, 0.22, 0.34],
         labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
     }
   }
 
-  function SERVICES(x, y, w, h, pt, preset, headFill, bw, rowH, headerH) {
+  function SERVICES(x, y, w, h, pt, preset, bw, rowH, headerH) {
     return mk({
       type: "services", x: x, y: y, w: w, h: h, pt: pt, align: 1, dir: 2,
       borderColor: RULE, borderWidth: bw, textColor: INK,
-      fillColor: headFill ? headFill : PAPER_BG,
-      fillTransparent: !headFill,
-      padding: 0.8, headerH: headerH, rowH: rowH,
+      fillColor: PAPER_BG, fillTransparent: true,
+      padding: 0.6, headerH: headerH, rowH: rowH,
       text: JSON.stringify(svcModel(preset))
     });
   }
 
-  /* ------------------------------------------------------------- captions */
-  /* v1.95.0 — thermal medical receipt captions (mirror the C++ .inc).       */
-  var FA_CLINIC    = "درمانگاه شبانه‌روزی درمان پلاس";
-  var FA_SUBTITLE  = "سامانه پذیرش و مدیریت درمانگاه";
-  var FA_PHONE     = "تلفن: ";
-  var FA_ADDR      = "نشانی: ";
-  var FA_APPT      = "تاریخ نوبت: ";
-  var FA_QUEUE     = "نوبت: ";
-  var FA_NID       = "کد ملی: ";
-  var FA_BARCODE   = "بارکد: ";
-  var FA_BASEINS   = "بیمه پایه: ";
-  var FA_SUPP      = "مکمل: ";
-  var FA_FULL      = "نام بیمار: ";
-  var FA_AGE       = "سن: ";
-  var FA_DOCTOR    = "دکتر: ";
-  var FA_DOCCODE   = "کد نظام پزشکی: ";
-  var FA_SPECCODE  = "کد تخصص: ";
-  var FA_SPECIALTY = "شرح تخصص: ";
-  var FA_PAID      = "پرداختی: ";
-  var FA_TOTAL     = "قیمت کل: ";
-  var FA_INSSHARE  = "سهم پایه: ";
-  var FA_SUPPPAY   = "سهم مکمل: ";
-  var FA_DISCOUNT  = "تخفیف از: ";
-  var FA_POS       = "POS: ";
-  var FA_CASH      = "نقد: ";
-  var FA_PATSHARE  = "سهم بیمار: ";
-  var FA_FINAL     = "مبلغ نهایی: ";
-  var FA_EPRESC    = "کد رهگیری نسخه الکترونیک: ";
-  var FA_REFERRAL  = "شماره معرف نسخه: ";
-  var FA_RECEPTION = "پذیرش: ";
-  var FA_CASHIER   = "صندوق: ";
-  var FA_SC        = "ش.ص: ";
-  var FA_PRINTTS   = "تاریخ چاپ: ";
-  var FA_SVCLIST   = "شرح خدمات";
+  var FA_CLINIC    = "درمانگاه شبانه روزی ثامن الائمه";
+  var FA_ADDR      = "آدرس : ";
+  var FA_PHONE     = "تلفن : ";
+  var FA_DOC_REC   = "قبض پزشک";
+  var FA_INS_REC   = "رسید بیمه";
+  var FA_DOC_BOTH  = "قبض و رسید";
+  var FA_APPT      = "تاریخ نوبت : ";
+  var FA_QUEUE     = "نوبت : ";
+  var FA_NID       = "کد ملی : ";
+  var FA_BARCODE   = "بارکد : ";
+  var FA_BASEINS   = "بیمه پایه : ";
+  var FA_SUPP      = "مکمل : ";
+  var FA_FULL      = "نام بیمار : ";
+  var FA_FILENO    = "شماره پرونده ";
+  var FA_ARCHIVE   = "شماره سابقه ";
+  var FA_DOCTOR    = "دکتر : ";
+  var FA_SPECIALTY = "شرح تخصص : ";
+  var FA_PAID      = "پرداختی : ";
+  var FA_TOTAL     = "قیمت کل : ";
+  var FA_INSSHARE  = "سهم پایه : ";
+  var FA_SUPPPAY   = "سهم مکمل : ";
+  var FA_DISCFROM  = "تخفیف از : ";
+  var FA_DISCOUNT  = "تخفیف : ";
+  var FA_CASH      = "نقد : ";
+  var FA_POS       = "POS : ";
+  var FA_EPRESC    = "کد رهگیری نسخه الکترونیک : ";
+  var FA_REFERRAL  = "شماره معرفی نامه : ";
+  var FA_RECEPTION = "پذیرش : ";
+  var FA_CASHIER   = "صندوق : ";
+  var FA_SC        = "ش.ص : ";
+  var FA_CASH_SFX  = " / دار";
   var FA_TEAR      = "— — — محل جدا کردن — — —";
   var FA_STUB      = "نسخهٔ بیمار";
   var FA_PAYLBL    = "پرداخت‌ها";
   var FA_SHARELBL  = "سهم بیمه";
-  var FA_DOC_REC   = "قبض پزشک";
-  var FA_INS_REC   = "رسید بیمه";
-  var FA_DOC_BOTH  = "قبض و رسید پزشکی";
-  var FA_RECEIPT   = "شماره قبض: ";
+  var FA_SVCLIST   = "شرح خدمات";
 
-  /* ----- medical receipt geometry (8 mm margins, portrait A4) ------------- */
-  var R_M   = 8.0;
-  var R_CW  = PG_W - 2 * R_M;        /* 194 */
-  var FR_M  = 5.0;                   /* page-frame margin (outside the box) */
-  var R_INK   = "#000000";
-  var R_SHADE = "#ECECEC";           /* very light gray (monochrome shading) */
-
-  /* ============================================ 30 designs / 10 families == */
-  /* v1.96.0 — pure monochrome line-art: hf=0 (no coloured backgrounds). The ten
-     families stay distinct through LAYOUT, not colour. */
-  var TPL = [
-    { f: 0, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.2, fr: false },
-    { f: 0, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.2, fr: false },
-    { f: 0, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.2, fr: false },
-    { f: 1, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 1, v: 1, s: SVC4_CAT,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 1, v: 2, s: SVC5_CODE, a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 2, v: 0, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: true  },
-    { f: 2, v: 1, s: SVC6_INS,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: true  },
-    { f: 2, v: 2, s: SVC7,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: true  },
-    { f: 3, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.8, fr: false },
-    { f: 3, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.8, fr: false },
-    { f: 3, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.8, fr: false },
-    { f: 4, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.25, rh: 6.0, fr: false },
-    { f: 4, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.25, rh: 6.0, fr: true  },
-    { f: 4, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.25, rh: 6.0, fr: false },
-    { f: 5, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 5, v: 1, s: SVC4_CAT,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 5, v: 2, s: SVC6_INS,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 6, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 6, v: 1, s: SVC4_CAT,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 6, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 7, v: 0, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: false },
-    { f: 7, v: 1, s: SVC6_INS,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: false },
-    { f: 7, v: 2, s: SVC7,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.6, fr: true  },
-    { f: 8, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.2, fr: false },
-    { f: 8, v: 1, s: SVC4_ROW,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.2, fr: false },
-    { f: 8, v: 2, s: SVC5,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 5.2, fr: false },
-    { f: 9, v: 0, s: SVC3,      a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 9, v: 1, s: SVC6_FIN,  a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: false },
-    { f: 9, v: 2, s: SVC5_CODE, a: "#000000", t: "#FFFFFF", hf: 0, bw: 0.30, rh: 6.0, fr: true  }
-  ];
-
-  var NAMES = [
-    "۰۱) قبض پزشک — کلاسیک",
-    "۰۲) رسید بیمه — کلاسیک خط‌کشی",
-    "۰۳) قبض و رسید — کلاسیک دوخطی",
-    "۰۴) قبض پزشک — باند سرتیتر",
-    "۰۵) رسید بیمه — باند سرتیتر",
-    "۰۶) قبض و رسید — باند سرتیتر",
-    "۰۷) قبض پزشک — فاکتور فشرده",
-    "۰۸) رسید بیمه — فاکتور فشرده",
-    "۰۹) قبض و رسید — فاکتور فشرده",
-    "۱۰) قبض پزشک — ستون کناری",
-    "۱۱) رسید بیمه — ستون کناری",
-    "۱۲) قبض و رسید — ستون کناری",
-    "۱۳) قبض پزشک — خط‌کشی تک‌رنگ",
-    "۱۴) رسید بیمه — خط‌کشی قاب‌دار",
-    "۱۵) قبض و رسید — خط‌کشی",
-    "۱۶) قبض پزشک — کارتی خط‌کشی",
-    "۱۷) رسید بیمه — کارتی خط‌کشی",
-    "۱۸) قبض و رسید — کارتی خط‌کشی",
-    "۱۹) قبض پزشک — عکس بیمار",
-    "۲۰) رسید بیمه — عکس بیمار",
-    "۲۱) قبض و رسید — عکس بیمار",
-    "۲۲) قبض پزشک — مالی کامل",
-    "۲۳) رسید بیمه — مالی کامل",
-    "۲۴) قبض و رسید — مالی کامل قاب‌دار",
-    "۲۵) قبض پزشک — فشرده ته‌برگ",
-    "۲۶) رسید بیمه — فشرده ته‌برگ",
-    "۲۷) قبض و رسید — فشرده ته‌برگ",
-    "۲۸) قبض پزشک — دو بلوکی",
-    "۲۹) رسید بیمه — دو بلوکی",
-    "۳۰) قبض و رسید — دو بلوکی قاب‌دار"
-  ];
-
-  /* push a labelled data field into a cell; align 0 = right (RTL cell start) */
-  function putF(d, x, y, w, h, field, prefix, pt, bold, align) {
-    if (bold) d.push(FB(x, y, w, h, field, prefix, pt, align || 0));
-    else      d.push(F (x, y, w, h, field, prefix, pt, align || 0));
-  }
-
-  /* v1.96.0 — SPLIT LABEL / VALUE (CRITICAL RULE): caption = its own PIT_LABEL
-     (right-aligned at the cell's right edge), bound value = its own PIT_FIELD
-     with an EMPTY prefix (right-aligned just left of the label), so the row reads
-     «label:  value» with NO hardcoded example text in the field. lwFrac tunes the
-     label band so long Persian captions never clip. field==null → label only. */
   function putLF(d, x, y, w, h, label, field, pt, lblBold, valBold, lwFrac) {
-    var lw = w * (lwFrac == null ? 0.42 : lwFrac), gap = 1.2, vw = w - lw - gap;
-    if (vw < 6) vw = 6;
+    var lw = w * (lwFrac == null ? 0.42 : lwFrac), gap = 0.8, vw = w - lw - gap;
+    if (vw < 5) vw = 5;
     d.push(L(x + w - lw, y, lw, h, label, pt, lblBold, 0));
     if (field) {
       if (valBold) d.push(FB(x, y, vw, h, field, "", pt, 0));
@@ -307,399 +179,438 @@
     }
   }
 
-  /* ============== SHARED MEDICAL-RECEIPT SECTION BUILDERS ================= */
-  /* Each appends to the item array and returns the next free y (mm). The    */
-  /* whole receipt body sits inside ONE bordered box (drawn last by          */
-  /* renderReceipt) so every internal rule meets a continuous thin outline.  */
-
-  /* Section 1 — clinic header (centered name + address + phone).            */
-  /* hdrMode: 0 plain, 1 gray band behind the name, 2 double rule below.     */
-  /* photo: a small patient-photo box tucked into the top-right corner.      */
-  function medHeader(d, x, y, w, pt, hdrMode, photo) {
-    var pw = 15.0, ph = 18.0, tw = w;
-    if (photo) tw = w - pw - 3.0;
-    var yy = y + 0.8, namePt = pt + 3.0;
-    if (hdrMode === 1 && !photo) {
-      /* v1.96.0: line-art emphasis (rule + larger bold name) — was a gray band */
-      d.push(HL(x, y + 0.4, w, 0.3));
-      d.push(L(x + 1, y + 0.8, w - 2, 6.4, FA_CLINIC, namePt + 1.0, true, 1));
-      yy = y + 0.4 + 7.4 + 0.6;
-    } else {
-      d.push(L(x, yy, tw, 6.4, FA_CLINIC, namePt, true, 1)); yy += 7.0;
-    }
-    d.push(F(x, yy, tw, 4.4, "clinicaddr",  "", pt - 2.0, 1)); yy += 5.0;
-    d.push(F(x, yy, tw, 4.2, "clinicphone", "", pt - 2.0, 1));
-    if (photo) d.push(PHOTO(x + w - pw, y + 0.8, pw, ph));
-    var bottom = y + (photo ? 19.0 : 18.0);
-    d.push(HL(x, bottom, w, 0.3));
-    if (hdrMode === 2 && !photo) { d.push(HL(x, bottom + 1.3, w, 0.3)); bottom += 1.3; }
-    return bottom;
-  }
-
-  /* Section 2 — wide, short barcode (centered, STANDARD ~72×7 mm) + divider. */
-  function medBarcode(d, x, y, w) {
-    var bcW = 72.0, bcH = 7.0;
-    d.push(BARCODE(x + (w - bcW) / 2.0, y + 0.4, bcW, bcH));
-    var bottom = y + bcH + 1.5;
-    d.push(HL(x, bottom, w, 0.3));
-    return bottom;
-  }
-
-  /* Section 3 — document title (bold, centered) + divider rule. */
-  function medTitle(d, x, y, w, pt, title) {
-    d.push(L(x, y + 0.4, w, 6.0, title, pt + 2.0, true, 1));
-    var bottom = y + 7.5;
-    d.push(HL(x, bottom, w, 0.3));
-    return bottom;
-  }
-
-  /* Section 4 — the ruled info box: 6 rows × 2 columns, split by a center
-     vertical line and separated by horizontal rules. v1.96.0: every row now
-     carries SPLIT label (PIT_LABEL) + bound value (PIT_FIELD, empty prefix). */
-  function medInfo(d, x, y, w, rH, pt, bw) {
-    var half = w / 2.0, vx = x + half, fh = rH - 0.6;
-    var rx = x + half + 1.0, rw = half - 2.0, lx = x + 1.0, lw = half - 2.0, cy = y;
-    function vline() { d.push(VL(vx, cy, rH, bw)); }
-    function rule()  { cy += rH; d.push(HL(x, cy, w, bw)); }
-
-    /* a: تاریخ نوبت: {apptdate} {appttime}  |  نوبت: {queue} */
-    /* RTL cell order right→left: [label][apptdate][appttime] */
-    vline();
-    var lblW = rw * 0.34, g = 1.0, rem = rw - lblW - 2 * g, f1 = rem * 0.58, f2 = rem * 0.42;
-    d.push(F (rx,         cy + 0.3, f2,    fh, "appttime", "", pt, 0));
-    d.push(FB(rx + f2 + g, cy + 0.3, f1,    fh, "apptdate", "", pt, 0));
-    d.push(L (rx + rw - lblW, cy + 0.3, lblW, fh, FA_APPT, pt, true, 0));
-    putLF(d, lx, cy + 0.3, lw, fh, FA_QUEUE, "queue", pt, false, false, 0.26);
-    rule();
-    /* b: کد ملی: {nid}  |  بارکد: {barcode} */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_NID, "nid", pt, true, false, 0.42);
-             putLF(d, lx, cy + 0.3, lw, fh, FA_BARCODE, "barcode", pt, false, false, 0.30); rule();
-    /* c: بیمه پایه: {ins}  |  مکمل: {supp} {supp_percent} */
-    /* RTL cell order right→left: [label][supp][supp_percent] */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_BASEINS, "ins", pt, false, false, 0.40);
-    lblW = lw * 0.22; g = 1.0; rem = lw - lblW - 2 * g; f1 = rem * 0.58; f2 = rem * 0.42;
-    d.push(F (lx,         cy + 0.3, f2,    fh, "supp_percent", "", pt, 0));
-    d.push(F (lx + f2 + g, cy + 0.3, f1,    fh, "supp",         "", pt, 0));
-    d.push(L (lx + lw - lblW, cy + 0.3, lblW, fh, FA_SUPP, pt, false, 0));
-    rule();
-    /* d: نام بیمار: {P-Name}  |  سن: {age}  (10Y/24Y) */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_FULL, "P-Name", pt, true, false, 0.40);
-             putLF(d, lx, cy + 0.3, lw, fh, FA_AGE, "age", pt, false, false, 0.20); rule();
-    /* e: دکتر: {doctor}  |  کد نظام پزشکی: {doctorcode} */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_DOCTOR, "doctor", pt, false, false, 0.22);
-             putLF(d, lx, cy + 0.3, lw, fh, FA_DOCCODE, "doctorcode", pt, false, false, 0.46); rule();
-    /* f: کد تخصص: {specialtycode}  |  شرح تخصص: {specialty}   (no bottom rule) */
-    vline(); putLF(d, rx, cy + 0.3, rw, fh, FA_SPECCODE, "specialtycode", pt, false, false, 0.30);
-             putLF(d, lx, cy + 0.3, lw, fh, FA_SPECIALTY, "specialty", pt, false, false, 0.30);
-    cy += rH;
-    return cy;
-  }
-
-  /* Family 4 — two-column info: patient LEFT / visit RIGHT. Same field set. */
-  function medInfoSplit(d, x, y, w, rH, pt, bw) {
-    var gap = 3.0, colW = (w - gap) / 2.0;
-    var lx = x, rx = x + colW + gap, fh = rH - 0.6, n = 6, i;
-    for (i = 0; i < n - 1; i++) {
-      d.push(HL(lx, y + (i + 1) * rH, colW, bw));
-      d.push(HL(rx, y + (i + 1) * rH, colW, bw));
-    }
-    d.push(RECT(lx, y, colW, n * rH, bw, 0));
-    d.push(RECT(rx, y, colW, n * rH, bw, 0));
-    function cell(cx, row, lab, fld, lb, vb, frac) {
-      putLF(d, cx + 1.0, y + row * rH + 0.3, colW - 2.0, fh, lab, fld, pt, lb, vb, frac);
-    }
-    cell(lx, 0, FA_FULL, "P-Name", true, false, 0.40);
-    cell(lx, 1, FA_AGE, "age", false, false, 0.22);
-    cell(lx, 2, FA_NID, "nid", true, false, 0.42);
-    cell(lx, 3, FA_BARCODE, "barcode", false, false, 0.30);
-    cell(lx, 4, FA_BASEINS, "ins", false, false, 0.40);
-    var cw = colW - 2.0, xx = lx + 1.0, yy = y + 5 * rH + 0.3;
-    var lblW = cw * 0.22, g = 1.0, rem = cw - lblW - 2 * g, f1 = rem * 0.58, f2 = rem * 0.42;
-    d.push(F(xx, yy, f2, fh, "supp_percent", "", pt, 0));
-    d.push(F(xx + f2 + g, yy, f1, fh, "supp", "", pt, 0));
-    d.push(L(xx + cw - lblW, yy, lblW, fh, FA_SUPP, pt, false, 0));
-    cw = colW - 2.0; xx = rx + 1.0; yy = y + 0.3;
-    lblW = cw * 0.34; g = 1.0; rem = cw - lblW - 2 * g; f1 = rem * 0.58; f2 = rem * 0.42;
-    d.push(F(xx, yy, f2, fh, "appttime", "", pt, 0));
-    d.push(FB(xx + f2 + g, yy, f1, fh, "apptdate", "", pt, 0));
-    d.push(L(xx + cw - lblW, yy, lblW, fh, FA_APPT, pt, true, 0));
-    cell(rx, 1, FA_QUEUE, "queue", false, false, 0.26);
-    cell(rx, 2, FA_DOCTOR, "doctor", false, false, 0.22);
-    cell(rx, 3, FA_DOCCODE, "doctorcode", false, false, 0.50);
-    cell(rx, 4, FA_SPECCODE, "specialtycode", false, false, 0.30);
-    cell(rx, 5, FA_SPECIALTY, "specialty", false, false, 0.30);
-    return y + n * rH;
-  }
-
-  /* Family 8 — shorter info (4×3) so the tear-off stub still fits. */
-  function medInfoCompact(d, x, y, w, rH, pt, bw) {
-    var cols = 3, rows = 4, cw = w / cols, fh = rH - 0.6, r, c;
-    for (r = 0; r < rows; r++) {
-      if (r > 0) d.push(HL(x, y + r * rH, w, bw));
-      for (c = 1; c < cols; c++) d.push(VL(x + c * cw, y + r * rH, rH, bw));
-    }
-    function cell(rr, cc, lab, fld, lb, vb, frac) {
-      putLF(d, x + cc * cw + 0.6, y + rr * rH + 0.3, cw - 1.2, fh, lab, fld, pt, lb, vb, frac);
-    }
-    cell(0, 0, FA_FULL, "P-Name", true, false, 0.42);
-    cell(0, 1, FA_AGE, "age", false, false, 0.28);
-    cell(0, 2, FA_NID, "nid", true, false, 0.42);
-    cell(1, 0, FA_QUEUE, "queue", false, false, 0.30);
-    var xx = x + 1 * cw + 0.6, yy = y + 1 * rH + 0.3, ww = cw - 1.2;
-    var lblW = ww * 0.38, g = 0.6, rem = ww - lblW - 2 * g, f1 = rem * 0.58, f2 = rem * 0.42;
-    d.push(F(xx, yy, f2, fh, "appttime", "", pt, 0));
-    d.push(FB(xx + f2 + g, yy, f1, fh, "apptdate", "", pt, 0));
-    d.push(L(xx + ww - lblW, yy, lblW, fh, FA_APPT, pt, true, 0));
-    cell(1, 2, FA_BARCODE, "barcode", false, false, 0.34);
-    cell(2, 0, FA_BASEINS, "ins", false, false, 0.42);
-    xx = x + 1 * cw + 0.6; yy = y + 2 * rH + 0.3; ww = cw - 1.2;
-    lblW = ww * 0.26; g = 0.6; rem = ww - lblW - 2 * g; f1 = rem * 0.58; f2 = rem * 0.42;
-    d.push(F(xx, yy, f2, fh, "supp_percent", "", pt, 0));
-    d.push(F(xx + f2 + g, yy, f1, fh, "supp", "", pt, 0));
-    d.push(L(xx + ww - lblW, yy, lblW, fh, FA_SUPP, pt, false, 0));
-    cell(2, 2, FA_DOCTOR, "doctor", false, false, 0.28);
-    cell(3, 0, FA_DOCCODE, "doctorcode", false, false, 0.56);
-    cell(3, 1, FA_SPECCODE, "specialtycode", false, false, 0.42);
-    cell(3, 2, FA_SPECIALTY, "specialty", false, false, 0.42);
-    return y + rows * rH;
-  }
-
-  /* Section 6 — financial section. v1.96.0: split label/value, line-art only.
-     mode 0: 4 rows; mode 1: full; mode 2: dual-block (line-art caption labels). */
-  function medFinancial(d, x, y, w, rH, pt, bw, mode) {
-    var half = w / 2.0, vx = x + half, fh = rH - 0.6, cy = y;
-    var rx = x + half + 1.0, rw = half - 2.0, lx = x + 1.0, lw = half - 2.0;
-    if (mode === 2) {
-      var gap = 3.0, bw2 = (w - gap) / 2.0, lx2 = x, rx2 = x + bw2 + gap, capH = 5.5;
-      var iy = y + capH;
-      /* line-art caption labels (bold, centered) replacing the old gray bands */
-      d.push(L(lx2 + 1, y + 0.5, bw2 - 2, capH - 0.7, FA_PAYLBL, pt - 0.5, true, 1));
-      d.push(L(rx2 + 1, y + 0.5, bw2 - 2, capH - 0.7, FA_SHARELBL, pt - 0.5, true, 1));
-      d.push(HL(lx2, y + capH, bw2, bw));
-      d.push(HL(rx2, y + capH, bw2, bw));
-      /* left block: paid / total / discount */
-      putLF(d, lx2 + 1, iy + 0.3, bw2 - 2, fh, FA_PAID, "paid", pt, true, false, 0.40);
-      d.push(HL(lx2, iy + rH, bw2, bw));
-      putLF(d, lx2 + 1, iy + rH + 0.3, bw2 - 2, fh, FA_TOTAL, "total", pt, false, false, 0.40);
-      d.push(HL(lx2, iy + 2 * rH, bw2, bw));
-      putLF(d, lx2 + 1, iy + 2 * rH + 0.3, bw2 - 2, fh, FA_DISCOUNT, "discount", pt, false, false, 0.40);
-      /* right block: insshare / supppay / pos / cash */
-      putLF(d, rx2 + 1, iy + 0.3, bw2 - 2, fh, FA_INSSHARE, "insshare", pt, false, false, 0.40);
-      d.push(HL(rx2, iy + rH, bw2, bw));
-      putLF(d, rx2 + 1, iy + rH + 0.3, bw2 - 2, fh, FA_SUPPPAY, "supppay", pt, false, false, 0.40);
-      d.push(HL(rx2, iy + 2 * rH, bw2, bw));
-      putLF(d, rx2 + 1, iy + 2 * rH + 0.3, bw2 - 2, fh, FA_POS, "pos", pt, false, false, 0.30);
-      d.push(HL(rx2, iy + 3 * rH, bw2, bw));
-      putLF(d, rx2 + 1, iy + 3 * rH + 0.3, bw2 - 2, fh, FA_CASH, "cash", pt, true, false, 0.30);
-      var bottom = y + capH + 4 * rH;
-      d.push(RECT(lx2, y, bw2, capH + 4 * rH, bw, 0));
-      d.push(RECT(rx2, y, bw2, capH + 4 * rH, bw, 0));
-      d.push(HL(x, bottom, w, bw));                 /* fin/epres divider */
-      return bottom;
-    }
-    function vline() { d.push(VL(vx, cy, rH, bw)); }
-    function rule()  { cy += rH; d.push(HL(x, cy, w, bw)); }
-    function row2(l1, f1, b1, l2, f2, b2) {
-      vline(); putLF(d, rx, cy + 0.3, rw, fh, l1, f1, pt, b1, b2, 0.40);
-               putLF(d, lx, cy + 0.3, lw, fh, l2, f2, pt, b2, false, 0.40); rule();
-    }
-    function row1(l, f, b) { putLF(d, x + 1.0, cy + 0.3, w - 2.0, fh, l, f, pt, b, false, 0.30); rule(); }
-    row2(FA_PAID, "paid", true, FA_TOTAL, "total", false);                 /* a */
-    row2(FA_INSSHARE, "insshare", false, FA_SUPPPAY, "supppay", false);     /* b */
-    row1(FA_DISCOUNT, "discount", false);                                  /* c (full width) */
-    row2(FA_POS, "pos", false, FA_CASH, "cash", false);                     /* d */
-    if (mode === 1) {
-      row2(FA_PATSHARE, "patientshare", false, FA_FINAL, "finaltotal", true); /* e */
-      row1("سهم بیمه پایه: ", "basepay", false);                              /* f */
-    }
-    return cy;
-  }
-
-  /* Sections 7 & 8 — e-prescription + referral (full-width split label/value). */
-  function medEpresReferral(d, x, y, w, rH, pt, bw) {
-    var fh = rH - 0.6, cy = y;
-    putLF(d, x + 1.0, cy + 0.3, w - 2.0, fh, FA_EPRESC, "eprescription", pt, false, false, 0.46);
-    cy += rH; d.push(HL(x, cy, w, bw));
-    putLF(d, x + 1.0, cy + 0.3, w - 2.0, fh, FA_REFERRAL, "referralno", pt, false, false, 0.32);
-    cy += rH;
-    return cy;
-  }
-
-  /* Sections 9 / 10 / 11 — below the box: پذیرش | صندوق (two columns split by a
-     vertical line), ش.ص , print timestamp. v1.96.0: split label/value items. */
-  function medBelow(d, x, y, w, pt) {
-    var fh = 5.5, gap = 2.2, half = w / 2.0, vx = x + half;
-    d.push(HL(x, y, w, 0.25));
-    d.push(VL(vx, y + 0.5, fh, 0.25));
-    putLF(d, x + half + 1.0, y + 1.0, half - 2.0, fh, FA_RECEPTION, "receptionist", pt - 1.0, false, false, 0.30);
-    putLF(d, x + 1.0, y + 1.0, half - 2.0, fh, FA_CASHIER, "cashier", pt - 1.0, false, false, 0.30);
-    y += fh + gap;
-    putLF(d, x + 1.0, y, w - 2.0, fh, FA_SC, "scnum", pt - 1.0, false, false, 0.14);
-    y += fh + gap;
-    putLF(d, x + 1.0, y, w * 0.50, fh, FA_PRINTTS, "date", pt - 1.0, false, false, 0.46);
-    putLF(d, x + 1.0 + w * 0.52, y, w * 0.46, fh, " ساعت: ", "time", pt - 1.0, false, false, 0.30);
-    y += fh + gap;
+  function emitHeader(d, x, y, w, pt, rules, photo) {
+    var pw = 14.0, ph = 16.0, tw = w;
+    if (photo) tw = w - pw - 2.0;
+    var namePt = pt + 3.0;
+    d.push(L(x, y, tw, 6.2, FA_CLINIC, namePt, true, 1)); y += 6.4;
+    d.push(F(x, y, tw, 4.0, "clinicaddr",  FA_ADDR,  pt - 1.5, 1)); y += 4.2;
+    d.push(F(x, y, tw, 3.8, "clinicphone", FA_PHONE, pt - 1.5, 1)); y += 4.0;
+    if (photo) d.push(PHOTO(x + w - pw, y - 14.4, pw, ph));
+    if (rules) { d.push(HL(x, y, w, 0.3)); y += 1.2; }
     return y;
   }
 
-  /* Family 8 — compact tear-off: a rule + a mini «نسخهٔ بیمار» stub (name /
-     receipt / total / insshare / paid), split label/value. No second barcode. */
-  function medStub(d, x, y, w, pt) {
-    d.push(HL(x, y, w, 0.3));
-    d.push(L(x, y + 0.6, w, 4, FA_TEAR, pt - 1.0, false, 1));
+  function emitTitle(d, x, y, w, pt, title) {
+    d.push(L(x, y, w, 5.6, title, pt + 1.5, true, 1));
     y += 6.0;
-    d.push(LC(x, y, w, 6, FA_STUB, pt + 1.0, true, 1, R_INK));
-    y += 7.0;
-    var rH = 5.0, fh = 4.4, half = w / 2.0;
-    d.push(RECT(x, y, w, 3 * rH, 0.3, 0));
-    d.push(VL(x + half, y, 3 * rH, 0.3));
-    putLF(d, x + half + 1.0, y + 0.3, half - 2.0, fh, FA_FULL, "P-Name", pt - 1.0, true, false, 0.36);
-    putLF(d, x + 1.0, y + 0.3, half - 2.0, fh, FA_RECEIPT, "receiptNo", pt - 1.0, false, false, 0.40);
+    d.push(HL(x, y, w, 0.3));
+    return y + 0.8;
+  }
+
+  function emitBarcode(d, x, y, w, bcW, bcH) {
+    if (bcW > w - 1.0) bcW = w - 1.0;
+    d.push(BARCODE(x + (w - bcW) / 2.0, y + 0.3, bcW, bcH));
+    return y + bcH + 1.2;
+  }
+
+  function emitSamenInfo(d, x, y, w, rH, pt, bw) {
+    var half = w / 2.0, fh = rH - 0.7;
+    function vline(cy) { d.push(VL(x + half, cy, rH, bw)); }
+    function rule(cy)  { d.push(HL(x, cy, w, bw)); }
+
+    vline(y);
+    var rx = x + half + 0.5, rw = half - 1.0;
+    var lblW = rw * 0.40, g = 0.5, rem = rw - lblW - 2 * g; if (rem < 8) rem = 8;
+    var f1 = rem * 0.58, f2 = rem * 0.42;
+    d.push(F (rx,          y + 0.3, f2, fh, "appttime", "", pt, 0));
+    d.push(FB(rx + f2 + g,  y + 0.3, f1, fh, "apptdate", "", pt, 0));
+    d.push(L (rx + rw - lblW, y + 0.3, lblW, fh, FA_APPT, pt, true, 0));
+    putLF(d, x + 0.5, y + 0.3, half - 1.0, fh, FA_QUEUE, "queue", pt, true, false, 0.38);
+    y += rH; rule(y);
+
+    vline(y);
+    putLF(d, x + half + 0.5, y + 0.3, half - 1.0, fh, FA_NID, "nid", pt, true, false, 0.40);
+    putLF(d, x + 0.5,      y + 0.3, half - 1.0, fh, FA_BARCODE, "receiptbarcode", pt, false, false, 0.32);
+    y += rH; rule(y);
+
+    vline(y);
+    putLF(d, x + half + 0.5, y + 0.3, half - 1.0, fh, FA_BASEINS, "ins", pt, false, false, 0.42);
+    var lx = x + 0.5, lw = half - 1.0;
+    lblW = lw * 0.28; g = 0.5; rem = lw - lblW - 2 * g;
+    f1 = rem * 0.58; f2 = rem * 0.42;
+    d.push(F(lx,          y + 0.3, f2, fh, "supp_percent", "", pt, 0));
+    d.push(F(lx + f2 + g,  y + 0.3, f1, fh, "supp",         "", pt, 0));
+    d.push(L(lx + lw - lblW, y + 0.3, lblW, fh, FA_SUPP, pt, false, 0));
+    y += rH; rule(y);
+
+    var w1 = w * 0.42, w2 = w * 0.33, w3 = w - w1 - w2;
+    d.push(VL(x + w1, y, rH, bw));
+    d.push(VL(x + w1 + w2, y, rH, bw));
+    putLF(d, x + w1 + w2 + 0.4, y + 0.3, w3 - 0.8, fh, FA_FULL, "full", pt, true, false, 0.44);
+    var ptB = pt + 1.5;
+    putLF(d, x + w3 + 0.4, y + 0.25, w2 - 0.8, fh, FA_FILENO, "fileNo", ptB, true, true, 0.52);
+    d[d.length - 1].bold = true; d[d.length - 1].pt = ptB;
+    putLF(d, x + 0.4, y + 0.4, w1 - 0.8, fh - 0.2, FA_ARCHIVE, "archiveNo", pt - 1.5, false, false, 0.52);
+    y += rH; rule(y);
+
+    var lblWd = (w < 60) ? 11.0 : 13.0, hyW = 2.4, codeW = w * 0.20;
+    if (codeW < 10) codeW = 10;
+    var docW = w - lblWd - hyW - codeW - 1.2; if (docW < 12) docW = 12;
+    var xl = x + 0.5;
+    d.push(F (xl,           y + 0.3, codeW, fh, "doctorcode", "", pt, 0));
+    d.push(L (xl + codeW,   y + 0.3, hyW,   fh, "-", pt, false, 1));
+    d.push(FB(xl + codeW + hyW, y + 0.3, docW, fh, "doctor", "", pt, 0));
+    d.push(L (x + w - lblWd - 0.4, y + 0.3, lblWd, fh, FA_DOCTOR, pt, true, 0));
+    y += rH; rule(y);
+
+    var codeWs = (w < 60) ? 6.0 : 7.5, emptyW = w * 0.16;
+    if (emptyW < 8) emptyW = 8;
+    var specW = w - codeWs - emptyW - 1.0;
+    d.push(VL(x + codeWs + 0.4, y, rH, bw));
+    d.push(VL(x + codeWs + emptyW, y, rH, bw));
+    d.push(F(x + 0.4, y + 0.3, codeWs, fh, "specialtycode", "", pt - 1.0, 1));
+    putLF(d, x + codeWs + emptyW + 0.4, y + 0.3, specW - 0.6, fh, FA_SPECIALTY, "specialty", pt, false, false, 0.36);
+    y += rH; rule(y);
+    return y;
+  }
+
+  function emitSamenInfoSplit(d, x, y, w, rH, pt, bw) {
+    var gap = 2.4, colW = (w - gap) / 2.0, fh = rH - 0.7;
+    var lx = x, rx = x + colW + gap, n = 6, i;
+    d.push(RECT(lx, y, colW, n * rH, bw));
+    d.push(RECT(rx, y, colW, n * rH, bw));
+    for (i = 1; i < n; i++) {
+      d.push(HL(lx, y + i * rH, colW, bw));
+      d.push(HL(rx, y + i * rH, colW, bw));
+    }
+    function cell(cx, row, lab, fld, lb, vb, frac, ptv) {
+      putLF(d, cx + 0.6, y + row * rH + 0.3, colW - 1.2, fh, lab, fld, ptv, lb, vb, frac);
+    }
+    cell(rx, 0, FA_FULL,    "full",           true,  false, 0.44, pt);
+    cell(rx, 1, FA_NID,     "nid",            true,  false, 0.40, pt);
+    cell(rx, 2, FA_FILENO,  "fileNo",         true,  true,  0.52, pt + 1.0);
+    cell(rx, 3, FA_ARCHIVE, "archiveNo",      false, false, 0.52, pt - 1.0);
+    cell(rx, 4, FA_BASEINS, "ins",            false, false, 0.42, pt);
+    var cw = colW - 1.2, xx = rx + 0.6, yy = y + 5 * rH + 0.3;
+    var lblW = cw * 0.28, g = 0.5, rem = cw - lblW - 2 * g, f1 = rem * 0.58, f2 = rem * 0.42;
+    d.push(F(xx,         yy, f2, fh, "supp_percent", "", pt, 0));
+    d.push(F(xx + f2 + g, yy, f1, fh, "supp",         "", pt, 0));
+    d.push(L(xx + cw - lblW, yy, lblW, fh, FA_SUPP, pt, false, 0));
+    cw = colW - 1.2; xx = lx + 0.6; yy = y + 0.3;
+    lblW = cw * 0.40; g = 0.5; rem = cw - lblW - 2 * g; f1 = rem * 0.58; f2 = rem * 0.42;
+    d.push(F (xx,         yy, f2, fh, "appttime", "", pt, 0));
+    d.push(FB(xx + f2 + g, yy, f1, fh, "apptdate", "", pt, 0));
+    d.push(L (xx + cw - lblW, yy, lblW, fh, FA_APPT, pt, true, 0));
+    cell(lx, 1, FA_QUEUE,     "queue",          true,  false, 0.38, pt);
+    cell(lx, 2, FA_BARCODE,   "receiptbarcode", false, false, 0.34, pt);
+    cell(lx, 3, FA_DOCTOR,    "doctor",         true,  false, 0.30, pt);
+    d.push(F(lx + 0.6, y + 4 * rH + 0.3, colW - 1.2, fh, "doctorcode", "-", pt, 0));
+    cell(lx, 5, FA_SPECIALTY, "specialty",      false, false, 0.40, pt);
+    d.push(F(lx + colW - 8.0, y + 5 * rH + 0.3, 7.0, fh, "specialtycode", "", pt - 1.0, 1));
+    return y + n * rH;
+  }
+
+  function emitSamenFinance(d, x, y, w, rH, pt, bw) {
+    var half = w / 2.0, fh = rH - 0.7;
+    function row2(l1, f1, b1, l2, f2) {
+      d.push(VL(x + half, y, rH, bw));
+      putLF(d, x + half + 0.5, y + 0.3, half - 1.0, fh, l1, f1, pt, b1, false, 0.44);
+      putLF(d, x + 0.5,      y + 0.3, half - 1.0, fh, l2, f2, pt, false, false, 0.44);
+      y += rH; d.push(HL(x, y, w, bw));
+    }
+    row2(FA_PAID,     "paid",          true,  FA_TOTAL,    "total");
+    row2(FA_INSSHARE, "insshare",      false, FA_SUPPPAY,  "supppay");
+    row2(FA_DISCFROM, "discount_from", false, FA_DISCOUNT, "discount");
+    row2(FA_CASH,     "cash",          true,  FA_POS,      "pos");
+    return y;
+  }
+
+  function emitDualFinance(d, x, y, w, rH, pt, bw) {
+    var gap = 2.5, bw2 = (w - gap) / 2.0, capH = 5.2, fh = rH - 0.7;
+    var lx = x, rx = x + bw2 + gap;
+    d.push(L(lx + 0.5, y + 0.3, bw2 - 1.0, capH - 0.6, FA_PAYLBL,   pt - 0.5, true, 1));
+    d.push(L(rx + 0.5, y + 0.3, bw2 - 1.0, capH - 0.6, FA_SHARELBL, pt - 0.5, true, 1));
+    d.push(HL(lx, y + capH, bw2, bw));
+    d.push(HL(rx, y + capH, bw2, bw));
+    var iy = y + capH;
+    putLF(d, lx + 0.5, iy + 0.3,      bw2 - 1.0, fh, FA_PAID,     "paid",          pt, true,  false, 0.44);
+    d.push(HL(lx, iy + rH, bw2, bw));
+    putLF(d, lx + 0.5, iy + rH + 0.3, bw2 - 1.0, fh, FA_TOTAL,    "total",         pt, false, false, 0.44);
+    d.push(HL(lx, iy + 2 * rH, bw2, bw));
+    putLF(d, lx + 0.5, iy + 2 * rH + 0.3, bw2 - 1.0, fh, FA_DISCFROM, "discount_from", pt, false, false, 0.44);
+    d.push(HL(lx, iy + 3 * rH, bw2, bw));
+    putLF(d, lx + 0.5, iy + 3 * rH + 0.3, bw2 - 1.0, fh, FA_DISCOUNT, "discount",      pt, false, false, 0.44);
+    putLF(d, rx + 0.5, iy + 0.3,      bw2 - 1.0, fh, FA_INSSHARE, "insshare",      pt, false, false, 0.44);
+    d.push(HL(rx, iy + rH, bw2, bw));
+    putLF(d, rx + 0.5, iy + rH + 0.3, bw2 - 1.0, fh, FA_SUPPPAY,  "supppay",       pt, false, false, 0.44);
+    d.push(HL(rx, iy + 2 * rH, bw2, bw));
+    putLF(d, rx + 0.5, iy + 2 * rH + 0.3, bw2 - 1.0, fh, FA_CASH,     "cash",          pt, true,  false, 0.36);
+    d.push(HL(rx, iy + 3 * rH, bw2, bw));
+    putLF(d, rx + 0.5, iy + 3 * rH + 0.3, bw2 - 1.0, fh, FA_POS,      "pos",           pt, false, false, 0.30);
+    var bottom = y + capH + 4 * rH;
+    d.push(RECT(lx, y, bw2, capH + 4 * rH, bw));
+    d.push(RECT(rx, y, bw2, capH + 4 * rH, bw));
+    d.push(HL(x, bottom, w, bw));
+    return bottom;
+  }
+
+  function emitSamenRef(d, x, y, w, rH, pt, bw) {
+    var fh = rH - 0.7;
+    putLF(d, x + 0.5, y + 0.3, w - 1.0, fh, FA_EPRESC,   "eprescription", pt - 0.5, false, false, 0.56);
+    y += rH; d.push(HL(x, y, w, bw));
+    putLF(d, x + 0.5, y + 0.3, w - 1.0, fh, FA_REFERRAL, "referralno",    pt - 0.5, false, false, 0.42);
+    y += rH;
+    return y;
+  }
+
+  function emitSamenFooter(d, x, y, w, pt) {
+    var fh = 4.6, half = w / 2.0;
+    d.push(HL(x, y, w, 0.25));
+    d.push(VL(x + half, y + 0.3, fh, 0.25));
+    putLF(d, x + half + 0.4, y + 0.5, half - 0.8, fh, FA_RECEPTION, "receptionist", pt - 1.0, false, false, 0.36);
+    putLF(d, x + 0.4,      y + 0.5, half - 0.8, fh, FA_CASHIER,   "cashier",      pt - 1.0, false, false, 0.36);
+    if (d.length) d[d.length - 1].suffix = FA_CASH_SFX;
+    y += fh + 0.8;
+    putLF(d, x + half + 0.4, y, half - 0.8, fh, FA_SC, "scnum", pt - 1.0, false, false, 0.28);
+    d.push(F(x + 0.4, y, half - 0.8, fh, "reg_ts", "", pt - 1.5, 0));
+    return y + fh + 0.4;
+  }
+
+  function emitStub(d, x, y, w, pt) {
+    d.push(HL(x, y, w, 0.3));
+    d.push(L(x, y + 0.4, w, 3.6, FA_TEAR, pt - 1.5, false, 1));
+    y += 4.6;
+    d.push(L(x, y, w, 4.8, FA_STUB, pt, true, 1));
+    y += 5.2;
+    var rH = 4.8, fh = 4.2, half = w / 2.0;
+    d.push(RECT(x, y, w, 2 * rH, 0.3));
+    d.push(VL(x + half, y, 2 * rH, 0.3));
+    putLF(d, x + half + 0.5, y + 0.3, half - 1.0, fh, FA_FULL,  "full",  pt - 1.0, true, false, 0.40);
+    putLF(d, x + 0.5,      y + 0.3, half - 1.0, fh, FA_QUEUE, "queue", pt - 1.0, false, false, 0.36);
     d.push(HL(x, y + rH, w, 0.3));
-    putLF(d, x + half + 1.0, y + rH + 0.3, half - 2.0, fh, FA_TOTAL, "total", pt - 1.0, false, false, 0.36);
-    putLF(d, x + 1.0, y + rH + 0.3, half - 2.0, fh, FA_INSSHARE, "insshare", pt - 1.0, false, false, 0.36);
-    d.push(HL(x, y + 2 * rH, w, 0.3));
-    putLF(d, x + 1.0, y + 2 * rH + 0.3, w - 2.0, fh, FA_FINAL, "paid", pt, true, true, 0.34);
-    y += 3 * rH + 2.0;
-    d.push(HL(x + w * 0.55, y, w * 0.45, 0.3));
-    d.push(L(x + w * 0.55, y + 0.4, w * 0.45, 4, "امضا و مهر صندوق", pt - 2.0, false, 1));
-    return y + 6.0;
+    putLF(d, x + 0.5, y + rH + 0.3, w - 1.0, fh, FA_PAID, "paid", pt, true, true, 0.28);
+    return y + 2 * rH + 1.0;
   }
 
-  /* Family 3 — sidebar: a narrow left panel (logo + clinic identity +       */
-  /* barcode) and a main column carrying the title + the ruled receipt box +  */
-  /* below lines.                                                             */
-  function renderSidebar(d, sp, pt, rH, bw, svcH, title) {
-    var sbW = 42.0, sbX = R_M, mainX = sbX + sbW + 4.0, mainW = R_CW - sbW - 4.0;
-    if (sp.fr) d.push(FRAME(PG_W, PG_H, FR_M, R_INK, 0.3));
-    /* sidebar panel: sections 1 (clinic header) + 2 (barcode) */
-    var sbTop = R_M, sy = sbTop + 1.2;
-    d.push(LOGO(sbX + (sbW - 22.0) / 2.0, sy, 22.0, 22.0)); sy += 24.0;
-    d.push(L(sbX + 1.0, sy, sbW - 2.0, 8.0, FA_CLINIC, pt + 1.0, true, 1)); sy += 9.0;
-    d.push(F(sbX + 1.0, sy, sbW - 2.0, 10.0, "clinicaddr", "", pt - 2.0, 1)); sy += 11.0;
-    d.push(F(sbX + 1.0, sy, sbW - 2.0, 5.0, "clinicphone", "", pt - 2.0, 1)); sy += 6.0;
-    d.push(HL(sbX + 1.0, sy, sbW - 2.0, 0.3)); sy += 3.0;
-    var sbBottom = sy + 2.0;
-    d.push(RECT(sbX, sbTop, sbW, sbBottom - sbTop, bw, 0));
-    /* main column: title + info + services + barcode BELOW the table + totals */
-    var mx = mainX, mw = mainW, boxTop = R_M, y = boxTop + 1.2;
-    d.push(L(mx, y, mw, 6.0, title, pt + 2.0, true, 1)); y += 7.5;
-    d.push(HL(mx, y, mw, 0.3)); y += 2.0;
-    y = medInfo(d, mx, y, mw, rH, pt, bw);
-    d.push(SERVICES(mx, y, mw, svcH, pt - 0.5, sp.s, 0, bw, rH - 1.0, rH - 0.8));
-    y += svcH;
-    y = medBarcode(d, mx, y, mw);
-    y = medFinancial(d, mx, y, mw, rH, pt, bw, 0);
-    y = medEpresReferral(d, mx, y, mw, rH, pt, bw);
-    d.push(RECT(mx, boxTop, mw, y - boxTop, bw, 0));
-    medBelow(d, mx, y + 2.0, mw, pt);
+  function paperSize(p) {
+    if (p === "R80") return [80, 200];
+    if (p === "R58") return [58, 200];
+    if (p === "A5")  return [148, 210];
+    return [210, 297];
+  }
+  function paperMargin(pw) {
+    if (pw <= 80.0) return 3.0;
+    if (pw <= 148.0) return 6.0;
+    return 8.0;
   }
 
-  /* ============== renderReceipt — one medical receipt (v1.99 orders) === */
-  /* Basic insurance is {ins} name only — never {ins_percent}. Supplementary
-     is {supp} + {supp_percent}. One Code128 sits below the services table. */
-  function renderReceipt(d, sp) {
-    var fam = sp.f;
-    var pt = (fam === 2 || fam === 7) ? 9.0 : (fam === 8) ? 8.5 : 9.5;
-    var rH = sp.rh, bw = sp.bw;
-    var svcH = (fam === 2 || fam === 7) ? 40.0 : (fam === 3) ? 38.0
-            : (fam === 8) ? 30.0 : (fam === 5) ? 32.0 : 34.0;
-    if (sp.v === 1) svcH += 2.0;
-    else if (sp.v === 2) svcH += 4.0;
-    var finMode = (fam === 7) ? 1 : (fam === 9) ? 2 : 0;
-    var photo = (fam === 6), sidebar = (fam === 3), tearoff = (fam === 8), capBars = (fam === 5);
-    var svcHdr = sp.hf; if (fam === 4) svcHdr = 0;
-    var base = (fam === 1 || fam === 5) ? 1 : (fam === 2) ? 2 : 0;
-    var hdrMode = (base + sp.v) % 3;
-    if (fam === 4) hdrMode = 0;
-    if (photo && hdrMode === 1) hdrMode = 2;
+  function buildSamenDefault() {
+    var PW = 80.0, PH = 200.0, M = 3.0, bw = 0.30, pt = 8.0, rH = 5.2;
+    var d = [], x = M, w = PW - 2 * M, y = M;
+    d.push(L(x, y, w, 6.4, FA_CLINIC, 11.0, true, 1)); y += 6.6;
+    d.push(F(x, y, w, 4.0, "clinicaddr",  FA_ADDR,  7.0, 1)); y += 4.2;
+    d.push(F(x, y, w, 3.8, "clinicphone", FA_PHONE, 7.0, 1)); y += 4.2;
+    var bcW = 50.0, bcH = 8.0;
+    d.push(BARCODE(x, y + 0.2, bcW, bcH));
+    d.push(L(x + bcW + 1.0, y + 1.0, w - bcW - 1.0, 6.4, FA_DOC_REC, 9.5, true, 0));
+    y += bcH + 1.0;
+    var footH = 10.5, boxTop = y, boxBot = PH - M - footH, boxH = boxBot - boxTop;
+    var ix = x + 0.8, iw = w - 1.6, iy = boxTop + 0.8;
+    iy = emitSamenInfo(d, ix, iy, iw, rH, pt, bw);
+    var finRefH = 6 * rH;
+    var svcH = boxBot - 0.8 - iy - finRefH;
+    if (svcH < 20.0) svcH = 20.0;
+    d.push(SERVICES(ix, iy, iw, svcH, 7.0, SVC_SAMEN, bw, 4.6, 5.0));
+    iy += svcH;
+    iy = emitSamenFinance(d, ix, iy, iw, rH, pt, bw);
+    iy = emitSamenRef(d, ix, iy, iw, rH, pt, bw);
+    d.push(FRAME_BOX(x, boxTop, w, boxH, bw));
+    emitSamenFooter(d, x, boxBot + 0.4, w, pt);
+    return { paper: "R80", items: d };
+  }
 
-    var title = (sp.v === 0) ? FA_DOC_REC : (sp.v === 1) ? FA_INS_REC : FA_DOC_BOTH;
-    if (sidebar) { renderSidebar(d, sp, pt, rH, bw, svcH, title); return; }
+  var EXTRA = [
+    { lay: 0, v: 0, s: SVC3,      paper: "R80", bw: 0.30, rh: 5.2, fr: false, photo: false, logo: false, tear: false },
+    { lay: 0, v: 1, s: SVC4_ROW,  paper: "R80", bw: 0.30, rh: 5.0, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 0, v: 2, s: SVC5,      paper: "A5",  bw: 0.30, rh: 5.6, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 1, v: 0, s: SVC3,      paper: "R80", bw: 0.30, rh: 5.0, fr: false, photo: false, logo: false, tear: false },
+    { lay: 1, v: 1, s: SVC4_CAT,  paper: "R58", bw: 0.28, rh: 4.8, fr: false, photo: false, logo: false, tear: false },
+    { lay: 1, v: 2, s: SVC5_CODE, paper: "A5",  bw: 0.30, rh: 5.6, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 2, v: 0, s: SVC6_FIN,  paper: "R80", bw: 0.30, rh: 5.0, fr: false, photo: false, logo: false, tear: false },
+    { lay: 2, v: 1, s: SVC6_INS,  paper: "A5",  bw: 0.30, rh: 5.4, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 2, v: 2, s: SVC7,      paper: "A4",  bw: 0.30, rh: 5.8, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 3, v: 0, s: SVC3,      paper: "A5",  bw: 0.30, rh: 5.4, fr: false, photo: false, logo: true,  tear: false },
+    { lay: 3, v: 1, s: SVC4_ROW,  paper: "A4",  bw: 0.30, rh: 5.8, fr: true,  photo: false, logo: true,  tear: false },
+    { lay: 3, v: 2, s: SVC5,      paper: "A4",  bw: 0.30, rh: 6.0, fr: false, photo: true,  logo: true,  tear: false },
+    { lay: 4, v: 0, s: SVC3,      paper: "A5",  bw: 0.25, rh: 5.4, fr: false, photo: false, logo: false, tear: false },
+    { lay: 4, v: 1, s: SVC4_ROW,  paper: "A4",  bw: 0.25, rh: 5.8, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 4, v: 2, s: SVC5,      paper: "A4",  bw: 0.25, rh: 6.0, fr: false, photo: true,  logo: false, tear: false },
+    { lay: 5, v: 0, s: SVC3,      paper: "R80", bw: 0.30, rh: 5.0, fr: false, photo: false, logo: false, tear: false },
+    { lay: 5, v: 1, s: SVC4_CAT,  paper: "A5",  bw: 0.30, rh: 5.4, fr: false, photo: false, logo: false, tear: false },
+    { lay: 5, v: 2, s: SVC6_INS,  paper: "A4",  bw: 0.30, rh: 5.8, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 6, v: 0, s: SVC3,      paper: "R58", bw: 0.28, rh: 4.8, fr: false, photo: false, logo: false, tear: false },
+    { lay: 6, v: 1, s: SVC5,      paper: "R80", bw: 0.30, rh: 5.2, fr: false, photo: false, logo: false, tear: false },
+    { lay: 6, v: 2, s: SVC5_CODE, paper: "A5",  bw: 0.30, rh: 5.6, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 7, v: 0, s: SVC3,      paper: "R58", bw: 0.25, rh: 4.6, fr: false, photo: false, logo: false, tear: false },
+    { lay: 7, v: 1, s: SVC4_ROW,  paper: "R58", bw: 0.28, rh: 4.8, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 7, v: 2, s: SVC5,      paper: "R80", bw: 0.30, rh: 5.0, fr: false, photo: false, logo: false, tear: false },
+    { lay: 8, v: 0, s: SVC3,      paper: "A5",  bw: 0.30, rh: 5.2, fr: false, photo: false, logo: false, tear: true  },
+    { lay: 8, v: 1, s: SVC4_ROW,  paper: "A4",  bw: 0.30, rh: 5.4, fr: true,  photo: false, logo: false, tear: true  },
+    { lay: 8, v: 2, s: SVC5,      paper: "A4",  bw: 0.30, rh: 5.6, fr: false, photo: false, logo: false, tear: true  },
+    { lay: 9, v: 0, s: SVC3,      paper: "A5",  bw: 0.30, rh: 5.4, fr: false, photo: false, logo: false, tear: false },
+    { lay: 9, v: 1, s: SVC6_FIN,  paper: "A4",  bw: 0.30, rh: 5.8, fr: true,  photo: false, logo: false, tear: false },
+    { lay: 9, v: 2, s: SVC5_CODE, paper: "A4",  bw: 0.30, rh: 6.0, fr: true,  photo: false, logo: false, tear: false }
+  ];
 
-    var x = R_M, w = R_CW, boxTop = R_M, y = boxTop + 1.2;
-    if (sp.fr) d.push(FRAME(PG_W, PG_H, FR_M, R_INK, 0.3));
+  var NAMES = [
+    "پیش‌فرض",
+    "۰۱) قبض پزشک — رول ۸۰ کلاسیک",
+    "۰۲) رسید بیمه — رول ۸۰ قاب‌دار",
+    "۰۳) قبض و رسید — A5 کلاسیک",
+    "۰۴) قبض پزشک — رول ۸۰ خدمات‌بالا",
+    "۰۵) رسید بیمه — رول ۵۸ خدمات‌بالا",
+    "۰۶) قبض و رسید — A5 خدمات‌بالا",
+    "۰۷) قبض پزشک — رول ۸۰ مالی‌اول",
+    "۰۸) رسید بیمه — A5 مالی‌اول",
+    "۰۹) قبض و رسید — A4 مالی‌اول",
+    "۱۰) قبض پزشک — A5 ستون کناری",
+    "۱۱) رسید بیمه — A4 ستون کناری",
+    "۱۲) قبض و رسید — A4 ستون و عکس",
+    "۱۳) قبض پزشک — A5 دو ستونه",
+    "۱۴) رسید بیمه — A4 دو ستونه",
+    "۱۵) قبض و رسید — A4 دو ستونه عکس",
+    "۱۶) قبض پزشک — رول ۸۰ با عنوان بخش",
+    "۱۷) رسید بیمه — A5 با عنوان بخش",
+    "۱۸) قبض و رسید — A4 با عنوان بخش",
+    "۱۹) قبض پزشک — رول ۵۸ بارکد پایین",
+    "۲۰) رسید بیمه — رول ۸۰ بارکد پایین",
+    "۲۱) قبض و رسید — A5 بارکد پایین",
+    "۲۲) قبض پزشک — رول ۵۸ فشرده",
+    "۲۳) رسید بیمه — رول ۵۸ فشرده قاب‌دار",
+    "۲۴) قبض و رسید — رول ۸۰ فشرده",
+    "۲۵) قبض پزشک — A5 ته‌برگ",
+    "۲۶) رسید بیمه — A4 ته‌برگ",
+    "۲۷) قبض و رسید — A4 ته‌برگ",
+    "۲۸) قبض پزشک — A5 دو بلوک مالی",
+    "۲۹) رسید بیمه — A4 دو بلوک مالی",
+    "۳۰) قبض و رسید — A4 دو بلوک مالی قاب‌دار"
+  ];
+
+  function buildExtra(extraIdx) {
+    var sp = EXTRA[extraIdx];
+    var sz = paperSize(sp.paper), PW = sz[0], PH = sz[1];
+    var d = [];
+    var lay = sp.lay, vari = sp.v;
+    var M = paperMargin(PW);
+    var bw = sp.bw, rH = sp.rh;
+    var pt = (PW <= 58.0) ? 7.2 : (PW <= 80.0) ? 8.2 : (PW <= 148.0) ? 9.0 : 9.5;
+    var bcW = (PW <= 58.0) ? 44.0 : (PW <= 80.0) ? 52.0 : (PW <= 148.0) ? 64.0 : 72.0;
+    var bcH = 7.0;
+    var footH = (PW <= 80.0) ? 11.0 : 13.5;
+    var stubH = sp.tear ? 16.0 : 0.0;
+    var x = M, w = PW - 2 * M, y = M;
+    var yMax = PH - M - footH - stubH;
+    var title = (vari === 0) ? FA_DOC_REC : (vari === 1) ? FA_INS_REC : FA_DOC_BOTH;
+    if (sp.fr) d.push(FRAME(PW, PH, (M > 3.0) ? (M - 1.5) : 2.0, 0.3));
 
     function caption(txt) {
       d.push(HL(x, y, w, 0.3));
-      d.push(L(x + 1, y + 0.3, w - 2, 4.4, txt, pt - 1.0, true, 1));
-      d.push(HL(x, y + 4.9, w, 0.3));
-      y += 5.4;
+      d.push(L(x + 0.6, y + 0.2, w - 1.2, 4.0, txt, pt - 1.0, true, 1));
+      d.push(HL(x, y + 4.4, w, 0.3));
+      y += 4.8;
     }
-    function emitSvc() {
-      d.push(SERVICES(x, y, w, svcH, pt - 0.5, sp.s, svcHdr, bw, rH - 1.0, rH - 0.8));
+    function emitSvcAt(svcH) {
+      d.push(SERVICES(x, y, w, svcH, pt - 0.8, sp.s, bw, rH - 0.8, rH - 0.5));
       y += svcH;
     }
-    function emitBc() {
-      y = medBarcode(d, x, y, w);
+    function emitBc() { y = emitBarcode(d, x, y, w, bcW, bcH); }
+
+    if (lay === 3 && sp.logo) {
+      var sbW = (PW >= 210.0) ? 40.0 : 30.0;
+      var sbX = x, mainX = x + sbW + 3.0, mainW = w - sbW - 3.0;
+      var sy = y;
+      d.push(LOGO(sbX + (sbW - 18.0) / 2.0, sy, 18.0, 18.0)); sy += 20.0;
+      d.push(L(sbX + 0.4, sy, sbW - 0.8, 10.0, FA_CLINIC, pt, true, 1)); sy += 11.0;
+      d.push(F(sbX + 0.4, sy, sbW - 0.8, 10.0, "clinicaddr", FA_ADDR, pt - 2.0, 1)); sy += 11.0;
+      d.push(F(sbX + 0.4, sy, sbW - 0.8, 5.0, "clinicphone", FA_PHONE, pt - 2.0, 1)); sy += 6.0;
+      sy = emitBarcode(d, sbX + 0.4, sy, sbW - 0.8, (sbW - 2.0 < bcW) ? (sbW - 2.0) : bcW, bcH);
+      d.push(RECT(sbX, y, sbW, sy - y + 1.0, bw));
+      var mx = mainX, mw = mainW, my = y;
+      if (sp.photo) d.push(PHOTO(mx + mw - 16.0, my, 15.0, 18.0));
+      d.push(L(mx, my, mw - (sp.photo ? 17.0 : 0), 6.0, title, pt + 1.5, true, 1)); my += 7.0;
+      my = emitSamenInfo(d, mx, my, mw, rH, pt, bw);
+      var remain = yMax - my - 6 * rH; if (remain < 22.0) remain = 22.0;
+      if (vari === 1) remain += 2.0; else if (vari === 2) remain += 4.0;
+      d.push(SERVICES(mx, my, mw, remain, pt - 0.8, sp.s, bw, rH - 0.8, rH - 0.5));
+      my += remain;
+      my = emitSamenFinance(d, mx, my, mw, rH, pt, bw);
+      my = emitSamenRef(d, mx, my, mw, rH, pt, bw);
+      d.push(RECT(mx, y, mw, my - y, bw));
+      emitSamenFooter(d, mx, (my + 1.0 < PH - M - stubH) ? my + 1.0 : PH - M - stubH - footH, mw, pt);
+      return { paper: sp.paper, items: d };
     }
 
-    y = medHeader(d, x, y, w, pt, hdrMode, photo);
-    y = medTitle(d, x, y, w, pt, title);
+    y = emitHeader(d, x, y, w, pt, true, sp.photo);
+    y = emitTitle(d, x, y, w, pt, title);
 
-    if (fam === 1) {
-      /* services-high */
-      emitSvc(); emitBc();
-      y = medInfo(d, x, y, w, rH, pt, bw);
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
-    } else if (fam === 2) {
-      /* services-low */
-      y = medInfo(d, x, y, w, rH, pt, bw);
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
-      emitSvc(); emitBc();
-    } else if (fam === 4) {
-      /* two-column info then services then barcode */
-      y = medInfoSplit(d, x, y, w, rH, pt, bw);
-      emitSvc(); emitBc();
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
-    } else if (fam === 5) {
-      /* ruled captions; services after info */
-      if (capBars) caption("مشخصات بیمار");
-      y = medInfo(d, x, y, w, rH, pt, bw);
-      if (capBars) caption(FA_SVCLIST);
-      emitSvc(); emitBc();
-      if (capBars) caption("مالی و پرداخت");
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
-    } else if (fam === 7) {
-      /* finance-first */
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medInfo(d, x, y, w, rH, pt, bw);
-      emitSvc(); emitBc();
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
+    var svcH = (PW <= 58.0) ? 22.0 : (PW <= 80.0) ? 28.0 : (PW <= 148.0) ? 36.0 : 42.0;
+    if (vari === 1) svcH += 2.0; else if (vari === 2) svcH += 4.0;
+
+    if (lay === 1) {
+      emitSvcAt(svcH); emitBc();
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
+    } else if (lay === 2) {
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      emitSvcAt(svcH); emitBc();
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
+    } else if (lay === 4) {
+      y = emitSamenInfoSplit(d, x, y, w, rH, pt, bw);
+      emitSvcAt(svcH); emitBc();
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
+    } else if (lay === 5) {
+      caption("مشخصات بیمار");
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      caption(FA_SVCLIST);
+      emitSvcAt(svcH); emitBc();
+      caption("مالی و پرداخت");
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
+    } else if (lay === 6) {
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      emitSvcAt(svcH);
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
+      emitBc();
+    } else if (lay === 7) {
+      y = emitSamenInfo(d, x, y, w, rH, pt - 0.4, bw);
+      emitSvcAt(svcH);
+      y = emitSamenFinance(d, x, y, w, rH, pt - 0.4, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt - 0.4, bw);
+      emitBc();
+    } else if (lay === 9) {
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      emitSvcAt(svcH); emitBc();
+      y = emitDualFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
     } else {
-      /* 0 classic / 6 photo / 8 compact tear-off / 9 dual-block */
-      if (tearoff) y = medInfoCompact(d, x, y, w, rH, pt, bw);
-      else y = medInfo(d, x, y, w, rH, pt, bw);
-      emitSvc(); emitBc();
-      y = medFinancial(d, x, y, w, rH, pt, bw, finMode);
-      y = medEpresReferral(d, x, y, w, rH, pt, bw);
+      y = emitSamenInfo(d, x, y, w, rH, pt, bw);
+      emitSvcAt(svcH); emitBc();
+      y = emitSamenFinance(d, x, y, w, rH, pt, bw);
+      y = emitSamenRef(d, x, y, w, rH, pt, bw);
     }
 
-    d.push(RECT(x, boxTop, w, y - boxTop, bw, 0));
-    y = medBelow(d, x, y + 2.0, w, pt);
-    if (tearoff) medStub(d, x, y + 2.0, w, pt);
+    var footY = y + 1.0;
+    var footLimit = PH - M - stubH - 11.0;
+    if (footY > footLimit) footY = footLimit;
+    y = emitSamenFooter(d, x, footY, w, pt);
+    if (sp.tear) emitStub(d, x, y + 0.6, w, pt);
+    return { paper: sp.paper, items: d };
   }
-
-  function buildTemplate(idx) {
-    if (idx < 0 || idx >= 30) idx = 0;
-    var sp = TPL[idx], d = [];
-    renderReceipt(d, sp);
-    return d;
-  }
-
-
 
   var ALL = [];
-  for (var i = 0; i < 30; i++) {
+  var i, built, items, j;
+  for (i = 0; i < 31; i++) {
     _uid = 0;
-    var items = buildTemplate(i);
-    for (var j = 0; j < items.length; j++) { items[j].id = j + 1; items[j].z = j + 1; }
+    built = (i === 0) ? buildSamenDefault() : buildExtra(i - 1);
+    items = built.items;
+    for (j = 0; j < items.length; j++) { items[j].id = j + 1; items[j].z = j + 1; }
     ALL.push({ id: 0, name: NAMES[i], kind: "builtin", group: "reception",
-      paper: "A4", orientation: 0, items: items });
+      paper: built.paper, orientation: 0, items: items });
   }
 
   window.AZ_TEMPLATES = ALL;

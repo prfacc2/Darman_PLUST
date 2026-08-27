@@ -219,7 +219,11 @@ struct NavHandler : public ICoreWebView2NavigationCompletedEventHandler {
         if(state->IsCancelled()) return S_OK;
         BOOL ok=FALSE;
         HRESULT hr=args?args->get_IsSuccess(&ok):E_POINTER;
-        if(SUCCEEDED(hr) && ok) InterlockedExchange(&state->navReady,1);
+        if(SUCCEEDED(hr) && ok){
+            InterlockedExchange(&state->navReady,1);
+            AdView* v=adViewFor(state->host);
+            if(v && v->ctrl) v->ctrl->put_IsVisible(TRUE);
+        }
         else state->Complete(FAILED(hr)?hr:E_FAIL);
         return S_OK;
     }
@@ -267,7 +271,10 @@ struct CtrlHandler : public ICoreWebView2CreateCoreWebView2ControllerCompletedHa
 
         RECT bounds; GetClientRect(state->host,&bounds);
         hr=ctrl->put_Bounds(bounds);
-        if(SUCCEEDED(hr)) hr=ctrl->put_IsVisible(TRUE);
+        // v2.00: keep the controller hidden until NavigateToString finishes so
+        // the user never sees the WebView2 default black flash. The host HWND
+        // is already painted with g_brBg.
+        if(SUCCEEDED(hr)) hr=ctrl->put_IsVisible(FALSE);
         if(FAILED(hr)){ state->Complete(hr); return S_OK; }
 
         std::string page=AdmissionPageForHost(true,state->host);

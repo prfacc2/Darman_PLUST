@@ -1132,7 +1132,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             Blacklist_AuditOverride(blocked,g_session.user.username);
 
         if(!Shift_IsOpen())
-            return "{\"ok\":false,\"needShift\":true,\"err\":\"برای پذیرش بیمار ابتدا باید شیفت را شروع کنید.\"}";
+            return "{\"ok\":false,\"needShift\":true,\"err\":\"برای پذیرش بیمار ابتدا باید شروع شیفت را بزنید\"}";
         ReceptionRecord r=adBuildRecord(body);
         if(r.services.empty())
             return "{\"ok\":false,\"err\":\"حداقل یک خدمت لازم است\"}";
@@ -1259,7 +1259,8 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+=",\"ps\":"+adDoctorStatsJson(r.treatingDoctor);
         if(!cashWarn.empty()) o+=",\"cashWarn\":"+jstr(cashWarn);
         o+="}";
-        WebAdmission_PushEvent("cashier.changed","{\"ok\":true}");
+        WebAdmission_PushEvent("cashier.changed", Shift_StatusJson());
+        WebAdmission_PushEvent("queue.update", adQueueJson(true,24));
         return o;
     }
 
@@ -1412,8 +1413,22 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(method.empty()) method=L"cash";
         if(!Cash_PayEx(u82w(idU),method,(long long)amt,(long long)disc,err))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
-        WebAdmission_PushEvent("cashier.changed","{\"ok\":true}");
-        return "{\"ok\":true}";
+        WebAdmission_PushEvent("cashier.changed", Shift_StatusJson());
+        // v2.00: print ONLY after a completed payment
+        {
+            ReceptionRecord rec;
+            if(Receipt_BuildRecord(u82w(idU), rec)){
+                HWND owner=g_hFrame;
+                int sid=adResolveSectionId();
+                RunOnUiThreadSync([&](){
+                    if(!printPrintDesign(rec,sid,owner))
+                        if(!printDesignedReceipt(rec,0,owner))
+                            printReceipt(rec,2,owner);
+                    kickCashDrawer();
+                });
+            }
+        }
+        return "{\"ok\":true,\"printed\":true}";
     }
     if(verb=="cashier.manual"){
         std::string nidU,fU,lU,dU; double amt=0;
@@ -1431,12 +1446,21 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring err;
         if(!Shift_Start(err))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
-        return Shift_StatusJson();
+        std::string st=Shift_StatusJson();
+        WebAdmission_PushEvent("shift.changed", st);
+        WebAdmission_PushEvent("cashier.changed", st);
+        return st;
     }
     if(verb=="cashier.shift.end"){
         std::wstring err;
         if(!Shift_End(err))
             return std::string("{\"ok\":false,\"err\":")+jstr(err)+"}";
+        std::string st=Shift_StatusJson();
+        WebAdmission_PushEvent("shift.changed", st);
+        WebAdmission_PushEvent("cashier.changed", st);
+        return st;
+    }
+    if(verb=="cashier.shift.status"){
         return Shift_StatusJson();
     }
     //  v1.92.0: front-end error bridge. JS reports uncaught errors / load
