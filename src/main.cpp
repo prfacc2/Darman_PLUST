@@ -500,23 +500,22 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             s_busy=true;
             User u;
             if(showLoginDialog(g_hFrame, 0, u)){
-                int shift=detectShift();
-                if(showShiftDialog(g_hFrame, shift)){
-                    g_session.user=u; g_session.shift=shift;
-                    g_session.title=resolveSessionTitle(u);
-                    g_session.loginAt=iranNow();
-                    setUserOnline(u.username,true);
-                    s_busy=false;
-                    switchScreen(SC_RECEPTION);
-                    return 0;
-                }
+                // v2.01: «انتخاب شیفت کاری» screen removed — shift comes from
+                // the user account (Part F2) with detectShift() as fallback.
+                g_session.user=u; g_session.shift=u.shift>=0?u.shift:detectShift();
+                g_session.title=resolveSessionTitle(u);
+                g_session.loginAt=iranNow();
+                setUserOnline(u.username,true);
+                s_busy=false;
+                switchScreen(SC_RECEPTION);
+                return 0;
             }
             s_busy=false;
         } else if(id==ID_HM_MANAGE){
             s_busy=true;
             User u;
             if(showLoginDialog(g_hFrame, 1, u)){
-                g_session.user=u; g_session.shift=detectShift();
+                g_session.user=u; g_session.shift=u.shift>=0?u.shift:detectShift();
                 g_session.title=resolveSessionTitle(u);
                 g_session.loginAt=iranNow();
                 setUserOnline(u.username,true);
@@ -529,7 +528,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
             s_busy=true;
             User u;
             if(showLoginDialog(g_hFrame, 3, u)){
-                g_session.user=u; g_session.shift=detectShift();
+                g_session.user=u; g_session.shift=u.shift>=0?u.shift:detectShift();
                 g_session.title=resolveSessionTitle(u);
                 g_session.loginAt=iranNow();
                 setUserOnline(u.username,true);
@@ -981,7 +980,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             bool ok = showLoginDialog(h, 2, u);
             s_dlgOpen = false;
             if(ok){
-                g_session.user=u; g_session.shift=detectShift();
+                g_session.user=u; g_session.shift=u.shift>=0?u.shift:detectShift();
                 g_session.title=resolveSessionTitle(u);
                 g_session.loginAt=iranNow();
                 setUserOnline(u.username,true);
@@ -1636,7 +1635,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
         if(dbg[0]){
             User u; u.username=L"reza"; u.fullname=L"رضا منشی";
             u.dept=L"پذیرش"; u.role=0;
-            g_session.user=u; g_session.shift=detectShift();
+            g_session.user=u; g_session.shift=u.shift>=0?u.shift:detectShift();
             g_session.title=resolveSessionTitle(u);
             g_session.loginAt=iranNow();
             if(!wcscmp(dbg,L"reception")){ switchScreen(SC_RECEPTION);
@@ -1657,7 +1656,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
                                                g_session.title=resolveSessionTitle(u);
                                                switchScreen(SC_MANAGE);
                                                openBackupManager(f); }
-            else if(!wcscmp(dbg,L"shift")){    int sh=0; showShiftDialog(f,sh); }
+            // v2.01: «انتخاب شیفت کاری» debug screen removed (Part F1).
             // §D.6: headless verification of the SERVERLESS embedded admission
             // surface (v1.66.0). Builds the fully-inlined page for both engine
             // variants and asserts every asset actually made it inline (styles,

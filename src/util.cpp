@@ -348,8 +348,8 @@ int detectShift(){
 }
 std::wstring shiftName(int s){
     switch(s){
-        case 0: return L"\u0635\u0628\u062d";                                  // صبح
-        case 1: return L"\u0628\u0639\u062f \u0627\u0632 \u0638\u0647\u0631"; // بعد از ظهر
-        default:return L"\u0634\u0628";                                       // شب
+        case 0: return L"\u0635\u0628\u062d";                  // صبح
+        case 1: return L"\u0639\u0635\u0631";                  // عصر (v2.01: was بعد از ظهر)
+        default:return L"\u0634\u0628";                       // شب
     }
 }

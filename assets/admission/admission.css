@@ -5579,6 +5579,11 @@ body.surface-dash .dash-panel{
   background:-webkit-linear-gradient(135deg,#dc2626 0%,#991b1b 100%);
   background:linear-gradient(135deg,#dc2626 0%,#991b1b 100%);
 }
+.dash-appico-tools{
+  background:#6366F1;
+  background:-webkit-linear-gradient(top,#818CF8 0%,#6366F1 60%,#4F46E5 100%);
+  background:linear-gradient(180deg,#818CF8 0%,#6366F1 60%,#4F46E5 100%);
+}
 /* hover: NO background — the badge scales and the name deepens, iOS-like */
 .dash-app:hover .dash-appico{
   -webkit-transform:scale(1.07);-ms-transform:scale(1.07);transform:scale(1.07);

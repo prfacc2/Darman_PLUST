@@ -4,6 +4,7 @@
 // ============================================================================
 #include "app.h"
 #include <stdio.h>
+#include <algorithm>
 
 //  Format (UTF-8, one per line):  username|fullname|dept|role|hash
 static std::wstring usersPath(){ return dataDir()+L"\\users.dat"; }
@@ -51,9 +52,11 @@ std::vector<User> loadUsers(){
         // (old files) → empty perms → FULL access (nothing is taken away from
         // existing accounts).
         if(f.size() >= 6) u.perms = f[5];
+        // v2.01 (Part F2): column 7 = assigned work shift (-1 = not assigned).
+        if(f.size() >= 7) u.shift = _wtoi(f[6].c_str());
         // §H: preserve any extra columns a newer version may have appended so a
         // round-trip save never drops forward-compatible data.
-        for(size_t i=6;i<f.size();i++){ u.extra+=L"|"; u.extra+=f[i]; }
+        for(size_t i=7;i<f.size();i++){ u.extra+=L"|"; u.extra+=f[i]; }
         out.push_back(u);
     }
     return out;
@@ -63,10 +66,12 @@ static void saveUsers(const std::vector<User>& us){
     for(auto& u : us){
         wchar_t role[4]; swprintf(role,4,L"%d",u.role);
         // v1.79.0: column 6 = permission keys (always emitted, may be empty);
+        // v2.01: column 7 = work shift (Part F2);
         // §H: then any preserved forward-compat trailing columns (u.extra
         // already begins with its own '|' separators).
+        wchar_t shiftStr[8]; swprintf(shiftStr,8,L"%d",u.shift);
         out += u.username+L"|"+u.fullname+L"|"+u.dept+L"|"+role+L"|"+u.hash
-             + L"|"+u.perms+u.extra+L"\r\n";
+             + L"|"+u.perms+L"|"+shiftStr+u.extra+L"\r\n";
     }
     writeFileUtf8(usersPath(), out, false);
 }
@@ -232,4 +237,141 @@ bool verifyLogin(const std::wstring& uname, const std::wstring& pass,
     err = L"نام کاربری یا رمز عبور اشتباه است.";
     logLine(L"login unknown user: "+uname);
     return false;
+}
+
+// ===========================================================================
+//  v2.01 (Part F2) — work-shift definitions
+//  Stored in data\shiftdefs.dat as: id|name|startMin|endMin  (pipe-delimited)
+//  Built-in shifts 0-2 are always present; custom shifts take id ≥ 3.
+// ===========================================================================
+static std::wstring shiftDefsPath(){ return dataDir()+L"\\shiftdefs.dat"; }
+
+static std::vector<ShiftDef> defaultShiftDefs(){
+    std::vector<ShiftDef> d(3);
+    d[0].id=0; d[0].name=L"صبح";       d[0].startMin=6*60;       d[0].endMin=14*60+30;
+    d[1].id=1; d[1].name=L"عصر";       d[1].startMin=14*60+30;   d[1].endMin=22*60+30;
+    d[2].id=2; d[2].name=L"شب";       d[2].startMin=22*60+30;   d[2].endMin=6*60;
+    return d;
+}
+
+std::vector<ShiftDef> loadShiftDefs(){
+    std::vector<ShiftDef> out;
+    std::wstring all=readFileUtf8(shiftDefsPath());
+    if(!all.empty()){
+        size_t pos=0;
+        while(pos<all.size()){
+            size_t e=all.find(L'\n',pos);
+            if(e==std::wstring::npos) e=all.size();
+            std::wstring line=trim(all.substr(pos,e-pos));
+            pos=e+1;
+            if(line.empty()) continue;
+            auto f=split(line,L'|');
+            if(f.size()<4) continue;
+            ShiftDef d;
+            d.id=_wtoi(f[0].c_str());
+            d.name=f[1];
+            d.startMin=_wtoi(f[2].c_str());
+            d.endMin=_wtoi(f[3].c_str());
+            if(d.id<0) continue;
+            out.push_back(d);
+        }
+    }
+    // Always ensure built-in shifts 0-2 exist (merge if missing).
+    auto defs=defaultShiftDefs();
+    for(const auto& def : defs){
+        bool found=false;
+        for(const auto& e : out) if(e.id==def.id){ found=true; break; }
+        if(!found) out.push_back(def);
+    }
+    // Sort by id.
+    std::sort(out.begin(),out.end(),[](const ShiftDef&a,const ShiftDef&b){return a.id<b.id;});
+    return out;
+}
+
+bool saveShiftDefs(const std::vector<ShiftDef>& defs){
+    std::wstring all;
+    for(const auto& d : defs){
+        wchar_t id[16],s[16],e[16];
+        swprintf(id,16,L"%d",d.id);
+        swprintf(s,16,L"%d",d.startMin);
+        swprintf(e,16,L"%d",d.endMin);
+        all+=std::wstring(id)+L"|"+d.name+L"|"+s+L"|"+e+L"\r\n";
+    }
+    return writeFileUtf8(shiftDefsPath(),all,false);
+}
+
+int addShiftDef(const std::wstring& name, int startMin, int endMin){
+    if(trim(name).empty()) return -1;
+    auto defs=loadShiftDefs();
+    int maxId=2;
+    for(const auto& d : defs) if(d.id>maxId) maxId=d.id;
+    ShiftDef d;
+    d.id=maxId+1;
+    d.name=trim(name);
+    d.startMin=startMin;
+    d.endMin=endMin;
+    defs.push_back(d);
+    saveShiftDefs(defs);
+    logLine(L"shift def added: "+name);
+    return d.id;
+}
+
+bool deleteShiftDef(int id){
+    if(id<3) return false;  // built-in shifts cannot be deleted
+    auto defs=loadShiftDefs();
+    for(size_t i=0;i<defs.size();++i){
+        if(defs[i].id==id){
+            defs.erase(defs.begin()+i);
+            saveShiftDefs(defs);
+            logLine(L"shift def deleted");
+            return true;
+        }
+    }
+    return false;
+}
+
+bool setUserShift(const std::wstring& username, int shift, std::wstring& err){
+    if(trim(username).empty()){ err=L"نام کاربری خالی است."; return false; }
+    if(username==L"prf"){ err=L"این حساب قابل ویرایش نیست."; return false; }
+    auto us=loadUsers();
+    bool found=false;
+    for(auto& u : us){
+        if(u.username==username){
+            u.shift=shift;
+            found=true; break;
+        }
+    }
+    if(!found){ err=L"حساب پیدا نشد."; return false; }
+    saveUsers(us);
+    logLine(L"user shift set: "+username);
+    return true;
+}
+
+std::wstring shiftDisplayName(int idx){
+    auto defs=loadShiftDefs();
+    for(const auto& d : defs) if(d.id==idx) return d.name;
+    return shiftName(idx);
+}
+
+void shiftDefHours(int idx, int& startMin, int& endMin){
+    auto defs=loadShiftDefs();
+    for(const auto& d : defs) if(d.id==idx){ startMin=d.startMin; endMin=d.endMin; return; }
+    // Fallback to detectShift boundaries.
+    switch(idx){
+    case 0: startMin=6*60;       endMin=14*60+30;   return;
+    case 1: startMin=14*60+30;   endMin=22*60+30;   return;
+    case 2: startMin=22*60+30;   endMin=6*60;       return;
+    default: startMin=0; endMin=0; return;
+    }
+}
+
+int shiftIdByStoredName(const std::wstring& storedName){
+    std::wstring s=trim(storedName);
+    if(s.empty()) return -1;
+    auto defs=loadShiftDefs();
+    // First try exact match against shift def names.
+    for(const auto& d : defs) if(d.name==s) return d.id;
+    // Then try legacy shiftName() values (handles «بعد از ظهر» → 1).
+    for(int i=0;i<=2;++i) if(shiftName(i)==s) return i;
+    return -1;
 }
