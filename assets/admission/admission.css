@@ -3515,26 +3515,11 @@ body.theme-dark,.theme-dark body{
 .theme-dark .payable-value span{color:#bbf7d0;}
 
 /* ============================================================================
-   v1.77.0 — UNZOOM READABILITY nudge.
-   When the user zooms OUT below the 80% default (Ctrl+scroll down) to fit all
-   items on screen, the CSS `zoom` shrinks text along with everything else. To
-   keep it legible, applyZoom() (admission.js) tags #appBody with `.az-unzoom`
-   and nudges the workspace base font up 1-3px; these companion rules bump the
-   explicit-size text elements (fields, labels, buttons, table, titles, invoice
-   lines) by ~1px so they shrink less than the layout. At >=80% the class is
-   absent, so zoom-in / the default are unchanged. Scoped to #appBody, so the
-   full-screen queue overlay (a sibling) is never affected.
-   Trident-safe: literal px sizes only — no custom properties / grid / gap.
+   v2.01 (Part H) — UNZOOM READABILITY nudge (revised).
+   When the user zooms OUT below the 80% default, applyZoom() now nudges the
+   body base font inline (1-3px graduated). The old .az-unzoom class rules
+   have been removed since zoom now targets document.body directly.
    ============================================================================ */
-.az-unzoom .inp{font-size:15px;}
-.az-unzoom .fld > span{font-size:13.5px;}
-.az-unzoom .btn{font-size:14.5px;}
-.az-unzoom .tbl{font-size:14px;}
-.az-unzoom .tbl thead th{font-size:13px;}
-.az-unzoom .card-title{font-size:15px;}
-.az-unzoom .inv-line{font-size:13.5px;}
-.az-unzoom .inv-line b{font-size:14.5px;}
-.az-unzoom .inv-gtitle{font-size:13px;}
 
 /* ============================================================================
    v1.78.0 — «SOFT CLINICAL» SURFACE REFRESH (light theme)

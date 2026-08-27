@@ -58,6 +58,16 @@ enum {
     MG_SV_INS,             // نوع بیمه (combo)
     MG_SV_STATUS,          // وضعیت (combo: فعال/غیرفعال)
     MG_SV_DESC,            // توضیحات
+    MG_SV_SHORT,           // v2.01: نام اختصار
+    MG_SV_LOVING,          // v2.01: کد لوینگ
+    MG_SV_EQUIV,           // v2.01: کد معادل
+    MG_SV_SRVID,           // v2.01: شناسه خدمت
+    MG_SV_REVGRP,          // v2.01: گروه درآمد
+    MG_SV_HNID,            // v2.01: کد ملی سلامت
+    MG_SV_FREE,            // v2.01: نرخ آزاد
+    MG_SV_GOV,             // v2.01: نرخ دولتی
+    MG_SV_FREEOLD,         // v2.01: نرخ آزاد قدیم
+    MG_SV_GOVCOLD,         // v2.01: نرخ دولتی قدیم
     MG_SV_SAVE,            // ذخیره / افزودن
     MG_SV_EDIT,            // ویرایش (بارگذاری ردیف انتخابی در فرم)
     MG_SV_DELETE,          // حذف
@@ -80,6 +90,9 @@ enum {
     MG_DC_FRANCHISE,       // فرانشیز
     MG_DC_PRINT,           // چاپ در قبض (toggle button)
     MG_DC_PERF,            // v1.78.0: تعریف به عنوان انجام دهنده (toggle button)
+    MG_DC_SITE,            // v2.01: امکان نمایش در لیست پزشکان سایت (toggle)
+    MG_DC_ONLINE,          // v2.01: امکان نوبت‌دهی اینترنتی (toggle)
+    MG_DC_ANES,            // v2.01: پزشک بیهوشی می‌باشد (toggle)
     MG_DC_SPEC,            // تخصص
     MG_DC_INSSPEC,         // تخصص بیمه
     MG_DC_DEGREE,          // مدرک
@@ -135,6 +148,9 @@ struct ManageState {
     // ---- services page (v1.28.0) ----
     HWND svCode=nullptr, svName=nullptr, svCat=nullptr, svDept=nullptr,
          svPrice=nullptr, svIns=nullptr, svStatus=nullptr, svDesc=nullptr,
+         svShort=nullptr, svLoving=nullptr, svEquiv=nullptr, svSrvId=nullptr,
+         svRevGrp=nullptr, svHnId=nullptr, svFree=nullptr, svGov=nullptr,
+         svFreeOld=nullptr, svGovOld=nullptr,
          svSave=nullptr, svEdit=nullptr, svDelete=nullptr, svClear=nullptr,
          svSearch=nullptr, svList=nullptr;
     std::vector<ServiceDef> svAll;      // all services (loaded)
@@ -152,13 +168,15 @@ struct ManageState {
          dcFranchise=nullptr, dcPrintChk=nullptr, dcSpec=nullptr, dcInsSpec=nullptr,
          dcDegree=nullptr, dcContract=nullptr, dcEmerg=nullptr, dcAcct=nullptr,
          dcSave=nullptr, dcEdit=nullptr, dcDelete=nullptr, dcClear=nullptr,
-         dcSearch=nullptr, dcList=nullptr, dcPerfChk=nullptr;
+         dcSearch=nullptr, dcList=nullptr, dcPerfChk=nullptr,
+         dcSiteChk=nullptr, dcOnlineChk=nullptr, dcAnesChk=nullptr;
     std::vector<DoctorDef>  dcAll;      // all doctors (loaded + cached)
     std::vector<int>        dcView;     // filtered indices into dcAll
     std::wstring            dcQuery;    // last search text
     int                     dcEditIdx=-1; // index into dcAll loaded in form (-1 = new)
     bool                    dcActiveVal=true, dcPrintVal=true; // toggle-button state
     bool                    dcPerfVal=true;   // v1.78.0: «تعریف به عنوان انجام دهنده» (default ON)
+    bool                    dcSiteVal=true, dcOnlineVal=false, dcAnesVal=false; // v2.01 Part B
     bool                    dcLoaded=false;
     // v1.66.0: dashboard summary cache — the dash calls loadAllPatients(),
     // loadUsers(), loadDepts(), countTodayReceptions(), unseen*Count() on
@@ -441,6 +459,13 @@ static void mgDocsRefreshChecks(){
     // v1.78.0: «تعریف به عنوان انجام دهنده» toggle (default بله)
     if(s_mg->dcPerfChk)
         SetWindowTextW(s_mg->dcPerfChk, s_mg->dcPerfVal?L"\u2611 بله":L"\u2610 خیر");
+    // v2.01 (Part B): complementary option checkboxes
+    if(s_mg->dcSiteChk)
+        SetWindowTextW(s_mg->dcSiteChk, s_mg->dcSiteVal?L"\u2611 بله":L"\u2610 خیر");
+    if(s_mg->dcOnlineChk)
+        SetWindowTextW(s_mg->dcOnlineChk, s_mg->dcOnlineVal?L"\u2611 بله":L"\u2610 خیر");
+    if(s_mg->dcAnesChk)
+        SetWindowTextW(s_mg->dcAnesChk, s_mg->dcAnesVal?L"\u2611 بله":L"\u2610 خیر");
 }
 static void mgDocsFilter(){
     if(!s_mg) return;
@@ -464,8 +489,10 @@ static void mgDocsFilter(){
         InvalidateRect(s_mg->dcList,NULL,FALSE);
     }
 }
-//  (Re)load doctors + repopulate the department combo from the live section
-//  list, then re-apply the filter and refresh the table.
+//  (Re)load doctors + repopulate the department combo from the live SECTION
+//  tree (sections.dat with subsections), then re-apply the filter and refresh
+//  the table. v2.01 (Part B): switched from loadDepts() to Sections_All() so
+//  the doctor's «بخش» can be a section OR a subsection.
 static void mgDocsReload(){
     if(!s_mg) return;
     s_mg->dcAll=loadDoctors();
@@ -474,11 +501,24 @@ static void mgDocsReload(){
         std::wstring cur; { wchar_t b[128]={0}; GetWindowTextW(s_mg->dcDept,b,128); cur=b; }
         SendMessageW(s_mg->dcDept,CB_RESETCONTENT,0,0);
         SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)L"—");
-        auto cats=loadDepts();
-        for(auto&c:cats) SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)c.name.c_str());
+        // v2.01: enumerate sections + subsections from the live section tree.
+        std::vector<Section> secs; Sections_All(secs);
+        for(const auto& s : secs){
+            if(!s.is_active) continue;
+            std::wstring label=s.name_fa;
+            if(s.parent_id>0){
+                // subsection: prefix with parent name for clarity
+                for(const auto& p : secs)
+                    if(p.id==s.parent_id){ label=p.name_fa+L" ← "+s.name_fa; break; }
+            }
+            SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)label.c_str());
+        }
         int idx=0;
         if(!cur.empty()){
-            for(int i=0;i<(int)cats.size();++i) if(cats[i].name==cur){ idx=i+1; break; }
+            int n=(int)SendMessageW(s_mg->dcDept,CB_GETCOUNT,0,0);
+            for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                SendMessageW(s_mg->dcDept,CB_GETLBTEXT,i,(LPARAM)b);
+                if(cur==b){ idx=i; break; } }
         }
         SendMessageW(s_mg->dcDept,CB_SETCURSEL,idx,0);
     }
@@ -507,6 +547,7 @@ static void mgDocsClearForm(){
     if(s_mg->dcContract) SendMessageW(s_mg->dcContract,CB_SETCURSEL,0,0);
     s_mg->dcActiveVal=true; s_mg->dcPrintVal=true;
     s_mg->dcPerfVal=true;              // v1.78.0: performer flag defaults ON for new doctors
+    s_mg->dcSiteVal=true; s_mg->dcOnlineVal=false; s_mg->dcAnesVal=false; // v2.01 Part B defaults
     s_mg->dcEditIdx=-1;
     mgDocsRefreshChecks();
 }
@@ -543,6 +584,7 @@ static void mgDocsLoadForm(const DoctorDef& d){
     }
     s_mg->dcActiveVal=d.active; s_mg->dcPrintVal=d.printOnReceipt;
     s_mg->dcPerfVal=d.isPerformer;   // v1.78.0: edit form round-trips the performer flag
+    s_mg->dcSiteVal=d.showOnSiteList; s_mg->dcOnlineVal=d.onlineAppointment; s_mg->dcAnesVal=d.isAnesthesiologist; // v2.01 Part B
     mgDocsRefreshChecks();
 }
 //  Read the form into a DoctorDef. The display `name` is composed from the
@@ -579,6 +621,7 @@ static DoctorDef mgDocsReadForm(){
     }
     d.active=s_mg->dcActiveVal; d.printOnReceipt=s_mg->dcPrintVal;
     d.isPerformer=s_mg->dcPerfVal;   // v1.78.0: the form owns the flag (no silent reset)
+    d.showOnSiteList=s_mg->dcSiteVal; d.onlineAppointment=s_mg->dcOnlineVal; d.isAnesthesiologist=s_mg->dcAnesVal; // v2.01 Part B
     std::wstring nm;
     if(!d.namePrefix.empty()) nm += d.namePrefix + L" ";
     if(!d.firstName.empty())  nm += d.firstName  + L" ";
@@ -586,20 +629,80 @@ static DoctorDef mgDocsReadForm(){
     d.name=trim(nm);
     return d;
 }
-//  «ذخیره» — insert a new doctor or update the one loaded in the form. Only the
-//  composed name is required (so a doctor is always identifiable); every other
-//  field is optional. On edit the existing `services` list is preserved.
+//  «ذخیره» — insert a new doctor or update the one loaded in the form.
+//  v2.01 (Part B2): full validation — required fields, national-ID checksum,
+//  mobile format, email format, duplicate docCode/medicalId/nationalId.
+//  On edit the existing `services` list is preserved.
 static void mgDocsSave(HWND h){
     if(!s_mg) return;
     DoctorDef d=mgDocsReadForm();
+    // Required: first name OR last name (so name is never empty).
     if(d.name.empty()){
-        s_mg->msg=L"حداقل نام پزشک را وارد کنید."; s_mg->msgCol=g_theme.danger;
+        s_mg->msg=L"نام و نام خانوادگی پزشک الزامی است."; s_mg->msgCol=g_theme.danger;
         InvalidateRect(h,NULL,TRUE); return;
     }
+    // Required: docCode (کد پزشک) — numeric, unique.
+    if(d.docCode.empty()){
+        s_mg->msg=L"کد پزشک الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    for(wchar_t c : d.docCode) if(c<L'0'||c>L'9'){
+        if(c>=L'\u06F0'&&c<=L'\u06F9') continue; // Persian digits OK
+        s_mg->msg=L"کد پزشک باید عددی باشد."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Required: medicalId (کد نظام پزشکی) — unique.
+    if(d.medicalId.empty()){
+        s_mg->msg=L"کد نظام پزشکی الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // National ID validation (if provided): 10 digits, checksum, unique.
+    if(!d.nationalId.empty()){
+        if(!validateNationalId(d.nationalId)){
+            s_mg->msg=L"کد ملی نامعتبر است."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // Mobile validation (if provided).
+    if(!d.mobile.empty() && !validateMobile(d.mobile)){
+        s_mg->msg=L"تلفن همراه نامعتبر است. (مثال: ۰۹۱۲۳۴۵۶۷۸۹)"; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Email validation (if provided).
+    if(!d.email.empty() && !validateEmail(d.email)){
+        s_mg->msg=L"ایمیل نامعتبر است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Franchise validation: numeric percentage 0-100 (if provided).
+    if(!d.franchise.empty()){
+        int f=_wtoi(d.franchise.c_str());
+        if(f<0||f>100){
+            s_mg->msg=L"فرانشیز باید عددی بین ۰ تا ۱۰۰ باشد."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // Duplicate checks against all other doctors.
+    int editIdx=s_mg->dcEditIdx;
+    for(int i=0;i<(int)s_mg->dcAll.size();++i){
+        if(i==editIdx) continue;
+        const DoctorDef& e=s_mg->dcAll[i];
+        if(!d.docCode.empty() && e.docCode==d.docCode){
+            s_mg->msg=L"کد پزشک تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+        if(!d.medicalId.empty() && e.medicalId==d.medicalId){
+            s_mg->msg=L"کد نظام پزشکی تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+        if(!d.nationalId.empty() && e.nationalId==d.nationalId){
+            s_mg->msg=L"کد ملی تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
     bool ok;
-    if(s_mg->dcEditIdx>=0 && s_mg->dcEditIdx<(int)s_mg->dcAll.size()){
-        d.services=s_mg->dcAll[s_mg->dcEditIdx].services;   // keep services list
-        s_mg->dcAll[s_mg->dcEditIdx]=d;
+    if(editIdx>=0 && editIdx<(int)s_mg->dcAll.size()){
+        d.services=s_mg->dcAll[editIdx].services;   // keep services list
+        s_mg->dcAll[editIdx]=d;
         ok=saveDoctors(s_mg->dcAll);
         if(ok){ s_mg->msg=L"پزشک «"+d.name+L"» ویرایش شد."; s_mg->msgCol=g_theme.success; }
     } else {
@@ -608,11 +711,13 @@ static void mgDocsSave(HWND h){
         if(ok){ s_mg->msg=L"پزشک «"+d.name+L"» اضافه شد."; s_mg->msgCol=g_theme.success; }
     }
     if(!ok){ s_mg->msg=L"ذخیرهٔ پزشک ناموفق بود."; s_mg->msgCol=g_theme.danger; }
-    else mgDocsClearForm();
+    else { mgDocsClearForm(); WebAdmission_NotifyCatalogChanged(); }
     mgDocsReload();
     InvalidateRect(h,NULL,TRUE);
 }
-//  «حذف» — delete the selected row (with confirm).
+//  «حذف» — delete the selected row (with confirm). v2.01 (Part B2): if the
+//  doctor is already used on an existing receipt/ticket, deletion is blocked
+//  with a clear explanation and the user is offered «غیرفعال کردن» instead.
 static void mgDocsDelete(HWND h){
     if(!s_mg || !s_mg->dcList) return;
     int sel=ListView_GetNextItem(s_mg->dcList,-1,LVNI_SELECTED);
@@ -620,14 +725,43 @@ static void mgDocsDelete(HWND h){
         s_mg->msg=L"ابتدا یک پزشک را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
         InvalidateRect(h,NULL,TRUE); return;
     }
-    const DoctorDef& d=s_mg->dcAll[s_mg->dcView[sel]];
+    int idx=s_mg->dcView[sel];
+    const DoctorDef& d=s_mg->dcAll[idx];
+    // Check if this doctor is used on any cashier ticket (by name).
+    bool inUse=false;
+    {
+        // Load tickets via Receipt_SearchJson by doctor name — but the simplest
+        // check is to scan cashier_tickets.dat for the doctor name. We use the
+        // public Receipt_SearchJson which returns JSON; an empty rows array
+        // means no usage.
+        ReceiptQuery rq; rq.doctor=d.name;
+        std::string result=Receipt_SearchJson(rq);
+        if(result.find("\"rows\":[")!=std::string::npos &&
+           result.find("\"rows\":[]")==std::string::npos)
+            inUse=true;
+    }
+    if(inUse){
+        std::wstring msg=L"پزشک «"+d.name+L"» در قبض‌های صادرشده استفاده شده است و قابل حذف نیست.\n"
+                         L"می‌توانید آن را غیرفعال کنید تا در پذیرش‌های جدید نمایش داده نشود.\n\n"
+                         L"آیا می‌خواهید این پزشک را غیرفعال کنید؟";
+        if(MessageBoxW(h,msg.c_str(),L"حذف ممکن نیست",MB_YESNO|MB_ICONQUESTION)==IDYES){
+            s_mg->dcAll[idx].active=false;
+            saveDoctors(s_mg->dcAll);
+            s_mg->msg=L"پزشک «"+d.name+L"» غیرفعال شد."; s_mg->msgCol=g_theme.success;
+            mgDocsClearForm();
+            mgDocsReload();
+            InvalidateRect(h,NULL,TRUE);
+        }
+        return;
+    }
     std::wstring q=L"حذف پزشک «"+d.name+L"»؟";
     if(MessageBoxW(h,q.c_str(),L"تأیید حذف",MB_YESNO|MB_ICONWARNING)!=IDYES) return;
-    s_mg->dcAll.erase(s_mg->dcAll.begin()+s_mg->dcView[sel]);
+    s_mg->dcAll.erase(s_mg->dcAll.begin()+idx);
     saveDoctors(s_mg->dcAll);
     s_mg->msg=L"پزشک حذف شد."; s_mg->msgCol=g_theme.success;
     mgDocsClearForm();
     mgDocsReload();
+    WebAdmission_NotifyCatalogChanged();
     InvalidateRect(h,NULL,TRUE);
 }
 //  «ویرایش» / double-click — load the selected row into the form.
@@ -3279,9 +3413,12 @@ static void mgLayout(HWND h){
         MoveWindow(s_mg->dcPrintChk, cx(1), cy(4), colW, fh, TRUE);
         MoveWindow(s_mg->dcAddress,  cx(2), cy(4), colW, fh, TRUE);
         MoveWindow(s_mg->dcAcct,     cx(3), cy(4), colW, fh, TRUE);
-        // v1.78.0 Row 5: تعریف به عنوان انجام دهنده (toggle) — own row so the
-        // six-row grid stays 4-up and the action buttons shift down one row.
-        MoveWindow(s_mg->dcPerfChk,  cx(0), cy(5), colW, fh, TRUE);
+        // v1.78.0 Row 5: four toggles (right→left):
+        //   تعریف به عنوان انجام دهنده | نمایش در لیست پزشکان سایت | نوبت‌دهی اینترنتی | پزشک بیهوشی
+        MoveWindow(s_mg->dcPerfChk,   cx(0), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcSiteChk,   cx(1), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcOnlineChk, cx(2), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcAnesChk,   cx(3), cy(5), colW, fh, TRUE);
         // action buttons row (right→left): ذخیره | ویرایش | حذف | فرم جدید
         int by=cy(5)+fh+S(6);
         int bw=S(120), bgap=S(10), bx=formR;
@@ -3299,7 +3436,8 @@ static void mgLayout(HWND h){
             s_mg->dcPrefix,s_mg->dcFirst,s_mg->dcLast,s_mg->dcNid,s_mg->dcMobile,
             s_mg->dcEmail,s_mg->dcFranchise,s_mg->dcSpec,s_mg->dcInsSpec,
             s_mg->dcDegree,s_mg->dcContract,s_mg->dcEmerg,s_mg->dcActiveChk,
-            s_mg->dcPrintChk,s_mg->dcPerfChk,s_mg->dcAddress,s_mg->dcAcct,s_mg->dcSave,
+            s_mg->dcPrintChk,s_mg->dcPerfChk,s_mg->dcSiteChk,s_mg->dcOnlineChk,s_mg->dcAnesChk,
+            s_mg->dcAddress,s_mg->dcAcct,s_mg->dcSave,
             s_mg->dcEdit,s_mg->dcDelete,s_mg->dcClear,s_mg->dcSearch,s_mg->dcList};
         for(HWND w:show) if(w) ShowWindow(w,SW_SHOW);
     }
@@ -4021,7 +4159,10 @@ static void mgPaintDocs(HDC dc, HWND h){
         {2,0,L"تلفن همراه"},{2,1,L"ایمیل"},{2,2,L"فرانشیز"},{2,3,L"تخصص"},
         {3,0,L"تخصص بیمه"},{3,3,L"قرار پزشک اورژانس"},{3,2,L"نوع قرار داد"},{3,1,L"مدرک"},
         {4,0,L"وضعیت فعالیت"},{4,1,L"چاپ در قبض"},{4,2,L"آدرس"},{4,3,L"حسابداری"},
-        {5,0,L"تعریف به عنوان انجام دهنده"}};
+        {5,0,L"تعریف به عنوان انجام دهنده"},
+        {5,1,L"نمایش در لیست پزشکان سایت"},
+        {5,2,L"نوبت‌دهی اینترنتی"},
+        {5,3,L"پزشک بیهوشی"}};
     for(const Lb& lb:lbs) lbl(cx(lb.c),cy(lb.r)-lh,colW,lb.t);
     // ---- search row: box (left, child) + status / empty hint (right) ----
     int srchTop=cardBot+S(8), srchH=fh, srchW=S(320);
@@ -4249,6 +4390,10 @@ static void mgBuildDocsPage(HWND h){
     // v1.78.0: «تعریف به عنوان انجام دهنده» toggle — same visual language as
     // the فعال / چاپ در قبض toggles, default ON.
     s_mg->dcPerfChk  =createFlatButton(h,MG_DC_PERF,  L"\u2611 بله",0,BS_OUTLINE,0,0,10,10);
+    // v2.01 (Part B): complementary option checkboxes
+    s_mg->dcSiteChk  =createFlatButton(h,MG_DC_SITE,  L"\u2611 بله",0,BS_OUTLINE,0,0,10,10);
+    s_mg->dcOnlineChk=createFlatButton(h,MG_DC_ONLINE,L"\u2610 خیر",0,BS_OUTLINE,0,0,10,10);
+    s_mg->dcAnesChk  =createFlatButton(h,MG_DC_ANES,  L"\u2610 خیر",0,BS_OUTLINE,0,0,10,10);
     s_mg->dcSave   =createFlatButton(h,MG_DC_SAVE,  L"ذخیره",  ICO_SAVE,  BS_PRIMARY,0,0,10,10);
     s_mg->dcEdit   =createFlatButton(h,MG_DC_EDIT,  L"ویرایش", ICO_GEAR,  BS_OUTLINE,0,0,10,10);
     s_mg->dcDelete =createFlatButton(h,MG_DC_DELETE,L"حذف",    ICO_TRASH, BS_DANGER, 0,0,10,10);
@@ -4593,6 +4738,12 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             case MG_DC_PRINT:  s_mg->dcPrintVal=!s_mg->dcPrintVal;
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
             case MG_DC_PERF:   s_mg->dcPerfVal=!s_mg->dcPerfVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_SITE:   s_mg->dcSiteVal=!s_mg->dcSiteVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_ONLINE: s_mg->dcOnlineVal=!s_mg->dcOnlineVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_ANES:   s_mg->dcAnesVal=!s_mg->dcAnesVal;
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
         }
         if(id==MG_CB_DEPT && HIWORD(w)==CBN_SELCHANGE){

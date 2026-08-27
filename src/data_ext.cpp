@@ -511,6 +511,10 @@ static DoctorDef parseKvDoctor(const std::wstring& block){
         else if(k==L"accounting") d.accounting=v;
         // v1.78.0: missing key (old files) keeps the ctor default → performer.
         else if(k==L"isPerformer") d.isPerformer=(v!=L"0");
+        // v2.01 (Part B): complementary checkboxes.
+        else if(k==L"showOnSiteList") d.showOnSiteList=(v!=L"0");
+        else if(k==L"onlineAppointment") d.onlineAppointment=(v!=L"0");
+        else if(k==L"isAnesthesiologist") d.isAnesthesiologist=(v!=L"0");
     }
     d.name=name; d.specialty=sp;
     if(!sv.empty()) for(auto&s:dx_split(sv,L';')) if(!trim(s).empty()) d.services.push_back(trim(s));
@@ -574,6 +578,9 @@ bool saveDoctors(const std::vector<DoctorDef>& doctors){
         out += L"emergencyContract="+d.emergencyContract+L"\r\n";
         out += L"accounting="+d.accounting+L"\r\n";
         out += L"isPerformer="+std::wstring(d.isPerformer?L"1":L"0")+L"\r\n";
+        out += L"showOnSiteList="+std::wstring(d.showOnSiteList?L"1":L"0")+L"\r\n";
+        out += L"onlineAppointment="+std::wstring(d.onlineAppointment?L"1":L"0")+L"\r\n";
+        out += L"isAnesthesiologist="+std::wstring(d.isAnesthesiologist?L"1":L"0")+L"\r\n";
         out += L"\r\n";
     }
     return writeFileUtf8(docsPath(),out,false);

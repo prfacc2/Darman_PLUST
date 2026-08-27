@@ -55,9 +55,21 @@ std::vector<ServiceDef> loadServices(){
         if(f.size()>15) s.priceGovNew = _wtoi64(f[15].c_str());
         if(f.size()>16) s.priceIns    = _wtoi64(f[16].c_str());
         if(f.size()>17) s.priceInsNew = _wtoi64(f[17].c_str());
-        // §H: keep any future extra columns verbatim (already unescaped here;
-        // re-escaped on save). v1.74 tariffs occupy 10..17, so extras start at 18.
-        for(size_t i=18;i<f.size();i++){ s.extra+=L"|"; s.extra+=svcEsc(f[i]); }
+        // v2.01 (Part C) — new service fields (columns 18..24). Older files
+        // load with these empty/zero — unchanged behaviour.
+        if(f.size()>18) s.shortName        = f[18];
+        if(f.size()>19) s.lovingCode       = f[19];
+        if(f.size()>20) s.equivCode        = f[20];
+        if(f.size()>21) s.serviceId        = f[21];
+        if(f.size()>22) s.revenueGroup     = f[22];
+        if(f.size()>23) s.healthNationalId = f[23];
+        if(f.size()>24) s.sectionId        = _wtoi(f[24].c_str());
+        // v2.01 (Part C3) — historical rates (columns 25..26).
+        if(f.size()>25) s.priceFreeOld     = _wtoi64(f[25].c_str());
+        if(f.size()>26) s.priceGovOld      = _wtoi64(f[26].c_str());
+        // §H: keep any future extra columns verbatim. v2.01 fields occupy
+        // 18..26, so extras start at 27.
+        for(size_t i=27;i<f.size();i++){ s.extra+=L"|"; s.extra+=svcEsc(f[i]); }
         out.push_back(s);
     }
     return out;
@@ -74,12 +86,18 @@ static void saveServices(const std::vector<ServiceDef>& v){
         wchar_t pgn[32]; swprintf(pgn,32,L"%lld",s.priceGovNew);
         wchar_t pi[32];  swprintf(pi,32,L"%lld",s.priceIns);
         wchar_t pin[32]; swprintf(pin,32,L"%lld",s.priceInsNew);
+        wchar_t secid[16]; swprintf(secid,16,L"%d",s.sectionId);
+        wchar_t pfo[32]; swprintf(pfo,32,L"%lld",s.priceFreeOld);
+        wchar_t pgo[32]; swprintf(pgo,32,L"%lld",s.priceGovOld);
         out += svcEsc(s.code)+L"|"+svcEsc(s.name)+L"|"+svcEsc(s.category)+L"|"+
                svcEsc(s.dept)+L"|"+pb+L"|"+svcEsc(s.insType)+L"|"+svcEsc(s.desc)+L"|"+
                sb+L"|"+svcEsc(s.created)+L"|"+svcEsc(s.modified)+L"|"+
                svcEsc(s.insName)+L"|"+svcEsc(s.multiplier)+L"|"+
-               pf+L"|"+pfn+L"|"+pg+L"|"+pgn+L"|"+pi+L"|"+pin+
-               s.extra+L"\r\n";
+               pf+L"|"+pfn+L"|"+pg+L"|"+pgn+L"|"+pi+L"|"+pin+L"|"+
+               svcEsc(s.shortName)+L"|"+svcEsc(s.lovingCode)+L"|"+
+               svcEsc(s.equivCode)+L"|"+svcEsc(s.serviceId)+L"|"+
+               svcEsc(s.revenueGroup)+L"|"+svcEsc(s.healthNationalId)+L"|"+
+               secid+L"|"+pfo+L"|"+pgo+s.extra+L"\r\n";
     }
     writeFileUtf8(servicesPath(),out,false);
 }
