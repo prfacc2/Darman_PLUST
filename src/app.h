@@ -270,6 +270,10 @@ std::wstring toFaDigits(const std::wstring& s);
 int          iranMinutesOfDay();
 int          detectShift();                              // 0=صبح 1=عصر 2=شب
 std::wstring shiftName(int s);
+// v2.01 (Part B): validation utilities
+bool validateNationalId(const std::wstring& nid);
+bool validateMobile(const std::wstring& mob);
+bool validateEmail(const std::wstring& email);
 
 // ------------------------------------------------------------------ utils --
 std::wstring exeDir();
@@ -779,15 +783,29 @@ struct ServiceDef {
     // forward-compat `extra` catch-all, so older 10-column files load unchanged.
     std::wstring insName;   // نام بیمه (base insurance name)
     std::wstring multiplier;// ضریب (decimal string, e.g. "1.5")
-    long long    priceFree;     // قیمت آزاد
-    long long    priceFreeNew;  // قیمت آزاد جدید
-    long long    priceGov;      // قیمت دولتی
-    long long    priceGovNew;   // قیمت دولتی جدید
+    long long    priceFree;     // نرخ آزاد (current)
+    long long    priceFreeNew;  // نرخ آزاد جدید (next/current alternative — billing fallback)
+    long long    priceGov;      // نرخ دولتی (current)
+    long long    priceGovNew;   // نرخ دولتی جدید (next/current alternative — billing fallback)
     long long    priceIns;      // قیمت بیمه
     long long    priceInsNew;   // قیمت بیمه جدید
+    // v2.01 (Part C) — new service definition fields:
+    std::wstring shortName;     // نام اختصار (required)
+    std::wstring lovingCode;    // کد لوینگ (free-form, optional)
+    std::wstring equivCode;     // کد معادل
+    std::wstring serviceId;     // شناسه خدمت
+    std::wstring revenueGroup;  // گروه درآمد
+    std::wstring healthNationalId; // کد ملی سلامت
+    int          sectionId;     // بخش/زیربخش id (links to sections.dat tree)
+    // v2.01 (Part C3) — historical rates. When the user changes «نرخ آزاد» or
+    // «نرخ دولتی», the previous value is moved here automatically. These are
+    // informational only — billing ALWAYS uses the current rates above.
+    long long    priceFreeOld;  // نرخ آزاد قدیم (historical, not used for billing)
+    long long    priceGovOld;   // نرخ دولتی قدیم (historical, not used for billing)
     std::wstring extra;     // §H forward-compat: unknown trailing columns
     ServiceDef():price(0),status(1),priceFree(0),priceFreeNew(0),
-                 priceGov(0),priceGovNew(0),priceIns(0),priceInsNew(0){}
+                 priceGov(0),priceGovNew(0),priceIns(0),priceInsNew(0),
+                 sectionId(0),priceFreeOld(0),priceGovOld(0){}
 };
 std::vector<ServiceDef> loadServices();
 bool  addService(const ServiceDef& s, std::wstring& err);   // insert (code must be unique)
@@ -1073,7 +1091,13 @@ struct DoctorDef {
     // پزشک معالج (ارجاع‌دهنده) قابل جستجو می‌ماند. کلید isPerformer= در doctors.dat؛
     // نبودنش در فایل‌های قدیمی یعنی true (سازگاری رو‌به‌عقب).
     bool isPerformer;
-    DoctorDef():docType(0),active(true),printOnReceipt(true),contractType(0),isPerformer(true){}
+    // v2.01 (Part B) — complementary options (three checkboxes):
+    bool showOnSiteList;       // امکان نمایش در لیست پزشکان سایت
+    bool onlineAppointment;    // امکان نوبت‌دهی اینترنتی
+    bool isAnesthesiologist;   // پزشک بیهوشی می‌باشد
+    DoctorDef():docType(0),active(true),printOnReceipt(true),contractType(0),
+                isPerformer(true),showOnSiteList(true),onlineAppointment(false),
+                isAnesthesiologist(false){}
 };
 std::vector<DoctorDef> loadDoctors();          // seeds defaults if empty
 std::vector<DoctorDef> todaysDoctors();        // doctors on shift today

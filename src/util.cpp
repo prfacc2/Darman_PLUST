@@ -348,8 +348,58 @@ int detectShift(){
 }
 std::wstring shiftName(int s){
     switch(s){
-        case 0: return L"\u0635\u0628\u062d";                                  // صبح
-        case 1: return L"\u0639\u0635\u0631";                                  // عصر (v2.01: was بعد از ظهر)
-        default:return L"\u0634\u0628";                                       // شب
+        case 0: return L"\u0635\u0628\u062d";                  // صبح
+        case 1: return L"\u0639\u0635\u0631";                  // عصر (v2.01: was بعد از ظهر)
+        default:return L"\u0634\u0628";                       // شب
     }
+}
+
+// ===========================================================================
+//  v2.01 (Part B) — validation utilities
+// ===========================================================================
+
+// Iranian national-ID checksum validation. Returns true for a valid 10-digit
+// code with a correct check digit. Persian/Arabic digits are normalized first.
+bool validateNationalId(const std::wstring& nid){
+    std::wstring s;
+    for(wchar_t c : trim(nid)){
+        if(c>=L'\u06F0' && c<=L'\u06F9') s+=(wchar_t)(L'0'+(c-L'\u06F0')); // Persian
+        else if(c>=L'\u0660' && c<=L'\u0669') s+=(wchar_t)(L'0'+(c-L'\u0660')); // Arabic
+        else if(c>=L'0' && c<=L'9') s+=c;
+    }
+    if(s.size()!=10) return false;
+    // All-same-digit codes are invalid (e.g. 0000000000, 1111111111).
+    bool allSame=true;
+    for(int i=1;i<10;i++) if(s[i]!=s[0]){ allSame=false; break; }
+    if(allSame) return false;
+    int sum=0;
+    for(int i=0;i<9;i++) sum+=(s[i]-L'0')*(10-i);
+    int rem=sum%11;
+    int check = (rem<2) ? rem : (11-rem);
+    return (s[9]-L'0')==check;
+}
+
+// Iranian mobile number validation: must be 11 digits starting with 09.
+// Persian/Arabic digits normalized; spaces/dashes stripped.
+bool validateMobile(const std::wstring& mob){
+    std::wstring s;
+    for(wchar_t c : trim(mob)){
+        if(c>=L'\u06F0' && c<=L'\u06F9') s+=(wchar_t)(L'0'+(c-L'\u06F0'));
+        else if(c>=L'\u0660' && c<=L'\u0669') s+=(wchar_t)(L'0'+(c-L'\u0660'));
+        else if(c>=L'0' && c<=L'9') s+=c;
+    }
+    return s.size()==11 && s[0]==L'0' && s[1]==L'9';
+}
+
+// Simple email format validation (non-empty local@domain with a dot in domain).
+bool validateEmail(const std::wstring& email){
+    std::wstring s=trim(email);
+    if(s.empty()) return true;   // optional field
+    size_t at=s.find(L'@');
+    if(at==std::wstring::npos || at==0 || at==s.size()-1) return false;
+    std::wstring local=s.substr(0,at);
+    std::wstring domain=s.substr(at+1);
+    if(domain.find(L'.')==std::wstring::npos) return false;
+    if(domain[0]==L'.' || domain.back()==L'.') return false;
+    return true;
 }

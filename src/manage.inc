@@ -31,7 +31,7 @@
 // It was previously only reachable from the hidden-admin panel, which was the
 // wrong surface. The hidden-admin patients tab is removed (see admin.cpp).
 enum { PG_DASH=0, PG_PATIENTS=1, PG_SECTS=2, PG_SERVICES=3, PG_DOCS=4, PG_EMPS=5,
-       PG_MSG=6, PG_REQS=7, PG_SAVED=8, PG_BACKUP=9, PG_PRINTCFG=10, PG_COUNT=11 };
+       PG_MSG=6, PG_REQS=7, PG_SAVED=8, PG_BACKUP=9, PG_PRINTCFG=10, PG_SHIFTS=11, PG_COUNT=12 };
 
 // control ids
 enum {
@@ -58,6 +58,16 @@ enum {
     MG_SV_INS,             // نوع بیمه (combo)
     MG_SV_STATUS,          // وضعیت (combo: فعال/غیرفعال)
     MG_SV_DESC,            // توضیحات
+    MG_SV_SHORT,           // v2.01: نام اختصار
+    MG_SV_LOVING,          // v2.01: کد لوینگ
+    MG_SV_EQUIV,           // v2.01: کد معادل
+    MG_SV_SRVID,           // v2.01: شناسه خدمت
+    MG_SV_REVGRP,          // v2.01: گروه درآمد
+    MG_SV_HNID,            // v2.01: کد ملی سلامت
+    MG_SV_FREE,            // v2.01: نرخ آزاد
+    MG_SV_GOV,             // v2.01: نرخ دولتی
+    MG_SV_FREEOLD,         // v2.01: نرخ آزاد قدیم
+    MG_SV_GOVCOLD,         // v2.01: نرخ دولتی قدیم
     MG_SV_SAVE,            // ذخیره / افزودن
     MG_SV_EDIT,            // ویرایش (بارگذاری ردیف انتخابی در فرم)
     MG_SV_DELETE,          // حذف
@@ -80,6 +90,9 @@ enum {
     MG_DC_FRANCHISE,       // فرانشیز
     MG_DC_PRINT,           // چاپ در قبض (toggle button)
     MG_DC_PERF,            // v1.78.0: تعریف به عنوان انجام دهنده (toggle button)
+    MG_DC_SITE,            // v2.01: امکان نمایش در لیست پزشکان سایت (toggle)
+    MG_DC_ONLINE,          // v2.01: امکان نوبت‌دهی اینترنتی (toggle)
+    MG_DC_ANES,            // v2.01: پزشک بیهوشی می‌باشد (toggle)
     MG_DC_SPEC,            // تخصص
     MG_DC_INSSPEC,         // تخصص بیمه
     MG_DC_DEGREE,          // مدرک
@@ -92,6 +105,9 @@ enum {
     MG_DC_CLEAR,           // فرم جدید (پاک کردن)
     MG_DC_SEARCH,          // جستجو
     MG_DC_LIST,            // جدول پزشکان (ListView)
+    // v2.01 (Part F2): shift management page controls
+    MG_SH_NAME=2900, MG_SH_START, MG_SH_END, MG_SH_SAVE, MG_SH_DELETE, MG_SH_CLEAR,
+    MG_SH_LIST,
 };
 
 struct EmpRow {
@@ -135,6 +151,9 @@ struct ManageState {
     // ---- services page (v1.28.0) ----
     HWND svCode=nullptr, svName=nullptr, svCat=nullptr, svDept=nullptr,
          svPrice=nullptr, svIns=nullptr, svStatus=nullptr, svDesc=nullptr,
+         svShort=nullptr, svLoving=nullptr, svEquiv=nullptr, svSrvId=nullptr,
+         svRevGrp=nullptr, svHnId=nullptr, svFree=nullptr, svGov=nullptr,
+         svFreeOld=nullptr, svGovOld=nullptr,
          svSave=nullptr, svEdit=nullptr, svDelete=nullptr, svClear=nullptr,
          svSearch=nullptr, svList=nullptr;
     std::vector<ServiceDef> svAll;      // all services (loaded)
@@ -152,14 +171,23 @@ struct ManageState {
          dcFranchise=nullptr, dcPrintChk=nullptr, dcSpec=nullptr, dcInsSpec=nullptr,
          dcDegree=nullptr, dcContract=nullptr, dcEmerg=nullptr, dcAcct=nullptr,
          dcSave=nullptr, dcEdit=nullptr, dcDelete=nullptr, dcClear=nullptr,
-         dcSearch=nullptr, dcList=nullptr, dcPerfChk=nullptr;
+         dcSearch=nullptr, dcList=nullptr, dcPerfChk=nullptr,
+         dcSiteChk=nullptr, dcOnlineChk=nullptr, dcAnesChk=nullptr;
     std::vector<DoctorDef>  dcAll;      // all doctors (loaded + cached)
     std::vector<int>        dcView;     // filtered indices into dcAll
     std::wstring            dcQuery;    // last search text
     int                     dcEditIdx=-1; // index into dcAll loaded in form (-1 = new)
     bool                    dcActiveVal=true, dcPrintVal=true; // toggle-button state
     bool                    dcPerfVal=true;   // v1.78.0: «تعریف به عنوان انجام دهنده» (default ON)
+    bool                    dcSiteVal=true, dcOnlineVal=false, dcAnesVal=false; // v2.01 Part B
     bool                    dcLoaded=false;
+    // v2.01 (Part F2): shift management page state
+    std::vector<ShiftDef>    shAll;       // all shift definitions (cached)
+    HWND                    shList=nullptr; // shift list ListView
+    HWND                    shName=nullptr, shStart=nullptr, shEnd=nullptr;
+    HWND                    shSave=nullptr, shDelete=nullptr, shClear=nullptr;
+    int                     shEditId=-1;     // id being edited (-1 = new)
+    bool                    shLoaded=false;
     // v1.66.0: dashboard summary cache — the dash calls loadAllPatients(),
     // loadUsers(), loadDepts(), countTodayReceptions(), unseen*Count() on
     // every WM_PAINT (several times per frame with GDI+), and every call
@@ -243,12 +271,23 @@ static void mgServicesFilter(){
     for(int i=0;i<(int)s_mg->svAll.size();++i){
         const ServiceDef& s=s_mg->svAll[i];
         if(q.empty()){ s_mg->svView.push_back(i); continue; }
-        std::wstring code=uikit::NormalizeFa(s.code);
-        std::wstring name=uikit::NormalizeFa(s.name);
-        std::wstring cat =uikit::NormalizeFa(s.category);
-        if(code.find(q)!=std::wstring::npos ||
-           name.find(q)!=std::wstring::npos ||
-           cat.find(q)!=std::wstring::npos)
+        // v2.01 (Part C): search across every visible catalogue column.
+        std::wstring code  =uikit::NormalizeFa(s.code);
+        std::wstring name  =uikit::NormalizeFa(s.name);
+        std::wstring sh    =uikit::NormalizeFa(s.shortName);
+        std::wstring loving=uikit::NormalizeFa(s.lovingCode);
+        std::wstring equiv =uikit::NormalizeFa(s.equivCode);
+        std::wstring sid   =uikit::NormalizeFa(s.serviceId);
+        std::wstring rev   =uikit::NormalizeFa(s.revenueGroup);
+        std::wstring hnid  =uikit::NormalizeFa(s.healthNationalId);
+        if(code.find(q)!=std::wstring::npos   ||
+           name.find(q)!=std::wstring::npos   ||
+           sh.find(q)!=std::wstring::npos     ||
+           loving.find(q)!=std::wstring::npos ||
+           equiv.find(q)!=std::wstring::npos  ||
+           sid.find(q)!=std::wstring::npos    ||
+           rev.find(q)!=std::wstring::npos    ||
+           hnid.find(q)!=std::wstring::npos)
             s_mg->svView.push_back(i);
     }
     if(s_mg->svList){
@@ -263,16 +302,28 @@ static void mgServicesReload(){
     if(!s_mg) return;
     s_mg->svAll=loadServices();
     s_mg->svLoaded=true;
-    // department combo: «— همه —»/blank first, then each section.
+    // department combo: «—»/blank first, then each section + subsection from
+    // the live section tree (v2.01 Part B/C — same pattern as the doctor form).
     if(s_mg->svDept){
         std::wstring cur; { wchar_t b[128]={0}; GetWindowTextW(s_mg->svDept,b,128); cur=b; }
         SendMessageW(s_mg->svDept,CB_RESETCONTENT,0,0);
-        auto cats=loadDepts();
         SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)L"—");
-        for(auto&c:cats) SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)c.name.c_str());
+        std::vector<Section> secs; Sections_All(secs);
+        for(const auto& s : secs){
+            if(!s.is_active) continue;
+            std::wstring label=s.name_fa;
+            if(s.parent_id>0){
+                for(const auto& p : secs)
+                    if(p.id==s.parent_id){ label=p.name_fa+L" ← "+s.name_fa; break; }
+            }
+            SendMessageW(s_mg->svDept,CB_ADDSTRING,0,(LPARAM)label.c_str());
+        }
         int idx=0;
         if(!cur.empty()){
-            for(int i=0;i<(int)cats.size();++i) if(cats[i].name==cur){ idx=i+1; break; }
+            int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0);
+            for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
+                if(cur==b){ idx=i; break; } }
         }
         SendMessageW(s_mg->svDept,CB_SETCURSEL,idx,0);
     }
@@ -286,6 +337,17 @@ static void mgServicesClearForm(){
     SetWindowTextW(s_mg->svCat, L"");
     SetWindowTextW(s_mg->svPrice,L"");
     SetWindowTextW(s_mg->svDesc,L"");
+    // v2.01 (Part C) fields
+    SetWindowTextW(s_mg->svShort,L"");
+    SetWindowTextW(s_mg->svLoving,L"");
+    SetWindowTextW(s_mg->svEquiv,L"");
+    SetWindowTextW(s_mg->svSrvId,L"");
+    SetWindowTextW(s_mg->svRevGrp,L"");
+    SetWindowTextW(s_mg->svHnId,L"");
+    SetWindowTextW(s_mg->svFree,L"");
+    SetWindowTextW(s_mg->svGov,L"");
+    SetWindowTextW(s_mg->svFreeOld,L"");
+    SetWindowTextW(s_mg->svGovOld,L"");
     if(s_mg->svDept)   SendMessageW(s_mg->svDept,CB_SETCURSEL,0,0);
     if(s_mg->svIns)    SendMessageW(s_mg->svIns,CB_SETCURSEL,0,0);
     if(s_mg->svStatus) SendMessageW(s_mg->svStatus,CB_SETCURSEL,0,0);
@@ -313,6 +375,29 @@ static void mgServicesFormatPriceLive(){
     }
     s_svPriceFormatting=false;
 }
+//  v2.01 (Part C): the four tariff boxes (نرخ آزاد / دولتی + قدیم) get the same
+//  live thousands-separator formatting as «قیمت». Each box owns a static
+//  re-entrancy guard so the EN_CHANGE fired while rewriting does not loop.
+static bool s_svFreeFmt=false, s_svGovFmt=false, s_svFreeOldFmt=false, s_svGovOldFmt=false;
+static void mgServicesFormatMoneyLive(HWND box,bool& guard){
+    if(!s_mg || !box) return;
+    if(guard) return;
+    guard=true;
+    wchar_t b[64]={0}; GetWindowTextW(box,b,64);
+    long long v=parseMoney(b);
+    std::wstring fmt=formatMoney(v);
+    if(fmt!=b){
+        int sl0=0, sl1=0; SendMessageW(box,EM_GETSEL,(WPARAM)&sl0,(LPARAM)&sl1);
+        SetWindowTextW(box,fmt.c_str());
+        int len=(int)fmt.size();
+        SendMessageW(box,EM_SETSEL,len,len);
+    }
+    guard=false;
+}
+static void mgServicesFormatFreeLive()   { if(s_mg) mgServicesFormatMoneyLive(s_mg->svFree,   s_svFreeFmt); }
+static void mgServicesFormatGovLive()    { if(s_mg) mgServicesFormatMoneyLive(s_mg->svGov,    s_svGovFmt); }
+static void mgServicesFormatFreeOldLive(){ if(s_mg) mgServicesFormatMoneyLive(s_mg->svFreeOld,s_svFreeOldFmt); }
+static void mgServicesFormatGovOldLive() { if(s_mg) mgServicesFormatMoneyLive(s_mg->svGovOld, s_svGovOldFmt); }
 //  Load a record into the form (for editing).
 static void mgServicesLoadForm(const ServiceDef& s){
     if(!s_mg) return;
@@ -321,12 +406,40 @@ static void mgServicesLoadForm(const ServiceDef& s){
     SetWindowTextW(s_mg->svCat, s.category.c_str());
     { std::wstring ps=formatMoney(s.price); SetWindowTextW(s_mg->svPrice,ps.c_str()); }
     SetWindowTextW(s_mg->svDesc,s.desc.c_str());
-    // department combo by name
+    // v2.01 (Part C) fields
+    SetWindowTextW(s_mg->svShort, s.shortName.c_str());
+    SetWindowTextW(s_mg->svLoving,s.lovingCode.c_str());
+    SetWindowTextW(s_mg->svEquiv, s.equivCode.c_str());
+    SetWindowTextW(s_mg->svSrvId, s.serviceId.c_str());
+    SetWindowTextW(s_mg->svRevGrp,s.revenueGroup.c_str());
+    SetWindowTextW(s_mg->svHnId,  s.healthNationalId.c_str());
+    { std::wstring f=formatMoney(s.priceFree);     SetWindowTextW(s_mg->svFree,   f.c_str()); }
+    { std::wstring g=formatMoney(s.priceGov);      SetWindowTextW(s_mg->svGov,    g.c_str()); }
+    { std::wstring fo=formatMoney(s.priceFreeOld); SetWindowTextW(s_mg->svFreeOld,fo.c_str()); }
+    { std::wstring go=formatMoney(s.priceGovOld);  SetWindowTextW(s_mg->svGovOld, go.c_str()); }
+    // department combo by sectionId: build the «parent ← sub» label for the
+    // matching section (or its plain name) and select that combo entry.
     if(s_mg->svDept){
-        int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0), sel=0;
-        for(int i=0;i<n;i++){ wchar_t b[128]={0};
-            SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
-            if(s.dept==b){ sel=i; break; } }
+        int sel=0;
+        if(s.sectionId>0){
+            std::vector<Section> secs; Sections_All(secs);
+            std::wstring want;
+            for(const auto& sec:secs){
+                if(sec.id!=s.sectionId) continue;
+                want=sec.name_fa;
+                if(sec.parent_id>0){
+                    for(const auto& p:secs)
+                        if(p.id==sec.parent_id){ want=p.name_fa+L" ← "+sec.name_fa; break; }
+                }
+                break;
+            }
+            if(!want.empty()){
+                int n=(int)SendMessageW(s_mg->svDept,CB_GETCOUNT,0,0);
+                for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                    SendMessageW(s_mg->svDept,CB_GETLBTEXT,i,(LPARAM)b);
+                    if(want==b){ sel=i; break; } }
+            }
+        }
         SendMessageW(s_mg->svDept,CB_SETCURSEL,sel,0);
     }
     if(s_mg->svIns){
@@ -349,30 +462,109 @@ static ServiceDef mgServicesReadForm(){
     ServiceDef s;
     if(!s_mg) return s;
     wchar_t b[512]={0};
-    GetWindowTextW(s_mg->svCode,b,512);  s.code=trim(b);
-    GetWindowTextW(s_mg->svName,b,512);  s.name=trim(b);
-    GetWindowTextW(s_mg->svPrice,b,512); s.price=parseMoney(b);
+    GetWindowTextW(s_mg->svCode,b,512);   s.code=trim(b);
+    GetWindowTextW(s_mg->svName,b,512);   s.name=trim(b);
+    GetWindowTextW(s_mg->svPrice,b,512);  s.price=parseMoney(b);   // legacy base price
+    // v2.01 (Part C) fields
+    GetWindowTextW(s_mg->svShort,b,512);  s.shortName=trim(b);
+    GetWindowTextW(s_mg->svLoving,b,512); s.lovingCode=trim(b);
+    GetWindowTextW(s_mg->svEquiv,b,512);  s.equivCode=trim(b);
+    GetWindowTextW(s_mg->svSrvId,b,512);  s.serviceId=trim(b);
+    GetWindowTextW(s_mg->svRevGrp,b,512); s.revenueGroup=trim(b);
+    GetWindowTextW(s_mg->svHnId,b,512);   s.healthNationalId=trim(b);
+    // tariff money fields — parseMoney already strips thousand separators.
+    GetWindowTextW(s_mg->svFree,b,64);    s.priceFree   =parseMoney(b);
+    GetWindowTextW(s_mg->svGov,b,64);     s.priceGov    =parseMoney(b);
+    GetWindowTextW(s_mg->svFreeOld,b,64); s.priceFreeOld=parseMoney(b);
+    GetWindowTextW(s_mg->svGovOld,b,64);  s.priceGovOld =parseMoney(b);
     s.category.clear();
     s.dept.clear();
     s.insType.clear();
     s.desc.clear();
-    s.status = 1;   // always active
+    // department: resolve the selected «parent ← sub» label back to a sectionId.
+    s.sectionId=0;
+    if(s_mg->svDept){
+        int sel=(int)SendMessageW(s_mg->svDept,CB_GETCURSEL,0,0);
+        if(sel>0){
+            wchar_t lb[128]={0}; SendMessageW(s_mg->svDept,CB_GETLBTEXT,sel,(LPARAM)lb);
+            std::wstring label=lb;
+            std::vector<Section> secs; Sections_All(secs);
+            for(const auto& sec:secs){
+                if(!sec.is_active) continue;
+                std::wstring lab=sec.name_fa;
+                if(sec.parent_id>0){
+                    for(const auto& p:secs)
+                        if(p.id==sec.parent_id){ lab=p.name_fa+L" ← "+sec.name_fa; break; }
+                }
+                if(lab==label){ s.sectionId=sec.id; break; }
+            }
+        }
+    }
+    // status combo (فعال / غیرفعال)
+    s.status = 1;
+    if(s_mg->svStatus){
+        int sel=(int)SendMessageW(s_mg->svStatus,CB_GETCURSEL,0,0);
+        if(sel==1) s.status=0;
+    }
     return s;
 }
 //  «ذخیره» — insert a new service or update the one loaded in the form.
 static void mgServicesSave(HWND h){
     if(!s_mg) return;
     ServiceDef s=mgServicesReadForm();
+    // ---- required-field validation (v2.01 Part C) ----
+    if(s.shortName.empty()){
+        s_mg->msg=L"نام اختصار الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    if(s.name.empty()){
+        s_mg->msg=L"نام کامل الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    if(s.code.empty()){
+        s_mg->msg=L"کد خدمت الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // code must be unique (exclude the record currently loaded for editing)
+    for(const auto& e:s_mg->svAll){
+        if(!s_mg->svEditCode.empty() && e.code==s_mg->svEditCode) continue;
+        if(e.code==s.code){
+            s_mg->msg=L"این کد خدمت تکراری است."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // ---- historical-rate migration (قدیم) ----
+    // When the operator changes «نرخ آزاد» / «نرخ دولتی» and the matching قدیم
+    // box is still empty, offer to archive the previous value there.
+    const ServiceDef* prev=nullptr;
+    for(const auto& e:s_mg->svAll) if(e.code==s_mg->svEditCode){ prev=&e; break; }
+    if(prev){
+        if(s.priceFree!=prev->priceFree && s.priceFreeOld==0 && prev->priceFree!=0){
+            if(MessageBoxW(h,L"نرخ آزاد تغییر کرد. مقدار قبلی به «نرخ آزاد قدیم» منتقل شود؟",
+                L"بایگانی نرخ قدیم",MB_YESNO|MB_ICONQUESTION)==IDYES)
+                s.priceFreeOld=prev->priceFree;
+        }
+        if(s.priceGov!=prev->priceGov && s.priceGovOld==0 && prev->priceGov!=0){
+            if(MessageBoxW(h,L"نرخ دولتی تغییر کرد. مقدار قبلی به «نرخ دولتی قدیم» منتقل شود؟",
+                L"بایگانی نرخ قدیم",MB_YESNO|MB_ICONQUESTION)==IDYES)
+                s.priceGovOld=prev->priceGov;
+        }
+    }
     std::wstring err; bool ok;
     if(!s_mg->svEditCode.empty() && s.code==s_mg->svEditCode){
-        // EDIT: preserve the hidden columns from the existing record so an old
-        // service that already carried a category/dept/insurance/description
-        // does not silently lose them just because the form no longer shows them.
+        // EDIT: preserve the hidden/legacy columns from the existing record so a
+        // service that already carried a category/dept/insurance/description or
+        // the professional tariff columns does not silently lose them. Status is
+        // now edited via the combo, so it is NOT overwritten here.
         for(const auto& e:s_mg->svAll){
             if(e.code==s.code){
                 s.category=e.category; s.dept=e.dept;
                 s.insType =e.insType;  s.desc=e.desc;
-                s.status  =e.status;   s.created=e.created;
+                s.created =e.created;
+                s.insName=e.insName; s.multiplier=e.multiplier;
+                s.priceFreeNew=e.priceFreeNew; s.priceGovNew=e.priceGovNew;
+                s.priceIns=e.priceIns; s.priceInsNew=e.priceInsNew;
+                s.extra=e.extra;
                 break;
             }
         }
@@ -441,6 +633,13 @@ static void mgDocsRefreshChecks(){
     // v1.78.0: «تعریف به عنوان انجام دهنده» toggle (default بله)
     if(s_mg->dcPerfChk)
         SetWindowTextW(s_mg->dcPerfChk, s_mg->dcPerfVal?L"\u2611 بله":L"\u2610 خیر");
+    // v2.01 (Part B): complementary option checkboxes
+    if(s_mg->dcSiteChk)
+        SetWindowTextW(s_mg->dcSiteChk, s_mg->dcSiteVal?L"\u2611 بله":L"\u2610 خیر");
+    if(s_mg->dcOnlineChk)
+        SetWindowTextW(s_mg->dcOnlineChk, s_mg->dcOnlineVal?L"\u2611 بله":L"\u2610 خیر");
+    if(s_mg->dcAnesChk)
+        SetWindowTextW(s_mg->dcAnesChk, s_mg->dcAnesVal?L"\u2611 بله":L"\u2610 خیر");
 }
 static void mgDocsFilter(){
     if(!s_mg) return;
@@ -464,8 +663,10 @@ static void mgDocsFilter(){
         InvalidateRect(s_mg->dcList,NULL,FALSE);
     }
 }
-//  (Re)load doctors + repopulate the department combo from the live section
-//  list, then re-apply the filter and refresh the table.
+//  (Re)load doctors + repopulate the department combo from the live SECTION
+//  tree (sections.dat with subsections), then re-apply the filter and refresh
+//  the table. v2.01 (Part B): switched from loadDepts() to Sections_All() so
+//  the doctor's «بخش» can be a section OR a subsection.
 static void mgDocsReload(){
     if(!s_mg) return;
     s_mg->dcAll=loadDoctors();
@@ -474,11 +675,24 @@ static void mgDocsReload(){
         std::wstring cur; { wchar_t b[128]={0}; GetWindowTextW(s_mg->dcDept,b,128); cur=b; }
         SendMessageW(s_mg->dcDept,CB_RESETCONTENT,0,0);
         SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)L"—");
-        auto cats=loadDepts();
-        for(auto&c:cats) SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)c.name.c_str());
+        // v2.01: enumerate sections + subsections from the live section tree.
+        std::vector<Section> secs; Sections_All(secs);
+        for(const auto& s : secs){
+            if(!s.is_active) continue;
+            std::wstring label=s.name_fa;
+            if(s.parent_id>0){
+                // subsection: prefix with parent name for clarity
+                for(const auto& p : secs)
+                    if(p.id==s.parent_id){ label=p.name_fa+L" ← "+s.name_fa; break; }
+            }
+            SendMessageW(s_mg->dcDept,CB_ADDSTRING,0,(LPARAM)label.c_str());
+        }
         int idx=0;
         if(!cur.empty()){
-            for(int i=0;i<(int)cats.size();++i) if(cats[i].name==cur){ idx=i+1; break; }
+            int n=(int)SendMessageW(s_mg->dcDept,CB_GETCOUNT,0,0);
+            for(int i=1;i<n;i++){ wchar_t b[128]={0};
+                SendMessageW(s_mg->dcDept,CB_GETLBTEXT,i,(LPARAM)b);
+                if(cur==b){ idx=i; break; } }
         }
         SendMessageW(s_mg->dcDept,CB_SETCURSEL,idx,0);
     }
@@ -507,6 +721,7 @@ static void mgDocsClearForm(){
     if(s_mg->dcContract) SendMessageW(s_mg->dcContract,CB_SETCURSEL,0,0);
     s_mg->dcActiveVal=true; s_mg->dcPrintVal=true;
     s_mg->dcPerfVal=true;              // v1.78.0: performer flag defaults ON for new doctors
+    s_mg->dcSiteVal=true; s_mg->dcOnlineVal=false; s_mg->dcAnesVal=false; // v2.01 Part B defaults
     s_mg->dcEditIdx=-1;
     mgDocsRefreshChecks();
 }
@@ -543,6 +758,7 @@ static void mgDocsLoadForm(const DoctorDef& d){
     }
     s_mg->dcActiveVal=d.active; s_mg->dcPrintVal=d.printOnReceipt;
     s_mg->dcPerfVal=d.isPerformer;   // v1.78.0: edit form round-trips the performer flag
+    s_mg->dcSiteVal=d.showOnSiteList; s_mg->dcOnlineVal=d.onlineAppointment; s_mg->dcAnesVal=d.isAnesthesiologist; // v2.01 Part B
     mgDocsRefreshChecks();
 }
 //  Read the form into a DoctorDef. The display `name` is composed from the
@@ -579,6 +795,7 @@ static DoctorDef mgDocsReadForm(){
     }
     d.active=s_mg->dcActiveVal; d.printOnReceipt=s_mg->dcPrintVal;
     d.isPerformer=s_mg->dcPerfVal;   // v1.78.0: the form owns the flag (no silent reset)
+    d.showOnSiteList=s_mg->dcSiteVal; d.onlineAppointment=s_mg->dcOnlineVal; d.isAnesthesiologist=s_mg->dcAnesVal; // v2.01 Part B
     std::wstring nm;
     if(!d.namePrefix.empty()) nm += d.namePrefix + L" ";
     if(!d.firstName.empty())  nm += d.firstName  + L" ";
@@ -586,20 +803,80 @@ static DoctorDef mgDocsReadForm(){
     d.name=trim(nm);
     return d;
 }
-//  «ذخیره» — insert a new doctor or update the one loaded in the form. Only the
-//  composed name is required (so a doctor is always identifiable); every other
-//  field is optional. On edit the existing `services` list is preserved.
+//  «ذخیره» — insert a new doctor or update the one loaded in the form.
+//  v2.01 (Part B2): full validation — required fields, national-ID checksum,
+//  mobile format, email format, duplicate docCode/medicalId/nationalId.
+//  On edit the existing `services` list is preserved.
 static void mgDocsSave(HWND h){
     if(!s_mg) return;
     DoctorDef d=mgDocsReadForm();
+    // Required: first name OR last name (so name is never empty).
     if(d.name.empty()){
-        s_mg->msg=L"حداقل نام پزشک را وارد کنید."; s_mg->msgCol=g_theme.danger;
+        s_mg->msg=L"نام و نام خانوادگی پزشک الزامی است."; s_mg->msgCol=g_theme.danger;
         InvalidateRect(h,NULL,TRUE); return;
     }
+    // Required: docCode (کد پزشک) — numeric, unique.
+    if(d.docCode.empty()){
+        s_mg->msg=L"کد پزشک الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    for(wchar_t c : d.docCode) if(c<L'0'||c>L'9'){
+        if(c>=L'\u06F0'&&c<=L'\u06F9') continue; // Persian digits OK
+        s_mg->msg=L"کد پزشک باید عددی باشد."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Required: medicalId (کد نظام پزشکی) — unique.
+    if(d.medicalId.empty()){
+        s_mg->msg=L"کد نظام پزشکی الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // National ID validation (if provided): 10 digits, checksum, unique.
+    if(!d.nationalId.empty()){
+        if(!validateNationalId(d.nationalId)){
+            s_mg->msg=L"کد ملی نامعتبر است."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // Mobile validation (if provided).
+    if(!d.mobile.empty() && !validateMobile(d.mobile)){
+        s_mg->msg=L"تلفن همراه نامعتبر است. (مثال: ۰۹۱۲۳۴۵۶۷۸۹)"; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Email validation (if provided).
+    if(!d.email.empty() && !validateEmail(d.email)){
+        s_mg->msg=L"ایمیل نامعتبر است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    // Franchise validation: numeric percentage 0-100 (if provided).
+    if(!d.franchise.empty()){
+        int f=_wtoi(d.franchise.c_str());
+        if(f<0||f>100){
+            s_mg->msg=L"فرانشیز باید عددی بین ۰ تا ۱۰۰ باشد."; s_mg->msgCol=g_theme.danger;
+            InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
+    // Duplicate checks against all other doctors.
+    int editIdx=s_mg->dcEditIdx;
+    for(int i=0;i<(int)s_mg->dcAll.size();++i){
+        if(i==editIdx) continue;
+        const DoctorDef& e=s_mg->dcAll[i];
+        if(!d.docCode.empty() && e.docCode==d.docCode){
+            s_mg->msg=L"کد پزشک تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+        if(!d.medicalId.empty() && e.medicalId==d.medicalId){
+            s_mg->msg=L"کد نظام پزشکی تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+        if(!d.nationalId.empty() && e.nationalId==d.nationalId){
+            s_mg->msg=L"کد ملی تکراری است. این کد برای پزشک «"+e.name+L"» ثبت شده است.";
+            s_mg->msgCol=g_theme.danger; InvalidateRect(h,NULL,TRUE); return;
+        }
+    }
     bool ok;
-    if(s_mg->dcEditIdx>=0 && s_mg->dcEditIdx<(int)s_mg->dcAll.size()){
-        d.services=s_mg->dcAll[s_mg->dcEditIdx].services;   // keep services list
-        s_mg->dcAll[s_mg->dcEditIdx]=d;
+    if(editIdx>=0 && editIdx<(int)s_mg->dcAll.size()){
+        d.services=s_mg->dcAll[editIdx].services;   // keep services list
+        s_mg->dcAll[editIdx]=d;
         ok=saveDoctors(s_mg->dcAll);
         if(ok){ s_mg->msg=L"پزشک «"+d.name+L"» ویرایش شد."; s_mg->msgCol=g_theme.success; }
     } else {
@@ -608,11 +885,13 @@ static void mgDocsSave(HWND h){
         if(ok){ s_mg->msg=L"پزشک «"+d.name+L"» اضافه شد."; s_mg->msgCol=g_theme.success; }
     }
     if(!ok){ s_mg->msg=L"ذخیرهٔ پزشک ناموفق بود."; s_mg->msgCol=g_theme.danger; }
-    else mgDocsClearForm();
+    else { mgDocsClearForm(); WebAdmission_NotifyCatalogChanged(); }
     mgDocsReload();
     InvalidateRect(h,NULL,TRUE);
 }
-//  «حذف» — delete the selected row (with confirm).
+//  «حذف» — delete the selected row (with confirm). v2.01 (Part B2): if the
+//  doctor is already used on an existing receipt/ticket, deletion is blocked
+//  with a clear explanation and the user is offered «غیرفعال کردن» instead.
 static void mgDocsDelete(HWND h){
     if(!s_mg || !s_mg->dcList) return;
     int sel=ListView_GetNextItem(s_mg->dcList,-1,LVNI_SELECTED);
@@ -620,14 +899,43 @@ static void mgDocsDelete(HWND h){
         s_mg->msg=L"ابتدا یک پزشک را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
         InvalidateRect(h,NULL,TRUE); return;
     }
-    const DoctorDef& d=s_mg->dcAll[s_mg->dcView[sel]];
+    int idx=s_mg->dcView[sel];
+    const DoctorDef& d=s_mg->dcAll[idx];
+    // Check if this doctor is used on any cashier ticket (by name).
+    bool inUse=false;
+    {
+        // Load tickets via Receipt_SearchJson by doctor name — but the simplest
+        // check is to scan cashier_tickets.dat for the doctor name. We use the
+        // public Receipt_SearchJson which returns JSON; an empty rows array
+        // means no usage.
+        ReceiptQuery rq; rq.doctor=d.name;
+        std::string result=Receipt_SearchJson(rq);
+        if(result.find("\"rows\":[")!=std::string::npos &&
+           result.find("\"rows\":[]")==std::string::npos)
+            inUse=true;
+    }
+    if(inUse){
+        std::wstring msg=L"پزشک «"+d.name+L"» در قبض‌های صادرشده استفاده شده است و قابل حذف نیست.\n"
+                         L"می‌توانید آن را غیرفعال کنید تا در پذیرش‌های جدید نمایش داده نشود.\n\n"
+                         L"آیا می‌خواهید این پزشک را غیرفعال کنید؟";
+        if(MessageBoxW(h,msg.c_str(),L"حذف ممکن نیست",MB_YESNO|MB_ICONQUESTION)==IDYES){
+            s_mg->dcAll[idx].active=false;
+            saveDoctors(s_mg->dcAll);
+            s_mg->msg=L"پزشک «"+d.name+L"» غیرفعال شد."; s_mg->msgCol=g_theme.success;
+            mgDocsClearForm();
+            mgDocsReload();
+            InvalidateRect(h,NULL,TRUE);
+        }
+        return;
+    }
     std::wstring q=L"حذف پزشک «"+d.name+L"»؟";
     if(MessageBoxW(h,q.c_str(),L"تأیید حذف",MB_YESNO|MB_ICONWARNING)!=IDYES) return;
-    s_mg->dcAll.erase(s_mg->dcAll.begin()+s_mg->dcView[sel]);
+    s_mg->dcAll.erase(s_mg->dcAll.begin()+idx);
     saveDoctors(s_mg->dcAll);
     s_mg->msg=L"پزشک حذف شد."; s_mg->msgCol=g_theme.success;
     mgDocsClearForm();
     mgDocsReload();
+    WebAdmission_NotifyCatalogChanged();
     InvalidateRect(h,NULL,TRUE);
 }
 //  «ویرایش» / double-click — load the selected row into the form.
@@ -1910,13 +2218,15 @@ enum {
     NE_E_FULL=3401, NE_E_USER, NE_E_PASS, NE_E_NID, NE_E_FATHER, NE_E_POS,
     NE_E_MOBILE, NE_E_LAND, NE_E_EMAIL, NE_E_SFROM, NE_E_STO, NE_E_HOURS,
     NE_E_HIRE, NE_E_ADDR, NE_E_EMPID, NE_E_UID, NE_CB_DEPT, NE_CB_ROLE,
+    NE_CB_SHIFT,    // v2.01 (Part F2): شیفت کاری combo
     NE_B_OK, NE_B_CANCEL, NE_CB_AUTOID, NE_B_PHOTO, NE_B_IDCARD
 };
 struct NewEmpState {
     HWND eFull,eUser,ePass,eNid,eFather,ePos,eMobile,eLand,eEmail,
          eSfrom,eSto,eHours,eHire,eAddr,eEmpId,eUid,cDept,cRole,bOk,bCancel,bAutoId,
-         bPhoto,bIdCard;
+         bPhoto,bIdCard,cShift;   // v2.01: cShift = شیفت کاری combo
     std::vector<DeptCat> depts;
+    std::vector<ShiftDef> shiftDefs;  // v2.01: shift definitions for the combo
     bool autoId;
     std::wstring photoPath, idCardPath;   // chosen image files (copied on save)
 };
@@ -1960,6 +2270,8 @@ static void neLayout(HWND h){
     row(s_nes->eFather,yR, rCol, rColL, fh);
     row(s_nes->cDept,  yR, rCol, rColL, S(200));
     row(s_nes->cRole,  yR, rCol, rColL, S(160));
+    // v2.01 (Part F2): «شیفت کاری» combo in the right column
+    row(s_nes->cShift, yR, rCol, rColL, S(200));
     row(s_nes->eMobile,yR, rCol, rColL, fh);
     // LEFT column
     row(s_nes->eEmpId, yL, lColR, lColL, fh);
@@ -2031,6 +2343,13 @@ static void neDoCreate(HWND h){
     u.dept=deptName;
     int roleSel=(int)SendMessageW(s_nes->cRole,CB_GETCURSEL,0,0);
     u.role=(roleSel==1)?1:0;
+    // v2.01 (Part F2): read the assigned shift from the combo.
+    int shiftSel=(int)SendMessageW(s_nes->cShift,CB_GETCURSEL,0,0);
+    if(shiftSel>0 && shiftSel-1<(int)s_nes->shiftDefs.size()){
+        u.shift=s_nes->shiftDefs[shiftSel-1].id;
+    } else {
+        u.shift=-1;  // not assigned
+    }
     std::wstring err;
     if(!addUser(u,err)){ MessageBoxW(h,err.c_str(),L"افزودن کارمند",MB_OK|MB_ICONERROR); return; }
     EmpProfile p; p.username=un; p.deptId=deptId;
@@ -2069,8 +2388,21 @@ static LRESULT CALLBACK neProc(HWND h, UINT m, WPARAM w, LPARAM l){
         SendMessageW(s_nes->eHire,EM_SETCUEBANNER,TRUE,(LPARAM)L"۱۴۰۴/۰۳/۲۸");
         s_nes->cDept=createThemedCombo(h,NE_CB_DEPT);
         s_nes->cRole=createThemedCombo(h,NE_CB_ROLE);
+        // v2.01 (Part F2): «شیفت کاری» combo — populated from shift definitions.
+        s_nes->cShift=createThemedCombo(h,NE_CB_SHIFT);
         SendMessageW(s_nes->cDept,WM_SETFONT,(WPARAM)g_fUI,TRUE);
         SendMessageW(s_nes->cRole,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        SendMessageW(s_nes->cShift,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        // Populate shift combo: «— انتخاب نشده —» then each shift def.
+        s_nes->shiftDefs=loadShiftDefs();
+        SendMessageW(s_nes->cShift,CB_ADDSTRING,0,(LPARAM)L"— انتخاب نشده —");
+        for(const auto& sd : s_nes->shiftDefs){
+            int sm=sd.startMin, em=sd.endMin;
+            wchar_t lbl[128]; swprintf(lbl,128,L"%s  (%02d:%02d - %02d:%02d)",
+                sd.name.c_str(), sm/60, sm%60, em/60, em%60);
+            SendMessageW(s_nes->cShift,CB_ADDSTRING,0,(LPARAM)lbl);
+        }
+        SendMessageW(s_nes->cShift,CB_SETCURSEL,0,0);
         s_nes->depts=loadDepts();
         for(auto&d:s_nes->depts) SendMessageW(s_nes->cDept,CB_ADDSTRING,0,(LPARAM)d.name.c_str());
         // preselect current section if any
@@ -2980,11 +3312,11 @@ static int  mgHeadH(){ return S(64); }      // content header height
 static const wchar_t* MG_NAV_LABELS[PG_COUNT] = {
     L"داشبورد", L"بیماران", L"بخش‌ها", L"مدیریت خدمات", L"پزشکان", L"کارمندان",
     L"پیام به کارمندان", L"درخواست‌ها", L"پیام‌های ذخیره‌شده",
-    L"پشتیبان‌گیری", L"تنظیمات چاپ"
+    L"پشتیبان‌گیری", L"تنظیمات چاپ", L"تعریف شیفت کاری"
 };
 static int MG_NAV_ICONS[PG_COUNT] = {
     ICO_TAB, ICO_ID, ICO_SHIELD, ICO_PLUS, ICO_CROSS_MED, ICO_USER, ICO_BELL,
-    ICO_GEAR, ICO_SAVE, ICO_REFRESH, ICO_GEAR
+    ICO_GEAR, ICO_SAVE, ICO_REFRESH, ICO_GEAR, ICO_CLOCK
 };
 //  content area to the LEFT of the RTL nav rail (rail is on the RIGHT)
 static RECT mgContentRect(HWND h){
@@ -3117,14 +3449,19 @@ static void mgLayout(HWND h){
         s_mg->eNote,s_mg->bNoteAttach,s_mg->bNoteSend,
         s_mg->ptSearch,s_mg->ptList,s_mg->ptAdd,
         s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svDept,s_mg->svPrice,
-        s_mg->svIns,s_mg->svStatus,s_mg->svDesc,s_mg->svSave,s_mg->svEdit,
+        s_mg->svIns,s_mg->svStatus,s_mg->svDesc,s_mg->svShort,s_mg->svLoving,
+        s_mg->svEquiv,s_mg->svSrvId,s_mg->svRevGrp,s_mg->svHnId,s_mg->svFree,
+        s_mg->svGov,s_mg->svFreeOld,s_mg->svGovOld,s_mg->svSave,s_mg->svEdit,
         s_mg->svDelete,s_mg->svClear,s_mg->svSearch,s_mg->svList,
         s_mg->dcDept,s_mg->dcType,s_mg->dcCode,s_mg->dcActiveChk,s_mg->dcMedId,
         s_mg->dcPrefix,s_mg->dcFirst,s_mg->dcLast,s_mg->dcNid,s_mg->dcMobile,
         s_mg->dcEmail,s_mg->dcAddress,s_mg->dcFranchise,s_mg->dcPrintChk,
         s_mg->dcSpec,s_mg->dcInsSpec,s_mg->dcDegree,s_mg->dcContract,s_mg->dcEmerg,
         s_mg->dcPerfChk,s_mg->dcAcct,s_mg->dcSave,s_mg->dcEdit,s_mg->dcDelete,s_mg->dcClear,
-        s_mg->dcSearch,s_mg->dcList};
+        s_mg->dcSearch,s_mg->dcList,
+        // v2.01 (Part F2): shift management controls
+        s_mg->shName,s_mg->shStart,s_mg->shEnd,s_mg->shSave,s_mg->shDelete,
+        s_mg->shClear,s_mg->shList};
     for(HWND w:all) if(w) ShowWindow(w,SW_HIDE);
 
     if(s_mg->page==PG_PATIENTS){
@@ -3204,40 +3541,57 @@ static void mgLayout(HWND h){
         ShowWindow(s_mg->bNoteSend,SW_SHOW);
     } else if(s_mg->page==PG_SERVICES){
         // ---- service-management form (top) + services table (fills rest) ----
-        //  Simplified (v1.49.0): the service form now has EXACTLY three fields —
-        //  «نام خدمت», «کد خدمت», «قیمت». Category / department / insurance /
-        //  status / description are gone from the UI; their controls are still
-        //  created (kept hidden) so the data layer and any legacy .dat records
-        //  keep working, but the operator only ever fills these three boxes.
+        //  v2.01 (Part C): the service form is now a full 4-column RTL grid
+        //  covering the whole service definition — بخش/زیربخش (combo), codes,
+        //  short + full names, tariffs (current نرخ آزاد/دولتی + قدیم), revenue
+        //  group and status (combo). The retired controls (svCat / svPrice /
+        //  svIns / svDesc) are kept (RULE 6) but stay hidden; svPrice still
+        //  mirrors s.price for backward compatibility with legacy billing data.
         int lh=S(20), fgap=S(14);
-        int formL=a.left+S(12), formR=rEdge;
-        int formW=formR-formL;
+        int formL=a.left+S(12), formR=rEdge, formW=formR-formL;
+        const int cols=4;
         int cgap=S(12);
-        int colW=(formW-2*cgap)/3;               // 3 columns (single row)
+        int colW=(formW-(cols-1)*cgap)/cols;
         auto cx=[&](int c){ return formR-(c+1)*colW-c*cgap; };  // RTL col left edge
-        int y=top+S(28);                          // room for the card title
-        // single row (RTL):  نام خدمت | کد خدمت | قیمت (ریال)
-        int r1c=y+lh;
-        MoveWindow(s_mg->svName,  cx(0), r1c, colW, fh, TRUE);
-        MoveWindow(s_mg->svCode,  cx(1), r1c, colW, fh, TRUE);
-        MoveWindow(s_mg->svPrice, cx(2), r1c, colW, fh, TRUE);
-        // action buttons row
-        int by=r1c+fh+fgap+S(4);
+        auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+fgap); };
+        int comboH=S(200);               // tall so the dropdown shows several rows
+        // Row 0: بخش/زیربخش (combo) | کد خدمت | نام اختصار | نام کامل
+        MoveWindow(s_mg->svDept,   cx(0), cy(0), colW, comboH, TRUE);
+        MoveWindow(s_mg->svCode,   cx(1), cy(0), colW, fh, TRUE);
+        MoveWindow(s_mg->svShort,  cx(2), cy(0), colW, fh, TRUE);
+        MoveWindow(s_mg->svName,   cx(3), cy(0), colW, fh, TRUE);
+        // Row 1: کد لوینگ | کد معادل | شناسه خدمت | کد ملی سلامت
+        MoveWindow(s_mg->svLoving, cx(0), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svEquiv,  cx(1), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svSrvId,  cx(2), cy(1), colW, fh, TRUE);
+        MoveWindow(s_mg->svHnId,   cx(3), cy(1), colW, fh, TRUE);
+        // Row 2: نرخ آزاد | نرخ دولتی | نرخ آزاد قدیم | نرخ دولتی قدیم
+        MoveWindow(s_mg->svFree,   cx(0), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svGov,    cx(1), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svFreeOld,cx(2), cy(2), colW, fh, TRUE);
+        MoveWindow(s_mg->svGovOld, cx(3), cy(2), colW, fh, TRUE);
+        // Row 3: گروه درآمد | وضعیت (combo)
+        MoveWindow(s_mg->svRevGrp, cx(0), cy(3), colW, fh, TRUE);
+        MoveWindow(s_mg->svStatus, cx(1), cy(3), colW, comboH, TRUE);
+        // action buttons row (right→left): ذخیره | ویرایش | حذف | فرم جدید
+        int by=cy(3)+fh+S(6);
         int bw=S(120), bgap=S(10), bx=formR;
         MoveWindow(s_mg->svSave,   bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svEdit,   bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svDelete, bx-bw, by, bw, S(40), TRUE); bx-=bw+bgap;
         MoveWindow(s_mg->svClear,  bx-bw, by, bw, S(40), TRUE);
-        // search box (left) below the form card
-        int listTop = by+S(40)+S(16);
-        int srchH=fh, srchTop=listTop;
-        int srchW=S(320);
+        // search box (left) below the form card + table fills the rest
+        int cardBot=by+S(40)+S(10);
+        int srchTop=cardBot+S(8), srchH=fh, srchW=S(320);
         MoveWindow(s_mg->svSearch, formL, srchTop, srchW, srchH, TRUE);
         int ly=srchTop+srchH+S(10);
         MoveWindow(s_mg->svList, formL, ly, formW, a.bottom-ly-S(8), TRUE);
-        // Only the three fields + action buttons + search + list are shown; the
-        // retired controls (svCat/svDept/svIns/svStatus/svDesc) stay hidden.
-        HWND show[]={s_mg->svName,s_mg->svCode,s_mg->svPrice,
+        // Only the new fields + dept/status combos + buttons + search + list are
+        // shown; the retired controls (svCat/svPrice/svIns/svDesc) stay hidden.
+        HWND show[]={s_mg->svDept,s_mg->svCode,s_mg->svShort,s_mg->svName,
+            s_mg->svLoving,s_mg->svEquiv,s_mg->svSrvId,s_mg->svHnId,
+            s_mg->svFree,s_mg->svGov,s_mg->svFreeOld,s_mg->svGovOld,
+            s_mg->svRevGrp,s_mg->svStatus,
             s_mg->svSave,s_mg->svEdit,s_mg->svDelete,s_mg->svClear,
             s_mg->svSearch,s_mg->svList};
         for(HWND w:show) if(w) ShowWindow(w,SW_SHOW);
@@ -3279,9 +3633,12 @@ static void mgLayout(HWND h){
         MoveWindow(s_mg->dcPrintChk, cx(1), cy(4), colW, fh, TRUE);
         MoveWindow(s_mg->dcAddress,  cx(2), cy(4), colW, fh, TRUE);
         MoveWindow(s_mg->dcAcct,     cx(3), cy(4), colW, fh, TRUE);
-        // v1.78.0 Row 5: تعریف به عنوان انجام دهنده (toggle) — own row so the
-        // six-row grid stays 4-up and the action buttons shift down one row.
-        MoveWindow(s_mg->dcPerfChk,  cx(0), cy(5), colW, fh, TRUE);
+        // v1.78.0 Row 5: four toggles (right→left):
+        //   تعریف به عنوان انجام دهنده | نمایش در لیست پزشکان سایت | نوبت‌دهی اینترنتی | پزشک بیهوشی
+        MoveWindow(s_mg->dcPerfChk,   cx(0), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcSiteChk,   cx(1), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcOnlineChk, cx(2), cy(5), colW, fh, TRUE);
+        MoveWindow(s_mg->dcAnesChk,   cx(3), cy(5), colW, fh, TRUE);
         // action buttons row (right→left): ذخیره | ویرایش | حذف | فرم جدید
         int by=cy(5)+fh+S(6);
         int bw=S(120), bgap=S(10), bx=formR;
@@ -3299,7 +3656,8 @@ static void mgLayout(HWND h){
             s_mg->dcPrefix,s_mg->dcFirst,s_mg->dcLast,s_mg->dcNid,s_mg->dcMobile,
             s_mg->dcEmail,s_mg->dcFranchise,s_mg->dcSpec,s_mg->dcInsSpec,
             s_mg->dcDegree,s_mg->dcContract,s_mg->dcEmerg,s_mg->dcActiveChk,
-            s_mg->dcPrintChk,s_mg->dcPerfChk,s_mg->dcAddress,s_mg->dcAcct,s_mg->dcSave,
+            s_mg->dcPrintChk,s_mg->dcPerfChk,s_mg->dcSiteChk,s_mg->dcOnlineChk,s_mg->dcAnesChk,
+            s_mg->dcAddress,s_mg->dcAcct,s_mg->dcSave,
             s_mg->dcEdit,s_mg->dcDelete,s_mg->dcClear,s_mg->dcSearch,s_mg->dcList};
         for(HWND w:show) if(w) ShowWindow(w,SW_SHOW);
     }
@@ -3345,6 +3703,7 @@ static const wchar_t* mgCardTitle(int page){
         case PG_SAVED: return L"پیام‌های ذخیره‌شده";
         case PG_BACKUP:return L"پشتیبان‌گیری و بازیابی";
         case PG_PRINTCFG: return L"تنظیمات چاپ بخش‌ها";
+        case PG_SHIFTS:  return L"تعریف شیفت کاری";
     }
     return L"";
 }
@@ -3925,12 +4284,12 @@ static void mgPaintServices(HDC dc, HWND h){
     int top=a.top+mgHeadH()+S(12);
     int lh=S(20), fgap=S(14);
     int formL=a.left+S(12), formR=rEdge, formW=formR-formL;
+    const int cols=4;
     int cgap=S(12);
-    int colW=(formW-2*cgap)/3;
+    int colW=(formW-(cols-1)*cgap)/cols;
     auto cx=[&](int c){ return formR-(c+1)*colW-c*cgap; };
-    int y=top+S(28);
-    int r1c=y+lh;                 // single field row
-    int by=r1c+fh+fgap+S(4);      // action-button row (right below the one row)
+    auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+fgap); };
+    int by=cy(3)+fh+S(6);
     int cardBot=by+S(40)+S(10);
     // ---- form card background ----
     RECT card={formL-S(4),top-S(2),formR+S(4),cardBot};
@@ -3945,10 +4304,14 @@ static void mgPaintServices(HDC dc, HWND h){
         RECT lr={x,ly,x+w,ly+S(16)};
         DrawTextW(dc,txt,-1,&lr,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
     };
-    // Exactly three labels, matching the three fields (RTL: name | code | price)
-    lbl(cx(0),r1c-lh,colW,L"نام خدمت");
-    lbl(cx(1),r1c-lh,colW,L"کد خدمت (خودکار در صورت خالی)");
-    lbl(cx(2),r1c-lh,colW,L"قیمت (ریال)");
+    // 4-column × 4-row grid of labels (RTL), matching the field layout exactly.
+    struct Lb{int r,c; const wchar_t* t;};
+    const Lb lbs[]={
+        {0,0,L"بخش/زیربخش"},{0,1,L"کد خدمت"},{0,2,L"نام اختصار"},{0,3,L"نام کامل"},
+        {1,0,L"کد لوینگ"},{1,1,L"کد معادل"},{1,2,L"شناسه خدمت"},{1,3,L"کد ملی سلامت"},
+        {2,0,L"نرخ آزاد"},{2,1,L"نرخ دولتی"},{2,2,L"نرخ آزاد قدیم"},{2,3,L"نرخ دولتی قدیم"},
+        {3,0,L"گروه درآمد"},{3,1,L"وضعیت"}};
+    for(const auto& lb:lbs) lbl(cx(lb.c),cy(lb.r)-lh,colW,lb.t);
     // ---- status message (below the buttons) ----
     if(!s_mg->msg.empty()){
         SelectObject(dc,g_fSmall); SetTextColor(dc,s_mg->msgCol);
@@ -3958,7 +4321,8 @@ static void mgPaintServices(HDC dc, HWND h){
     // ---- empty-state hint for the table ----
     if(s_mg->svView.empty()){
         SelectObject(dc,g_fUI); SetTextColor(dc,g_theme.textDim);
-        RECT er={formL,by+S(40)+S(70),formR,by+S(40)+S(110)};
+        int srchTop=cardBot+S(8), srchH=fh, lt=srchTop+srchH+S(10);
+        RECT er={formL,lt+S(30),formR,lt+S(70)};
         DrawTextW(dc,L"هنوز خدمتی ثبت نشده است — فرم بالا را پر کنید و «ذخیره» را بزنید.",
             -1,&er,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
     }
@@ -3972,6 +4336,101 @@ static void mgPaintServices(HDC dc, HWND h){
 //  the search row. The doctor TABLE itself is the LVS_OWNERDATA child (dcList),
 //  themed by applyThemedListView; it paints its own rows. Geometry mirrors the
 //  mgLayout PG_DOCS branch exactly so labels line up with their controls.
+// ============================================================================
+//  v2.01 (Part F2) — «تعریف شیفت کاری» shift management helpers (file scope)
+// ============================================================================
+static void mgShiftsReload(){
+    if(!s_mg) return;
+    s_mg->shAll=loadShiftDefs();
+    s_mg->shLoaded=true;
+    if(s_mg->shList){
+        ListView_SetItemCountEx(s_mg->shList,(int)s_mg->shAll.size(),
+            LVSICF_NOINVALIDATEALL|LVSICF_NOSCROLL);
+        InvalidateRect(s_mg->shList,NULL,FALSE);
+    }
+}
+static void mgShiftsClearForm(){
+    if(!s_mg) return;
+    SetWindowTextW(s_mg->shName,L"");
+    SetWindowTextW(s_mg->shStart,L"");
+    SetWindowTextW(s_mg->shEnd,L"");
+    s_mg->shEditId=-1;
+}
+static void mgShiftsSave(HWND h){
+    if(!s_mg) return;
+    wchar_t name[128]={0}, start[16]={0}, end[16]={0};
+    GetWindowTextW(s_mg->shName,name,128);
+    GetWindowTextW(s_mg->shStart,start,16);
+    GetWindowTextW(s_mg->shEnd,end,16);
+    std::wstring nm=trim(name);
+    if(nm.empty()){ s_mg->msg=L"نام شیفت الزامی است."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return; }
+    auto parseTime=[&](const wchar_t* s)->int{
+        std::wstring t=trim(s);
+        for(auto& c : t) if(c>=L'\u06F0'&&c<=L'\u06F9') c=L'0'+(c-L'\u06F0');
+        int hh=0,mm=0;
+        size_t cp=t.find(L':');
+        if(cp!=std::wstring::npos){ hh=_wtoi(t.substr(0,cp).c_str()); mm=_wtoi(t.substr(cp+1).c_str()); }
+        else { hh=_wtoi(t.c_str()); }
+        if(hh<0)hh=0; if(hh>23)hh=23; if(mm<0)mm=0; if(mm>59)mm=59;
+        return hh*60+mm;
+    };
+    int sm=parseTime(start), em=parseTime(end);
+    if(s_mg->shEditId>=0){
+        auto defs=loadShiftDefs();
+        for(auto& d : defs) if(d.id==s_mg->shEditId){
+            d.name=nm; d.startMin=sm; d.endMin=em;
+            saveShiftDefs(defs);
+            s_mg->msg=L"شیفت «"+nm+L"» ویرایش شد."; s_mg->msgCol=g_theme.success;
+            break;
+        }
+    } else {
+        int id=addShiftDef(nm,sm,em);
+        if(id<0){ s_mg->msg=L"افزودن شیفت ناموفق بود."; s_mg->msgCol=g_theme.danger; }
+        else { s_mg->msg=L"شیفت «"+nm+L"» اضافه شد."; s_mg->msgCol=g_theme.success; }
+    }
+    mgShiftsClearForm();
+    mgShiftsReload();
+    InvalidateRect(h,NULL,TRUE);
+}
+static void mgShiftsDelete(HWND h){
+    if(!s_mg || !s_mg->shList) return;
+    int sel=ListView_GetNextItem(s_mg->shList,-1,LVNI_SELECTED);
+    if(sel<0 || sel>=(int)s_mg->shAll.size()){
+        s_mg->msg=L"ابتدا یک شیفت را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    const ShiftDef& sd=s_mg->shAll[sel];
+    if(sd.id<3){
+        s_mg->msg=L"شیفت‌های پیش‌فرض (صبح، عصر، شب) قابل حذف نیستند."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    std::wstring q=L"حذف شیفت «"+sd.name+L"»؟";
+    if(MessageBoxW(h,q.c_str(),L"تأیید حذف",MB_YESNO|MB_ICONWARNING)!=IDYES) return;
+    deleteShiftDef(sd.id);
+    s_mg->msg=L"شیفت حذف شد."; s_mg->msgCol=g_theme.success;
+    mgShiftsClearForm();
+    mgShiftsReload();
+    InvalidateRect(h,NULL,TRUE);
+}
+static void mgShiftsEditSelected(HWND h){
+    if(!s_mg || !s_mg->shList) return;
+    int sel=ListView_GetNextItem(s_mg->shList,-1,LVNI_SELECTED);
+    if(sel<0 || sel>=(int)s_mg->shAll.size()){
+        s_mg->msg=L"ابتدا یک شیفت را از جدول انتخاب کنید."; s_mg->msgCol=g_theme.danger;
+        InvalidateRect(h,NULL,TRUE); return;
+    }
+    const ShiftDef& sd=s_mg->shAll[sel];
+    s_mg->shEditId=sd.id;
+    SetWindowTextW(s_mg->shName,sd.name.c_str());
+    wchar_t t[16];
+    swprintf(t,16,L"%02d:%02d",sd.startMin/60,sd.startMin%60);
+    SetWindowTextW(s_mg->shStart,toFaDigits(std::wstring(t)).c_str());
+    swprintf(t,16,L"%02d:%02d",sd.endMin/60,sd.endMin%60);
+    SetWindowTextW(s_mg->shEnd,toFaDigits(std::wstring(t)).c_str());
+    InvalidateRect(h,NULL,TRUE);
+    SetFocus(s_mg->shName);
+}
 static void mgPaintDocs(HDC dc, HWND h){
     if(!s_mg) return;
     RECT a=mgContentRect(h);
@@ -4021,7 +4480,10 @@ static void mgPaintDocs(HDC dc, HWND h){
         {2,0,L"تلفن همراه"},{2,1,L"ایمیل"},{2,2,L"فرانشیز"},{2,3,L"تخصص"},
         {3,0,L"تخصص بیمه"},{3,3,L"قرار پزشک اورژانس"},{3,2,L"نوع قرار داد"},{3,1,L"مدرک"},
         {4,0,L"وضعیت فعالیت"},{4,1,L"چاپ در قبض"},{4,2,L"آدرس"},{4,3,L"حسابداری"},
-        {5,0,L"تعریف به عنوان انجام دهنده"}};
+        {5,0,L"تعریف به عنوان انجام دهنده"},
+        {5,1,L"نمایش در لیست پزشکان سایت"},
+        {5,2,L"نوبت‌دهی اینترنتی"},
+        {5,3,L"پزشک بیهوشی"}};
     for(const Lb& lb:lbs) lbl(cx(lb.c),cy(lb.r)-lh,colW,lb.t);
     // ---- search row: box (left, child) + status / empty hint (right) ----
     int srchTop=cardBot+S(8), srchH=fh, srchW=S(320);
@@ -4036,6 +4498,67 @@ static void mgPaintDocs(HDC dc, HWND h){
         DrawTextW(dc, s_mg->dcAll.empty()?L"هنوز پزشکی ثبت نشده است":L"موردی یافت نشد",
             -1,&er,DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
     }
+}
+//  (Helper functions mgShiftsReload/Save/Delete/etc. are at file scope above.)
+// ============================================================================
+static void mgPaintShifts(HDC dc, HWND h){
+    if(!s_mg) return;
+    RECT a=mgContentRect(h);
+    if(!s_mg->shLoaded) mgShiftsReload();
+    // Form card (top section): title + fields.
+    int top=a.top+S(16), formW=a.right-a.left-S(48);
+    int fh=S(30), lh=S(24), gap=S(10), cgap=S(12);
+    int colW=(formW-3*cgap)/4;
+    auto cx=[&](int c){ return a.right-S(24)-(c+1)*colW-c*cgap; };
+    auto cy=[&](int row){ return top+S(28)+lh+row*(lh+fh+gap); };
+    int by=cy(0)+fh+S(6);
+    int cardBot=by+S(40)+S(10);
+    RECT card={a.left+S(20),top-S(2),a.right-S(24),cardBot};
+    gpShadow(dc,card,S(12),S(7),g_dark?58:40);
+    gpGradRoundRectBg(dc,card,S(12),g_theme.surfaceTop,g_theme.surface,g_theme.border,g_theme.bg);
+    // card title
+    int ttop=top+S(2), th=S(24), med=S(22), mcy=ttop+th/2;
+    RECT mdr={a.right-S(24)-med-S(4),mcy-med/2,a.right-S(24)-S(4),mcy+med/2};
+    gpRoundRectBg(dc,mdr,med/2,blendColor(g_theme.surface,g_infoAccent,g_dark?22:16),
+                  blendColor(g_theme.border,g_infoAccent,46),g_theme.surface);
+    { RECT ir={mdr.left+S(5),mdr.top+S(5),mdr.right-S(5),mdr.bottom-S(5)};
+      drawIcon(dc,ICO_CLOCK,ir,blendColor(g_infoAccent,g_theme.text,12),S(2)); }
+    SelectObject(dc,g_fSection); SetTextColor(dc,g_theme.sectionInk);
+    { RECT tr={a.left+S(30),ttop,mdr.left-S(10),ttop+th};
+      DrawTextW(dc,L"تعریف شیفت کاری",-1,&tr,
+        DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
+    // fade separator under title
+    { int sy=ttop+th, x0=a.left+S(30), x1=a.right-S(34), span=x1-x0;
+      if(span>0){ int seg=S(6); if(seg<2)seg=2;
+        for(int x=x0;x<x1;x+=seg){ int xe=x+seg; if(xe>x1)xe=x1;
+            int al=150-(140*(x1-x))/span; if(al<8)al=8; if(al>255)al=255;
+            gpLine(dc,x,sy,xe,sy,blendColor(g_theme.border,g_infoAccent,32),1.0f,al); } } }
+    // field labels
+    auto lbl=[&](int x,int ly,int w,const wchar_t* txt){
+        SelectObject(dc,g_fLabel); SetTextColor(dc,g_theme.labelInk);
+        RECT lr={x,ly,x+w,ly+S(16)};
+        DrawTextW(dc,txt,-1,&lr,DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
+    };
+    lbl(cx(0),cy(0)-lh,colW,L"نام شیفت");
+    lbl(cx(1),cy(0)-lh,colW,L"ساعت شروع");
+    lbl(cx(2),cy(0)-lh,colW,L"ساعت پایان");
+    // action buttons row
+    MoveWindow(s_mg->shSave,  cx(0), by, colW, S(36), TRUE); ShowWindow(s_mg->shSave,SW_SHOW);
+    MoveWindow(s_mg->shDelete,cx(1), by, colW, S(36), TRUE); ShowWindow(s_mg->shDelete,SW_SHOW);
+    MoveWindow(s_mg->shClear, cx(2), by, colW, S(36), TRUE); ShowWindow(s_mg->shClear,SW_SHOW);
+    // status / empty hint
+    if(!s_mg->msg.empty()){
+        SelectObject(dc,g_fSmall); SetTextColor(dc,s_mg->msgCol);
+        RECT mr={a.left+S(30),by+S(40),a.right-S(34),by+S(40)+S(22)};
+        DrawTextW(dc,s_mg->msg.c_str(),-1,&mr,DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    }
+    // table below the form card
+    int srchTop=cardBot+S(8), ly=srchTop+S(10);
+    MoveWindow(s_mg->shList, a.left+S(20), ly, formW, a.bottom-ly-S(8), TRUE);
+    ShowWindow(s_mg->shList,SW_SHOW);
+    // Show/hide form fields
+    HWND show[]={s_mg->shName,s_mg->shStart,s_mg->shEnd};
+    for(HWND e:show) ShowWindow(e,SW_SHOW);
 }
 
 // ---- the dashboard shell: nav rail (right) + content card (left) -----------
@@ -4140,6 +4663,7 @@ static void mgPaintShell(HDC dc, HWND h){
             case PG_REQS:  mgPaintReqs(dc,h);  break;
             case PG_SAVED: mgPaintSaved(dc,h); break;
             case PG_BACKUP:mgPaintBackup(dc,h);break;
+            case PG_SHIFTS:mgPaintShifts(dc,h);break;
         }
         if(!s_mg->msg.empty()){
             SetTextColor(dc,s_mg->msgCol); SelectObject(dc,g_fSmall);
@@ -4203,6 +4727,7 @@ static void mgGoPage(HWND h, int page){
     else if(page==PG_PATIENTS){ mgPatientsLoadAsync(h); }
     else if(page==PG_SERVICES){ mgServicesClearForm(); mgServicesReload(); }
     else if(page==PG_DOCS){ mgDocsClearForm(); mgDocsReload(); }
+    else if(page==PG_SHIFTS){ mgShiftsClearForm(); mgShiftsReload(); }  // v2.01 Part F2
     // v1.69.0: replay the subtle dashboard entrance each time the dash is shown;
     // stop it (and the timer) whenever we navigate away.
     if(page==PG_DASH) mgDashAnimStart(h); else mgDashAnimStop(h);
@@ -4249,6 +4774,10 @@ static void mgBuildDocsPage(HWND h){
     // v1.78.0: «تعریف به عنوان انجام دهنده» toggle — same visual language as
     // the فعال / چاپ در قبض toggles, default ON.
     s_mg->dcPerfChk  =createFlatButton(h,MG_DC_PERF,  L"\u2611 بله",0,BS_OUTLINE,0,0,10,10);
+    // v2.01 (Part B): complementary option checkboxes
+    s_mg->dcSiteChk  =createFlatButton(h,MG_DC_SITE,  L"\u2611 بله",0,BS_OUTLINE,0,0,10,10);
+    s_mg->dcOnlineChk=createFlatButton(h,MG_DC_ONLINE,L"\u2610 خیر",0,BS_OUTLINE,0,0,10,10);
+    s_mg->dcAnesChk  =createFlatButton(h,MG_DC_ANES,  L"\u2610 خیر",0,BS_OUTLINE,0,0,10,10);
     s_mg->dcSave   =createFlatButton(h,MG_DC_SAVE,  L"ذخیره",  ICO_SAVE,  BS_PRIMARY,0,0,10,10);
     s_mg->dcEdit   =createFlatButton(h,MG_DC_EDIT,  L"ویرایش", ICO_GEAR,  BS_OUTLINE,0,0,10,10);
     s_mg->dcDelete =createFlatButton(h,MG_DC_DELETE,L"حذف",    ICO_TRASH, BS_DANGER, 0,0,10,10);
@@ -4269,6 +4798,34 @@ static void mgBuildDocsPage(HWND h){
             ListView_InsertColumn(s_mg->dcList,i,&lc); }
     }
     applyThemedListView(s_mg->dcList);
+    // v2.01 (Part F2): shift management page controls
+    {
+        DWORD es=WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL;
+        s_mg->shName  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_NAME,g_hInst,0);
+        s_mg->shStart =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_START,g_hInst,0);
+        s_mg->shEnd   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SH_END,g_hInst,0);
+        s_mg->shSave  =createFlatButton(h,MG_SH_SAVE,  L"ذخیره",ICO_SAVE,BS_PRIMARY,0,0,10,10);
+        s_mg->shDelete=createFlatButton(h,MG_SH_DELETE,L"حذف",ICO_TRASH,BS_DANGER,0,0,10,10);
+        s_mg->shClear =createFlatButton(h,MG_SH_CLEAR,L"فرم جدید",ICO_PLUS,BS_OUTLINE,0,0,10,10);
+        s_mg->shList  =CreateWindowExW(0,WC_LISTVIEWW,L"",
+            WS_CHILD|WS_TABSTOP|LVS_OWNERDATA|LVS_REPORT|LVS_SHOWSELALWAYS|LVS_SINGLESEL,
+            0,0,10,10,h,(HMENU)MG_SH_LIST,g_hInst,0);
+        ListView_SetExtendedListViewStyle(s_mg->shList,
+            LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER);
+        SendMessageW(s_mg->shList,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+        {   // RTL columns: # | نام شیفت | ساعت شروع | ساعت پایان
+            struct { const wchar_t* t; int w; } shcols[]={
+                {L"#",S(44)},{L"نام شیفت",S(200)},{L"ساعت شروع",S(120)},{L"ساعت پایان",S(120)} };
+            LVCOLUMNW lc={0}; lc.mask=LVCF_TEXT|LVCF_WIDTH|LVCF_FMT; lc.fmt=LVCFMT_RIGHT;
+            for(int i=0;i<4;i++){ lc.pszText=(LPWSTR)shcols[i].t; lc.cx=shcols[i].w;
+                ListView_InsertColumn(s_mg->shList,i,&lc); }
+        }
+        applyThemedListView(s_mg->shList);
+        HWND shEds[]={s_mg->shName,s_mg->shStart,s_mg->shEnd};
+        for(HWND e:shEds){ SendMessageW(e,WM_SETFONT,(WPARAM)g_fUI,TRUE); enableEnterNavigation(e); }
+        SendMessageW(s_mg->shStart,EM_SETCUEBANNER,TRUE,(LPARAM)L"HH:MM");
+        SendMessageW(s_mg->shEnd,EM_SETCUEBANNER,TRUE,(LPARAM)L"HH:MM");
+    }
     SendMessageW(s_mg->dcSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
     // type combo: پزشک / پرستار
     SendMessageW(s_mg->dcType,CB_ADDSTRING,0,(LPARAM)L"پزشک");
@@ -4356,6 +4913,17 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         s_mg->svDesc  =CreateWindowExW(0,L"EDIT",L"",
             WS_CHILD|WS_TABSTOP|ES_AUTOVSCROLL|ES_MULTILINE|WS_VSCROLL,
             0,0,10,10,h,(HMENU)MG_SV_DESC,g_hInst,0);
+        // v2.01 (Part C) service-definition fields
+        s_mg->svShort  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_SHORT, g_hInst,0);
+        s_mg->svLoving =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_LOVING,g_hInst,0);
+        s_mg->svEquiv  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_EQUIV, g_hInst,0);
+        s_mg->svSrvId  =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_SRVID, g_hInst,0);
+        s_mg->svRevGrp =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_REVGRP,g_hInst,0);
+        s_mg->svHnId   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_HNID,  g_hInst,0);
+        s_mg->svFree   =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_FREE,  g_hInst,0);
+        s_mg->svGov    =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_GOV,   g_hInst,0);
+        s_mg->svFreeOld=CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_FREEOLD,g_hInst,0);
+        s_mg->svGovOld =CreateWindowExW(0,L"EDIT",L"",es,0,0,10,10,h,(HMENU)MG_SV_GOVCOLD,g_hInst,0);
         s_mg->svSave  =createFlatButton(h,MG_SV_SAVE,  L"ذخیره",  ICO_SAVE, BS_PRIMARY,0,0,10,10);
         s_mg->svEdit  =createFlatButton(h,MG_SV_EDIT,  L"ویرایش", ICO_GEAR, BS_OUTLINE,0,0,10,10);
         s_mg->svDelete=createFlatButton(h,MG_SV_DELETE,L"حذف",    ICO_TRASH,BS_DANGER, 0,0,10,10);
@@ -4377,17 +4945,22 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         ListView_SetExtendedListViewStyle(s_mg->svList,
             LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER);
         SendMessageW(s_mg->svList,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-        {   // RTL columns (rightmost first): کد | نام | دسته | مبلغ | وضعیت | ویرایش
+        {   // RTL columns (rightmost first): ردیف | کد خدمات | کد معادل | نام اختصار |
+            // نام کامل | کد ملی خدمت | نرخ آزاد | نرخ دولتی
             struct { const wchar_t* t; int w; } cols[]={
-                {L"کد خدمت",S(90)},{L"نام خدمت",S(230)},{L"دسته",S(130)},
-                {L"مبلغ (ریال)",S(130)},{L"وضعیت",S(90)},{L"آخرین ویرایش",S(120)} };
+                {L"ردیف",S(50)},{L"کد خدمات",S(90)},{L"کد معادل",S(90)},
+                {L"نام اختصار",S(130)},{L"نام کامل",S(220)},{L"کد ملی خدمت",S(120)},
+                {L"نرخ آزاد",S(120)},{L"نرخ دولتی",S(120)} };
             LVCOLUMNW lc={0}; lc.mask=LVCF_TEXT|LVCF_WIDTH|LVCF_FMT; lc.fmt=LVCFMT_RIGHT;
-            for(int i=0;i<6;i++){ lc.pszText=(LPWSTR)cols[i].t; lc.cx=cols[i].w;
+            for(int i=0;i<8;i++){ lc.pszText=(LPWSTR)cols[i].t; lc.cx=cols[i].w;
                 ListView_InsertColumn(s_mg->svList,i,&lc); }
         }
         applyThemedListView(s_mg->svList);
         SendMessageW(s_mg->svSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
-        { HWND se[]={s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svPrice,s_mg->svDesc};
+        { HWND se[]={s_mg->svCode,s_mg->svName,s_mg->svCat,s_mg->svPrice,s_mg->svDesc,
+                     s_mg->svShort,s_mg->svLoving,s_mg->svEquiv,s_mg->svSrvId,
+                     s_mg->svRevGrp,s_mg->svHnId,s_mg->svFree,s_mg->svGov,
+                     s_mg->svFreeOld,s_mg->svGovOld};
           for(HWND e:se){ SendMessageW(e,WM_SETFONT,(WPARAM)g_fUI,TRUE); enableEnterNavigation(e); }
           HWND sc[]={s_mg->svDept,s_mg->svIns,s_mg->svStatus};
           for(HWND c:sc) SendMessageW(c,WM_SETFONT,(WPARAM)g_fUI,TRUE);
@@ -4518,12 +5091,14 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
                     const ServiceDef& s=s_mg->svAll[s_mg->svView[vi]];
                     static wchar_t cell[256];
                     switch(di->item.iSubItem){
-                        case 0: wcsncpy(cell,toFaDigits(s.code).c_str(),255); break;
-                        case 1: wcsncpy(cell,s.name.c_str(),255); break;
-                        case 2: wcsncpy(cell,s.category.c_str(),255); break;
-                        case 3: wcsncpy(cell,toFaDigits(formatMoney(s.price)).c_str(),255); break;
-                        case 4: wcsncpy(cell,s.status?L"فعال":L"غیرفعال",255); break;
-                        case 5: wcsncpy(cell,toFaDigits(s.modified).c_str(),255); break;
+                        case 0: wcsncpy(cell,toFaDigits(std::to_wstring(vi+1)).c_str(),255); break;            // ردیف
+                        case 1: wcsncpy(cell,toFaDigits(s.code).c_str(),255); break;                           // کد خدمات
+                        case 2: wcsncpy(cell,toFaDigits(s.equivCode).c_str(),255); break;                      // کد معادل
+                        case 3: wcsncpy(cell,s.shortName.c_str(),255); break;                                  // نام اختصار
+                        case 4: wcsncpy(cell,s.name.c_str(),255); break;                                       // نام کامل
+                        case 5: wcsncpy(cell,toFaDigits(s.healthNationalId).c_str(),255); break;               // کد ملی خدمت
+                        case 6: wcsncpy(cell,toFaDigits(formatMoney(s.priceFree)).c_str(),255); break;         // نرخ آزاد
+                        case 7: wcsncpy(cell,toFaDigits(formatMoney(s.priceGov)).c_str(),255); break;          // نرخ دولتی
                         default: cell[0]=0; break;
                     }
                     cell[255]=0; di->item.pszText=cell;
@@ -4554,6 +5129,29 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             }
             if(nh->code==NM_DBLCLK){ mgDocsEditSelected(h); return 0; }
         }
+        // v2.01 (Part F2): shift management table
+        if(nh && nh->hwndFrom==s_mg->shList){
+            if(nh->code==LVN_GETDISPINFOW){
+                NMLVDISPINFOW* di=(NMLVDISPINFOW*)l;
+                int vi=di->item.iItem;
+                if(vi>=0 && vi<(int)s_mg->shAll.size() && (di->item.mask & LVIF_TEXT)){
+                    const ShiftDef& sd=s_mg->shAll[vi];
+                    static wchar_t shcell[128];
+                    switch(di->item.iSubItem){
+                        case 0: wcsncpy(shcell,toFaDigits(std::to_wstring(vi+1)).c_str(),127); break;
+                        case 1: wcsncpy(shcell,sd.name.c_str(),127); break;
+                        case 2: { wchar_t t[16]; swprintf(t,16,L"%02d:%02d",sd.startMin/60,sd.startMin%60);
+                                 wcsncpy(shcell,toFaDigits(std::wstring(t)).c_str(),127); } break;
+                        case 3: { wchar_t t[16]; swprintf(t,16,L"%02d:%02d",sd.endMin/60,sd.endMin%60);
+                                 wcsncpy(shcell,toFaDigits(std::wstring(t)).c_str(),127); } break;
+                        default: shcell[0]=0; break;
+                    }
+                    shcell[127]=0; di->item.pszText=shcell;
+                }
+                return 0;
+            }
+            if(nh->code==NM_DBLCLK){ mgShiftsEditSelected(h); return 0; }
+        }
         break; }
     case WM_COMMAND:{
         if(!s_mg) return 0;
@@ -4571,6 +5169,10 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
             mgServicesFormatPriceLive();
             return 0;
         }
+        if(id==MG_SV_FREE && HIWORD(w)==EN_CHANGE){    mgServicesFormatFreeLive();    return 0; }
+        if(id==MG_SV_GOV && HIWORD(w)==EN_CHANGE){     mgServicesFormatGovLive();     return 0; }
+        if(id==MG_SV_FREEOLD && HIWORD(w)==EN_CHANGE){ mgServicesFormatFreeOldLive(); return 0; }
+        if(id==MG_SV_GOVCOLD && HIWORD(w)==EN_CHANGE){ mgServicesFormatGovOldLive();  return 0; }
         if(id==MG_DC_SEARCH && HIWORD(w)==EN_CHANGE){
             wchar_t b[256]={0}; GetWindowTextW(s_mg->dcSearch,b,256);
             s_mg->dcQuery=b; mgDocsFilter();
@@ -4594,6 +5196,17 @@ static LRESULT CALLBACK manageProc(HWND h, UINT m, WPARAM w, LPARAM l){
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
             case MG_DC_PERF:   s_mg->dcPerfVal=!s_mg->dcPerfVal;
                                mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_SITE:   s_mg->dcSiteVal=!s_mg->dcSiteVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_ONLINE: s_mg->dcOnlineVal=!s_mg->dcOnlineVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            case MG_DC_ANES:   s_mg->dcAnesVal=!s_mg->dcAnesVal;
+                               mgDocsRefreshChecks(); InvalidateRect(h,NULL,FALSE); return 0;
+            // v2.01 (Part F2): shift management command handlers
+            case MG_SH_SAVE:   mgShiftsSave(h); return 0;
+            case MG_SH_DELETE: mgShiftsDelete(h); return 0;
+            case MG_SH_CLEAR:  mgShiftsClearForm(); s_mg->msg.clear();
+                               InvalidateRect(h,NULL,TRUE); return 0;
         }
         if(id==MG_CB_DEPT && HIWORD(w)==CBN_SELCHANGE){
             int sel=(int)SendMessageW(s_mg->cDept,CB_GETCURSEL,0,0);
