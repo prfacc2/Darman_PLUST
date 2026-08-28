@@ -5645,6 +5645,21 @@ void Reception_OpenSvReport(){
     activateKind(h, TK_SVREPORT);
 }
 void Reception_CloseSvReport(){ closeActiveKind(TK_SVREPORT); }
+void Reception_CycleTab(){
+    HWND h=recWnd(); if(!h || !s_rd || s_rd->tabs.empty()) return;
+    int n=(int)s_rd->tabs.size();
+    int start=s_rd->active;
+    if(start<0) start=0;
+    for(int k=1;k<=n;k++){
+        int i=(start+k)%n;
+        TabPage* t=s_rd->tabs[i];
+        if(!t || t->detached) continue;
+        s_rd->active=i;
+        recLayoutTabs(h);
+        InvalidateRect(h,NULL,TRUE);
+        return;
+    }
+}
 // v1.89.0: dashboard app-icon actions — portal / new empty tab / fresh
 // admission (the «پذیرش بیمار» behaviour that used to live in the removed
 // header action bar: reuse an EMPTY tab if focused, else open a fresh one).

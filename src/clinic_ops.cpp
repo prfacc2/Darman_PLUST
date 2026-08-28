@@ -710,7 +710,14 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId,
     std::string tabs="[{\"id\":0,\"name\":\"\u0635\u0646\u062f\u0648\u0642 \u0646\u0631\u0641\u062a\u0647\u200c\u0647\u0627\",\"kind\":\"unpaid\"}";
     if(sc.supervisor){
         for(const auto& s:secs){
-            if(!s.is_active || s.parent_id!=0 || s.has_pos) continue;
+            if(!s.is_active || s.has_pos) continue;
+            if(s.parent_id==0 && !s.cashier_tab) continue;
+            if(s.parent_id!=0 && !s.cashier_tab) continue;
+            if(s.parent_id!=0){
+                bool parentCash=false;
+                for(const auto& p:secs) if(p.id==s.parent_id && p.cashier_tab) parentCash=true;
+                if(parentCash) continue;
+            }
             tabs+=",{\"id\":"+opsJnum(s.id)+",\"name\":"+opsJstr(s.name_fa)+",\"kind\":\"section\"}";
         }
     } else if(sc.homeSectionId>0 && !Sections_HasPos(sc.homeSectionId)){
@@ -739,7 +746,7 @@ std::string Cash_PageJson(const std::wstring& q, int tabSectionId,
             // صندوق = فقط پرداخت‌نشده‌ها (حتی در تب بخش)
             if(cashRemain(t)<=0) continue;
             if(tabSectionId<=0) inTab=true;
-            else inTab=(t.sectionId==tabSectionId);
+            else inTab=(t.sectionId==tabSectionId || t.subId==tabSectionId);
         }
         if(!inTab) continue;
         patients++;
@@ -1459,7 +1466,9 @@ std::string SvReport_Json(const SvReportQuery& q){
         }
         if(q.subId>0 && t.subId!=q.subId) continue;
         if(!q.doctorName.empty() && t.doctor!=q.doctorName) continue;
-        bool isPaid = (t.paid>0);
+        bool isPaid = (t.paid>0) || t.status==L"paid" || t.payMethod==L"free"
+                   || t.payMethod==L"cash" || t.payMethod==L"pos"
+                   || (!t.paidAt.empty() && t.paidAt!=L"0");
         if(q.payStatus==0 && isPaid) continue;
         if(q.payStatus==1 && !isPaid) continue;
 

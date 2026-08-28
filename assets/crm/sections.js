@@ -282,6 +282,14 @@
       };
       if (!payload.name) { Crm.toast('نام زیربخش الزامی است.', 'err'); return; }
       if (!payload.parentId) { Crm.toast('انتخاب بخش مربوطه الزامی است.', 'err'); return; }
+      if (payload.cashierTab) {
+        var pi, parent = null;
+        for (pi = 0; pi < rows.length; pi++) if (rows[pi].id === payload.parentId) { parent = rows[pi]; break; }
+        if (parent && parent.cashierTab && !(sub && sub.cashierTab)) {
+          Crm.toast('این بخش خودش «ثبت پذیرش در صندوق» دارد. زیربخش نمی‌تواند همزمان این تیک را داشته باشد.', 'err');
+          return;
+        }
+      }
       Crm.call('crm.sections.save', payload).then(function () {
         Crm.toast(adding ? 'زیربخش اضافه شد.' : 'زیربخش ویرایش شد.', 'ok');
         m.close(); loadSubs(host, '');

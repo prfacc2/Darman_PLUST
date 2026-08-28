@@ -1860,6 +1860,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
         if(msg.message==WM_KEYDOWN){
             HWND root=GetAncestor(msg.hwnd,GA_ROOT);
             if(root==g_hFrame){
+                if(msg.wParam==VK_TAB && (GetKeyState(VK_CONTROL)&0x8000)){
+                    Reception_CycleTab();
+                    continue;
+                }
                 if(msg.wParam==VK_F8){
                     SendMessageW(g_hFrame, WM_KEYDOWN, msg.wParam, msg.lParam);
                     continue;

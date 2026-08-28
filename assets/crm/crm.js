@@ -257,6 +257,11 @@
       if (n > 0) { badge.style.display = ''; badge.innerHTML = faDigits('' + n); }
       else badge.style.display = 'none';
     }
+    var mail = $('navMsgBtn');
+    if (mail && !mail._wired) {
+      mail._wired = true;
+      mail.onclick = function () { Crm.nav('messages'); };
+    }
     Crm.state.data = d;
   }
 

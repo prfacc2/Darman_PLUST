@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"2.04.0"
+#define APP_VERSION_W   L"2.05.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -615,6 +615,7 @@ void Reception_CloseQueue();
 void Reception_CloseReceipts();
 void Reception_ClosePortal();
 void Reception_ResetZoom();
+void Reception_CycleTab();   // v2.05: Ctrl+Tab — next C++ tab (RTL wrap)
 
 // ---------------------------------------------------------------- dialogs --
 // role: 0 پذیرش / 1 مدیریت / 2 admin (hidden, prf)

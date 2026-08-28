@@ -127,12 +127,21 @@
     if (typeof newOrient === "number") S.design.orientation = newOrient;
     var newDims = paperDims(S.design.paper, S.design.orientation);
     pushUndo();
-    // v1.99: always scale item x,y,w,h by newW/oldW and newH/oldH so the
-    // relative layout is kept. Print-side calcPscale still fits the authored
-    // design onto the physical printer paper.
-    reflowItems(oldDims[0], oldDims[1], newDims[0], newDims[1]);
+    // v2.05: the page rectangle must change with A4/A5/thermal. fitZoom made
+    // every size look the same. واکنش‌گرا still proportionally reflows items.
+    if (S.reflowOnResize) {
+      reflowItems(oldDims[0], oldDims[1], newDims[0], newDims[1]);
+    } else {
+      (S.design.items || []).forEach(function (it) {
+        if (it.w > newDims[0]) it.w = newDims[0];
+        if (it.h > newDims[1]) it.h = newDims[1];
+        if (it.x + it.w > newDims[0]) it.x = Math.max(0, newDims[0] - it.w);
+        if (it.y + it.h > newDims[1]) it.y = Math.max(0, newDims[1] - it.h);
+      });
+    }
     compactForNarrow(S.design);
-    renderAll(); fitZoom();
+    renderAll();
+    centerPaper();
   }
 
   /* ---------------------------------------------------------- app state --- */
@@ -2199,4 +2208,9 @@
     displayText: displayText, setTool: setTool, selectMany: selectMany,
     SVC_PLACEHOLDER_ROWS: SVC_PLACEHOLDER_ROWS
   };
+  document.addEventListener("contextmenu", function (e) {
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    return false;
+  }, false);
 })();

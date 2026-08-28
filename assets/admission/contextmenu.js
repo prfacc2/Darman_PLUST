@@ -152,14 +152,6 @@
     addItem('کپی', 'Ctrl+C', !!sel, function () { doExec('copy'); });
     addItem('برش', 'Ctrl+X', !!sel, function () { doExec('cut'); });
     addItem('چسباندن', 'Ctrl+V', text, function () { pasteInto(el); });
-    if (text) {
-      addSep();
-      addItem('انتخاب همه', 'Ctrl+A', true, function () {
-        try { el.focus(); el.select(); } catch (e) {}
-      });
-    }
-    addSep();
-    addItem('پاک کردن فیلدهای بیمار', 'F2', true, resetPatient);
 
     menu.style.display = 'block';
     /* position within viewport */

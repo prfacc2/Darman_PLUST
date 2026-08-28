@@ -7629,7 +7629,7 @@ body.surface-portal #portalDetail{
 .portal-bub-in .portal-bub-meta{text-align:left;}
 .portal-bub-out{text-align:right;}
 .portal-bub-out .portal-bub-txt{
-  background:linear-gradient(180deg,#2D5FE6 0%,#4570F0 100%);color:#fff;border:1px solid #2D5FE6;
+  background:#DCF8C6;color:#0D1B2A;border:1px solid #B6E09A;
   border-bottom-right-radius:4px;text-align:right;
 }
 .portal-bub-out .portal-bub-meta{text-align:right;color:#6B7C92;}
@@ -8099,7 +8099,9 @@ body.theme-dark .svr-loading-prog{background:#0D1218;}
 .svr-loading-fill{height:100%;width:0%;background:#2B48CC;}
 body.theme-dark .svr-loading-fill{background:#3B82F6;}
 .svr-pages{max-width:800px;margin:0 auto;}
-body.surface-svr .svr-pages{max-width:none;}
+body.surface-svr .svr-pages{max-width:80mm;margin:0 auto;padding:8px 4px;}
+.svr-block-dates{font-size:11px;text-align:center;margin-top:6px;color:#5C6B7E;}
+.svr-sheet{page-break-after:always;margin-bottom:18px;padding-bottom:12px;border-bottom:1px dashed #A8B5CC;}
 .svr-report-hdr{
   display:-ms-flexbox;display:flex;-ms-flex-pack:justify;justify-content:space-between;
   -ms-flex-align:center;align-items:center;margin-bottom:12px;

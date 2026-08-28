@@ -807,8 +807,8 @@
       sel.value = doc.name || '';
       sel.size = 1;
     }
-    if ($('doc2code') && (doc.code || doc.medicalId))
-      $('doc2code').value = toFa(doc.code || doc.medicalId);
+    if ($('doc2code') && (doc.medicalId || doc.code))
+      $('doc2code').value = toFa(doc.medicalId || doc.code);
     closeDocSuggest();
     refreshDoctorStats(doc.name || '');
   }
@@ -827,7 +827,7 @@
       if ((d.name || '') === nm) {
         applyDoctorRows($('doc2name'), rows, false);
         if ($('doc2name')) $('doc2name').value = nm;
-        if (box) box.value = toFa(d.code || d.medicalId || '');
+        if (box) box.value = toFa(d.medicalId || d.code || '');
         closeDocSuggest();
         collapseDoctorSelect();
         return;
@@ -905,7 +905,7 @@
     var rows = state.performers || [], i;
     for (i = 0; i < rows.length; i++) {
       if ((rows[i].name || '') === nm) {
-        box.value = toFa(rows[i].code || rows[i].medicalId || '');
+        box.value = toFa(rows[i].medicalId || rows[i].code || '');
         return;
       }
     }
@@ -938,7 +938,7 @@
           }
         }
         /* same convention as selectDoctor(): the 1-based list code fills the box */
-        box.value = toFa(d.code || d.medicalId || q);
+        box.value = toFa(d.medicalId || d.code || q);
       });
     };
     if (immediate) { run(); return; }
@@ -3636,15 +3636,14 @@
     var ta = $('portalReplyText'); if (!ta) return;
     var text = trimStr(ta.value);
     if (!text) { toast('متن پاسخ خالی است', 'err'); return; }
-    cashAsk('آیا مطمئن هستید پیام را ارسال می‌کنید؟', function () {
-      try {
-        Bridge.call('portal.message.reply', { idx: portal.detailIdx, text: text }).then(function () {
-          toast('پاسخ ارسال شد', 'ok');
-          ta.value = '';
-          portalLoad();
-        }, function () { toast('ارسال پاسخ ناموفق بود', 'err'); });
-      } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
-    });
+    try {
+      Bridge.call('portal.message.reply', { idx: portal.detailIdx, text: text }).then(function (r) {
+        if (r && r.ok === false) { toast(r.err || 'ارسال پاسخ ناموفق بود', 'err'); return; }
+        toast('پاسخ ارسال شد', 'ok');
+        ta.value = '';
+        portalLoad();
+      }).catch(function () { toast('ارسال پاسخ ناموفق بود', 'err'); });
+    } catch (e) { toast('ارسال پاسخ ناموفق بود', 'err'); }
   }
 
   /* open a full message in #portalDetail and mark it seen immediately (req. H).
@@ -3951,7 +3950,7 @@
     mono: false, repeatHdr: true, highlight: true,
     fontLarge: false, dense: false, excelMulti: false,
     building: false, buildToken: 0, wired: false,
-    debounceT: 0, watchdogT: 0, secRows: []
+    debounceT: 0, watchdogT: 0, secRows: [], perPage: 10
   };
   var svrPaperDims = { R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
 
@@ -4070,6 +4069,9 @@
     if (td && !td.value) td.value = today;
     if (!svr.wired) {
       svr.wired = true;
+      on($('svrPerPage'), 'change', function () {
+        svr.perPage = parseInt(($('svrPerPage') && $('svrPerPage').value) || '10', 10) || 10;
+      });
       on($('svrFiltersBtn'), 'click', function () { svrOpenFilters(); });
       on($('svrFilterClose'), 'click', function () { svrCloseFilters(); });
       on($('svrFilterBk'), 'click', function () { svrCloseFilters(); });
@@ -4144,9 +4146,7 @@
     if (!pages) return;
     pages.innerHTML = '';
     var hdr = document.createElement('div'); hdr.className = 'svr-report-hdr';
-    hdr.innerHTML = '<div class="svr-hdr-dates"><div>از تاریخ :  ' + svrEsc($('svrFrom') ? $('svrFrom').value : '') + '</div>'
-      + '<div>تا تاریخ :  ' + svrEsc($('svrTo') ? $('svrTo').value : '') + '</div></div>'
-      + '<div class="svr-hdr-count">(' + svrFa((d && d.totalRecords) || 0) + ')</div>';
+    hdr.innerHTML = '<div class="svr-hdr-count">(' + svrFa((d && d.totalRecords) || 0) + ')</div>';
     pages.appendChild(hdr);
   }
   function svrPaintFooter(pages, d) {
@@ -4183,11 +4183,21 @@
     }
     svrPaintShell(pages, d);
     var i = 0;
+    var per = svr.perPage || 10;
+    if ($('svrPerPage')) per = parseInt($('svrPerPage').value, 10) || per;
+    var sheet = null;
     function buildChunk() {
       if (token !== svr.buildToken) return;
       var chunk = 2;
       while (i < blocks.length && chunk > 0) {
-        pages.appendChild(svrBlockHtml(blocks[i], d));
+        if (!sheet || sheet.getAttribute('data-n') >= per) {
+          sheet = document.createElement('div');
+          sheet.className = 'svr-sheet';
+          sheet.setAttribute('data-n', '0');
+          pages.appendChild(sheet);
+        }
+        sheet.appendChild(svrBlockHtml(blocks[i], d));
+        sheet.setAttribute('data-n', String((+sheet.getAttribute('data-n') || 0) + 1));
         i++; chunk--;
       }
       var pct = 40 + Math.round(i / blocks.length * 55);
@@ -4232,6 +4242,8 @@
     html += '<td colspan="2" class="svr-total-cell">تعداد کل ' + svrFa(total) + '</td>';
     html += '<td colspan="2" class="svr-total-cell">پرداخت شده ' + svrFa(paidCount) + '</td>';
     html += '</tr></tfoot></table>';
+    html += '<div class="svr-block-dates">از تاریخ : ' + svrEsc($('svrFrom') ? $('svrFrom').value : '') +
+      ' &nbsp; تا تاریخ : ' + svrEsc($('svrTo') ? $('svrTo').value : '') + '</div>';
     div.innerHTML = html;
     return div;
   }

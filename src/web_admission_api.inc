@@ -625,11 +625,9 @@ static std::string performersJson(){
     for(size_t i=0;i<docs.size();++i){
         const auto& d=docs[i];
         if(!d.isPerformer) continue;
-        wchar_t cb[16]; swprintf(cb,16,L"%d",(int)i+1);
-        std::wstring dcode=cb;
         if(n++) o+=",";
         o+="{\"name\":"+jstr(d.name)+",\"specialty\":"+jstr(d.specialty)+
-           ",\"code\":"+jstr(dcode)+
+           ",\"code\":"+jstr(d.medicalId.empty()?d.docCode:d.medicalId)+
            ",\"medicalId\":"+jstr(d.medicalId)+
            ",\"isPerformer\":"+(d.isPerformer?std::string("true"):std::string("false"))+"}";
         if(n>=500) break;
@@ -795,14 +793,12 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             const auto& d=docs[i];
             if(onlyPerformers && !d.isPerformer) continue;
             if(!onlyPerformers && d.docType==1) continue;
-            wchar_t cb[16]; swprintf(cb,16,L"%d",(int)i+1);
-            std::wstring dcode=cb;
+            std::wstring dcode=d.medicalId.empty()?d.docCode:d.medicalId;
             bool hit;
             if(!code.empty())
-                // v1.74.0: when code is provided (numeric input), search by medical
-                // council ID and doc code — NOT just the doctor's list index.
-                hit = (dcode==code)
-                     || wcontains(d.medicalId,code) || wcontains(d.medicalId,normDigits(code))
+                // v2.05: never match the 1-based list index (that turned «456»
+                // into doctor #9). Search medical-council ID and doc code only.
+                hit = wcontains(d.medicalId,code) || wcontains(d.medicalId,normDigits(code))
                      || wcontains(d.docCode,code) || wcontains(d.docCode,normDigits(code))
                      || wcontains(d.name,code);
             else hit = q.empty() || wcontains(d.name,q) || wcontains(d.specialty,q)
@@ -1607,14 +1603,16 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return o;
     }
     if(verb=="portal.message.reply"){
-        // reply to the original sender (← پاسخ: prefix)
         double idx=0; jsonGetNumber(body,"idx",idx);
         std::string txt; jsonGetString(body,"text",txt);
+        if(txt.empty()) return "{\"ok\":false,\"err\":\"متن خالی است.\"}";
         auto msgs=loadMessages(g_session.user.username);
         std::reverse(msgs.begin(),msgs.end());
-        int i=(int)idx; if(i>=0&&i<(int)msgs.size()){
-            pushMessageT(g_session.user.username,msgs[i].from,L"↩ پاسخ: "+u82w(txt),KMSG_NORMAL);
-        }
+        int i=(int)idx;
+        if(i<0 || i>=(int)msgs.size()) return "{\"ok\":false,\"err\":\"پیام پیدا نشد.\"}";
+        std::wstring to=msgs[i].from;
+        if(to.empty()) to=L"*";
+        pushMessageT(g_session.user.username,to,L"↩ "+u82w(txt),KMSG_NORMAL);
         return "{\"ok\":true}";
     }
     if(verb=="portal.message.print"){

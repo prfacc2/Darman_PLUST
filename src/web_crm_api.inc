@@ -825,9 +825,7 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         o+="],\"totalUsers\":"+jnum((long long)us.size())+",\"depts\":[";
         auto ds=loadDepts();
         for(size_t i=0;i<ds.size();++i){ if(i)o+=","; o+=crmDeptJson(ds[i]); }
-        o+="]}";
-        // v1.80.0: the clinical sections tree too — the account pickers filter
-        // by بخش/زیربخش from it (personnel live there now).
+        o+="]";
         std::vector<Section> ss; Sections_All(ss);
         o+=",\"sects\":[";
         bool fs=true;
@@ -835,7 +833,7 @@ static std::string crmApi(const std::string& verb, const std::string& body){
             if(!fs)o+=","; fs=false;
             o+="{\"id\":"+jstr(std::to_wstring(s2.id))+",\"code\":"+jstr(s2.code)+
                ",\"name\":"+jstr(s2.name_fa)+",\"parentId\":"+jnum(s2.parent_id)+"}"; }
-        o+="]";
+        o+="]}";
         return o;
     }
     if(verb=="crm.employees.save"){
@@ -891,6 +889,10 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         // v1.80.0: «__none__» is honoured SERVER-side too, so the suspended
         // view never depends on the 200-row cap (client can't see past it).
         bool wantSuspended=(deptId==L"__none__");
+        // v2.05: empty query + no section → do not dump every person.
+        if(q.empty() && deptId.empty() && !wantSuspended){
+            return "{\"rows\":[],\"total\":0,\"needQuery\":true}";
+        }
         std::string o="{\"rows\":[";
         int n=0, total=0;
         for(auto& p:ps){

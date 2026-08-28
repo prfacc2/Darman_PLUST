@@ -1792,9 +1792,10 @@ enum PdSvcCol {
     PSC_PRICE,    // مبلغ واحد
     PSC_LINE,     // مبلغ کل سطر
     PSC_DISC,     // تخفیف
-    PSC_INS,      // سهم بیمه
-    PSC_PAT,      // سهم بیمار
+    PSC_INS,      // سهم بیمه / سهم پایه
+    PSC_PAT,      // سهم بیمار / پرداختی
     PSC_CAT,      // نوع خدمت
+    PSC_SUPP,     // سهم مکمل
     PSC_NONE
 };
 // Classify a header caption. Matching is substring based and tolerant of the
@@ -1822,6 +1823,7 @@ static PdSvcCol pdSvcColOf(const std::wstring& labIn, int idx){
     if(has(L"تعداد")||has(L"مقدار")||L==L"تع")            return PSC_QTY;
     if(has(L"ردیف")||has(L"شماره")||L==L"ر")              return PSC_ROW;
     if(L==L"#"||L==L"№"||L==L"#")                        return PSC_ROW; // v1.96.0 row-no col
+    if(has(L"سهممکمل")||has(L"مکمل"))                      return PSC_SUPP;
     if(has(L"سهمبیمه")||has(L"سهمپایه")||has(L"بیمه"))    return PSC_INS;
     if(has(L"سهمبیمار")||has(L"پرداختی"))                 return PSC_PAT;
     if(has(L"تخفیف"))                                     return PSC_DISC;
@@ -1894,6 +1896,7 @@ static std::wstring pdSvcCellValue(PdSvcCol kind, const ServiceLine& s, int rowI
         case PSC_DISC:  return s.discount>0? toFaDigits(formatMoney(s.discount)) : std::wstring(L"—");
         case PSC_INS:   return toFaDigits(formatMoney(s.insShare));
         case PSC_PAT:   return toFaDigits(formatMoney(s.patShare));
+        case PSC_SUPP:  return L"—";
         case PSC_CAT:   return s.category.empty()? std::wstring(L"—") : s.category;
         default:        return L"";
     }
@@ -2476,9 +2479,9 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     // This is what fixes the print-dialog fallback path where the DC paper differs
     // from d.paper. When paper == authored size (normal A4 case) scale == 1 and
     // nothing changes. No schema change: authored size is inferred from extents.
-    double authW=d.paperW, authH=d.paperH;
-    for(const auto& it:d.items){ double ex=it.x+it.w; if(ex>authW)authW=ex;
-                                  double ey=it.y+it.h; if(ey>authH)authH=ey; }
+    // v2.05: authored space is the design paper, not the item bounding box.
+    // Expanding to item extents made A5 prints shrink as if they were still A4.
+    double authW=d.paperW>0?d.paperW:210, authH=d.paperH>0?d.paperH:297;
     double pscale=1.0;
 
     int dpiX=GetDeviceCaps(dc,LOGPIXELSX), dpiY=GetDeviceCaps(dc,LOGPIXELSY);

@@ -538,4 +538,16 @@
   global.AzPerf = AzPerf;
   if (!global.Bridge) global.Bridge = AzBridge;
 
+  /* v2.05: browser context menu → copy / cut / paste only */
+  (function () {
+    function onCtx(e) {
+      e = e || global.event;
+      if (e.preventDefault) e.preventDefault();
+      e.returnValue = false;
+      return false;
+    }
+    if (doc.addEventListener) doc.addEventListener('contextmenu', onCtx, false);
+    else if (doc.attachEvent) doc.attachEvent('oncontextmenu', onCtx);
+  })();
+
 })(window);

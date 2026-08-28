@@ -200,6 +200,10 @@
       var rows = d.rows || [];
       var box = Crm.$('accPersonList');
       if (!box) return;
+      if (d.needQuery) {
+        box.innerHTML = '<div class="crm-empty-line">برای دیدن پرسنل، بخش را انتخاب کنید یا نام / کد پرسنلی / کد ملی را جستجو کنید.</div>';
+        return;
+      }
       if (!rows.length) {
         box.innerHTML = '<div class="crm-empty-line">پرسنلی یافت نشد — ابتدا در «تعریف پرسنل» معرفی کنید.</div>';
         return;
