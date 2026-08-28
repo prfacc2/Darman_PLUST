@@ -123,7 +123,7 @@ bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out);
 bool Receipt_Cancel(const std::wstring& id, const std::wstring& reason, std::wstring& err);
 std::string Receipt_SectionsJson();
 
-// v2.01 (Part D): «به تفکیک خدمات» — per-service breakdown report.
+// v2.02: «تفکیک خدمات» — per-service breakdown report.
 // Filters: fromJalali/toJalali (YYYY/MM/DD), shiftId (-1=all), sectionId (-1=all),
 // doctorName (empty=all), serviceCode (empty=all), payStatus (-1=all, 0=unpaid, 1=paid)
 struct SvReportQuery {

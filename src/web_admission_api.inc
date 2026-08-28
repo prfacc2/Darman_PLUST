@@ -652,9 +652,9 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring mode=getSetting(L"reception.mode"+suffix,
                            getSetting(L"reception.mode",L"simple"));
         if(mode!=L"full") mode=L"simple";
-        // v2.01 (Part H): zoom is session-scoped — always reset to the fitted
-        // default (80%) on every page build. Never restore a persisted value.
-        int zoom=80;
+        // v2.02: zoom is session-scoped — always reset to 100% so the page
+        // fills the C++ host. Never restore a persisted value.
+        int zoom=100;
         o+="\"date\":"+jstr(adTodayJalali())+",";
         o+="\"time\":"+jstr(adNowTime())+",";
         o+="\"shift\":"+jstr(shiftName(g_session.shift))+",";
@@ -975,7 +975,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     }
     if(verb=="receipt.sections") return Receipt_SectionsJson();
 
-    // ---- v2.01 (Part D): «به تفکیک خدمات» report verbs ------------------
+    // ---- v2.02: «تفکیک خدمات» report verbs ------------------
     if(verb=="svreport.data"){
         SvReportQuery rq;
         std::string tmp;
@@ -1391,6 +1391,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="queue")   RunOnUiThread([](){ Reception_CloseQueue(); });
         else if(kind=="receipts") RunOnUiThread([](){ Reception_CloseReceipts(); });
         else if(kind=="portal")   RunOnUiThread([](){ Reception_ClosePortal(); });
+        else if(kind=="svreport") RunOnUiThread([](){ Reception_CloseSvReport(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }

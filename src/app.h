@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"2.01.0"
+#define APP_VERSION_W   L"2.02.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -604,7 +604,8 @@ void Reception_OpenQueue();
 void Reception_OpenReceipts();
 void Reception_OpenPortal();
 void Reception_OpenBlacklist();
-void Reception_OpenSvReport();   // v2.01: «به تفکیک خدمات» report
+void Reception_OpenSvReport();   // v2.02: «تفکیک خدمات» report
+void Reception_CloseSvReport();
 void Reception_OpenNewTab();
 void Reception_OpenAdmissionNew();
 void Reception_OpenAdmissionTicket(const std::string& ticketJson);

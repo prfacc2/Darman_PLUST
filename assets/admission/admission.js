@@ -87,7 +87,7 @@
     performers: [],        /* v1.78.0: cached «انجام دهنده» list (isPerformer doctors) */
     ps: { P: 0, S: 0 },
     mode: 'simple',
-    zoom: 80,
+    zoom: 100,
     overrideBlock: false,
     ready: false,
     formLocked: false,
@@ -1985,12 +1985,10 @@
       }
     });
 
-    /* v2.01 (Part H): Ctrl+scroll = zoom in/out. Session-scoped ONLY — NOT
-       persisted across sessions. Each tab keeps its own independent zoom
-       factor (each tab is a separate browser instance). All tabs reset to
-       the fitted default (80%) on the next login / app start. Discrete 5%
-       steps, clamped 50%–200%. Ctrl+0 resets to 80%. A brief indicator shows
-       the current zoom percentage while zooming. */
+    /* v2.02: Ctrl+scroll = zoom in/out. Session-scoped ONLY — NOT persisted.
+       Each tab keeps its own independent zoom (separate browser instance).
+       Default is 100% so the page fills the C++ host; other tabs are untouched.
+       Discrete 5% steps, clamped 50%–200%. Ctrl+0 resets to 100%. */
     on(document, 'wheel', function (e) {
       e = e || window.event;
       if (!e.ctrlKey) return;
@@ -2002,13 +2000,13 @@
       applyZoom(z);
       showZoomIndicator(z);
     });
-    /* v2.01 (Part H): Ctrl+0 = reset zoom to the fitted default (80%). */
+    /* v2.02: Ctrl+0 = reset zoom to 100% (fill the C++ host). */
     on(document, 'keydown', function (e) {
       e = e || window.event;
       if (e.ctrlKey && (e.keyCode === 48 || e.keyCode === 96)) {
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
-        applyZoom(80, true);
-        showZoomIndicator(80);
+        applyZoom(100, true);
+        showZoomIndicator(100);
       }
     });
   }
@@ -2045,7 +2043,7 @@
     function nudge() {
       var host = document.body; if (!host) return;
       host.style.zoom = '';
-      host.style.zoom = (state.zoom || 80) + '%';
+      host.style.zoom = (state.zoom || 100) + '%';
     }
     function onScroll() { if (t) clearTimeout(t); t = setTimeout(nudge, 150); }
     on(window, 'scroll', onScroll);
@@ -2077,25 +2075,39 @@
     return (b.offsetTop !== t) || (c.offsetTop !== t);
   }
   function applyZoom(z, force) {
-    var prev = state.zoom || 80;
+    var prev = state.zoom || 100;
     if (z < 50) z = 50; if (z > 200) z = 200;
     state.zoom = z;
-    /* v2.01 (Part H): zoom applies to document.body so it works on ALL
-       surfaces (admission, cashier, tools, dash, etc.), not just admission.
-       Each tab is a separate browser instance, so zoom is automatically
-       scoped to the active tab — other tabs keep their own zoom unchanged. */
+    /* v2.02: default 100% fills the C++ host with no side/bottom gap.
+       Zoom is per-tab (each tab is its own browser). At 100% we CLEAR zoom
+       and transform so the page is laid out at the host's real pixel size. */
     var host = document.body;
     if (!host) return true;
+    if (z === 100) {
+      host.style.zoom = '';
+      host.style.webkitTransform = '';
+      host.style.msTransform = '';
+      host.style.transform = '';
+      host.style.webkitTransformOrigin = '';
+      host.style.msTransformOrigin = '';
+      host.style.transformOrigin = '';
+      host.style.fontSize = '';
+      host.style.width = '100%';
+      host.style.height = '100%';
+      return true;
+    }
     host.style.zoom = z + '%';          /* primary: CSS zoom scales content in place */
     /* Detect whether `zoom` actually reflowed the element. Fall back to
        transform:scale() if the browser ignored zoom (some MSHTML builds). */
     var took = false;
     var sw = window.innerWidth, hw = document.documentElement.offsetWidth;
     if (sw && hw) took = Math.round(hw) !== Math.round(sw);
-    host.style.webkitTransformOrigin = 'top center';
-    host.style.msTransformOrigin = 'top center';
-    host.style.transformOrigin = 'top center';
-    if (took || z === 100) {
+    /* Anchor top-right for RTL so zoom-out does not invent a left/bottom
+       gutter the way `top center` did. */
+    host.style.webkitTransformOrigin = 'top right';
+    host.style.msTransformOrigin = 'top right';
+    host.style.transformOrigin = 'top right';
+    if (took) {
       host.style.webkitTransform = '';
       host.style.msTransform = '';
       host.style.transform = '';
@@ -2105,10 +2117,8 @@
       host.style.msTransform = 'scale(' + f + ')';
       host.style.transform = 'scale(' + f + ')';
     }
-    /* v2.01: UNZOOM READABILITY — only when zoomed OUT below the 80% default.
-       Nudge the body base font up a little so text stays legible even when
-       shrunk to fit all items. At >=80% the inline font is cleared. */
-    if (z < 80) {
+    /* UNZOOM READABILITY — only when zoomed OUT below 100%. */
+    if (z < 100) {
       var fsBump = z < 60 ? 3 : (z < 70 ? 2 : 1);
       host.style.fontSize = (14 + fsBump) + 'px';
     } else {
@@ -2123,9 +2133,9 @@
     return true;
   }
   function applySavedZoom(saved) {
-    /* v2.01 (Part H): always reset to the fitted default (80%) on load.
+    /* v2.02: always reset to 100% on load so the page fills the C++ host.
        Zoom is session-scoped — never restored from a persisted value. */
-    applyZoom(80, true);
+    applyZoom(100, true);
   }
   function applyMode(mode) {
     state.mode = mode === 'full' ? 'full' : 'simple';
@@ -3947,7 +3957,7 @@
   }
 
   /* =========================================================================
-     v2.01 (Part D) — «به تفکیک خدمات» per-service breakdown report
+     v2.02 — «تفکیک خدمات» per-service breakdown report
      Progressive loading, paper-size pagination, Excel export, live sync.
      ====================================================================== */
   var svr = {
@@ -4228,7 +4238,7 @@
     html += '</body></html>';
     var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     var url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = 'به_تفکیک_خدمات_' + (fromV || 'گزارش') + '.xls';
+    a.href = url; a.download = 'تفکیک_خدمات_' + (fromV || 'گزارش') + '.xls';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     toast('خروجی اکسل آماده شد', 'ok');
@@ -4510,7 +4520,7 @@
         }
         if (r.ps) updatePS(r.ps);
         applyMode(r.mode || 'simple');
-        if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
+        if (state.surface === 'admission') applySavedZoom(r.zoom || 100);
       }
       document.body.className = String(document.body.className || '')
         .replace(/\btheme-(dark|calm|warm|neon)\b/g, '').replace(/\s+/g, ' ');
@@ -4594,7 +4604,7 @@
         return;
       }
       if (state.surface === 'svreport') {
-        /* v2.01: «به تفکیک خدمات» — per-service breakdown report */
+        /* v2.02: «تفکیک خدمات» — per-service breakdown report */
         svReportInit();
         return;
       }

@@ -33,6 +33,25 @@ static AdView* adViewFor(HWND h){
     auto it=g_adViews.find(h); return it==g_adViews.end()?nullptr:it->second;
 }
 
+// v2.02: keep the Chromium composition locked to the host HWND. DefWindowProc
+// never called put_Bounds, so a later MoveWindow left پذیرش inset in the C++
+// container. Also pin ZoomFactor at 1 — CSS zoom (per tab) is the user control.
+static LRESULT CALLBACK wv2HostProc(HWND h, UINT m, WPARAM w, LPARAM l){
+    switch(m){
+    case WM_SIZE:{
+        AdView* v=adViewFor(h);
+        if(v && v->ctrl){
+            RECT rc; GetClientRect(h,&rc);
+            v->ctrl->put_Bounds(rc);
+            v->ctrl->put_ZoomFactor(1.0);
+        }
+        return 0;
+    }
+    case WM_ERASEBKGND: return 1;
+    }
+    return DefWindowProcW(h,m,w,l);
+}
+
 // ---- WebView2Loader.dll dynamic binding ------------------------------------
 static PFN_CreateWebView2Env         pCreateEnv=nullptr;
 static PFN_GetAvailableBrowserVersion pGetVer=nullptr;
@@ -271,6 +290,7 @@ struct CtrlHandler : public ICoreWebView2CreateCoreWebView2ControllerCompletedHa
 
         RECT bounds; GetClientRect(state->host,&bounds);
         hr=ctrl->put_Bounds(bounds);
+        if(SUCCEEDED(hr)) ctrl->put_ZoomFactor(1.0);
         // v2.00: keep the controller hidden until NavigateToString finishes so
         // the user never sees the WebView2 default black flash. The host HWND
         // is already painted with g_brBg.
@@ -416,7 +436,7 @@ static HWND WV2_CreateView(HWND parent){
     static bool cls=false;
     static const wchar_t* CLS=L"AzWebAdmissionHost";
     if(!cls){
-        WNDCLASSW wc={}; wc.lpfnWndProc=DefWindowProcW; wc.hInstance=g_hInst;
+        WNDCLASSW wc={}; wc.lpfnWndProc=wv2HostProc; wc.hInstance=g_hInst;
         wc.hCursor=LoadCursor(NULL,IDC_ARROW);
         wc.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);
         wc.lpszClassName=CLS;
@@ -484,9 +504,11 @@ static HWND WV2_CreateView(HWND parent){
 
 static void WV2_Resize(HWND view, int w, int h){
     AdView* v=adViewFor(view); if(!v||!v->ctrl) return;
+    if(w<1) w=1; if(h<1) h=1;
     MoveWindow(view,0,0,w,h,TRUE);
     RECT rc={0,0,w,h};
     v->ctrl->put_Bounds(rc);
+    v->ctrl->put_ZoomFactor(1.0);
 }
 
 static void WV2_PushEvent(const char* eventName, const std::string& jsonData){

@@ -126,8 +126,25 @@ enum TabKind {
     TK_RECEIPTS    = 6,   // v1.88: native «جستجوی قبض» web surface (was in-page)
     TK_DASH        = 7,   // v1.89: native «داشبورد» — the permanent landing tab
     TK_BLACKLIST   = 8,   // v1.94: لیست سیاه بیماران — HTML surface
-    TK_SVREPORT    = 9    // v2.01: «به تفکیک خدمات» — per-service breakdown report
+    TK_SVREPORT    = 9    // v2.02: «تفکیک خدمات» — per-service breakdown report
 };
+// v2.02: single map of tab kind → HTML surface name. Adding a new HTML tab
+// means one extra case here (plus title / ui.openTab kind). Kinds that return
+// nullptr (TK_EMPTY today) stay native-painted and never get a WebView.
+static const char* tabKindSurface(int kind){
+    switch(kind){
+    case TK_RECEPTION: return "admission";
+    case TK_TOOLS:     return "tools";
+    case TK_CASHIER:   return "cashier";
+    case TK_QUEUE:     return "queue";
+    case TK_RECEIPTS:  return "receipts";
+    case TK_DASH:      return "dash";
+    case TK_PORTAL:    return "portal";
+    case TK_BLACKLIST: return "blacklist";
+    case TK_SVREPORT:  return "svreport";
+    default:           return nullptr;
+    }
+}
 struct TabPage {
     HWND page;                // container window (child of reception)
     int  kind;                // TabKind
@@ -565,7 +582,7 @@ static int tabIconFor(int kind){
     if(kind==TK_RECEIPTS) return ICO_RECEIPT; // جستجوی قبض — receipt glyph
     if(kind==TK_DASH)    return ICO_HOME;     // داشبورد — home glyph
     if(kind==TK_BLACKLIST) return ICO_ID;     // لیست سیاه — national-id card glyph
-    if(kind==TK_SVREPORT) return ICO_RECEIPT; // به تفکیک خدمات — report glyph
+    if(kind==TK_SVREPORT) return ICO_RECEIPT; // تفکیک خدمات — report glyph
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
@@ -1221,9 +1238,13 @@ static void recUpdateScrollbar(HWND h, TabPage* t){
 static void tabPageLayout(HWND h, TabPage* t){
     if(!t) return;
     // §3 hybrid host: if the HTML/CSS/JS surface is up it owns the whole tab.
+    // v2.02: WebAdmission_Resize also updates the engine's composition bounds
+    // (WebView2 put_Bounds / MSHTML SetObjectRects). MoveWindow alone left the
+    // Chromium surface at its create-time size, so پذیرش looked tiny and
+    // centred inside the C++ host with gaps on the sides and bottom.
     if(t->web){
         RECT rc; GetClientRect(h,&rc);
-        MoveWindow(t->web,0,0,rc.right,rc.bottom,TRUE);
+        WebAdmission_Resize(t->web, rc.right, rc.bottom);
         return;
     }
     if(t->kind!=TK_RECEPTION) return;   // painted pages have no controls
@@ -2758,11 +2779,6 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // controls — they own no edit boxes, combos or buttons.
         //  v1.60.0: the appointment (نوبت‌دهی) child page branch was removed
         //  together with the whole feature.
-        if(t->kind!=TK_RECEPTION && t->kind!=TK_TOOLS && t->kind!=TK_CASHIER
-           && t->kind!=TK_QUEUE && t->kind!=TK_RECEIPTS && t->kind!=TK_DASH
-           && t->kind!=TK_PORTAL     // v1.93: portal now has an HTML surface
-           && t->kind!=TK_BLACKLIST) // v1.94: blacklist has an HTML surface
-            return 0;
         //  v1.33.0: PREFERRED renderer — «پذیرش بیمار» is rendered by an
         //  embedded WebView2 (Chromium) surface loaded from the in-app loopback
         //  host: the modern HTML/CSS/JS admission UI, fully two-way synced with
@@ -2775,23 +2791,21 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
         //  v1.84.0: tools / cashier / a receipt-backed پذیرش reuse the same
         //  inline page with a per-host surface inject. No GDI fallback for
         //  tools or cashier.
+        //  v2.02: HTML surfaces are driven by tabKindSurface() — TK_SVREPORT
+        //  used to miss the old allow-list, so the tab opened as a blank
+        //  painted page that looked like «تب جدید».
         t->web = NULL;
-        if(WebAdmission_Available()){
-            const char* surf="admission";
-            if(t->kind==TK_TOOLS) surf="tools";
-            else if(t->kind==TK_CASHIER) surf="cashier";
-            else if(t->kind==TK_QUEUE) surf="queue";
-            else if(t->kind==TK_RECEIPTS) surf="receipts";
-            else if(t->kind==TK_DASH) surf="dash";
-            else if(t->kind==TK_PORTAL) surf="portal";
-            else if(t->kind==TK_BLACKLIST) surf="blacklist";
-            else if(t->kind==TK_SVREPORT) surf="svreport";
-            HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
-            if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
+        if(const char* surf=tabKindSurface(t->kind)){
+            if(WebAdmission_Available()){
+                HWND wv = WebAdmission_CreateViewEx(h, surf, t->extraJson);
+                if(wv){ t->web = wv; return 0; }   // embedded UI owns the whole tab
+            }
+            // v1.89: TK_DASH also falls back to the native admission form, so a
+            // machine without WebView2 AND MSHTML still has a working پذیرش path.
+            if(t->kind!=TK_RECEPTION && t->kind!=TK_DASH) return 0;
+        } else {
+            return 0;   // TK_EMPTY: native painted blank page
         }
-        // v1.89: TK_DASH also falls back to the native admission form, so a
-        // machine without WebView2 AND MSHTML still has a working پذیرش path.
-        if(t->kind!=TK_RECEPTION && t->kind!=TK_DASH) return 0;
         // v1.25.0: ES_RIGHT so every textbox is right-aligned (راست‌چین) by
         // default — Persian RTL data entry. Fields with enableAutoDir still flip
         // alignment live based on typed content (Latin vs Persian).
@@ -4801,7 +4815,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_RECEIPTS)  t->title=L"جستجوی قبض";
     else if(kind==TK_DASH)      t->title=L"داشبورد";
     else if(kind==TK_BLACKLIST) t->title=L"لیست سیاه بیماران";
-    else if(kind==TK_SVREPORT) t->title=L"به تفکیک خدمات";
+    else if(kind==TK_SVREPORT) t->title=L"تفکیک خدمات";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5616,11 +5630,14 @@ void Reception_OpenBlacklist(){
     if(!h) return;
     activateKind(h, TK_BLACKLIST);
 }
-// v2.01 (Part D): «به تفکیک خدمات» — per-service breakdown report.
+// v2.02: «تفکیک خدمات» — per-service breakdown report (own HTML tab).
 void Reception_OpenSvReport(){
-    HWND h=recWnd(); if(!h) return;
+    HWND h=recWnd();
+    if(!h) h=createReceptionScreen(g_hFrame);
+    if(!h) return;
     activateKind(h, TK_SVREPORT);
 }
+void Reception_CloseSvReport(){ closeActiveKind(TK_SVREPORT); }
 // v1.89.0: dashboard app-icon actions — portal / new empty tab / fresh
 // admission (the «پذیرش بیمار» behaviour that used to live in the removed
 // header action bar: reuse an EMPTY tab if focused, else open a fresh one).
@@ -5648,9 +5665,9 @@ void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
 void Reception_CloseReceipts(){ closeActiveKind(TK_RECEIPTS); }
 void Reception_ClosePortal(){ closeActiveKind(TK_PORTAL); }
 void Reception_ResetZoom(){
-    // v2.01 (Part H): zoom is session-scoped — no longer persisted. Just push
-    // the reset event to all live views so each tab resets its own zoom.
-    WebAdmission_PushEvent("reception.settings", "{\"zoom\":80}");
+    // v2.02: zoom is session-scoped and defaults to 100% so the page fills
+    // the C++ host. Each tab is its own browser instance — reset is per-tab.
+    WebAdmission_PushEvent("reception.settings", "{\"zoom\":100}");
 }
 
 HWND createReceptionScreen(HWND frame){

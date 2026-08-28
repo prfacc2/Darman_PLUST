@@ -1388,7 +1388,7 @@ std::string OpsBackup_PickSave(){ return opsPickBak(true); }
 std::string OpsBackup_PickOpen(){ return opsPickBak(false); }
 
 // ===========================================================================
-//  v2.01 (Part D) — «به تفکیک خدمات» per-service breakdown report
+//  v2.02 — «تفکیک خدمات» per-service breakdown report
 // ===========================================================================
 
 // Parse a ticket's servicesJson into {code, name} pairs.

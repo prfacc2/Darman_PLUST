@@ -22,7 +22,7 @@
 }
 
 *{box-sizing:border-box;-ms-box-sizing:border-box;}
-html,body{height:100%;margin:0;padding:0;}
+html,body{width:100%;height:100%;margin:0;padding:0;}
 body{
   font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;
   /* Soft blue-grey gradient page so the white cards read as distinct panels
@@ -4607,6 +4607,36 @@ body.surface-tools .tools-appico{
   background:-webkit-linear-gradient(top,#60A5FA 0%,#2D5FE6 55%,#1D3AA8 100%);
   background:linear-gradient(180deg,#60A5FA 0%,#2D5FE6 55%,#1D3AA8 100%);
 }
+/* v2.02: report badge — NEVER white. Same family as search/cash/queue so the
+   «تفکیک خدمات» tile stays visible in light, dark and neon. */
+.tools-appico-report,
+.tools-drico.tools-appico-report{
+  color:#fff;
+  background:#7c3aed;
+  background:-webkit-linear-gradient(top,#c4b5fd 0%,#8b5cf6 48%,#6d28d9 100%);
+  background:linear-gradient(180deg,#c4b5fd 0%,#8b5cf6 48%,#6d28d9 100%);
+}
+body.theme-dark .tools-appico-report,
+body.theme-dark .tools-drico.tools-appico-report{
+  color:#fff;
+  background:#7c3aed;
+  background:-webkit-linear-gradient(top,#a78bfa 0%,#7c3aed 55%,#5b21b6 100%);
+  background:linear-gradient(180deg,#a78bfa 0%,#7c3aed 55%,#5b21b6 100%);
+}
+body.theme-neon .tools-appico-report,
+body.theme-neon .tools-drico.tools-appico-report{
+  color:#0A0E1A;
+  background:#00F0FF;
+  background:-webkit-linear-gradient(top,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
+  background:linear-gradient(180deg,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
+}
+body.surface-tools #toolsSvReport{
+  background:transparent;
+}
+body.theme-dark.surface-tools #toolsSvReport,
+body.theme-neon.surface-tools #toolsSvReport{
+  background:transparent;
+}
 body.surface-tools .tools-tile-name{display:block;font-size:15px;font-weight:900;color:#0D1B2A;}
 body.surface-tools .tools-tile-sub{display:block;margin-top:5px;font-size:11.5px;color:#4A5A72;}
 .tools-tile-go{
@@ -8000,7 +8030,7 @@ body.theme-neon.surface-rc .rc-tbl tbody tr:hover td{background:#152238;color:#0
 body.theme-neon.surface-rc .rc-tbl tbody tr.rc-sel td{background:#00F0FF;color:#0A0E1A;}
 
 /* ============================================================================
-   v2.01 (Part D) — «به تفکیک خدمات» SVREPORT surface
+   v2.02 — «تفکیک خدمات» SVREPORT surface
    Trident-safe: literal hex, no var(), no calc().
    ============================================================================ */
 .svr-panel{display:none;}
@@ -8125,3 +8155,37 @@ body.theme-dark .svr-settings-card{background:#151B25;border:1px solid #2C3645;}
 body.theme-dark .svr-settings-title{color:#E8EEF6;}
 .svr-settings-btns{display:-ms-flexbox;display:flex;-ms-flex-pack:end;justify-content:flex-end;}
 .btn-sm{font-size:12px;padding:4px 10px;min-height:28px;}
+
+/* neon — report surface must not fall through to the light (white) rules */
+body.theme-neon.surface-svr .svr-panel{background:#0A0E1A;}
+body.theme-neon .svr-toolbar{background:#121828;border-bottom:1px solid #2A3458;}
+body.theme-neon .svr-tb-lbl,body.theme-neon .svr-chk{color:#B0C4E0;}
+body.theme-neon .svr-pagecount{color:#00F0FF;}
+body.theme-neon .svr-loading{background:rgba(10,14,26,.95);}
+body.theme-neon .svr-loading-box{background:#121828;border:1px solid #2A3458;}
+body.theme-neon .svr-loading-text{color:#E0F0FF;}
+body.theme-neon .svr-block-title{background:#1A2238;border-color:#2A3458;color:#00F0FF;}
+body.theme-neon .svr-tbl{border-color:#2A3458;}
+body.theme-neon .svr-tbl th,body.theme-neon .svr-tbl td{border-color:#2A3458;color:#E0F0FF;}
+body.theme-neon .svr-tbl th{background:#1A2238;color:#00F0FF;}
+body.theme-neon .svr-tbl tbody tr:nth-child(even) td{background:#101828;}
+body.theme-neon .svr-tbl tbody tr:nth-child(odd) td{background:#0C121E;}
+body.theme-neon .svr-settings-card{background:#121828;border:1px solid #2A3458;}
+body.theme-neon .svr-settings-title{color:#E0F0FF;}
+
+/* v2.02 last-word: report badge is never white in any theme */
+body.surface-tools .tools-appico-report,
+body.theme-dark.surface-tools .tools-appico-report,
+body.theme-dark .tools-drico.tools-appico-report{
+  color:#fff !important;
+  background:#7c3aed;
+  background:-webkit-linear-gradient(top,#c4b5fd 0%,#8b5cf6 48%,#6d28d9 100%);
+  background:linear-gradient(180deg,#c4b5fd 0%,#8b5cf6 48%,#6d28d9 100%);
+}
+body.theme-neon.surface-tools .tools-appico-report,
+body.theme-neon .tools-drico.tools-appico-report{
+  color:#0A0E1A !important;
+  background:#00F0FF;
+  background:-webkit-linear-gradient(top,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
+  background:linear-gradient(180deg,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
+}
