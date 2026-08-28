@@ -344,7 +344,7 @@
   // DESIGN-TIME preview uses field tokens, never example service names
   // («ویزیت»). Print time still fills live ReceptionRecord.services.
   // v1.99: exactly TWO placeholder rows; every cell is a [token], never blank.
-  var SVC_PLACEHOLDER_ROWS = 2;
+  var SVC_PLACEHOLDER_ROWS = 1;
   function svcSample(kind, label) {
     switch (kind) {
       case PSC.NAME:  return "[نام خدمت]";
@@ -386,13 +386,15 @@
     var kinds = [];
     for (var k = 0; k < m.cols; k++) kinds.push(svcColOf(m.labels[k], k));
 
-    var hHpx = (it.headerH > 0) ? mm(it.headerH) : 0;
-    var rHpx = (it.rowH > 0) ? mm(it.rowH) : 0;
-    // v1.99: always two token placeholder rows — never pad the box with blanks.
+    var boxH = mm(it.h || 0);
+    var hHpx = (it.headerH > 0) ? mm(it.headerH) : Math.max(14, boxH * 0.16);
+    var rHpx = (it.rowH > 0) ? mm(it.rowH) : Math.max(12, Math.min(22, boxH - hHpx));
+    /* v2.03: match C++ preview — header + one data row, NEVER stretch the
+       table to 100% of the item box (that made HTML look much taller). */
     var nRows = SVC_PLACEHOLDER_ROWS;
 
     var html = "<table class='svc-tbl' style='font-size:" + ptPx(it.pt || 8.5) +
-      "px;color:" + ink + ";direction:rtl;table-layout:fixed;width:100%'>";
+      "px;color:" + ink + ";direction:rtl;table-layout:fixed;width:100%;height:auto'>";
     if (m.header) {
       html += "<tr" + (hHpx > 0 ? " style='height:" + hHpx.toFixed(2) + "px'" : "") + ">";
       for (var c = 0; c < m.cols; c++) {

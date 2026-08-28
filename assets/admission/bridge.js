@@ -160,7 +160,7 @@
     return true;
   }
 
-  function callWebView(verb, payload) {
+  function callWebView(verb, payload, timeoutMs) {
     var id = 'r' + (seq++);
     var d = new Deferred();
     pending[id] = d;
@@ -168,9 +168,11 @@
       global.chrome.webview.postMessage(
         { verb: verb, id: id, payload: payload || {} });
     } catch (e) { delete pending[id]; d.reject(e); return d.promise(); }
+    var ms = timeoutMs || 15000;
+    if (verb === 'svreport.data' && ms < 120000) ms = 120000;
     setTimeout(function () {
       if (pending[id]) { delete pending[id]; d.reject(new Error('timeout: ' + verb)); }
-    }, 15000);
+    }, ms);
     return d.promise();
   }
 
@@ -277,8 +279,8 @@
       if (!listeners[event]) listeners[event] = [];
       listeners[event].push(handler);
     },
-    call: function (verb, payload) {
-      if (transport === 'webview') return callWebView(verb, payload);
+    call: function (verb, payload, timeoutMs) {
+      if (transport === 'webview') return callWebView(verb, payload, timeoutMs);
       if (transport === 'external') return callExternal(verb, payload);
       if (transport === 'http' && allowHttp) return callHttp(verb, payload);
       var d = new Deferred();

@@ -1395,16 +1395,22 @@ std::string OpsBackup_PickOpen(){ return opsPickBak(false); }
 struct SvcLineLite { std::wstring code, name; };
 static std::vector<SvcLineLite> parseTicketServices(const std::wstring& js){
     std::vector<SvcLineLite> out;
+    if(js.empty() || js==L"[]") return out;
     size_t p=0;
     while(true){
         size_t c=js.find(L"\"code\":\"",p); if(c==std::wstring::npos) break;
         c+=8; size_t ce=js.find(L'"',c); if(ce==std::wstring::npos) break;
         SvcLineLite s; s.code=js.substr(c,ce-c);
-        size_t n=js.find(L"\"name\":\"",ce); if(n==std::wstring::npos) break;
-        n+=8; size_t ne=js.find(L'"',n); if(ne==std::wstring::npos) break;
-        s.name=js.substr(n,ne-n);
+        size_t n=js.find(L"\"name\":\"",ce);
+        if(n!=std::wstring::npos && n<ce+80){
+            n+=8; size_t ne=js.find(L'"',n);
+            if(ne!=std::wstring::npos){ s.name=js.substr(n,ne-n); p=ne+1; }
+            else { s.name=s.code; p=ce+1; }
+        } else {
+            s.name=s.code; p=ce+1;
+        }
+        if(s.name.empty()) s.name=s.code;
         out.push_back(s);
-        p=ne+1;
     }
     return out;
 }
@@ -1482,7 +1488,7 @@ std::string SvReport_Json(const SvReportQuery& q){
 
             ReportRow row;
             row.seq=_wtoi(t.turn.c_str());
-            if(row.seq<=0) row.seq=(int)t.receiptNo.empty()?0:_wtoi(t.receiptNo.c_str());
+            if(row.seq<=0) row.seq=t.receiptNo.empty()?0:_wtoi(t.receiptNo.c_str());
             row.name=t.first+L" "+t.last;
             row.nid=t.nid;
             row.insBase=insBase;

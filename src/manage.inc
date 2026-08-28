@@ -2922,6 +2922,37 @@ static void pcDrawServices(HDC dc, const PrintItem& it, const RECT& box, double 
     for(int rr=0;rr<=total;++rr){ MoveToEx(dc,cx[m.cols],ry[rr],0); LineTo(dc,cx[0],ry[rr]); }
     SelectObject(dc,op); DeleteObject(pen);
 }
+// v2.03: barcode preview — bars only, never the JSON model (code128/hri).
+static void pcDrawBarcode(HDC dc, const PrintItem& it, const RECT& box, double /*scPxMm*/){
+    int x0=box.left, y0=box.top, x1=box.right, y1=box.bottom;
+    int W=x1-x0, H=y1-y0; if(W<=4||H<=4) return;
+    int hriH = (H>20) ? (int)(H*0.22) : 0;
+    int barBottom = y1 - hriH;
+    unsigned ink = it.textColor ? it.textColor : 0x000000u;
+    HBRUSH br=CreateSolidBrush(pcCR(ink));
+    static const int pat[]={1,2,1,1,3,1,1,2,2,1,1,3,1,1,2,1};
+    int x=x0+2, i=0;
+    while(x<x1-2){
+        int bw=pat[i&15];
+        if((i&1)==0){
+            RECT r={x,y0,x+bw,barBottom};
+            if(r.right>x1-2) r.right=x1-2;
+            if(r.right>r.left) FillRect(dc,&r,br);
+        }
+        x+=bw+1; ++i;
+        if(i>400) break;
+    }
+    DeleteObject(br);
+    if(hriH>6){
+        RECT tr={x0,barBottom,x1,y1};
+        SetTextColor(dc,pcCR(ink));
+        HFONT f=CreateFontW(-(hriH-2),0,0,0,FW_NORMAL,0,0,0,DEFAULT_CHARSET,0,0,
+            CLEARTYPE_QUALITY,0,L"Vazirmatn");
+        HGDIOBJ of=SelectObject(dc,f);
+        DrawTextW(dc,L"[بارکد]",-1,&tr,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
+        SelectObject(dc,of); DeleteObject(f);
+    }
+}
 // preview-mode table: shows raw cell text (no live record substitution)
 static void pcDrawTable(HDC dc, const PrintItem& it, const RECT& box, double scPxMm){
     PcTable t; if(!pcParseTable(it.text,t)) return;
@@ -3005,9 +3036,16 @@ static void pcPaintDesign(HDC dc, const RECT& area, const PrintDesign& d, double
         int x0=mmX(it.x), y0=mmY(it.y), x1=mmX(it.x+it.w), y1=mmY(it.y+it.h);
         if(it.type==PIT_TABLE){
             RECT rr={x0,y0,x1,y1}; pcDrawTable(dc,it,rr,sc*pscale);
-        } else if(it.type==PIT_SERVICES){
-            // §1.51.0: dynamic services list (preview shows header + placeholder row)
+        } else if(it.type==PIT_SERVICES ||
+                  (it.text.find(L"\"labels\"")!=std::wstring::npos &&
+                   it.text.find(L"\"widths\"")!=std::wstring::npos)){
             RECT rr={x0,y0,x1,y1}; pcDrawServices(dc,it,rr,sc*pscale);
+        } else if(it.type==PIT_BARCODE ||
+                  (it.text.size() && it.text[0]==L'{' &&
+                   it.text.find(L"\"sym\"")!=std::wstring::npos)){
+            // v2.03: never paint the barcode JSON ({"sym":"code128","hri":true})
+            // as text — that leaked «hr» / «code» onto the preview.
+            RECT rr={x0,y0,x1,y1}; pcDrawBarcode(dc,it,rr,sc*pscale);
         } else if(it.type==PIT_HLINE){
             HPEN p=CreatePen(PS_SOLID,1,pcCR(it.borderColor)); HGDIOBJ o=SelectObject(dc,p);
             MoveToEx(dc,x0,y0,0); LineTo(dc,x1,y0); SelectObject(dc,o); DeleteObject(p);
@@ -3044,10 +3082,13 @@ static void pcPaintDesign(HDC dc, const RECT& area, const PrintDesign& d, double
             }
         } else { // text: LABEL / FIELD — show sample/text
             std::wstring s=it.text;
+            // v2.03: never dump JSON models / color tokens as visible text.
+            if(!s.empty() && s[0]==L'{') continue;
             if(it.type==PIT_FIELD){ std::wstring v=it.field.empty()?L"":(L"["+it.field+L"]");
                 s=it.prefix+(it.text.empty()?v:it.text)+it.suffix; }
             else s=it.prefix+it.text+it.suffix;
             if(s.empty()) continue;
+            if(s[0]==L'{') continue;
             // WYSIWYG font size: pt → px.  sc is px-per-mm, and 1pt = 1/72 in =
             // 25.4/72 mm, so px = pt * sc * (25.4/72).  (The old 3.78/2.83 factor
             // was ~3.8× too large and made text overlap.)  §1.52.0: also apply
@@ -3183,12 +3224,13 @@ static LRESULT CALLBACK pcProc(HWND h, UINT m, WPARAM w, LPARAM l){
             WS_CHILD|WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY,0,0,10,10,h,(HMENU)PC_LIST,g_hInst,0);
         SendMessageW(s_pcs->list,WM_SETFONT,(WPARAM)g_fUI,TRUE);
         Designs_Init();
+        // v2.03: this list is «طرح‌های من». Top row = default. Then only
+        // user-created designs. The 30 ready templates live in طراحی چاپ.
         std::vector<PrintDesign> b; Designs_Builtins(b);
         std::vector<PrintDesign> u; Designs_User(u);
         if(!b.empty()){
             PrintDesign def=b[0]; def.name=L"پیش‌فرض";
             s_pcs->designs.push_back(def);
-            for(size_t i=1;i<b.size();++i) s_pcs->designs.push_back(b[i]);
         }
         for(auto& d:u) s_pcs->designs.push_back(d);
         for(auto& d:s_pcs->designs)

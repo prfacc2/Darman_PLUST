@@ -3965,7 +3965,8 @@
     paper: 'R80', orient: 0, margin: 5, scale: 100,
     mono: false, repeatHdr: true, highlight: true,
     fontLarge: false, dense: false, excelMulti: false,
-    building: false, buildToken: 0
+    building: false, buildToken: 0, wired: false,
+    debounceT: 0, watchdogT: 0
   };
   var svrPaperDims = { R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
 
@@ -3977,9 +3978,37 @@
   function svrEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function svrSelVal(id) { var el = $(id); return (el && el.tagName === 'SELECT') ? parseInt(el.value, 10) : -1; }
 
+  function svrSetProgress(pct, msg) {
+    if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+    var fill = $('svrLoadingFill'), pctx = $('svrLoadingPct'), lt = $('svrLoadingText');
+    if (fill) fill.style.width = pct + '%';
+    if (pctx) pctx.textContent = svrFa(Math.round(pct)) + '٪';
+    if (lt && msg) lt.textContent = msg;
+  }
+  function svrShowLoading(pct, msg) {
+    var loading = $('svrLoading');
+    if (loading) {
+      loading.className = 'svr-loading svr-on';
+      loading.style.display = 'flex';
+      loading.style.opacity = '1';
+    }
+    svrSetProgress(pct || 0, msg || 'در حال آماده‌سازی گزارش');
+  }
+  function svrHideLoading() {
+    if (svr.watchdogT) { try { clearTimeout(svr.watchdogT); } catch (e0) {} svr.watchdogT = 0; }
+    var loading = $('svrLoading');
+    if (!loading) return;
+    loading.className = 'svr-loading';
+    loading.style.display = 'none';
+    loading.style.opacity = '1';
+  }
+  function svrDebouncedBuild() {
+    if (svr.debounceT) { try { clearTimeout(svr.debounceT); } catch (e1) {} }
+    svr.debounceT = setTimeout(function () { svr.debounceT = 0; svrBuild(); }, 600);
+  }
+
   function svReportInit() {
     if (state.surface !== 'svreport') return;
-    // Load filter dropdowns.
     Bridge.call('svreport.shifts', {}).then(function (d) {
       if (d && d.rows) {
         var sel = $('svrShift'); if (sel) { sel.innerHTML = '<option value="-1">همه</option>';
@@ -4000,36 +4029,37 @@
     });
     if (state.date) { var fd = $('svrFrom'), td = $('svrTo');
       if (fd && !fd.value) fd.value = state.date; if (td && !td.value) td.value = state.date; }
-    // Wire actions.
-    on($('svrRefresh'), 'click', function () { svrBuild(); });
-    on($('svrFrom'), 'change', function () { svrBuild(); });
-    on($('svrTo'), 'change', function () { svrBuild(); });
-    on($('svrShift'), 'change', function () { svrBuild(); });
-    on($('svrSection'), 'change', function () { svrBuild(); });
-    on($('svrService'), 'change', function () { svrBuild(); });
-    on($('svrPayStatus'), 'change', function () { svrBuild(); });
-    on($('svrSearch'), 'keyup', function () { svrRender(); });
-    on($('svrPaper'), 'change', function () { svr.paper = $('svrPaper').value;
-      var og = $('svrOrientGroup'); if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
-      svrRender(); });
-    on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10); svrRender(); });
-    on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; svrRender(); });
-    on($('svrScale'), 'change', function () { svr.scale = parseInt($('svrScale').value, 10) || 100; svrRender(); });
-    on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; svrRender(); });
-    on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; svrRender(); });
-    on($('svrExcel'), 'click', function () { svrExportExcel(); });
-    on($('svrPreview'), 'click', function () { svrPrint(true); });
-    on($('svrPrint'), 'click', function () { svrPrint(false); });
-    on($('svrSettings'), 'click', function () { svrToggleSettings(); });
-    on($('svrSetClose'), 'click', function () { svrToggleSettings(); });
-    on($('svrSetHighlight'), 'change', function () { svr.highlight = $('svrSetHighlight').checked; svrRender(); });
-    on($('svrSetFont'), 'change', function () { svr.fontLarge = $('svrSetFont').checked; svrRender(); });
-    on($('svrSetDensity'), 'change', function () { svr.dense = $('svrSetDensity').checked; svrRender(); });
-    on($('svrSetExcelMulti'), 'change', function () { svr.excelMulti = $('svrSetExcelMulti').checked; });
-    // Live sync: refresh on cashier/queue/shift events.
-    Bridge.on('cashier.changed', function () { if (state.surface === 'svreport') svrBuild(); });
-    Bridge.on('queue.update', function () { if (state.surface === 'svreport') svrBuild(); });
-    Bridge.on('shift.changed', function () { if (state.surface === 'svreport') svrBuild(); });
+    if (!svr.wired) {
+      svr.wired = true;
+      on($('svrRefresh'), 'click', function () { svrBuild(); });
+      on($('svrFrom'), 'change', function () { svrBuild(); });
+      on($('svrTo'), 'change', function () { svrBuild(); });
+      on($('svrShift'), 'change', function () { svrBuild(); });
+      on($('svrSection'), 'change', function () { svrBuild(); });
+      on($('svrService'), 'change', function () { svrBuild(); });
+      on($('svrPayStatus'), 'change', function () { svrBuild(); });
+      on($('svrSearch'), 'keyup', function () { svrRender(); });
+      on($('svrPaper'), 'change', function () { svr.paper = $('svrPaper').value;
+        var og = $('svrOrientGroup'); if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
+        svrRender(); });
+      on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10); svrRender(); });
+      on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; svrRender(); });
+      on($('svrScale'), 'change', function () { svr.scale = parseInt($('svrScale').value, 10) || 100; svrRender(); });
+      on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; svrRender(); });
+      on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; svrRender(); });
+      on($('svrExcel'), 'click', function () { svrExportExcel(); });
+      on($('svrPreview'), 'click', function () { svrPrint(true); });
+      on($('svrPrint'), 'click', function () { svrPrint(false); });
+      on($('svrSettings'), 'click', function () { svrToggleSettings(); });
+      on($('svrSetClose'), 'click', function () { svrToggleSettings(); });
+      on($('svrSetHighlight'), 'change', function () { svr.highlight = $('svrSetHighlight').checked; svrRender(); });
+      on($('svrSetFont'), 'change', function () { svr.fontLarge = $('svrSetFont').checked; svrRender(); });
+      on($('svrSetDensity'), 'change', function () { svr.dense = $('svrSetDensity').checked; svrRender(); });
+      on($('svrSetExcelMulti'), 'change', function () { svr.excelMulti = $('svrSetExcelMulti').checked; });
+      Bridge.on('cashier.changed', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
+      Bridge.on('queue.update', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
+      Bridge.on('shift.changed', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
+    }
     svrBuild();
   }
 
@@ -4039,10 +4069,15 @@
     if (state.surface !== 'svreport') return;
     var token = ++svr.buildToken;
     svr.building = true;
-    var loading = $('svrLoading');
-    if (loading) loading.style.display = 'flex';
-    var lt = $('svrLoadingText'); if (lt) lt.textContent = 'در حال آماده‌سازی گزارش';
-    var lp = $('svrLoadingProg'); if (lp) lp.style.width = '0%';
+    svrShowLoading(0, 'در حال خواندن قبض‌ها و خدمات');
+    if (svr.watchdogT) { try { clearTimeout(svr.watchdogT); } catch (e2) {} }
+    svr.watchdogT = setTimeout(function () {
+      if (token !== svr.buildToken) return;
+      svr.building = false;
+      svrHideLoading();
+      var pages = $('svrPages');
+      if (pages) pages.innerHTML = '<div class="svr-error">گزارش در زمان مقرر آماده نشد. دوباره تلاش کنید.</div>';
+    }, 120000);
     var from = $('svrFrom'), to = $('svrTo');
     var q = {
       from: from ? from.value : '', to: to ? to.value : '',
@@ -4051,44 +4086,85 @@
       serviceCode: $('svrService') ? $('svrService').value : '',
       payStatus: svrSelVal('svrPayStatus')
     };
-    Bridge.call('svreport.data', q).then(function (d) {
+    svrSetProgress(8, 'در حال خواندن قبض‌ها و خدمات');
+    Bridge.call('svreport.data', q, 120000).then(function (d) {
       if (token !== svr.buildToken) return;
-      svr.data = d; svr.building = false;
+      svr.data = d || {};
+      svrSetProgress(40, 'داده‌ها دریافت شد — در حال جدول‌بندی');
       svrRenderProgressive(token);
-    }).fail(function () {
+    }).catch(function () {
       if (token !== svr.buildToken) return;
       svr.building = false;
-      if (loading) loading.style.display = 'none';
-      var pages = $('svrPages'); if (pages) pages.innerHTML = '<div class="svr-error">خطا در آماده‌سازی گزارش</div>';
+      svrHideLoading();
+      var pages = $('svrPages');
+      if (pages) pages.innerHTML = '<div class="svr-error">خطا در آماده‌سازی گزارش</div>';
     });
   }
 
+  function svrPaintShell(pages, d) {
+    if (!pages) return;
+    pages.innerHTML = '';
+    var hdr = document.createElement('div'); hdr.className = 'svr-report-hdr';
+    hdr.innerHTML = '<div class="svr-hdr-dates"><div>از تاریخ :  ' + svrEsc($('svrFrom') ? $('svrFrom').value : '') + '</div>'
+      + '<div>تا تاریخ :  ' + svrEsc($('svrTo') ? $('svrTo').value : '') + '</div></div>'
+      + '<div class="svr-hdr-count">(' + svrFa((d && d.totalRecords) || 0) + ')</div>';
+    pages.appendChild(hdr);
+  }
+  function svrPaintFooter(pages, d) {
+    if (!pages || !d || !d.footer) return;
+    var f = d.footer, ft = document.createElement('div'); ft.className = 'svr-footer';
+    ft.innerHTML = 'زمان و تاریخ چاپ :  ' + svrEsc(f.shift || '') + '  ' + svrEsc(f.time || '') + '  ' + svrEsc(f.date || '') +
+      (f.user ? '  کاربر :  ' + svrEsc(f.user) : '');
+    pages.appendChild(ft);
+  }
+
   function svrRenderProgressive(token) {
-    var d = svr.data;
-    if (!d || !d.ok) { var loading = $('svrLoading'); if (loading) loading.style.display = 'none'; return; }
+    var d = svr.data || {};
+    var pages = $('svrPages');
+    if (!d.ok) {
+      svr.building = false;
+      svrHideLoading();
+      if (pages) pages.innerHTML = '<div class="svr-empty">در بازهٔ زمانی انتخاب‌شده موردی یافت نشد</div>';
+      svrUpdatePageCount();
+      return;
+    }
     var blocks = d.blocks || [];
-    var lt = $('svrLoadingText'), lp = $('svrLoadingProg'), pages = $('svrPages');
-    if (pages) pages.innerHTML = '';
+    if (!pages) { svr.building = false; svrHideLoading(); return; }
+    if (blocks.length === 0) {
+      svrPaintShell(pages, d);
+      var empty = document.createElement('div'); empty.className = 'svr-empty';
+      empty.textContent = 'در بازهٔ زمانی انتخاب‌شده موردی یافت نشد';
+      pages.appendChild(empty);
+      svrPaintFooter(pages, d);
+      svrSetProgress(100, 'آماده');
+      svr.building = false;
+      svrHideLoading();
+      svrUpdatePageCount();
+      return;
+    }
+    svrPaintShell(pages, d);
     var i = 0;
     function buildChunk() {
       if (token !== svr.buildToken) return;
-      var chunk = 3;
-      while (i < blocks.length && chunk > 0) { pages.appendChild(svrBlockHtml(blocks[i], d)); i++; chunk--; }
+      var chunk = 2;
+      while (i < blocks.length && chunk > 0) {
+        pages.appendChild(svrBlockHtml(blocks[i], d));
+        i++; chunk--;
+      }
+      var pct = 40 + Math.round(i / blocks.length * 55);
+      svrSetProgress(pct, 'در حال آماده‌سازی خدمت ' + svrFa(i) + ' از ' + svrFa(blocks.length));
       if (i < blocks.length) {
-        if (lt) lt.textContent = 'در حال آماده‌سازی صفحه ' + svrFa(i) + ' از ' + svrFa(blocks.length);
-        if (lp) lp.style.width = Math.round(i / blocks.length * 100) + '%';
         setTimeout(buildChunk, 0);
       } else {
-        if (lp) lp.style.width = '100%';
-        var l2 = $('svrLoading'); if (l2) { l2.style.opacity = '0'; setTimeout(function () { if (l2) l2.style.display = 'none'; }, 300); }
+        svrPaintFooter(pages, d);
+        svrSetProgress(100, 'آماده');
+        svr.building = false;
+        svrHideLoading();
         var body = $('svrBody'); if (body) body.scrollTop = 0;
         svrUpdatePageCount();
       }
     }
-    if (blocks.length === 0) {
-      if (pages) pages.innerHTML = '<div class="svr-empty">در بازهٔ زمانی انتخاب‌شده موردی یافت نشد</div>';
-      if (loading) loading.style.display = 'none'; svrUpdatePageCount();
-    } else { buildChunk(); }
+    buildChunk();
   }
 
   function svrBlockHtml(blk, d) {
