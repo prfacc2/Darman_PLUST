@@ -652,9 +652,8 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring mode=getSetting(L"reception.mode"+suffix,
                            getSetting(L"reception.mode",L"simple"));
         if(mode!=L"full") mode=L"simple";
-        // v2.02: zoom is session-scoped — always reset to 100% so the page
-        // fills the C++ host. Never restore a persisted value.
-        int zoom=100;
+        // v2.04: admission fitted default is 80% (v2.00 layout). Session-scoped.
+        int zoom=80;
         o+="\"date\":"+jstr(adTodayJalali())+",";
         o+="\"time\":"+jstr(adNowTime())+",";
         o+="\"shift\":"+jstr(shiftName(g_session.shift))+",";
@@ -984,6 +983,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         double dN;
         if(jsonGetNumber(body,"shiftId",dN)) rq.shiftId=(int)llround(dN);
         if(jsonGetNumber(body,"sectionId",dN)) rq.sectionId=(int)llround(dN);
+        if(jsonGetNumber(body,"subId",dN)) rq.subId=(int)llround(dN);
         if(jsonGetString(body,"doctor",tmp)) rq.doctorName=u82w(tmp);
         if(jsonGetString(body,"serviceCode",tmp)) rq.serviceCode=u82w(tmp);
         if(jsonGetNumber(body,"payStatus",dN)) rq.payStatus=(int)llround(dN);
@@ -995,7 +995,19 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         }
         return SvReport_Json(rq);
     }
-    if(verb=="svreport.sections") return Receipt_SectionsJson();
+    if(verb=="svreport.sections"){
+        std::vector<Section> secs; Sections_All(secs);
+        std::string o="{\"ok\":true,\"rows\":[";
+        bool first=true;
+        for(const auto& s:secs){
+            if(!s.is_active) continue;
+            if(!first) o+=","; first=false;
+            o+="{\"id\":"+std::to_string(s.id)+",\"name\":"+jstr(s.name_fa)+
+               ",\"parentId\":"+std::to_string(s.parent_id)+"}";
+        }
+        o+="]}";
+        return o;
+    }
     if(verb=="svreport.shifts"){
         auto defs=loadShiftDefs();
         std::string o="{\"ok\":true,\"rows\":[";

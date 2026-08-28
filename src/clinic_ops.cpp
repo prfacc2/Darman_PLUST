@@ -1457,6 +1457,7 @@ std::string SvReport_Json(const SvReportQuery& q){
         if(q.sectionId>0){
             if(t.sectionId!=q.sectionId && t.subId!=q.sectionId) continue;
         }
+        if(q.subId>0 && t.subId!=q.subId) continue;
         if(!q.doctorName.empty() && t.doctor!=q.doctorName) continue;
         bool isPaid = (t.paid>0);
         if(q.payStatus==0 && isPaid) continue;

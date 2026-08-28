@@ -4823,13 +4823,20 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     // a native scrollbar.
     DWORD pgStyle = WS_CHILD|WS_CLIPCHILDREN;
     if(kind==TK_RECEPTION) pgStyle |= WS_VSCROLL;
+    // v2.04: register the tab BEFORE CreateWindow. WV2_CreateView pumps the
+    // UI thread; if tabs were still empty, recProc painted «هیچ پذیرشی باز نیست».
+    s_rd->tabs.push_back(t);
+    s_rd->active=(int)s_rd->tabs.size()-1;
     HWND pg=CreateWindowExW(0,TABPG_CLASS,L"",
         pgStyle,
         0,infoBarH()+tabBarH(),rc.right,rc.bottom-infoBarH()-tabBarH(),
         h,NULL,g_hInst,t);
-    if(!pg){ delete t; return; }
-    s_rd->tabs.push_back(t);
-    s_rd->active=(int)s_rd->tabs.size()-1;
+    if(!pg){
+        s_rd->tabs.pop_back();
+        if(s_rd->active>=(int)s_rd->tabs.size())
+            s_rd->active=(int)s_rd->tabs.size()-1;
+        delete t; return;
+    }
     ensureTabVisible(h, s_rd->active);
     recLayoutTabs(h);
     InvalidateRect(h,NULL,TRUE);
@@ -5523,13 +5530,13 @@ static LRESULT CALLBACK recProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 SelectObject(dc,g_fTitle);
                 SetTextColor(dc,g_theme.text);
                 RECT hr={S(20),by+med+gap,rc.right-S(20),by+med+gap+hl};
-                DrawTextW(dc,L"هیچ پذیرشی باز نیست",-1,&hr,
+                DrawTextW(dc,L"در حال بارگذاری داشبورد…",-1,&hr,
                     DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
                 SelectObject(dc,g_fUI);
                 SetTextColor(dc,g_theme.textDim);
                 RECT sr2={S(20),hr.bottom+S(6),rc.right-S(20),hr.bottom+S(6)+sl};
                 DrawTextW(dc,
-                    L"برای شروع، از داشبورد «پذیرش بیمار» را انتخاب کنید",
+                    L"لطفاً چند لحظه صبر کنید",
                     -1,&sr2,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX);
             }
         }
@@ -5667,7 +5674,7 @@ void Reception_ClosePortal(){ closeActiveKind(TK_PORTAL); }
 void Reception_ResetZoom(){
     // v2.02: zoom is session-scoped and defaults to 100% so the page fills
     // the C++ host. Each tab is its own browser instance — reset is per-tab.
-    WebAdmission_PushEvent("reception.settings", "{\"zoom\":100}");
+    WebAdmission_PushEvent("reception.settings", "{\"zoom\":80}");
 }
 
 HWND createReceptionScreen(HWND frame){
@@ -5681,17 +5688,17 @@ HWND createReceptionScreen(HWND frame){
     }
     RECT rc=frameContentRect();
     HWND h=CreateWindowExW(0,RC_CLASS,L"",
-        WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,
+        WS_CHILD|WS_CLIPCHILDREN,
         rc.left,rc.top,rc.right-rc.left,rc.bottom-rc.top,frame,NULL,g_hInst,NULL);
-    // v1.89.0 — the reception account lands on the DASHBOARD (TK_DASH): the
-    // permanent, non-closable first tab. Everything else (کارتابل, پذیرش بیمار,
-    // تب جدید, ابزارها…) opens on demand from the dashboard's app icons. No
-    // previously-open tab is auto-restored.
+    // v1.89.0 — the reception account lands on the DASHBOARD (TK_DASH).
+    // v2.04: create hidden, add the dash tab, THEN show — so the empty
+    // «هیچ پذیرشی باز نیست» paint never flashes before the tab exists.
     addTabKind(h, TK_DASH);
     if(s_rd){
-        s_rd->active = 0;            // focus the dashboard tab
+        s_rd->active = 0;
         recLayoutTabs(h);
     }
+    ShowWindow(h, SW_SHOW);
     // v1.97: coming online → toast unseen کارتابل count (offline → login).
     {
         int n=unseenMessageCount(g_session.user.username);

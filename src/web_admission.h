@@ -26,6 +26,9 @@ bool WebAdmission_Available();
 // admission page variants so the first tab open is instant. Replaces the old
 // loopback WebAdmission_EnsureHost() — there is no local server anymore.
 void WebAdmission_Prepare();
+// v2.04: finish WebView2 environment warmup on the UI thread so the first
+// dashboard tab does not wait on env launch.
+void WebAdmission_Warm();
 
 // Create the embedded WebView2 view as a child of `parent`, sized to fill it,
 // and load the admission page. Returns the WebView host HWND on success, or

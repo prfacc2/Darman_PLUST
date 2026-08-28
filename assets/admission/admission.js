@@ -87,7 +87,7 @@
     performers: [],        /* v1.78.0: cached «انجام دهنده» list (isPerformer doctors) */
     ps: { P: 0, S: 0 },
     mode: 'simple',
-    zoom: 100,
+    zoom: 80,
     overrideBlock: false,
     ready: false,
     formLocked: false,
@@ -1985,28 +1985,26 @@
       }
     });
 
-    /* v2.02: Ctrl+scroll = zoom in/out. Session-scoped ONLY — NOT persisted.
-       Each tab keeps its own independent zoom (separate browser instance).
-       Default is 100% so the page fills the C++ host; other tabs are untouched.
-       Discrete 5% steps, clamped 50%–200%. Ctrl+0 resets to 100%. */
+    /* v2.04: admission zoom matches v2.00 — Ctrl+scroll on #appBody only.
+       Other surfaces stay at 100% and are not scaled. Session-scoped. */
     on(document, 'wheel', function (e) {
       e = e || window.event;
       if (!e.ctrlKey) return;
+      if (state.surface !== 'admission') return;
       if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
       var delta = e.wheelDelta || (e.detail ? -e.detail : 0);
       var z = state.zoom || 80;
       z += (delta > 0) ? 5 : -5;
       if (z < 50) z = 50; if (z > 200) z = 200;
-      applyZoom(z);
-      showZoomIndicator(z);
+      if (applyZoom(z)) showZoomIndicator(z);
     });
-    /* v2.02: Ctrl+0 = reset zoom to 100% (fill the C++ host). */
     on(document, 'keydown', function (e) {
       e = e || window.event;
       if (e.ctrlKey && (e.keyCode === 48 || e.keyCode === 96)) {
+        if (state.surface !== 'admission') return;
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
-        applyZoom(100, true);
-        showZoomIndicator(100);
+        applyZoom(80, true);
+        showZoomIndicator(80);
       }
     });
   }
@@ -2043,7 +2041,7 @@
     function nudge() {
       var host = document.body; if (!host) return;
       host.style.zoom = '';
-      host.style.zoom = (state.zoom || 100) + '%';
+      host.style.zoom = (state.zoom || 80) + '%';
     }
     function onScroll() { if (t) clearTimeout(t); t = setTimeout(nudge, 150); }
     on(window, 'scroll', onScroll);
@@ -2075,39 +2073,24 @@
     return (b.offsetTop !== t) || (c.offsetTop !== t);
   }
   function applyZoom(z, force) {
-    var prev = state.zoom || 100;
+    var prev = state.zoom || 80;
     if (z < 50) z = 50; if (z > 200) z = 200;
     state.zoom = z;
-    /* v2.02: default 100% fills the C++ host with no side/bottom gap.
-       Zoom is per-tab (each tab is its own browser). At 100% we CLEAR zoom
-       and transform so the page is laid out at the host's real pixel size. */
-    var host = document.body;
+    /* v2.04: v2.00 admission layout — zoom the inner workspace (#appBody),
+       never document.body. Other surfaces have no #appBody columns. */
+    var host = $('appBody');
     if (!host) return true;
-    if (z === 100) {
-      host.style.zoom = '';
-      host.style.webkitTransform = '';
-      host.style.msTransform = '';
-      host.style.transform = '';
-      host.style.webkitTransformOrigin = '';
-      host.style.msTransformOrigin = '';
-      host.style.transformOrigin = '';
-      host.style.fontSize = '';
-      host.style.width = '100%';
-      host.style.height = '100%';
-      return true;
-    }
-    host.style.zoom = z + '%';          /* primary: CSS zoom scales content in place */
-    /* Detect whether `zoom` actually reflowed the element. Fall back to
-       transform:scale() if the browser ignored zoom (some MSHTML builds). */
+    host.style.zoom = z + '%';
+    var shell = $('app');
     var took = false;
-    var sw = window.innerWidth, hw = document.documentElement.offsetWidth;
-    if (sw && hw) took = Math.round(hw) !== Math.round(sw);
-    /* Anchor top-right for RTL so zoom-out does not invent a left/bottom
-       gutter the way `top center` did. */
-    host.style.webkitTransformOrigin = 'top right';
-    host.style.msTransformOrigin = 'top right';
-    host.style.transformOrigin = 'top right';
-    if (took) {
+    if (shell) {
+      var sw = shell.offsetWidth, hw = host.offsetWidth;
+      if (sw && hw) took = Math.round(hw) !== Math.round(sw);
+    }
+    host.style.webkitTransformOrigin = 'center center';
+    host.style.msTransformOrigin = 'center center';
+    host.style.transformOrigin = 'center center';
+    if (took || z === 100) {
       host.style.webkitTransform = '';
       host.style.msTransform = '';
       host.style.transform = '';
@@ -2117,12 +2100,15 @@
       host.style.msTransform = 'scale(' + f + ')';
       host.style.transform = 'scale(' + f + ')';
     }
-    /* UNZOOM READABILITY — only when zoomed OUT below 100%. */
-    if (z < 100) {
+    if (z < 80) {
       var fsBump = z < 60 ? 3 : (z < 70 ? 2 : 1);
       host.style.fontSize = (14 + fsBump) + 'px';
+      if ((' ' + host.className + ' ').indexOf(' az-unzoom ') < 0) {
+        host.className = String(host.className || '') + ' az-unzoom';
+      }
     } else {
       host.style.fontSize = '';
+      host.className = String(host.className || '').replace(/\s*az-unzoom\b/g, '');
     }
     /* v2.01: wrap-guard only for the admission surface (three-column layout).
        Other surfaces don't have colRight/colCenter/colLeft, so skip the check. */
@@ -2133,9 +2119,8 @@
     return true;
   }
   function applySavedZoom(saved) {
-    /* v2.02: always reset to 100% on load so the page fills the C++ host.
-       Zoom is session-scoped — never restored from a persisted value. */
-    applyZoom(100, true);
+    /* v2.04: fitted default is 80% like v2.00. Session-scoped — not persisted. */
+    applyZoom(80, true);
   }
   function applyMode(mode) {
     state.mode = mode === 'full' ? 'full' : 'simple';
@@ -3966,7 +3951,7 @@
     mono: false, repeatHdr: true, highlight: true,
     fontLarge: false, dense: false, excelMulti: false,
     building: false, buildToken: 0, wired: false,
-    debounceT: 0, watchdogT: 0
+    debounceT: 0, watchdogT: 0, secRows: []
   };
   var svrPaperDims = { R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
 
@@ -4007,6 +3992,60 @@
     svr.debounceT = setTimeout(function () { svr.debounceT = 0; svrBuild(); }, 600);
   }
 
+  function svrFillSections() {
+    var sel = $('svrSection'); if (!sel) return;
+    sel.innerHTML = '<option value="-1">همه</option>';
+    var rows = svr.secRows || [];
+    for (var i = 0; i < rows.length; i++) {
+      if ((rows[i].parentId || 0) === 0)
+        sel.innerHTML += '<option value="' + rows[i].id + '">' + rows[i].name + '</option>';
+    }
+    svrFillSubs();
+  }
+  function svrFillSubs() {
+    var sub = $('svrSub'); if (!sub) return;
+    var pid = svrSelVal('svrSection');
+    sub.innerHTML = '<option value="-1">همه</option>';
+    var rows = svr.secRows || [];
+    for (var i = 0; i < rows.length; i++) {
+      var p = rows[i].parentId || 0;
+      if (p <= 0) continue;
+      if (pid < 0 || p === pid)
+        sub.innerHTML += '<option value="' + rows[i].id + '">' + rows[i].name + '</option>';
+    }
+  }
+  function svrOpenFilters() {
+    var p = $('svrFilterPanel'), bk = $('svrFilterBk');
+    if (p) { p.className = 'svr-filter-panel open'; p.setAttribute('aria-hidden', 'false'); }
+    if (bk) bk.className = 'svr-filter-bk open';
+  }
+  function svrCloseFilters() {
+    var p = $('svrFilterPanel'), bk = $('svrFilterBk');
+    if (p) { p.className = 'svr-filter-panel'; p.setAttribute('aria-hidden', 'true'); }
+    if (bk) bk.className = 'svr-filter-bk';
+  }
+  function svrResetFilters() {
+    var today = state.date || '';
+    if ($('svrFrom')) $('svrFrom').value = today;
+    if ($('svrTo')) $('svrTo').value = today;
+    function setv(id, v) { var e = $(id); if (e) e.value = v; }
+    setv('svrShift', '-1'); setv('svrSection', '-1'); setv('svrSub', '-1');
+    if ($('svrDoctor')) $('svrDoctor').value = '';
+    setv('svrService', ''); setv('svrPayStatus', '-1');
+    setv('svrPaper', 'R80'); setv('svrOrient', '0');
+    setv('svrMargin', '5'); setv('svrScale', '100');
+    if ($('svrMono')) $('svrMono').checked = false;
+    if ($('svrRepeatHeader')) $('svrRepeatHeader').checked = true;
+    if ($('svrSetHighlight')) $('svrSetHighlight').checked = true;
+    if ($('svrSetFont')) $('svrSetFont').checked = false;
+    if ($('svrSetDensity')) $('svrSetDensity').checked = false;
+    svr.paper = 'R80'; svr.orient = 0; svr.margin = 5; svr.scale = 100;
+    svr.mono = false; svr.repeatHdr = true; svr.highlight = true;
+    svr.fontLarge = false; svr.dense = false;
+    svrFillSubs();
+    var og = $('svrOrientGroup'); if (og) og.style.display = 'none';
+  }
+
   function svReportInit() {
     if (state.surface !== 'svreport') return;
     Bridge.call('svreport.shifts', {}).then(function (d) {
@@ -4016,10 +4055,8 @@
       }
     });
     Bridge.call('svreport.sections', {}).then(function (d) {
-      if (d && d.rows) {
-        var sel = $('svrSection'); if (sel) { sel.innerHTML = '<option value="-1">همه</option>';
-          for (var i = 0; i < d.rows.length; i++) sel.innerHTML += '<option value="' + d.rows[i].id + '">' + d.rows[i].name + '</option>'; }
-      }
+      svr.secRows = (d && d.rows) ? d.rows : [];
+      svrFillSections();
     });
     Bridge.call('svreport.services', {}).then(function (d) {
       if (d && d.rows) {
@@ -4027,31 +4064,33 @@
           for (var i = 0; i < d.rows.length; i++) sel.innerHTML += '<option value="' + d.rows[i].code + '">' + d.rows[i].name + '</option>'; }
       }
     });
-    if (state.date) { var fd = $('svrFrom'), td = $('svrTo');
-      if (fd && !fd.value) fd.value = state.date; if (td && !td.value) td.value = state.date; }
+    var today = state.date || '';
+    var fd = $('svrFrom'), td = $('svrTo');
+    if (fd && !fd.value) fd.value = today;
+    if (td && !td.value) td.value = today;
     if (!svr.wired) {
       svr.wired = true;
+      on($('svrFiltersBtn'), 'click', function () { svrOpenFilters(); });
+      on($('svrFilterClose'), 'click', function () { svrCloseFilters(); });
+      on($('svrFilterBk'), 'click', function () { svrCloseFilters(); });
+      on($('svrFilterApply'), 'click', function () { svrCloseFilters(); svrBuild(); });
+      on($('svrFilterReset'), 'click', function () { svrResetFilters(); });
       on($('svrRefresh'), 'click', function () { svrBuild(); });
-      on($('svrFrom'), 'change', function () { svrBuild(); });
-      on($('svrTo'), 'change', function () { svrBuild(); });
-      on($('svrShift'), 'change', function () { svrBuild(); });
-      on($('svrSection'), 'change', function () { svrBuild(); });
-      on($('svrService'), 'change', function () { svrBuild(); });
-      on($('svrPayStatus'), 'change', function () { svrBuild(); });
+      on($('svrSection'), 'change', function () { svrFillSubs(); });
       on($('svrSearch'), 'keyup', function () { svrRender(); });
-      on($('svrPaper'), 'change', function () { svr.paper = $('svrPaper').value;
-        var og = $('svrOrientGroup'); if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
-        svrRender(); });
-      on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10); svrRender(); });
-      on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; svrRender(); });
-      on($('svrScale'), 'change', function () { svr.scale = parseInt($('svrScale').value, 10) || 100; svrRender(); });
-      on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; svrRender(); });
-      on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; svrRender(); });
+      on($('svrPaper'), 'change', function () {
+        svr.paper = $('svrPaper').value;
+        var og = $('svrOrientGroup');
+        if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
+      });
+      on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10) || 0; });
+      on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; });
+      on($('svrScale'), 'change', function () { svr.scale = parseInt($('svrScale').value, 10) || 100; });
+      on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; });
+      on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; });
       on($('svrExcel'), 'click', function () { svrExportExcel(); });
       on($('svrPreview'), 'click', function () { svrPrint(true); });
       on($('svrPrint'), 'click', function () { svrPrint(false); });
-      on($('svrSettings'), 'click', function () { svrToggleSettings(); });
-      on($('svrSetClose'), 'click', function () { svrToggleSettings(); });
       on($('svrSetHighlight'), 'change', function () { svr.highlight = $('svrSetHighlight').checked; svrRender(); });
       on($('svrSetFont'), 'change', function () { svr.fontLarge = $('svrSetFont').checked; svrRender(); });
       on($('svrSetDensity'), 'change', function () { svr.dense = $('svrSetDensity').checked; svrRender(); });
@@ -4060,10 +4099,9 @@
       Bridge.on('queue.update', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
       Bridge.on('shift.changed', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
     }
+    var og0 = $('svrOrientGroup'); if (og0) og0.style.display = 'none';
     svrBuild();
   }
-
-  function svrToggleSettings() { var dlg = $('svrSettingsDlg'); if (dlg) dlg.style.display = dlg.style.display === 'none' ? '' : 'none'; }
 
   function svrBuild() {
     if (state.surface !== 'svreport') return;
@@ -4082,6 +4120,7 @@
     var q = {
       from: from ? from.value : '', to: to ? to.value : '',
       shiftId: svrSelVal('svrShift'), sectionId: svrSelVal('svrSection'),
+      subId: svrSelVal('svrSub'),
       doctor: $('svrDoctor') ? $('svrDoctor').value : '',
       serviceCode: $('svrService') ? $('svrService').value : '',
       payStatus: svrSelVal('svrPayStatus')
@@ -4596,7 +4635,7 @@
         }
         if (r.ps) updatePS(r.ps);
         applyMode(r.mode || 'simple');
-        if (state.surface === 'admission') applySavedZoom(r.zoom || 100);
+        if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
       }
       document.body.className = String(document.body.className || '')
         .replace(/\btheme-(dark|calm|warm|neon)\b/g, '').replace(/\s+/g, ' ');

@@ -30,6 +30,13 @@ void WebAdmission_Prepare(){
     AdmissionInlinePage(true);    // WebView2 variant (data: URI font)
     if(WV2_Available()) WV2_PreWarm();   // v1.95: warm the env at launch, not at first tab
 }
+void WebAdmission_Warm(){
+    WebAdmission_Prepare();
+    if(WV2_Available()){
+        ICoreWebView2Environment* env=WV2_EnsureEnvironment();
+        if(env) env->Release();
+    }
+}
 
 HWND WebAdmission_CreateView(HWND parent){
     if(!parent) return nullptr;

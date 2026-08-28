@@ -51,9 +51,9 @@ svg{display:inline-block;vertical-align:middle;}
 .app{
   display:-ms-flexbox;display:flex;
   -ms-flex-direction:column;flex-direction:column;
-  /* v2.03: 100% of the C++ WebView host — not 100vh (that freezes the first
-     small create-time size) and not CSS zoom. The HTML fills the container. */
-  width:100%;height:100%;overflow:hidden;
+  /* v2.04: restore the v2.00 admission shell (100vh clip). WebView2 put_Bounds
+     still fills the C++ host; CSS zoom on #appBody (80%) is the fitted layout. */
+  width:100%;height:100vh;overflow:hidden;
 }
 
 /* ---------------------------------------------------------------- TOPBAR --- */
@@ -8197,3 +8197,53 @@ body.theme-neon .tools-drico.tools-appico-report{
   background:-webkit-linear-gradient(top,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
   background:linear-gradient(180deg,#7af6ff 0%,#00F0FF 50%,#0080FF 100%);
 }
+
+/* v2.04 — compact report header + filter panel */
+.svr-tb-main{-ms-flex-align:center;align-items:center;}
+.svr-tb-title{font-size:15px;font-weight:800;color:#1A2435;margin-left:10px;white-space:nowrap;}
+body.theme-dark .svr-tb-title,body.theme-neon .svr-tb-title{color:#E8F0FF;}
+.svr-tb-main .svr-search{-ms-flex:1 1 auto;flex:1 1 auto;min-width:120px;max-width:280px;}
+.svr-tb-main .svr-pagecount{margin-right:auto;margin-left:8px;}
+.svr-filter-bk{
+  display:none;position:absolute;top:0;right:0;bottom:0;left:0;z-index:40;
+  background:rgba(16,24,40,.35);
+}
+.svr-filter-bk.open{display:block;}
+.svr-filter-panel{
+  display:none;position:absolute;top:0;right:0;bottom:0;left:0;z-index:41;
+  -ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;
+}
+.svr-filter-panel.open{display:-ms-flexbox;display:flex;}
+.svr-filter-card{
+  width:92%;max-width:720px;max-height:86%;overflow-y:auto;
+  background:#F7FAFE;border:1px solid #A8B5CC;border-radius:14px;
+  padding:16px 18px;-webkit-box-shadow:0 16px 40px rgba(16,24,40,.28);
+  box-shadow:0 16px 40px rgba(16,24,40,.28);
+}
+body.theme-dark .svr-filter-card{background:#151B25;border-color:#2C3645;}
+body.theme-neon .svr-filter-card{background:#121828;border-color:#2A3458;}
+.svr-filter-head{
+  display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  -ms-flex-pack:justify;justify-content:space-between;margin-bottom:12px;
+}
+.svr-filter-title{font-size:16px;font-weight:800;color:#1A2435;}
+body.theme-dark .svr-filter-title,body.theme-neon .svr-filter-title{color:#E8F0FF;}
+.svr-filter-grid{
+  display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;margin:-6px;
+}
+.svr-f-field{
+  width:50%;padding:6px;display:block;min-width:0;
+}
+.svr-f-field span{
+  display:block;font-size:12px;font-weight:700;color:#2E3D52;margin-bottom:4px;
+}
+body.theme-dark .svr-f-field span,body.theme-neon .svr-f-field span{color:#B0C4E0;}
+.svr-filter-checks{
+  display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;margin-top:8px;
+}
+.svr-filter-checks .svr-chk{margin:6px 0 6px 16px;}
+.svr-filter-actions{
+  display:-ms-flexbox;display:flex;-ms-flex-pack:end;justify-content:flex-end;
+  margin-top:14px;
+}
+.svr-filter-actions .btn{margin-right:8px;}

@@ -507,6 +507,7 @@ static LRESULT CALLBACK homeProc(HWND h, UINT m, WPARAM w, LPARAM l){
                 g_session.loginAt=iranNow();
                 setUserOnline(u.username,true);
                 s_busy=false;
+                WebAdmission_Warm();
                 switchScreen(SC_RECEPTION);
                 return 0;
             }

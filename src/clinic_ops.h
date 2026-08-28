@@ -130,9 +130,10 @@ struct SvReportQuery {
     std::wstring fromJalali, toJalali;
     int shiftId;          // -1 = all
     int sectionId;        // -1 = all
+    int subId;            // -1 = all
     std::wstring doctorName;
     std::wstring serviceCode;  // empty = all services
     int payStatus;        // -1 = all, 0 = unpaid, 1 = paid
-    SvReportQuery():shiftId(-1),sectionId(-1),payStatus(-1){}
+    SvReportQuery():shiftId(-1),sectionId(-1),subId(-1),payStatus(-1){}
 };
 std::string SvReport_Json(const SvReportQuery& q);
