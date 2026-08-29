@@ -85,6 +85,8 @@
     doctors: [],
     doctorList: [],        /* v1.98: full پزشک معالج combo (like performers) */
     performers: [],        /* v1.78.0: cached «انجام دهنده» list (isPerformer doctors) */
+    perfResults: [],       /* v2.06: live «انجام دهنده» search rows (#perfResults) */
+    performersFilled: false, /* v2.06: latch — the combo fill runs exactly once */
     ps: { P: 0, S: 0 },
     mode: 'simple',
     zoom: 80,
@@ -842,28 +844,12 @@
     });
   }
 
-  /* v1.94: doctor search auto-select — mirrors resolvePerfCode() for the
-     performer: when the search yields exactly one row, OR an exact medicalId/
-     code match is found, auto-select it via selectDoctor() instead of just
-     listing suggestions. The matched row/index are captured into locals before
-     defer() so the setTimeout closure never sees a stale loop variable. */
-  function autoSelectDoctor(rows, en) {
-    if (!rows || !rows.length) return;
-    var pick = null, idx = -1, i;
-    if (rows.length === 1) { pick = rows[0]; idx = 0; }
-    else {
-      for (i = 0; i < rows.length; i++) {
-        if (toEn(rows[i].medicalId || '') === en || toEn(rows[i].code || '') === en) {
-          pick = rows[i]; idx = i; break;
-        }
-      }
-    }
-    if (!pick) return;
-    defer(function () {
-      selectDoctor(pick, idx);
-      closeDocSuggest();
-    });
-  }
+  /* v2.06: auto-select was REMOVED by explicit user request. While typing the
+     پزشک معالج code/name the app must NEVER pick a doctor on its own — it only
+     opens the suggestion list below the field; the operator explicitly clicks
+     a row (or presses Enter to run the search) to choose. The old v1.94
+     behaviour (snap on 1 result / exact medicalId match) is gone. */
+  var DOC_AUTOS_SELECT_DISABLED = true;
 
   /* ---------------------------------------------------------------------- *
      v1.78.0 — «انجام دهنده» (performer) wiring.
@@ -874,34 +860,112 @@
      قبل از این نسخه کمبوی #perfname هرگز پر نمی‌شد — از صفر وصل شده است.
      ---------------------------------------------------------------------- */
   /* v1.93: fillPerformers accepts optional folded rows from the init response.
-     When rows are supplied we render directly (no bridge round-trip); with no
-     argument we fall back to the standalone 'doctor.performers' call. */
+     v2.06 BUGFIX: init folds the FULL JSON envelope ({"rows":[…]}) — not a
+     bare array — so the old code set state.performers to an object, its
+     .length was undefined, the render loop never ran and the «انجام دهنده»
+     combo stayed EMPTY for the whole session. Both shapes are unwrapped now.
+     v2.06: the performer directory also carries docType (0=پزشک, 1=پرستار) so
+     the combo can badge nurses, and if the directory is somehow empty we still
+     fall back to a full doctor.search so the operator can always pick someone. */
   function fillPerformers(rows) {
     var sel = $('perfname'); if (!sel) return;
     function applyRows(rs) {
+      if (rs && rs.rows && typeof rs.rows.length === 'number') rs = rs.rows;  /* envelope */
       state.performers = rs || [];
+      if (state.performers.length) state.performersFilled = true;
       var h = '<option value="">— انتخاب —</option>', i;
       for (i = 0; i < state.performers.length; i++) {
         var nm = state.performers[i].name || '';
         var label = nm + (state.performers[i].specialty ? ' — ' + state.performers[i].specialty : '');
+        if (state.performers[i].docType === 1) label += ' (پرستار)';
         h += '<option value="' + esc(nm) + '">' + esc(label) + '</option>';
       }
       sel.innerHTML = h;
     }
-    if (rows) { applyRows(rows); return; }
+    /* v2.06 latch: once the combo is populated, never re-run the fallback
+       chain (it could otherwise race two doctor.search calls into one select). */
+    if (state.performersFilled) { applyRows(state.performers); return; }
+    if (rows && (typeof rows.length === 'number' || (rows.rows && typeof rows.rows.length === 'number'))) {
+      applyRows(rows);
+      if (!state.performers.length) fillPerformers();
+      return;
+    }
     try {
       Bridge.call('doctor.performers', {}).then(function (r) {
         applyRows((r && r.rows) || []);
+        /* v2.06: last-resort fallback — the combo must never be empty */
+        if (!state.performers.length) {
+          Bridge.call('doctor.search', {}).then(function (r2) {
+            applyRows((r2 && (r2.rows || r2.doctors)) || []);
+          });
+        }
+      }, function () {
+        Bridge.call('doctor.search', {}).then(function (r2) {
+          applyRows((r2 && (r2.rows || r2.doctors)) || []);
+        });
       });
-    } catch (e) { /* ignore — combo stays empty */ }
+    } catch (e) {
+      try {
+        Bridge.call('doctor.search', {}).then(function (r2) {
+          applyRows((r2 && (r2.rows || r2.doctors)) || []);
+        });
+      } catch (e2) { /* ignore — combo stays empty */ }
+    }
   }
-  /* picking a performer name → mirror its code into the numeric code box.
-     Convention matches selectDoctor() on this same page (and the native form):
-     the 1-based list code goes in the box (medicalId is only a fallback). */
+  /* v2.06: the performer suggestion list — rendered under #perfcode exactly
+     like the doctor list under #doc2code. Typing only OPENS the list; it never
+     selects anything. The operator clicks a row to choose (auto-select is
+     disabled by explicit user request). */
+  function renderPerfResults(rows) {
+    var box = $('perfResults');
+    if (!box) return;
+    state.perfResults = rows || [];
+    if (!rows || !rows.length) { box.innerHTML = ''; return; }
+    var html = '', i, p, lim = Math.min(rows.length, 25);
+    for (i = 0; i < lim; i++) {
+      p = rows[i];
+      html += '<div class="row" data-perf="' + i + '">' +
+        '<span class="r-name">' + esc(p.name || '') + '</span>' +
+        '<span class="r-sub">' + esc(p.specialty || '') + '</span>' +
+        (p.code ? '<span class="r-code">' + esc(toFa(p.code)) + '</span>' : '') +
+        '</div>';
+    }
+    box.innerHTML = html;   /* delegated click — wired once in wire() */
+  }
+  function closePerfSuggest() {
+    var box = $('perfResults');
+    if (box) box.innerHTML = '';
+  }
+  function selectPerformer(p, ix) {
+    var sel = $('perfname');
+    if (sel) {
+      var i, found = -1;
+      for (i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === (p.name || '')) { found = i; break; }
+      }
+      if (found < 0) {
+        /* v2.06: performer not yet in the combo (e.g. a nurse) → add it so the
+           selection is always reflected in both fields. */
+        var opt = document.createElement('option');
+        opt.value = p.name || '';
+        opt.text = (p.name || '') + (p.specialty ? ' — ' + p.specialty : '');
+        try { sel.appendChild(opt); } catch (e) { sel.options[sel.options.length] = opt; }
+        found = sel.options.length - 1;
+      }
+      sel.selectedIndex = found;
+      sel.size = 1;
+    }
+    var box = $('perfcode');
+    if (box) box.value = toFa(p.medicalId || p.code || '');
+    closePerfSuggest();
+  }
+  /* picking a performer name → mirror its code into the code box.
+     v2.06: the code is کد نظام پزشکی with کد پزشک as the explicit fallback
+     (the user asked for both to be usable). */
   function mirrorPerfCode() {
     var nm = $('perfname') ? trimStr($('perfname').value) : '';
     var box = $('perfcode'); if (!box) return;
-    if (!nm) { box.value = ''; return; }
+    if (!nm) { box.value = ''; closePerfSuggest(); return; }
     var rows = state.performers || [], i;
     for (i = 0; i < rows.length; i++) {
       if ((rows[i].name || '') === nm) {
@@ -910,36 +974,18 @@
       }
     }
   }
-  /* typing a code → resolve to the matching performer and select it.
-     While TYPING we only snap on an EXACT کد نظام پزشکی / code match (so
-     «142536» never jumps after the first digit); Enter may take the first
-     (best) partial row. */
+  /* typing in the performer code box → LIVE suggestion list (no auto-select).
+     Enter re-runs the search and refreshes the list; choosing is always an
+     explicit click (v2.06 — user request). */
   var perfTimer = null;
   function resolvePerfCode(immediate) {
     var box = $('perfcode'); if (!box) return;
     var q = toEn(trimStr(box.value)).replace(/\s+/g, '');
-    if (!q) return;
+    if (!q) { renderPerfResults([]); return; }
     var run = function () {
-      Bridge.call('doctor.search', { q: q, code: q, role: 'performer' }).then(function (r) {
-        var rows = (r && r.rows) || [];
-        if (!rows.length) return;
-        var d = null, i;
-        if (immediate) d = rows[0];
-        else {
-          for (i = 0; i < rows.length; i++) {
-            if (toEn(rows[i].medicalId || '') === q || toEn(rows[i].code || '') === q) { d = rows[i]; break; }
-          }
-          if (!d) return;             /* no exact match yet — keep typing */
-        }
-        var sel = $('perfname');
-        if (sel) {
-          for (i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value === (d.name || '')) { sel.selectedIndex = i; break; }
-          }
-        }
-        /* same convention as selectDoctor(): the 1-based list code fills the box */
-        box.value = toFa(d.medicalId || d.code || q);
-      });
+      Bridge.call('doctor.performers', { q: q, code: q }).then(function (r) {
+        renderPerfResults((r && r.rows) || []);
+      }, function () { renderPerfResults([]); });
     };
     if (immediate) { run(); return; }
     if (perfTimer) clearTimeout(perfTimer);
@@ -1215,6 +1261,11 @@
         e = e || window.event;
         var key = e.keyCode || e.which;
 
+        /* v2.06: Ctrl+Tab is the app-level tab-switch hotkey — never let the
+           page turn it into a plain field-advance. Let it bubble to the host
+           (WebView2 accelerator / native pump) which cycles the tabs. */
+        if (key === 9 && (e.ctrlKey || e.metaKey)) return true;
+
         /* Ctrl+A / Cmd+A → select the entire value inside an INPUT */
         if ((e.ctrlKey || e.metaKey) && (key === 65 || key === 97)) {
           if (el.tagName === 'INPUT') {
@@ -1310,9 +1361,8 @@
         var params = byCode ? { q: en, code: en } : { q: q };
         Bridge.call('doctor.search', params).then(function (r) {
           var rows = r.rows || r.doctors || [];
+          /* v2.06: list only — no auto-select while typing (user request). */
           renderDocResults(rows);
-          /* v1.94: auto-select single result / exact match (like performer) */
-          autoSelectDoctor(rows, en);
         });
       }, 180);
     }
@@ -1590,6 +1640,18 @@
       var doc = (state.doctors || [])[ix];
       if (!doc) return;
       defer(function () { selectDoctor(doc, ix); closeDocSuggest(); });
+    });
+
+    /* v2.06: performer results list → select performer (delegated, deferred) */
+    on($('perfResults'), 'click', function (e) {
+      e = e || window.event;
+      var box = $('perfResults');
+      var row = findUp(e.target || e.srcElement, 'data-perf', box);
+      if (!row) return;
+      var ix = +row.getAttribute('data-perf');
+      var p = (state.perfResults || [])[ix];
+      if (!p) return;
+      defer(function () { selectPerformer(p, ix); closePerfSuggest(); });
     });
 
     /* queue table → recall / remove (delegated, deferred) */
@@ -3130,9 +3192,9 @@
     var params = byCode ? { q: en, code: en } : { q: q };
     Bridge.call('doctor.search', params).then(function (r) {
       var rows = r.rows || r.doctors || [];
+      /* v2.06: Enter re-runs the search and shows the list — it never
+         auto-selects; the operator must click a suggestion explicitly. */
       renderDocResults(rows);
-      /* v1.94: auto-select single result / exact match (like performer) */
-      autoSelectDoctor(rows, en);
     });
   }
 
@@ -3306,6 +3368,7 @@
     if ($('profileState')) $('profileState').style.display = 'none';
     if ($('patResults')) $('patResults').innerHTML = '<div class="empty">نتیجه‌ای نیست</div>';
     if ($('docResults')) $('docResults').innerHTML = '';
+    if ($('perfResults')) $('perfResults').innerHTML = '';
     renderSvcSuggest([]);
     renderServices(); recompute();
     /* v1.75.0: after clearing, no field is selected → auto-focus کد ملی (nid)
@@ -3503,24 +3566,29 @@
   }
 
   function portalTileHtml(m) {
-    /* v1.97: WhatsApp-style list tile — priority BACKGROUND + date AND time. */
+    /* v1.97: WhatsApp-style list tile — priority BACKGROUND + date AND time.
+       v2.06: rows the user SENT carry the mine flag → own-style tile with an
+       «ارسال به …» caption so both sides of the conversation are visible. */
+    var mine = (m.mine === true);
     var pv = String(m.text || '').replace(/\s+/g, ' ');
     pv = pv.replace(/^\s+|\s+$/g, '');
     if (pv.indexOf('\u21a9') === 0) pv = pv.substring(1);
     pv = pv.replace(/^\s+|\s+$/g, '');
     if (pv.length > 140) pv = pv.substring(0, 140) + '\u2026';
-    var pin = m.pinned
+    var pin = (m.pinned && !mine)
       ? '<span class="portal-tile-pin" title="سنجاق‌شده">\u2605</span>'
       : '';
-    var dot = (!m.seen) ? '<span class="portal-unread-dot"></span>' : '';
+    var dot = (!m.seen && !mine) ? '<span class="portal-unread-dot"></span>' : '';
     var when = trimStr((m.date || '') + (m.time ? '  ' + m.time : ''));
     var act = (Number(m.idx) === Number(portal.detailIdx)) ? ' active' : '';
-    return '<div class="portal-tile ' + portalStripe(m.type) + act + '" data-idx="' + esc(m.idx) + '">' +
+    var who = mine
+      ? '<span class="portal-tile-from">' + esc((m.to === '*' ? 'همه' : m.to) || '—') + '</span>' +
+        '<span class="portal-tile-sent">ارسال شما</span>'
+      : '<span class="portal-tile-from">' + esc(m.from || '—') + '</span>';
+    return '<div class="portal-tile ' + portalStripe(m.type) + act + (mine ? ' portal-tile-mine' : '') + '" data-idx="' + esc(m.idx) + '">' +
       '<span class="portal-stripe"></span>' +
       '<div class="portal-tile-main">' +
-        '<div class="portal-tile-row">' + dot +
-          '<span class="portal-tile-from">' + esc(m.from || '—') + '</span>' + pin +
-        '</div>' +
+        '<div class="portal-tile-row">' + dot + who + pin + '</div>' +
         '<div class="portal-tile-date">' + esc(when || '—') + '</div>' +
         '<div class="portal-tile-prev">' + esc(pv) + '</div>' +
       '</div>' +
@@ -3608,6 +3676,10 @@
 
   function portalIsOurs(m) {
     if (!m) return false;
+    /* v2.06: the server now tags every row with a definitive "mine" flag —
+       no more string matching between the fullname (init sends the display
+       name) and the username (what messages store), which never matched. */
+    if (m.mine === true) return true;
     var txt = String(m.text || '');
     if (txt.indexOf('\u21a9') === 0) return true;
     var from = String(m.from || '');
@@ -3617,16 +3689,23 @@
   }
 
   function portalThread(seed) {
+    /* v2.06: the thread is a real two-way conversation now. The server list
+       returns BOTH the messages I received AND the ones I sent (mine:true),
+       so the thread = every row exchanged with the peer, in list order. */
     var src = portalSrc();
-    var who = String((seed && seed.from) || portal.peer || '');
-    var us = state.userName || '';
+    var who = String((seed && (seed.mine ? seed.to : seed.from)) || portal.peer || '');
     var out = [], i, m, from, to;
     for (i = 0; i < src.length; i++) {
       m = src[i];
       from = String(m.from || '');
       to = String(m.to || '');
-      if (who && from === who) out.push(m);
-      else if (portalIsOurs(m) && (from === us || to === who || from === who)) out.push(m);
+      if (m.mine === true) {
+        /* my own message → keep it when it was sent to this peer */
+        if (!who || to === who) out.push(m);
+      } else {
+        /* received row → keep it when it came from this peer (or broadcast) */
+        if (!who || from === who || to === '*') out.push(m);
+      }
     }
     if (!out.length && seed) out.push(seed);
     return out;
@@ -3655,7 +3734,7 @@
     var m = null, i, src = portalSrc();
     for (i = 0; i < src.length; i++) { if (Number(src[i].idx) === Number(idx)) { m = src[i]; break; } }
     portal.detailIdx = m ? Number(m.idx) : -1;
-    portal.peer = m ? String(m.from || '') : '';
+    portal.peer = m ? String((m.mine ? m.to : m.from) || '') : '';
     if (!m) { det.innerHTML = '<div class="portal-empty">پیام یافت نشد</div>'; return; }
     var initial = String(m.from || '؟').replace(/^\s+|\s+$/g, '').charAt(0) || '؟';
     var thread = portalThread(m);
@@ -3664,7 +3743,6 @@
       row = thread[k];
       ours = portalIsOurs(row);
       body = String(row.text || '');
-      if (body.indexOf('\u21a9') === 0) body = body.substring(1);
       when = trimStr((row.date || '') + (row.time ? '  ' + row.time : ''));
       bubbles += '<div class="portal-bub ' + (ours ? 'portal-bub-out' : 'portal-bub-in') + '">' +
         '<div class="portal-bub-txt">' + esc(body) + '</div>' +
@@ -3684,8 +3762,11 @@
       '</div>' +
     '</div>';
     det.innerHTML = html;
-    try { Bridge.call('portal.messages.seenone', { idx: portal.detailIdx }); } catch (e) {}
-    m.seen = true;
+    /* v2.06: only RECEIVED rows have a meaningful seen flag to clear. */
+    if (m.mine !== true) {
+      try { Bridge.call('portal.messages.seenone', { idx: portal.detailIdx }); } catch (e) {}
+      m.seen = true;
+    }
     var threadEl = $('portalThread');
     if (threadEl) threadEl.scrollTop = threadEl.scrollHeight;
     portalRender(); /* refresh active tile */
@@ -3700,21 +3781,27 @@
     if (!btn) return;
     var act = btn.getAttribute('data-act');
     var idx = portal.detailIdx;
+    var cur = portalCurrentMsg();
+    /* v2.06: rows I SENT are read-only — pin/seen/delete address the copy the
+       RECIPIENT owns, so those actions are disabled for my own bubbles. */
+    var mine = cur ? (cur.mine === true) : false;
     if (act === 'back') { portalCloseDetail(); }
     else if (act === 'reply') { portalToggleReply(); }
     else if (act === 'send') { portalSendReply(); }
     else if (act === 'pin') {
-      var cur = portalCurrentMsg();
+      if (mine) { toast('این پیام ارسالی شماست', 'info'); return; }
       var pin = cur ? !cur.pinned : true;
       try { Bridge.call('portal.messages.pin', { idx: idx, pin: pin }); } catch (e2) {}
       if (cur) cur.pinned = pin;
       defer(portalLoad);
     } else if (act === 'save') {
+      if (mine) { toast('این پیام ارسالی شماست', 'info'); return; }
       try { Bridge.call('portal.messages.save', { idx: idx }); } catch (e2) {}
       toast('پیام ذخیره شد', 'ok');
     } else if (act === 'print') {
       try { Bridge.call('portal.message.print', { idx: idx }); } catch (e2) {}
     } else if (act === 'delete') {
+      if (mine) { toast('این پیام ارسالی شماست', 'info'); return; }
       try { Bridge.call('portal.messages.delete', { idx: idx }); } catch (e2) {}
       toast('پیام حذف شد', 'ok');
       portalCloseDetail();
@@ -3946,13 +4033,16 @@
      ====================================================================== */
   var svr = {
     data: null,
-    paper: 'R80', orient: 0, margin: 5, scale: 100,
+    paper: 'R180', orient: 0, margin: 5, scale: 100,
     mono: false, repeatHdr: true, highlight: true,
     fontLarge: false, dense: false, excelMulti: false,
+    pcLayout: 'tbl', pcCols: 'seq-name-ins-status',   /* v2.06: «تنظیمات چاپ» */
     building: false, buildToken: 0, wired: false,
     debounceT: 0, watchdogT: 0, secRows: [], perPage: 10
   };
-  var svrPaperDims = { R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
+  /* v2.06: the thermal roll is now 180mm wide (18cm) — everything fits.
+     R58 stays for narrow legacy printers; R180 is the new default. */
+  var svrPaperDims = { R180:[180,297], R80:[80,297], R58:[58,297], A5:[148,210], A4:[210,297] };
 
   function svrFa(n) {
     var s = String(n || ''), fa = '۰۱۲۳۴۵۶۷۸۹', o = '';
@@ -4023,6 +4113,144 @@
     if (p) { p.className = 'svr-filter-panel'; p.setAttribute('aria-hidden', 'true'); }
     if (bk) bk.className = 'svr-filter-bk';
   }
+  /* v2.06: reflect the selected paper on <body data-svr-paper=…> so the CSS
+     sizes the on-screen strip exactly like the printed page (WYSIWYG). */
+  function svrApplyPaperPreview() {
+    var p = svr.paper || 'R180';
+    if (document.body && document.body.setAttribute) {
+      document.body.setAttribute('data-svr-paper', p);
+    }
+  }
+
+  /* v2.06 — PRINT SETTINGS («تنظیمات چاپ») for تفکیک خدمات.
+     Structure / layout / paper / typography of the printed report, with a
+     LIVE WYSIWYG preview that renders with the exact same stylesheet the
+     printer uses (svrGetPrintCss) — what you see is what gets printed. */
+  function svrPrintCfgOpen() {
+    var old = $('svrPrintCfgDlg');
+    if (old) { old.className = 'svr-pc-dlg open'; return; }
+    var dlg = document.createElement('div');
+    dlg.id = 'svrPrintCfgDlg'; dlg.className = 'svr-pc-dlg open';
+    dlg.innerHTML =
+      '<div class="svr-pc-bk" id="svrPcBk"></div>' +
+      '<div class="svr-pc-card">' +
+        '<div class="svr-pc-head"><div class="svr-pc-title">تنظیمات چاپ گزارش</div>' +
+        '<button type="button" class="btn btn-sm" id="svrPcClose">بستن</button></div>' +
+        '<div class="svr-pc-body">' +
+          '<div class="svr-pc-side">' +
+            '<label class="svr-pc-f"><span>ساختار جدول</span>' +
+              '<select class="inp" id="svrPcLayout">' +
+                '<option value="tbl">جدول با خطوط کامل</option>' +
+                '<option value="lines">فقط خطوط افقی</option>' +
+                '<option value="plain">بدون خطوط</option>' +
+              '</select></label>' +
+            '<label class="svr-pc-f"><span>چیدمان ستون‌ها</span>' +
+              '<select class="inp" id="svrPcCols">' +
+                '<option value="seq-name-ins-status">ردیف / نام / بیمه / وضعیت</option>' +
+                '<option value="seq-name-status">ردیف / نام / وضعیت</option>' +
+                '<option value="name-ins-status">نام / بیمه / وضعیت</option>' +
+              '</select></label>' +
+            '<label class="svr-pc-f"><span>سایز کاغذ</span>' +
+              '<select class="inp" id="svrPcPaper">' +
+                '<option value="R180">رول ۱۸۰ میلی‌متر (۱۸ سانتی)</option>' +
+                '<option value="R80">رول ۸۰ میلی‌متر</option>' +
+                '<option value="R58">رول ۵۷ میلی‌متر</option>' +
+                '<option value="A5">A5</option>' +
+                '<option value="A4">A4</option>' +
+              '</select></label>' +
+            '<label class="svr-pc-f"><span>حاشیه (میلی‌متر)</span>' +
+              '<input type="text" class="inp" id="svrPcMargin" /></label>' +
+            '<label class="svr-pc-f"><span>اندازه فونت</span>' +
+              '<select class="inp" id="svrPcFont">' +
+                '<option value="11">کوچک (۱۱)</option>' +
+                '<option value="12">متوسط (۱۲)</option>' +
+                '<option value="14">بزرگ (۱۴)</option>' +
+              '</select></label>' +
+            '<label class="svr-pc-chk"><input type="checkbox" id="svrPcMono" /> چاپ تک‌رنگ (مونو)</label>' +
+            '<label class="svr-pc-chk"><input type="checkbox" id="svrPcRepeat" /> تکرار سرستون در هر صفحه</label>' +
+            '<label class="svr-pc-chk"><input type="checkbox" id="svrPcDense" /> ردیف‌های فشرده</label>' +
+          '</div>' +
+          '<div class="svr-pc-prev-wrap"><div class="svr-pc-prev" id="svrPcPrev"></div></div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(dlg);
+    /* seed the controls from the live svr state */
+    var set = function (id, v) { var e = $(id); if (e) e.value = v; };
+    set('svrPcPaper', svr.paper);
+    set('svrPcMargin', String(svr.margin));
+    set('svrPcFont', svr.fontLarge ? '14' : (svr.dense ? '11' : '12'));
+    if ($('svrPcMono')) $('svrPcMono').checked = !!svr.mono;
+    if ($('svrPcRepeat')) $('svrPcRepeat').checked = !!svr.repeatHdr;
+    if ($('svrPcDense')) $('svrPcDense').checked = !!svr.dense;
+    set('svrPcLayout', svr.pcLayout || 'tbl');
+    set('svrPcCols', svr.pcCols || 'seq-name-ins-status');
+    on($('svrPcClose'), 'click', function () { svrPrintCfgClose(); });
+    on($('svrPcBk'), 'click', function () { svrPrintCfgClose(); });
+    var upd = function () { svrPrintCfgApply(); };
+    on($('svrPcLayout'), 'change', upd);
+    on($('svrPcCols'), 'change', upd);
+    on($('svrPcPaper'), 'change', upd);
+    on($('svrPcMargin'), 'change', upd);
+    on($('svrPcFont'), 'change', upd);
+    on($('svrPcMono'), 'change', upd);
+    on($('svrPcRepeat'), 'change', upd);
+    on($('svrPcDense'), 'change', upd);
+    svrPrintCfgApply();
+  }
+  function svrPrintCfgClose() {
+    var d = $('svrPrintCfgDlg'); if (!d) return;
+    d.className = 'svr-pc-dlg';
+    try { document.body.removeChild(d); } catch (e) {}
+  }
+  /* apply the dialog's controls to the live svr state, refresh the report and
+     re-render the WYSIWYG mini preview with the print stylesheet. */
+  function svrPrintCfgApply() {
+    var v = function (id, dflt) { var e = $(id); return e ? e.value : dflt; };
+    svr.pcLayout = v('svrPcLayout', 'tbl');
+    svr.pcCols = v('svrPcCols', 'seq-name-ins-status');
+    var paper = v('svrPcPaper', svr.paper);
+    if (paper !== svr.paper) {
+      svr.paper = paper;
+      if ($('svrPaper')) $('svrPaper').value = paper;
+      var og = $('svrOrientGroup');
+      if (og) og.style.display = (paper === 'A4' || paper === 'A5') ? '' : 'none';
+    }
+    var m = parseInt(v('svrPcMargin', String(svr.margin)), 10);
+    svr.margin = (m >= 0 && m <= 30) ? m : svr.margin;
+    if ($('svrMargin')) $('svrMargin').value = String(svr.margin);
+    var fs = v('svrPcFont', '12');
+    svr.fontLarge = (fs === '14');
+    svr.dense = ($('svrPcDense') && $('svrPcDense').checked) || (fs === '11');
+    if ($('svrSetFont')) $('svrSetFont').checked = svr.fontLarge;
+    if ($('svrSetDensity')) $('svrSetDensity').checked = svr.dense;
+    svr.mono = !!($('svrPcMono') && $('svrPcMono').checked);
+    if ($('svrMono')) $('svrMono').checked = svr.mono;
+    svr.repeatHdr = !!($('svrPcRepeat') && $('svrPcRepeat').checked);
+    if ($('svrRepeatHeader')) $('svrRepeatHeader').checked = svr.repeatHdr;
+    svrApplyPaperPreview();
+    svrRender();
+    svrPrintCfgRenderPreview();
+  }
+  /* WYSIWYG mini preview: the exact same CSS string the printer receives,
+     applied to a scaled-down copy of #svrPages inside the dialog. */
+  function svrPrintCfgRenderPreview() {
+    var host = $('svrPcPrev'); if (!host) return;
+    var pages = $('svrPages');
+    var dims = svrPaperDims[svr.paper] || svrPaperDims.R180;
+    var pw = svr.orient ? dims[1] : dims[0];
+    host.innerHTML = '';
+    var style = document.createElement('style');
+    style.type = 'text/css';
+    /* scope the print CSS to the preview container so it does not leak */
+    style.appendChild(document.createTextNode(svrGetPrintCss()));
+    host.appendChild(style);
+    var frame = document.createElement('div');
+    frame.className = 'svr-pc-prev-sheet';
+    frame.style.width = pw + 'mm';
+    if (pages) frame.innerHTML = pages.innerHTML;
+    host.appendChild(frame);
+  }
+
   function svrResetFilters() {
     var today = state.date || '';
     if ($('svrFrom')) $('svrFrom').value = today;
@@ -4031,14 +4259,14 @@
     setv('svrShift', '-1'); setv('svrSection', '-1'); setv('svrSub', '-1');
     if ($('svrDoctor')) $('svrDoctor').value = '';
     setv('svrService', ''); setv('svrPayStatus', '-1');
-    setv('svrPaper', 'R80'); setv('svrOrient', '0');
+    setv('svrPaper', 'R180'); setv('svrOrient', '0');
     setv('svrMargin', '5'); setv('svrScale', '100');
     if ($('svrMono')) $('svrMono').checked = false;
     if ($('svrRepeatHeader')) $('svrRepeatHeader').checked = true;
     if ($('svrSetHighlight')) $('svrSetHighlight').checked = true;
     if ($('svrSetFont')) $('svrSetFont').checked = false;
     if ($('svrSetDensity')) $('svrSetDensity').checked = false;
-    svr.paper = 'R80'; svr.orient = 0; svr.margin = 5; svr.scale = 100;
+    svr.paper = 'R180'; svr.orient = 0; svr.margin = 5; svr.scale = 100;
     svr.mono = false; svr.repeatHdr = true; svr.highlight = true;
     svr.fontLarge = false; svr.dense = false;
     svrFillSubs();
@@ -4084,6 +4312,7 @@
         svr.paper = $('svrPaper').value;
         var og = $('svrOrientGroup');
         if (og) og.style.display = (svr.paper === 'A4' || svr.paper === 'A5') ? '' : 'none';
+        svrApplyPaperPreview();
       });
       on($('svrOrient'), 'change', function () { svr.orient = parseInt($('svrOrient').value, 10) || 0; });
       on($('svrMargin'), 'change', function () { svr.margin = parseInt($('svrMargin').value, 10) || 5; });
@@ -4091,6 +4320,7 @@
       on($('svrMono'), 'change', function () { svr.mono = $('svrMono').checked; });
       on($('svrRepeatHeader'), 'change', function () { svr.repeatHdr = $('svrRepeatHeader').checked; });
       on($('svrExcel'), 'click', function () { svrExportExcel(); });
+      on($('svrPrintCfg'), 'click', function () { svrPrintCfgOpen(); });
       on($('svrPreview'), 'click', function () { svrPrint(true); });
       on($('svrPrint'), 'click', function () { svrPrint(false); });
       on($('svrSetHighlight'), 'change', function () { svr.highlight = $('svrSetHighlight').checked; svrRender(); });
@@ -4102,6 +4332,7 @@
       Bridge.on('shift.changed', function () { if (state.surface === 'svreport') svrDebouncedBuild(); });
     }
     var og0 = $('svrOrientGroup'); if (og0) og0.style.display = 'none';
+    svrApplyPaperPreview();
     svrBuild();
   }
 
@@ -4278,7 +4509,7 @@
     var el = $('svrPageCount'); if (!el) return;
     var dims = svrPaperDims[svr.paper] || svrPaperDims.R80;
     var pw = svr.orient ? dims[1] : dims[0];
-    if (svr.paper === 'R80' || svr.paper === 'R58') {
+    if (svr.paper === 'R180' || svr.paper === 'R80' || svr.paper === 'R58') {
       var pages = $('svrPages'); var h = pages ? pages.offsetHeight : 0;
       var mm = Math.round(h / 3.78); el.textContent = 'طول رول: ' + svrFa((mm / 1000).toFixed(1)) + ' متر';
     } else {
@@ -4299,17 +4530,33 @@
   }
 
   function svrGetPrintCss() {
-    var dims = svrPaperDims[svr.paper] || svrPaperDims.R80;
+    var dims = svrPaperDims[svr.paper] || svrPaperDims.R180;
     var pw = svr.orient ? dims[1] : dims[0], ph = svr.orient ? dims[0] : dims[1], m = svr.margin;
     var fs = svr.fontLarge ? 14 : 12;
     var c = '';
-    c += '@page{size:' + pw + 'mm ' + (svr.paper === 'R80' || svr.paper === 'R58' ? 'auto' : ph + 'mm') + ';margin:' + m + 'mm;}';
+    c += '@page{size:' + pw + 'mm ' + (svr.paper === 'R180' || svr.paper === 'R80' || svr.paper === 'R58' ? 'auto' : ph + 'mm') + ';margin:' + m + 'mm;}';
     c += 'body{font-family:Vazirmatn,Tahoma,sans-serif;direction:rtl;font-size:' + fs + 'px;color:#1A2435;}';
     c += '.svr-block{margin-bottom:8px;page-break-inside:avoid;}';
     c += '.svr-block-title{background:' + (svr.mono ? '#f0f0f0' : '#E8EDF5') + ';border:1px solid #A8B5CC;padding:6px 10px;font-weight:700;text-align:center;border-radius:4px 4px 0 0;}';
     c += '.svr-tbl{width:100%;border-collapse:collapse;}';
-    c += '.svr-tbl th,.svr-tbl td{border:1px solid #A8B5CC;padding:' + (svr.dense ? '2px 4px' : '4px 6px') + ';}';
+    /* v2.06 — structure option from «تنظیمات چاپ»: full grid / horizontal
+       rules only / plain. All three keep the data complete (no ellipsis). */
+    var lay = svr.pcLayout || 'tbl';
+    if (lay === 'plain') {
+      c += '.svr-tbl th,.svr-tbl td{border:none;padding:' + (svr.dense ? '2px 4px' : '4px 6px') + ';}';
+    } else if (lay === 'lines') {
+      c += '.svr-tbl th,.svr-tbl td{border:none;border-bottom:1px solid #A8B5CC;padding:' + (svr.dense ? '2px 4px' : '4px 6px') + ';}';
+    } else {
+      c += '.svr-tbl th,.svr-tbl td{border:1px solid #A8B5CC;padding:' + (svr.dense ? '2px 4px' : '4px 6px') + ';}';
+    }
     c += '.svr-tbl th{background:' + (svr.mono ? '#f0f0f0' : '#DDE4EF') + ';font-weight:700;text-align:center;}';
+    /* v2.06 — column-layout option: hide the columns the operator excluded. */
+    var cols = svr.pcCols || 'seq-name-ins-status';
+    if (cols === 'seq-name-status') {
+      c += '.svr-c-ins{display:none;}';
+    } else if (cols === 'name-ins-status') {
+      c += '.svr-c-seq{display:none;}';
+    }
     c += '.svr-c-seq{text-align:center;width:40px;white-space:nowrap;}';
     c += '.svr-c-name{text-align:right;}';
     c += '.svr-c-ins{text-align:center;}';

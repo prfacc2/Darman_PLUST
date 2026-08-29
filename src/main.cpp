@@ -915,6 +915,12 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // WebView2 object) and free it. lParam is the heap task pointer.
         WebUiTask_Run(l);
         return 0;
+    case WM_APP+42:
+        // v2.06: Ctrl+Tab forwarded from the WebView2 accelerator handler — the
+        // browser had focus so the main pump never saw the raw keydown. Cycle
+        // the reception tabs exactly like the native path does.
+        Reception_CycleTab();
+        return 0;
     case WM_TIMER:
         if(w==TIMER_CLOCK){
             // §H: repaint only the clock/date zone (minimal invalidation — no
@@ -1857,13 +1863,27 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
     MSG msg;
     while(GetMessageW(&msg,NULL,0,0)){
         // global key routing
-        if(msg.message==WM_KEYDOWN){
-            HWND root=GetAncestor(msg.hwnd,GA_ROOT);
-            if(root==g_hFrame){
-                if(msg.wParam==VK_TAB && (GetKeyState(VK_CONTROL)&0x8000)){
+        // v2.06 — Ctrl+Tab must switch tabs NO MATTER WHERE THE FOCUS IS:
+        // the main frame, the HTML surface (WebView2/MSHTML child), the tab
+        // bar, the header, or the personnel-account popup. The old code gated
+        // on GetAncestor(msg.hwnd,GA_ROOT)==g_hFrame, which silently killed
+        // the hotkey whenever focus sat inside the personnel popup or any
+        // other top-level child. Now the check is: is this keydown from a
+        // window that belongs to OUR process? If so, and Ctrl is held with
+        // Tab, cycle the reception tabs and consume the message before any
+        // webview/edit subclass can swallow it.
+        if(msg.message==WM_KEYDOWN || msg.message==WM_SYSKEYDOWN){
+            if(msg.wParam==VK_TAB && (GetKeyState(VK_CONTROL)&0x8000)){
+                DWORD pid=0; GetWindowThreadProcessId(msg.hwnd,&pid);
+                if(pid==GetCurrentProcessId()){
                     Reception_CycleTab();
                     continue;
                 }
+            }
+        }
+        if(msg.message==WM_KEYDOWN){
+            HWND root=GetAncestor(msg.hwnd,GA_ROOT);
+            if(root==g_hFrame){
                 if(msg.wParam==VK_F8){
                     SendMessageW(g_hFrame, WM_KEYDOWN, msg.wParam, msg.lParam);
                     continue;

@@ -200,10 +200,11 @@
             <div class="card-body doc-body">
               <label class="fld"><span>کد انجام دهنده</span>
                 <div class="with-ico">
-                  <input type="text" id="perfcode" class="inp" data-nav inputmode="numeric" placeholder="کد فهرست انجام‌دهنده…" />
+                  <input type="text" id="perfcode" class="inp" data-nav autocomplete="off" placeholder="نام یا کد (نظام پزشکی / کد پزشک)…" />
                   <span class="in-ico"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 2a8 8 0 105 14.3l5.3 5.4 1.4-1.4-5.4-5.3A8 8 0 0010 2z"/></svg></span>
                 </div>
               </label>
+              <div class="mini-list doc-results" id="perfResults"></div>
               <label class="fld"><span>نام انجام دهنده</span>
                 <select id="perfname" class="inp" data-nav><option value="">— انتخاب —</option></select>
               </label>
@@ -971,6 +972,9 @@
         <button type="button" class="btn btn-sm btn-primary" id="svrFiltersBtn">فیلترها</button>
         <button type="button" class="btn btn-sm" id="svrRefresh">بروزرسانی</button>
         <button type="button" class="btn btn-sm" id="svrExcel">خروجی اکسل</button>
+        <!-- v2.06: print SETTINGS — structure / layout / paper / template of the
+             printed report, with a live WYSIWYG preview of the exact output. -->
+        <button type="button" class="btn btn-sm" id="svrPrintCfg">تنظیمات چاپ</button>
         <button type="button" class="btn btn-sm" id="svrPreview">پیش‌نمایش چاپ</button>
         <button type="button" class="btn btn-sm btn-primary" id="svrPrint">چاپ</button>
         <span class="svr-pagecount" id="svrPageCount"></span>
@@ -1000,6 +1004,7 @@
           </label>
           <label class="svr-f-field"><span>سایز کاغذ</span>
             <select class="inp svr-select" id="svrPaper">
+              <option value="R180">رول حرارتی ۱۸۰ میلی‌متر (۱۸ سانتی)</option>
               <option value="R80">رول حرارتی ۸۰ میلی‌متر</option>
               <option value="R58">رول حرارتی ۵۷ میلی‌متر</option>
               <option value="A5">A5</option>

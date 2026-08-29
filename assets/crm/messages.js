@@ -279,30 +279,41 @@
 
   function msgRow(host, m) {
     var cls = 'crm-msg';
-    if (!m.seen) cls += ' unseen';
+    /* v2.06: sent-by-me rows get their own style so the operator sees their
+       own messages in the inbox (previously only the manager's side showed). */
+    if (m.mine === true) cls += ' mine';
+    if (!m.seen && m.mine !== true) cls += ' unseen';
     if (m.pinned) cls += ' pinned';
     var row = Crm.el('div', cls);
     var body = Crm.el('div', 'crm-msg-body');
     body.innerHTML =
-      '<div><span class="crm-msg-from">' + Crm.esc(m.from) + '</span>' +
+      '<div><span class="crm-msg-from">' + Crm.esc(m.from) +
+        (m.mine === true ? ' <span class="crm-msg-to">← ' + Crm.esc((m.to === '*' ? 'همه' : m.to) || '') + '</span>' : '') +
+      '</span>' +
       '<span class="crm-msg-time">' + Crm.esc(m.time || '') + '</span> ' +
       Crm.pill(typeLabel(m.type), typeKind(m.type)) + '</div>' +
       '<div class="crm-msg-text">' + Crm.esc(m.text) + '</div>';
     row.appendChild(body);
     var acts = Crm.el('div', 'crm-msg-actions');
-    acts.innerHTML =
-      '<button class="crm-row-btn" data-act="pin">' + (m.pinned ? 'برداشتن پین' : 'پین') + '</button>' +
-      '<button class="crm-row-btn danger" data-act="del">حذف</button>';
-    acts.childNodes[0].onclick = function () {
-      Crm.call('crm.messages.pin', { idx: m.idx, pin: !m.pinned }).then(function () { load(host); },
-        function () { Crm.toast('عملیات ناموفق بود.', 'err'); });
-    };
-    acts.childNodes[1].onclick = function () {
-      Crm.confirm('حذف این پیام؟', function () {
-        Crm.call('crm.messages.delete', { idx: m.idx }).then(function () { Crm.toast('پیام حذف شد.', 'ok'); load(host); },
-          function () { Crm.toast('حذف ناموفق بود.', 'err'); });
-      }, { danger: true });
-    };
+    if (m.mine === true) {
+      /* v2.06: sent rows — informational only (no pin/delete on the copy the
+         recipient owns). */
+      acts.innerHTML = '<span class="crm-msg-sent-tag">ارسال‌شده</span>';
+    } else {
+      acts.innerHTML =
+        '<button class="crm-row-btn" data-act="pin">' + (m.pinned ? 'برداشتن پین' : 'پین') + '</button>' +
+        '<button class="crm-row-btn danger" data-act="del">حذف</button>';
+      acts.childNodes[0].onclick = function () {
+        Crm.call('crm.messages.pin', { idx: m.idx, pin: !m.pinned }).then(function () { load(host); },
+          function () { Crm.toast('عملیات ناموفق بود.', 'err'); });
+      };
+      acts.childNodes[1].onclick = function () {
+        Crm.confirm('حذف این پیام؟', function () {
+          Crm.call('crm.messages.delete', { idx: m.idx }).then(function () { Crm.toast('پیام حذف شد.', 'ok'); load(host); },
+            function () { Crm.toast('حذف ناموفق بود.', 'err'); });
+        }, { danger: true });
+      };
+    }
     row.appendChild(acts);
     return row;
   }

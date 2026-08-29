@@ -90,35 +90,17 @@
       SVC6_FIN = 5, SVC6_INS = 6, SVC7 = 7, SVC_SAMEN = 8;
 
   function svcModel(preset) {
+    /* v2.06 — TABLE POLICY: every preset renders the canonical 3-column table
+       (نام خدمت / تعداد / شرح خدمت). Money and identity data live in the
+       footer blocks below the table, never as table columns. The variant only
+       tweaks the NAME/DESC width split. */
     switch (preset) {
-      case SVC4_ROW: return { cols: 5, header: true,
-        widths: [0.32, 0.10, 0.20, 0.30, 0.08],
-        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت", "ردیف"] };
-      case SVC4_CAT: return { cols: 5, header: true,
-        widths: [0.26, 0.12, 0.10, 0.22, 0.30],
-        labels: ["نام خدمت", "نوع خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
-      case SVC5: return { cols: 4, header: true,
-        widths: [0.32, 0.12, 0.24, 0.32],
-        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
-      case SVC5_CODE: return { cols: 5, header: true,
-        widths: [0.26, 0.12, 0.10, 0.22, 0.30],
-        labels: ["نام خدمت", "کد خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
-      case SVC6_FIN: return { cols: 6, header: true,
-        widths: [0.24, 0.08, 0.14, 0.10, 0.18, 0.26],
-        labels: ["نام خدمت", "تعداد", "مبلغ واحد", "تخفیف", "مبلغ کل", "شرح خدمت"] };
-      case SVC6_INS: return { cols: 6, header: true,
-        widths: [0.24, 0.08, 0.16, 0.14, 0.14, 0.24],
-        labels: ["نام خدمت", "تعداد", "مبلغ کل", "سهم بیمه", "سهم بیمار", "شرح خدمت"] };
-      case SVC7: return { cols: 7, header: true,
-        widths: [0.20, 0.10, 0.08, 0.12, 0.16, 0.26, 0.08],
-        labels: ["نام خدمت", "کد خدمت", "تعداد", "مبلغ واحد", "مبلغ کل",
-                 "شرح خدمت", "ردیف"] };
       case SVC_SAMEN: return { cols: 3, header: true,
-        widths: [0.58, 0.10, 0.32],
-        labels: ["نام خدمت", "#", "شرح خدمت"] };
-      default: return { cols: 4, header: true,
-        widths: [0.34, 0.10, 0.22, 0.34],
-        labels: ["نام خدمت", "تعداد", "مبلغ کل", "شرح خدمت"] };
+        widths: [0.56, 0.10, 0.34],
+        labels: ["نام خدمت", "تعداد", "شرح خدمت"] };
+      default: return { cols: 3, header: true,
+        widths: [0.34, 0.10, 0.56],
+        labels: ["نام خدمت", "تعداد", "شرح خدمت"] };
     }
   }
 

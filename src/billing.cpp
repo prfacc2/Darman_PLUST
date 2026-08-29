@@ -421,8 +421,17 @@ bool printReceipt(const ReceptionRecord& r, int kind, HWND owner){
                 for(int c=0;c<5;++c){
                     RECT cr={cxr-colW[c]+4, y+2, cxr-4, y+rowH-2};
                     UINT al=(c==1||c==2)? DT_RIGHT : DT_CENTER;
-                    DrawTextW(dc,cells[c].c_str(),-1,&cr,
-                        al|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+                    /* v2.06 — NO ELLIPSIS in the classic receipt either
+                       («کلا هیچی نباید ۳ نقطه بشه»): wrap long service
+                       names/descriptions instead of truncating them. */
+                    RECT mr={0,0,cr.right-cr.left,1000000};
+                    DrawTextW(dc,cells[c].c_str(),-1,&mr,
+                        al|DT_TOP|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                    int mh=mr.bottom-mr.top;
+                    RECT dr=cr;
+                    int off=((cr.bottom-cr.top)-mh)/2; if(off>0) dr.top+=off;
+                    DrawTextW(dc,cells[c].c_str(),-1,&dr,
+                        al|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
                     cxr-=colW[c];
                 }
                 y+=rowH;

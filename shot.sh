@@ -24,7 +24,8 @@ SRCS="src/main.cpp src/util.cpp src/handlers.cpp src/theme.cpp src/users.cpp \
       src/setup_splash.cpp src/web_designer.cpp src/services.cpp \
       src/blacklist.cpp src/web_admission.cpp \
       src/web_pages.cpp src/web_thread_pool.cpp src/web_ping_api.cpp \
-      src/web_crm.cpp src/insurance_defs.cpp src/clinic_ops.cpp"
+      src/web_crm.cpp src/insurance_defs.cpp src/clinic_ops.cpp \
+      src/accounting.cpp"
 if [ ! -f build/DarmanPlus_dbg.exe ] || [ -n "$FORCE_BUILD" ]; then
   $RES -O coff -i src/app.rc -o obj/app.res
   $CXX -std=c++17 -O2 -municode -mwindows -DAZ_DEBUG_BUILD -DAZ_DEBUG_LOGS=1 \

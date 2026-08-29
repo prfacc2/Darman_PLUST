@@ -2906,8 +2906,15 @@ static void pcDrawServices(HDC dc, const PrintItem& it, const RECT& box, double 
             std::wstring cell=c<(int)m.labels.size()?m.labels[c]:L"";
             RECT cr={cx[c+1]+pad,ry[0],cx[c]-pad,ry[1]};
             if(cr.right<=cr.left||cr.bottom<=cr.top) continue;
-            DrawTextW(dc,cell.c_str(),-1,&cr,
-                DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+            /* v2.06 — preview matches print: wrap, never ۳ نقطه. */
+            RECT mr={0,0,cr.right-cr.left,1000000};
+            DrawTextW(dc,cell.c_str(),-1,&mr,
+                DT_CENTER|DT_TOP|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+            int mh=mr.bottom-mr.top;
+            RECT dr=cr;
+            int off=((cr.bottom-cr.top)-mh)/2; if(off>0) dr.top+=off;
+            DrawTextW(dc,cell.c_str(),-1,&dr,
+                DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
         }
         SelectObject(dc,of);
     }
@@ -2978,7 +2985,15 @@ static void pcDrawTable(HDC dc, const PrintItem& it, const RECT& box, double scP
             if(rr<(int)t.cells.size()&&c<(int)t.cells[rr].size()) cell=t.cells[rr][c];
             RECT cr={cx[c+1]+pad,ry[rr],cx[c]-pad,ry[rr+1]};
             if(cr.right<=cr.left||cr.bottom<=cr.top) continue;
-            DrawTextW(dc,cell.c_str(),-1,&cr,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+            /* v2.06 — preview matches print: wrap, never ۳ نقطه. */
+            RECT mr={0,0,cr.right-cr.left,1000000};
+            DrawTextW(dc,cell.c_str(),-1,&mr,
+                DT_CENTER|DT_TOP|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+            int mh=mr.bottom-mr.top;
+            RECT dr=cr;
+            int off=((cr.bottom-cr.top)-mh)/2; if(off>0) dr.top+=off;
+            DrawTextW(dc,cell.c_str(),-1,&dr,
+                DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
         } SelectObject(dc,of); }
     DeleteObject(fN); DeleteObject(fH);
     int bw=1; HPEN pen=CreatePen(PS_SOLID,bw,pcCR(it.borderColor)); HGDIOBJ op=SelectObject(dc,pen);

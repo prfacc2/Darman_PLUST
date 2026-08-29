@@ -72,6 +72,16 @@ static PrintItem mkPhoto(double x,double y,double w,double h){
     it.borderWidth=0.3; return it;
 }
 
+// ---------------------------------------------------------------------------o
+//  v2.06 — TABLE POLICY (user request): the services table carries EXACTLY
+//  three columns — نام خدمت / تعداد / شرح خدمت. Nothing else. All money and
+//  identity data (پرداختی، قیمت کل، سهم پایه، سهم مکمل، تخفیف، نقد، POS،
+//  کد رهگیری نسخه الکترونیک، شماره معرفی نامه، صندوق دار، ش.ص، تاریخ و ساعت)
+//  lives BELOW the table in the footer blocks (emitSamenFinance /
+//  emitSamenRef / emitSamenFooter). The former per-variant presets are kept
+//  as enum values so stored designs referencing them still parse, but every
+//  preset now renders the same canonical 3-column model (only the column
+//  widths differ slightly per paper width).
 // ---------------------------------------------------------------------------
 enum SvcPreset {
     SVC3 = 0, SVC4_ROW, SVC4_CAT, SVC5, SVC5_CODE, SVC6_FIN, SVC6_INS, SVC7,
@@ -80,39 +90,11 @@ enum SvcPreset {
 };
 
 static std::wstring svcModelJson(int preset){
-    switch(preset){
-    case SVC4_ROW:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.32,0.10,0.20,0.30,0.08],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\",\"ردیف\"]}";
-    case SVC4_CAT:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.26,0.12,0.10,0.22,0.30],"
-               L"\"labels\":[\"نام خدمت\",\"نوع خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
-    case SVC5:
-        return L"{\"cols\":4,\"header\":true,\"widths\":[0.32,0.12,0.24,0.32],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
-    case SVC5_CODE:
-        return L"{\"cols\":5,\"header\":true,\"widths\":[0.26,0.12,0.10,0.22,0.30],"
-               L"\"labels\":[\"نام خدمت\",\"کد خدمت\",\"تعداد\",\"مبلغ کل\",\"شرح خدمت\"]}";
-    case SVC6_FIN:
-        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.08,0.14,0.10,0.18,0.26],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ واحد\",\"تخفیف\",\"مبلغ کل\","
-               L"\"شرح خدمت\"]}";
-    case SVC6_INS:
-        return L"{\"cols\":6,\"header\":true,\"widths\":[0.24,0.08,0.16,0.14,0.14,0.24],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"مبلغ کل\",\"سهم بیمه\",\"سهم بیمار\","
-               L"\"شرح خدمت\"]}";
-    case SVC7:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.20,0.10,0.08,0.12,0.16,0.26,0.08],"
-               L"\"labels\":[\"نام خدمت\",\"کد خدمت\",\"تعداد\",\"مبلغ واحد\",\"مبلغ کل\","
-               L"\"شرح خدمت\",\"ردیف\"]}";
-    case SVC_SAMEN:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.22,0.08,0.16,0.12,0.14,0.14,0.14],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"شرح خدمت\",\"پرداختی\",\"قیمت کل\",\"سهم پایه\",\"سهم مکمل\"]}";
-    case SVC3:
-    default:
-        return L"{\"cols\":7,\"header\":true,\"widths\":[0.22,0.08,0.16,0.12,0.14,0.14,0.14],"
-               L"\"labels\":[\"نام خدمت\",\"تعداد\",\"شرح خدمت\",\"پرداختی\",\"قیمت کل\",\"سهم پایه\",\"سهم مکمل\"]}";
-    }
+    /* v2.06: every preset → the canonical 3-column table. The variant only
+       tweaks the NAME/DESC width split so narrow rolls keep readable prose. */
+    (void)preset;
+    return L"{\"cols\":3,\"header\":true,\"widths\":[0.34,0.10,0.56],"
+           L"\"labels\":[\"نام خدمت\",\"تعداد\",\"شرح خدمت\"]}";
 }
 
 static PrintItem mkServices(double x,double y,double w,double h,double pt,
@@ -155,11 +137,12 @@ static PrintItem mkServices(double x,double y,double w,double h,double pt,
 #define FA_DISCFROM  L"تخفیف از : "
 #define FA_DISCOUNT  L"تخفیف : "
 #define FA_CASH      L"نقد : "
+#define FA_CASHDISC  L"تخفیف نقد : "
 #define FA_POS       L"POS : "
 #define FA_EPRESC    L"کد رهگیری نسخه الکترونیک : "
 #define FA_REFERRAL  L"شماره معرفی نامه : "
 #define FA_RECEPTION L"پذیرش : "
-#define FA_CASHIER   L"صندوق : "
+#define FA_CASHIER   L"صندوق دار : "
 #define FA_SC        L"ش.ص : "
 #define FA_CASH_SFX  L" / دار"
 #define FA_TEAR      L"— — — محل جدا کردن — — —"
@@ -325,10 +308,13 @@ static double emitSamenFinance(std::vector<PrintItem>& v,double x,double y,doubl
         putLF(v, x+0.5,      y+0.3, half-1.0, fh, l2, f2, pt, false, false, 0.44);
         y+=rH; v.push_back(mkHLine(x, y, w, bw));
     };
+    /* v2.06: the complete financial footer block requested by the user —
+       پرداختی، قیمت کل، سهم پایه، سهم مکمل، تخفیف از، تخفیف، تخفیف نقد،
+       POS — all BELOW the services table, never as table columns. */
     row2(FA_PAID,     L"paid",          true,  FA_TOTAL,    L"total");
     row2(FA_INSSHARE, L"insshare",      false, FA_SUPPPAY,  L"supppay");
     row2(FA_DISCFROM, L"discount_from", false, FA_DISCOUNT, L"discount");
-    row2(FA_CASH,     L"cash",          true,  FA_POS,      L"pos");
+    row2(FA_CASHDISC, L"cash",          false, FA_POS,      L"pos");
     return y;
 }
 
@@ -341,6 +327,8 @@ static double emitDualFinance(std::vector<PrintItem>& v,double x,double y,double
     v.push_back(mkHLine(lx, y+capH, bw2, bw));
     v.push_back(mkHLine(rx, y+capH, bw2, bw));
     double iy=y+capH;
+    /* v2.06: same complete footer field set as emitSamenFinance — the whole
+       money block lives below the table, never inside it. */
     putLF(v, lx+0.5, iy+0.3,        bw2-1.0, fh, FA_PAID,     L"paid",          pt, true,  false, 0.44);
     v.push_back(mkHLine(lx, iy+rH, bw2, bw));
     putLF(v, lx+0.5, iy+rH+0.3,     bw2-1.0, fh, FA_TOTAL,    L"total",         pt, false, false, 0.44);
@@ -352,7 +340,7 @@ static double emitDualFinance(std::vector<PrintItem>& v,double x,double y,double
     v.push_back(mkHLine(rx, iy+rH, bw2, bw));
     putLF(v, rx+0.5, iy+rH+0.3,     bw2-1.0, fh, FA_SUPPPAY,  L"supppay",       pt, false, false, 0.44);
     v.push_back(mkHLine(rx, iy+2*rH, bw2, bw));
-    putLF(v, rx+0.5, iy+2*rH+0.3,   bw2-1.0, fh, FA_CASH,     L"cash",          pt, true,  false, 0.36);
+    putLF(v, rx+0.5, iy+2*rH+0.3,   bw2-1.0, fh, FA_CASHDISC, L"cash",          pt, true,  false, 0.36);
     v.push_back(mkHLine(rx, iy+3*rH, bw2, bw));
     putLF(v, rx+0.5, iy+3*rH+0.3,   bw2-1.0, fh, FA_POS,      L"pos",           pt, false, false, 0.30);
     double bottom=y+capH+4*rH;
@@ -669,6 +657,7 @@ void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
     const int N = 31;
     auto stamp=[](){
+        setSetting(L"tpl_migration_2_06", L"1");
         setSetting(L"tpl_migration_2_00", L"1");
         setSetting(L"tpl_migration_1_200", L"1");
         setSetting(L"tpl_migration_1_99", L"1");
@@ -698,6 +687,40 @@ void Designs_Init(){
             else Designs_Insert(fresh);
         }
         for(size_t i=N;i<existing.size();++i) Designs_Delete(existing[i].id);
+        stamp();
+    }
+    // v2.06 migration — the services-table policy changed: the table now has
+    // EXACTLY three columns (نام خدمت / تعداد / شرح خدمت) and all money data
+    // moved to the footer blocks. Rebuild every builtin AND migrate any
+    // user-saved design whose services model still carries the old columns.
+    if(getSetting(L"tpl_migration_2_06", L"0") != L"1"){
+        for(int i=0;i<N;i++){
+            PrintDesign fresh=buildTemplate(i);
+            if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }
+            else Designs_Insert(fresh);
+        }
+        /* migrate user-saved designs (id >= 31) that still hold an old model */
+        for(size_t i=N;i<existing.size();++i){
+            PrintDesign d=existing[i];
+            bool changed=false;
+            for(auto& it:d.items){
+                if(it.type!=PIT_SERVICES) continue;
+                std::wstring t=it.text;
+                if(t.find(L"نام خدمت")!=std::wstring::npos &&
+                   (t.find(L"مبلغ کل")!=std::wstring::npos ||
+                    t.find(L"قیمت کل")!=std::wstring::npos ||
+                    t.find(L"سهم پایه")!=std::wstring::npos ||
+                    t.find(L"سهم بیمه")!=std::wstring::npos ||
+                    t.find(L"مبلغ واحد")!=std::wstring::npos ||
+                    t.find(L"کد خدمت")!=std::wstring::npos ||
+                    t.find(L"ردیف")!=std::wstring::npos ||
+                    t.find(L"نوع خدمت")!=std::wstring::npos)){
+                    it.text=svcModelJson(SVC3);
+                    changed=true;
+                }
+            }
+            if(changed) Designs_Update(d);
+        }
         stamp();
     }
 }

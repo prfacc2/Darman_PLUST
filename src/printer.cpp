@@ -1751,8 +1751,43 @@ static void pdDrawTable(HDC dc, const PrintItem& it, const RECT& box,
             // RTL: visual column c occupies [cx[c+1] .. cx[c]]
             RECT cr={cx[c+1]+pad, ry[rr]+pad/2, cx[c]-pad, ry[rr+1]-pad/2};
             if(cr.right<=cr.left||cr.bottom<=cr.top) continue;
-            DrawTextW(dc,cell.c_str(),-1,&cr,
-                DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+            /* v2.06 — NO ELLIPSIS: shrink-to-fit then wrap (never ۳ نقطه). */
+            {
+                std::wstring fname=it.fontName.empty()?std::wstring(L"Vazirmatn"):it.fontName;
+                double sz=fontPt;
+                int limit=cr.right-cr.left; if(limit<2) limit=2;
+                auto mk=[&](double s){
+                    int lfh=-(int)(s*fontPxPerPt+0.5); if(lfh>-4) lfh=-4;
+                    return CreateFontW(lfh,0,0,0,isHead?FW_BOLD:FW_NORMAL,
+                        it.italic?1:0,0,0,DEFAULT_CHARSET,0,0,
+                        CLEARTYPE_QUALITY,0,fname.c_str()); };
+                HFONT f=mk(sz);
+                HGDIOBJ o2=SelectObject(dc,f);
+                RECT mr={0,0,limit,0};
+                DrawTextW(dc,cell.c_str(),-1,&mr,
+                    DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                int w=mr.right-mr.left;
+                SelectObject(dc,o2); DeleteObject(f);
+                while(w>limit && sz>4.5){
+                    sz*=0.9; f=mk(sz); o2=SelectObject(dc,f);
+                    RECT m2={0,0,limit,0};
+                    DrawTextW(dc,cell.c_str(),-1,&m2,
+                        DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                    w=m2.right-m2.left;
+                    SelectObject(dc,o2); DeleteObject(f);
+                }
+                f=mk(sz); o2=SelectObject(dc,f);
+                RECT wr={0,0,limit,1000000};
+                DrawTextW(dc,cell.c_str(),-1,&wr,
+                    DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                int th=wr.bottom-wr.top;
+                RECT dr=cr;
+                int off=((cr.bottom-cr.top)-th)/2; if(off>0) dr.top+=off;
+                DrawTextW(dc,cell.c_str(),-1,&dr,
+                    DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
+                SelectObject(dc,of);
+                DeleteObject(f);
+            }
         }
         SelectObject(dc,of);
     }
@@ -1913,7 +1948,52 @@ struct PdServicesLayout {
     int textLineH=1;
     int baseRowH=1;
     int headH=0;
+    double fNormPt=8.5;      // v2.06: base font size so cell drawing can shrink-to-fit
+    std::wstring fontName;   // v2.06: item font name for the shrink loop
+    double fontPxPerPt=4.0/3.0; // v2.06: real DC px-per-pt (populated by pdBuildServicesLayout)
 };
+/* v2.06: shared shrink-to-fit font factory — no cell may EVER render with an
+   ellipsis, so over-wide numeric cells step the size down until they fit. */
+static HFONT pdSvcFont(double pt,double pxPerPt,const std::wstring& name){
+    int lf=-(int)(pt*pxPerPt+0.5); if(lf>-4) lf=-4;
+    return CreateFontW(lf,0,0,0,FW_NORMAL,0,0,0,DEFAULT_CHARSET,0,0,
+        CLEARTYPE_QUALITY,0,name.empty()?L"Vazirmatn":name.c_str());
+}
+static void pdDrawCellNoEllipsis(HDC dc,const std::wstring& cell,const RECT& cr,
+                                 double basePt,double pxPerPt,const std::wstring& fontName){
+    if(cell.empty()) return;
+    double sz=basePt;
+    int limit=cr.right-cr.left; if(limit<2) limit=2;
+    HFONT f=pdSvcFont(sz,pxPerPt,fontName);
+    HGDIOBJ of=SelectObject(dc,f);
+    RECT mr={0,0,limit,0};
+    DrawTextW(dc,cell.c_str(),-1,&mr,
+        DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+    int w=mr.right-mr.left;
+    SelectObject(dc,of); DeleteObject(f);
+    while(w>limit && sz>4.5){
+        sz*=0.9;
+        f=pdSvcFont(sz,pxPerPt,fontName);
+        of=SelectObject(dc,f);
+        RECT m2={0,0,limit,0};
+        DrawTextW(dc,cell.c_str(),-1,&m2,
+            DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+        w=m2.right-m2.left;
+        SelectObject(dc,of); DeleteObject(f);
+    }
+    /* final draw — wrap + vertical center, never clipped, never ellipsised */
+    f=pdSvcFont(sz,pxPerPt,fontName);
+    of=SelectObject(dc,f);
+    RECT wr={0,0,limit,1000000};
+    DrawTextW(dc,cell.c_str(),-1,&wr,
+        DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+    int th=wr.bottom-wr.top;
+    RECT dr=cr;
+    int off=((cr.bottom-cr.top)-th)/2; if(off>0) dr.top+=off;
+    DrawTextW(dc,cell.c_str(),-1,&dr,
+        DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
+    SelectObject(dc,of); DeleteObject(f);
+}
 static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
                                   double pxPerMmX, double pxPerMmY,
                                   double fontPxPerPt, const ReceptionRecord* live,
@@ -1938,6 +2018,11 @@ static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
     int lf=-(int)(fontPt*fontPxPerPt);
     HFONT fNorm=CreateFontW(lf,0,0,0,FW_NORMAL,it.italic?1:0,0,0,DEFAULT_CHARSET,0,0,
         CLEARTYPE_QUALITY,0,it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
+    /* v2.06: remember the real font metrics so cell drawing can shrink-to-fit
+       with the SAME px/pt factor the rest of the table uses. */
+    out.fNormPt=fontPt;
+    out.fontName=it.fontName.empty()?std::wstring(L"Vazirmatn"):it.fontName;
+    out.fontPxPerPt=fontPxPerPt;
     out.pad=(int)(1.2*pxPerMmX); if(out.pad<2) out.pad=2;
     TEXTMETRICW tm={0};
     HGDIOBJ oldFont=SelectObject(dc,fNorm);
@@ -2029,8 +2114,9 @@ static void pdPaintServiceLogicalRow(HDC dc,const PrintItem& it,
             DrawTextW(dc,cell.c_str(),-1,&dr,
                 DT_RIGHT|DT_TOP|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX);
         } else {
-            DrawTextW(dc,cell.c_str(),-1,&cr,
-                DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+            /* v2.06 — NO ELLIPSIS IN PRINT («کلا هیچی نباید ۳ نقطه بشه»):
+               numeric/short cells shrink-to-fit then wrap; never truncated. */
+            pdDrawCellNoEllipsis(dc,cell,cr,layout.fNormPt,layout.fontPxPerPt,layout.fontName);
         }
     }
     SelectObject(dc,oldFont);
@@ -2118,8 +2204,44 @@ static void pdDrawServices(HDC dc, const PrintItem& it, const RECT& box,
             RECT cr={cx[c+1]+layout.pad,ry[0]+layout.pad/2,
                      cx[c]-layout.pad,ry[1]-layout.pad/2};
             if(cr.right<=cr.left||cr.bottom<=cr.top) continue;
-            DrawTextW(dc,cell.c_str(),-1,&cr,
-                DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_RTLREADING|DT_END_ELLIPSIS|DT_NOPREFIX);
+            /* v2.06: header labels shrink-to-fit / wrap — never ۳ نقطه. */
+            {
+                double sz=fontPt;
+                int limit=cr.right-cr.left; if(limit<2) limit=2;
+                auto mkHead=[&](double s){
+                    int lfh=-(int)(s*layout.fontPxPerPt+0.5); if(lfh>-4) lfh=-4;
+                    return CreateFontW(lfh,0,0,0,FW_BOLD,0,0,0,DEFAULT_CHARSET,0,0,
+                        CLEARTYPE_QUALITY,0,layout.fontName.c_str()); };
+                HFONT f=mkHead(sz);
+                HGDIOBJ of=SelectObject(dc,f);
+                RECT mr={0,0,limit,0};
+                DrawTextW(dc,cell.c_str(),-1,&mr,
+                    DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                int w=mr.right-mr.left;
+                SelectObject(dc,of); DeleteObject(f);
+                while(w>limit && sz>4.5){
+                    sz*=0.9;
+                    f=mkHead(sz);
+                    of=SelectObject(dc,f);
+                    RECT m2={0,0,limit,0};
+                    DrawTextW(dc,cell.c_str(),-1,&m2,
+                        DT_CENTER|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                    w=m2.right-m2.left;
+                    SelectObject(dc,of); DeleteObject(f);
+                }
+                f=mkHead(sz);
+                of=SelectObject(dc,f);
+                RECT wr={0,0,limit,1000000};
+                DrawTextW(dc,cell.c_str(),-1,&wr,
+                    DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                int th=wr.bottom-wr.top;
+                RECT dr=cr;
+                int off=((cr.bottom-cr.top)-th)/2; if(off>0) dr.top+=off;
+                DrawTextW(dc,cell.c_str(),-1,&dr,
+                    DT_CENTER|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX|DT_NOCLIP);
+                SelectObject(dc,oldFont);
+                DeleteObject(f);
+            }
         }
         SelectObject(dc,oldFont);
     }

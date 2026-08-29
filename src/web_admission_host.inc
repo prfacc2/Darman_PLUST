@@ -189,6 +189,15 @@ struct AccelHandler : public ICoreWebView2AcceleratorKeyPressedEventHandler {
                        kind==COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN);
         if(isDown){
             bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
+            /* v2.06: Ctrl+Tab is the app-level tab-switch hotkey — when Ctrl
+               is held the webview must NOT take the Tab (the page's JS would
+               treat it as a plain field-advance). Mark it handled here and
+               forward to the main frame so the global router cycles the tabs. */
+            if(vk==VK_TAB && ctrl){
+                args->put_Handled(TRUE);
+                if(g_hFrame) PostMessageW(g_hFrame, WM_APP+42, 0, 0);
+                return S_OK;
+            }
             if(vk==VK_TAB || vk==VK_RETURN || vk==VK_LEFT || vk==VK_RIGHT ||
                vk==VK_UP  || vk==VK_DOWN   || vk==VK_HOME || vk==VK_END  ||
                vk==VK_ESCAPE || (ctrl && vk=='A')){

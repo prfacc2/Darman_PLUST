@@ -618,17 +618,35 @@ static void portalSplitTime(const std::wstring& s, std::wstring& date, std::wstr
 // v1.93: the full performer directory (performers only, no filter) — folded
 // into init so the portal surface can populate its performer combo without a
 // second round-trip. Mirrors the doctor.performers verb's no-filter path.
+// v2.06: emits docType too (0=پزشک, 1=پرستار) so the admission combo can badge
+// nurses; and when NOT ONE doctor is flagged isPerformer (e.g. every checkbox
+// was unticked in Management) the directory falls back to ALL active doctors +
+// nurses — the «انجام دهنده» combo must never render empty.
 static std::string performersJson(){
     auto docs=loadDoctors();
-    std::string o="{\"rows\":[";
-    int n=0;
+    std::vector<const DoctorDef*> picked;
     for(size_t i=0;i<docs.size();++i){
         const auto& d=docs[i];
-        if(!d.isPerformer) continue;
+        if(!d.active) continue;
+        if(d.isPerformer) picked.push_back(&docs[i]);
+    }
+    if(picked.empty()){
+        for(size_t i=0;i<docs.size();++i){
+            const auto& d=docs[i];
+            if(!d.active) continue;
+            picked.push_back(&docs[i]);   /* v2.06 fallback — never an empty list */
+        }
+    }
+    std::string o="{\"rows\":[";
+    size_t n=0;
+    for(size_t i=0;i<picked.size();++i){
+        const auto& d=*picked[i];
         if(n++) o+=",";
         o+="{\"name\":"+jstr(d.name)+",\"specialty\":"+jstr(d.specialty)+
            ",\"code\":"+jstr(d.medicalId.empty()?d.docCode:d.medicalId)+
            ",\"medicalId\":"+jstr(d.medicalId)+
+           ",\"docCode\":"+jstr(d.docCode)+
+           ",\"docType\":"+jnum(d.docType)+
            ",\"isPerformer\":"+(d.isPerformer?std::string("true"):std::string("false"))+"}";
         if(n>=500) break;
     }
@@ -791,6 +809,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         int n=0;
         for(size_t i=0;i<docs.size();++i){
             const auto& d=docs[i];
+            if(!d.active) continue;                       /* v2.06: skip غیرفعال */
             if(onlyPerformers && !d.isPerformer) continue;
             if(!onlyPerformers && d.docType==1) continue;
             std::wstring dcode=d.medicalId.empty()?d.docCode:d.medicalId;
@@ -810,6 +829,10 @@ static std::string admissionApi(const std::string& verb, const std::string& body
                ",\"code\":"+jstr(dcode)+
                // v1.69.0: return medicalId so the JS can display it
                ",\"medicalId\":"+jstr(d.medicalId)+
+               // v2.06: docCode + docType so the admission «انجام دهنده» search
+               // can match کد پزشک too and badge پرستار rows.
+               ",\"docCode\":"+jstr(d.docCode)+
+               ",\"docType\":"+jnum(d.docType)+
                // v1.78.0: let the JS badge performers in search results
                ",\"isPerformer\":"+(d.isPerformer?std::string("true"):std::string("false"))+"}";
             // v1.78.0: a pure directory fetch (doctor.performers with no
@@ -1539,21 +1562,70 @@ static std::string admissionApi(const std::string& verb, const std::string& body
     //  — matching seenOneMessage / deleteOneMessage / pinMessage which take
     //  an `indexNewestFirst`. Field names mirror crmMsgJson (web_crm_api.inc).
     // ====================================================================
+    //  v2.06 BUGFIX («پیام خودم در چت نمایش داده نمی‌شود»):
+    //  loadMessages() keeps only rows addressed TO the user (to==user || to==*)
+    //  so the messages the user SENT (to = the peer) never came back — the
+    //  chat showed only the manager's side. The portal list now includes the
+    //  user's own SENT rows too, merged in file order, each tagged with a
+    //  definitive "mine" flag (no string matching on the JS side).
+    //  Inbox-only idx alignment: `idx` is still the position in the RECEIVED
+    //  rows (sent rows carry idx=-1) so seenone/delete/pin keep addressing the
+    //  same rows they always did.
     if(verb=="portal.messages.list"){
-        auto msgs=loadMessages(g_session.user.username);
-        std::reverse(msgs.begin(),msgs.end());   // newest-first
+        const std::wstring me=g_session.user.username;
+        /* v2.06: single oldest-first scan of messages.dat; a row participates
+           when the user RECEIVED it (to==me || to==*) or SENT it personally
+           (from==me, not a broadcast). Sent rows are tagged "mine":true and
+           carry idx=-1 (inbox verbs keep their old received-order indices). */
+        std::vector<KMsg> rows; std::vector<int> idxOf; std::vector<char> mine;
+        {
+            std::wstring all=readFileUtf8(dataDir()+L"\\messages.dat");
+            size_t pos=0;
+            while(pos<all.size()){
+                size_t e=all.find(L'\n',pos); if(e==std::wstring::npos) e=all.size();
+                std::wstring line=all.substr(pos,e-pos); pos=e+1;
+                if(trim(line).empty()) continue;
+                auto f=adSplit(line,L'|');
+                if(f.size()<5) continue;
+                KMsg k; k.from=f[0]; k.to=f[1]; k.time=f[2]; k.seen=(f[3]==L"1");
+                if(f.size()>=6){ k.type=_wtoi(f[4].c_str()); k.text=f[5]; }
+                else          { k.type=KMSG_NORMAL;        k.text=f[4]; }
+                k.pinned = (f.size()>=7 && f[6]==L"1");
+                /* v2.06: skip the auto-generated audit rows («کاربر … پیام را
+                   مشاهده/حذف کرد») — they are bookkeeping, not conversation,
+                   and would flood the chat thread. */
+                if(k.from==L"مدیریت" && k.text.rfind(L"کاربر «",0)==0) continue;
+                bool recvRow = (k.to==L"*" || k.to==me || me.empty());
+                bool sentRow = (k.from==me && k.to!=L"*");
+                if(recvRow){ rows.push_back(k); idxOf.push_back(0); mine.push_back(0); }
+                else if(sentRow){ rows.push_back(k); idxOf.push_back(0); mine.push_back(1); }
+            }
+            /* assign indices: received rows keep the newest-first convention
+               the data layer expects (rawIndexForUserMsg: n-1-indexNewestFirst)
+               while they are still ordered oldest-first here → descending from
+               (recvCount-1) down to 0. Sent rows get unique negative ids
+               (-1, -2, …) so the JS can address each row unambiguously. */
+            int r=0, s=0, recvCount=0;
+            for(size_t i=0;i<rows.size();++i) if(!mine[i]) recvCount++;
+            for(size_t i=0;i<rows.size();++i){
+                if(mine[i]) idxOf[i]=-(++s);
+                else idxOf[i]=(recvCount-1)-(r++);
+            }
+        }
         std::string o="{\"rows\":[";
-        for(size_t i=0;i<msgs.size();i++){
-            const auto& m=msgs[i];
-            if(i) o+=",";
-            o+="{\"idx\":"+jnum((long long)i)+",";
+        /* newest-first: emit from the end */
+        for(int i=(int)rows.size()-1;i>=0;--i){
+            if(i!=(int)rows.size()-1) o+=",";
+            const auto& m=rows[i];
+            o+="{\"idx\":"+jnum((long long)idxOf[i])+",";
             o+="\"from\":"+jstr(m.from)+",";
             o+="\"to\":"+jstr(m.to)+",";
             o+="\"text\":"+jstr(m.text)+",";
             o+="\"time\":"+jstr(m.time)+",";
             o+="\"seen\":"; o+=(m.seen?"true":"false"); o+=",";
             o+="\"type\":"+jnum(m.type)+",";
-            o+="\"pinned\":"; o+=(m.pinned?"true":"false");
+            o+="\"pinned\":"; o+=(m.pinned?"true":"false"); o+=",";
+            o+="\"mine\":"; o+=(mine[i]?"true":"false");
             o+="}";
         }
         o+="],\"unseen\":"+jnum((long long)unseenMessageCount(g_session.user.username))+"}";
@@ -1612,7 +1684,10 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(i<0 || i>=(int)msgs.size()) return "{\"ok\":false,\"err\":\"پیام پیدا نشد.\"}";
         std::wstring to=msgs[i].from;
         if(to.empty()) to=L"*";
-        pushMessageT(g_session.user.username,to,L"↩ "+u82w(txt),KMSG_NORMAL);
+        /* v2.06: the reply is stored with the SENDER as the current user, so
+           portal.messages.list (which now also returns from==me rows) shows
+           the operator's own bubble in the chat immediately. */
+        pushMessageT(g_session.user.username,to,u82w(txt),KMSG_NORMAL);
         return "{\"ok\":true}";
     }
     if(verb=="portal.message.print"){

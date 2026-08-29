@@ -8049,18 +8049,23 @@ body.theme-dark.surface-svr .svr-panel{background:#0B0F15;}
 body.theme-dark .svr-toolbar{background:#151B25;border-bottom:1px solid #2C3645;}
 .svr-tb-row{
   display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;
-  -ms-flex-align:center;align-items:center;gap:6px 10px;margin-bottom:4px;
+  -ms-flex-align:center;align-items:center;margin-bottom:4px;
+  margin-left:10px;
+
 }
 .svr-tb-row:last-child{margin-bottom:0;}
-.svr-tb-group{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:4px;}
+.svr-tb-group{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;}
+.svr-tb-group>*{margin-left:4px;}
 .svr-tb-lbl{font-size:12px;font-weight:600;color:#2E3D52;white-space:nowrap;}
 body.theme-dark .svr-tb-lbl{color:#C2CCDC;}
 .svr-tb-group .inp{font-size:12px;padding:3px 6px;min-height:28px;}
 .svr-date{width:90px;}.svr-select{min-width:80px;}.svr-search{width:120px;}.svr-num{width:50px;}
-.svr-chk{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;gap:4px;font-size:12px;color:#2E3D52;cursor:pointer;white-space:nowrap;}
+.svr-chk{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;font-size:12px;color:#2E3D52;cursor:pointer;white-space:nowrap;}
+.svr-chk input{margin-left:4px;margin-right:0;}
 body.theme-dark .svr-chk{color:#C2CCDC;}
 .svr-chk input{cursor:pointer;}
-.svr-tb-actions{display:-ms-flexbox;display:flex;gap:4px;margin-right:auto;}
+.svr-tb-actions{display:-ms-flexbox;display:flex;margin-right:auto;}
+.svr-tb-actions>*{margin-left:4px;}
 .svr-tb-info{-ms-flex-pack:end;justify-content:flex-end;}
 .svr-pagecount{font-size:12px;font-weight:700;color:#2B48CC;}
 body.theme-dark .svr-pagecount{color:#3B82F6;}
@@ -8099,7 +8104,23 @@ body.theme-dark .svr-loading-prog{background:#0D1218;}
 .svr-loading-fill{height:100%;width:0%;background:#2B48CC;}
 body.theme-dark .svr-loading-fill{background:#3B82F6;}
 .svr-pages{max-width:800px;margin:0 auto;}
-body.surface-svr .svr-pages{max-width:80mm;margin:0 auto;padding:8px 4px;}
+/* v2.06: the roll preview follows the selected paper width (default 18cm) and
+   is visually separated from the page background — the SHEET (center) uses a
+   white paper surface with a subtle shadow, while the surrounding area keeps
+   the panel surface colour, so the operator sees the real printable strip. */
+body.surface-svr .svr-pages{
+  max-width:180mm;margin:0 auto;padding:10px 8px;
+  background:#F7F9FC;border-radius:10px;
+  -webkit-box-shadow:0 6px 26px rgba(15,35,70,.18);box-shadow:0 6px 26px rgba(15,35,70,.18);
+}
+body.theme-dark.surface-svr .svr-pages{
+  background:#0B1420;border-radius:10px;
+  -webkit-box-shadow:0 6px 26px rgba(0,0,0,.55);box-shadow:0 6px 26px rgba(0,0,0,.55);
+}
+body.surface-svr[data-svr-paper="R80"] .svr-pages{max-width:80mm;}
+body.surface-svr[data-svr-paper="R58"] .svr-pages{max-width:58mm;}
+body.surface-svr[data-svr-paper="A5"] .svr-pages{max-width:148mm;}
+body.surface-svr[data-svr-paper="A4"] .svr-pages{max-width:210mm;}
 .svr-block-dates{font-size:11px;text-align:center;margin-top:6px;color:#5C6B7E;}
 .svr-sheet{page-break-after:always;margin-bottom:18px;padding-bottom:12px;border-bottom:1px dashed #A8B5CC;}
 .svr-report-hdr{
@@ -8158,7 +8179,10 @@ body.theme-dark .svr-empty,body.theme-dark .svr-error{color:#95A3B8;}
 .svr-settings-card{
   background:#F1F4F9;border:1px solid #A8B5CC;border-radius:10px;padding:16px 20px;
   -webkit-box-shadow:0 8px 30px rgba(20,40,80,.25);box-shadow:0 8px 30px rgba(20,40,80,.25);
-  display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;gap:10px;
+  display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;
+  margin:-5px 0;
+  padding:0;
+
 }
 body.theme-dark .svr-settings-card{background:#151B25;border:1px solid #2C3645;}
 .svr-settings-title{font-size:15px;font-weight:700;color:#0D1726;margin-bottom:4px;}
@@ -8249,3 +8273,67 @@ body.theme-dark .svr-f-field span,body.theme-neon .svr-f-field span{color:#B0C4E
   margin-top:14px;
 }
 .svr-filter-actions .btn{margin-right:8px;}
+
+/* ---- v2.06: sent-message tiles (mine:true) — own messages are visually
+   distinct from received ones so the operator sees both sides of every
+   conversation in the portal workdesk. ---- */
+.portal-tile.portal-tile-mine{background:#F2F6FF;}
+.portal-tile.portal-tile-mine .portal-tile-from{color:#2D5FE6;}
+.portal-tile-sent{
+  display:inline-block;font-size:10.5px;font-weight:800;color:#FFFFFF;
+  background:#2D5FE6;border-radius:999px;padding:1px 8px;margin-right:6px;
+  -ms-flex:0 0 auto;flex:0 0 auto;vertical-align:middle;
+}
+body.theme-dark .portal-tile.portal-tile-mine{background:#12203A;}
+body.theme-dark .portal-tile.portal-tile-mine .portal-tile-from{color:#7DA6FF;}
+body.theme-dark .portal-tile-sent{background:#2F5BD8;}
+body.theme-neon .portal-tile.portal-tile-mine{background:#0E1B33;}
+body.theme-neon .portal-tile.portal-tile-mine .portal-tile-from{color:#8FD0FF;}
+body.theme-neon .portal-tile-sent{background:#1B6FE0;}
+
+/* =========================================================================
+   v2.06 — PRINT SETTINGS dialog (تفکیک خدمات) with WYSIWYG preview.
+   The center (sheet) background is deliberately DIFFERENT from the outer
+   background so the printable strip is clearly visible.
+   ========================================================================= */
+.svr-pc-dlg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:12000;}
+.svr-pc-dlg.open{display:block;}
+.svr-pc-bk{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(12,20,36,.55);}
+.svr-pc-card{
+  position:absolute;top:50%;left:50%;-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%);
+  width:min(1060px,94vw);max-height:88vh;overflow:auto;
+  background:#F1F4F9;border:1px solid #C3CEE0;border-radius:14px;
+  -webkit-box-shadow:0 24px 80px rgba(10,25,55,.35);box-shadow:0 24px 80px rgba(10,25,55,.35);
+}
+body.theme-dark .svr-pc-card{background:#0F1725;border-color:#263447;
+  -webkit-box-shadow:0 24px 80px rgba(0,0,0,.6);box-shadow:0 24px 80px rgba(0,0,0,.6);}
+.svr-pc-head{
+  display:-ms-flexbox;display:flex;-ms-flex-pack:justify;justify-content:space-between;
+  -ms-flex-align:center;align-items:center;padding:14px 18px;border-bottom:1px solid #C3CEE0;
+}
+body.theme-dark .svr-pc-head{border-bottom:1px solid #263447;}
+.svr-pc-title{font-size:15px;font-weight:800;color:#0D1726;}
+body.theme-dark .svr-pc-title{color:#E8EEF6;}
+.svr-pc-body{display:-ms-flexbox;display:flex;padding:16px 18px;}
+.svr-pc-side{margin-left:16px;}
+.svr-pc-prev-wrap{margin-right:0;}
+.svr-pc-side{-ms-flex:0 0 300px;flex:0 0 300px;display:block;}
+.svr-pc-f{display:block;margin-bottom:12px;}
+.svr-pc-f>span{display:block;font-size:12px;font-weight:700;color:#33445C;margin-bottom:5px;}
+body.theme-dark .svr-pc-f>span{color:#C7D3E4;}
+.svr-pc-chk{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;
+  font-size:12.5px;font-weight:600;color:#33445C;margin-bottom:10px;cursor:pointer;}
+.svr-pc-chk input{margin-left:8px;margin-right:0;-ms-flex:0 0 auto;flex:0 0 auto;}
+body.theme-dark .svr-pc-chk{color:#C7D3E4;}
+/* preview area — the OUTER tray colour differs from the SHEET colour on purpose */
+.svr-pc-prev-wrap{
+  -ms-flex:1 1 auto;flex:1 1 auto;min-width:0;background:#DDE5F0;border:1px solid #C3CEE0;
+  border-radius:12px;padding:18px;overflow:auto;max-height:64vh;
+}
+body.theme-dark .svr-pc-prev-wrap{background:#0A0F1A;border-color:#263447;}
+.svr-pc-prev{display:block;}
+.svr-pc-prev-sheet{
+  background:#FFFFFF;margin:0 auto;padding:10px 8px;
+  -webkit-box-shadow:0 8px 30px rgba(10,25,55,.30);box-shadow:0 8px 30px rgba(10,25,55,.30);
+  border-radius:4px;
+}

@@ -166,11 +166,12 @@ for chunk in re.split(r"\n\s*case\s+|\n\s*default:", model_body):
     key = tag.group(1) if tag else "SVC3"
     inc_presets.setdefault(key, parsed)
 
+# v2.06: every preset renders the SAME canonical 3-column model
+# (نام خدمت / تعداد / شرح خدمت) — money data lives in the footer blocks.
 check(
-    len(inc_presets) >= 8,
-    f"expected at least 8 parsable column presets in svcModelJson, got {sorted(inc_presets)}",
+    len(inc_presets) >= 1,
+    f"expected at least 1 parsable column preset in svcModelJson, got {sorted(inc_presets)}",
 )
-check("SVC_SAMEN" in inc_presets, "SVC_SAMEN (نام خدمت|#|شرح خدمت) preset is missing")
 
 
 def audit_preset(where, key, model, defaultish=False):
@@ -178,7 +179,7 @@ def audit_preset(where, key, model, defaultish=False):
     widths = model.get("widths") or []
     labels = model.get("labels") or []
     check(model.get("header") is True, f"{where} preset {key} has no header row")
-    check(cols in (3, 4, 5, 6, 7), f"{where} preset {key} declares an odd column count {cols}")
+    check(cols == 3, f"{where} preset {key} must be the 3-column v2.06 table, got {cols}")
     check(len(widths) == cols, f"{where} preset {key}: {len(widths)} widths for {cols} cols")
     check(len(labels) == cols, f"{where} preset {key}: {len(labels)} labels for {cols} cols")
     total = sum(widths)
@@ -198,30 +199,26 @@ def audit_preset(where, key, model, defaultish=False):
     )
     check("NAME" in kinds, f"{where} preset {key} lacks mandatory NAME: {kinds}")
     check("DESC" in kinds, f"{where} preset {key} lacks mandatory DESC: {kinds}")
-    if cols >= 4:
-        for mandatory in ("QTY", "LINE"):
-            check(
-                mandatory in kinds,
-                f"{where} preset {key} lacks mandatory {mandatory}: {kinds}",
-            )
+    # v2.06: money columns are FORBIDDEN in the table (they live in the footer)
+    for forbidden in ("LINE", "PRICE", "DISC", "INS", "PAT", "SUPP", "CODE", "CAT"):
+        check(
+            forbidden not in kinds,
+            f"{where} preset {key} still carries a {forbidden} column — "
+            "v2.06 policy is نام خدمت/تعداد/شرح خدمت only",
+        )
+    check("QTY" in kinds, f"{where} preset {key} lacks mandatory QTY: {kinds}")
     check(
         len(set(kinds)) == len(kinds),
         f"{where} preset {key} repeats a column kind: {kinds}",
     )
-    if kinds[-1] != "DESC" and "ROW" in kinds:
-        check(
-            kinds[-1] == "ROW" and kinds[-2] == "DESC",
-            f"{where} preset {key} must put DESC last (or before trailing ROW): {kinds}",
-        )
-    else:
-        check(
-            kinds[-1] == "DESC",
-            f"{where} preset {key} must put DESC last: {kinds}",
-        )
+    check(
+        kinds[-1] == "DESC",
+        f"{where} preset {key} must put DESC last: {kinds}",
+    )
     if defaultish:
         check(
-            kinds == ["NAME", "ROW", "DESC"],
-            f"{where} default services must be NAME+ROW+DESC, got {kinds}",
+            kinds == ["NAME", "QTY", "DESC"],
+            f"{where} default services must be NAME+QTY+DESC, got {kinds}",
         )
     return kinds
 
@@ -308,8 +305,9 @@ check(init_fn is not None, "Designs_Init() was not found")
 if init_fn:
     init_body = init_fn.group(1)
     check(
-        init_body.count("stamp();") == 2,
-        "the migration must be stamped for fresh installs and the v2.00 upgrade "
+        init_body.count("stamp();") == 3,
+        "the migration must be stamped for fresh installs, the v2.00 upgrade and "
+        "the v2.06 3-column upgrade "
         f"(found {init_body.count('stamp();')} stamp() calls)",
     )
     check(
@@ -512,8 +510,9 @@ if js_designs:
         check("آدرس : " in d0["prefixes"], "default clinicaddr prefix is not «آدرس : »")
         check("تلفن : " in d0["prefixes"], "default clinicphone prefix is not «تلفن : »")
         if d0["model"]:
+            # v2.06: the canonical table is نام خدمت / تعداد / شرح خدمت
             check(
-                d0["model"].get("labels") == ["نام خدمت", "#", "شرح خدمت"],
+                d0["model"].get("labels") == ["نام خدمت", "تعداد", "شرح خدمت"],
                 f"default services columns are {d0['model'].get('labels')}",
             )
 
@@ -555,10 +554,10 @@ check(
     "ویزیت پزشک عمومی" not in designer_js,
     "designer services preview still shows example service names",
 )
-check("SVC_PLACEHOLDER_ROWS = 2" in designer_js,
-      "designer PIT_SERVICES preview is not locked to 2 placeholder rows")
+check("SVC_PLACEHOLDER_ROWS = 1" in designer_js,
+      "designer PIT_SERVICES preview is not locked to 1 placeholder row")
 check("[نام خدمت]" in designer_js and "[تعداد]" in designer_js and
-      "[مبلغ کل]" in designer_js and "[شرح خدمت]" in designer_js,
+      "[شرح خدمت]" in designer_js,
       "designer services preview is missing the required [token] placeholders")
 check('id="btnToolSelect"' in index_html and 'id="btnToolHand"' in index_html,
       "select/hand toolbar buttons are missing from the designer")

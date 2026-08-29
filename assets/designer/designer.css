@@ -124,7 +124,8 @@ code{background:#eef2f8;border-radius:4px;padding:1px 5px;font-family:Consolas,m
   white-space:normal;overflow-wrap:anywhere;word-break:break-word;
   text-align:center;vertical-align:middle;
   direction:rtl;unicode-bidi:plaintext}
-.pi.nowrap td,.pi.nowrap .pi-text{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+/* v2.06 — NEVER ۳ نقطه in the preview: wrap like the print engine. */
+.pi.nowrap td,.pi.nowrap .pi-text{white-space:normal;overflow-wrap:anywhere;word-break:break-word;overflow:hidden}
 .pi-services td.th{font-weight:700}
 /* §1.55.0: static tables are RTL too — column 0 is the RIGHT-most column */
 .pi-table table{direction:rtl}

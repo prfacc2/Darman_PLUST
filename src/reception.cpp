@@ -2031,19 +2031,24 @@ static bool applyDocByCode(HWND eCode, HWND cList){
     if(!eCode || !cList) return false;
     std::wstring c=codeBoxDigits(eCode);
     if(c.empty()) return false;
+    /* v2.06: the combo now starts with a «— انتخاب —» placeholder row, so the
+       doctor list index is (row - 1). No silent auto-select of the first hit
+       either — the code resolves only when it names a real doctor. */
     int idx=_wtoi(c.c_str())-1;
     int n=(int)SendMessageW(cList,CB_GETCOUNT,0,0);
-    if(idx<0 || idx>=n) return false;
-    SendMessageW(cList,CB_SETCURSEL,idx,0);
+    if(idx<0 || idx+1>n-1) return false;
+    SendMessageW(cList,CB_SETCURSEL,idx+1,0);
     echoDocCode(eCode,idx);
     return true;
 }
 // when the operator picks from the combo, mirror the 1-based code back.
+// v2.06: row 0 is the «— انتخاب —» placeholder — selecting it clears the code.
 static void mirrorDocCodeFromList(HWND eCode, HWND cList){
     if(!eCode || !cList) return;
     int sel=(int)SendMessageW(cList,CB_GETCURSEL,0,0);
     if(sel<0) return;
-    echoDocCode(eCode,sel);
+    if(sel==0){ SetWindowTextW(eCode,L""); return; }
+    echoDocCode(eCode,sel-1);
 }
 // v1.78.0: the performer combo lists ONLY doctors flagged isPerformer, so the
 // combo row no longer equals the doctors-list index. Each row carries the
@@ -2074,6 +2079,8 @@ static void mirrorPerfCodeFromList(HWND eCode, HWND cList){
     if(!eCode || !cList) return;
     int sel=(int)SendMessageW(cList,CB_GETCURSEL,0,0);
     if(sel<0) return;
+    /* v2.06: row 0 is the «— انتخاب —» placeholder — selecting it clears the code. */
+    if(sel==0){ SetWindowTextW(eCode,L""); return; }
     echoDocCode(eCode,(int)SendMessageW(cList,CB_GETITEMDATA,sel,0));
 }
 
@@ -2899,10 +2906,12 @@ static LRESULT CALLBACK tabPageProc(HWND h, UINT m, WPARAM w, LPARAM l){
                     perfRows++;
                 }
             }
-            if(!docs.empty())
-                SendMessageW(t->cDoc2List,CB_SETCURSEL,0,0);
-            if(perfRows)
-                SendMessageW(t->cPerfList,CB_SETCURSEL,0,0);
+            /* v2.06: NO AUTO-SELECT (user request) — the combos open on the
+               empty «— انتخاب —» row; the operator explicitly picks. */
+            SendMessageW(t->cDoc2List,CB_INSERTSTRING,0,(LPARAM)L"— انتخاب —");
+            SendMessageW(t->cPerfList,CB_INSERTSTRING,0,(LPARAM)L"— انتخاب —");
+            SendMessageW(t->cDoc2List,CB_SETCURSEL,0,0);
+            SendMessageW(t->cPerfList,CB_SETCURSEL,0,0);
         }
         SendMessageW(t->cApptShift,CB_ADDSTRING,0,(LPARAM)L"صبح");
         SendMessageW(t->cApptShift,CB_ADDSTRING,0,(LPARAM)L"عصر");

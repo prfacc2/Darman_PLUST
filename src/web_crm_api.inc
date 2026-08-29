@@ -219,7 +219,10 @@ static std::string crmMsgJson(const KMsg& m, int idx){
     o+="\"time\":"+jstr(m.time)+",";
     o+="\"seen\":"; o+=(m.seen?"true":"false"); o+=",";
     o+="\"type\":"+jnum(m.type)+",";
-    o+="\"pinned\":"; o+=(m.pinned?"true":"false"); o+="";
+    o+="\"pinned\":"; o+=(m.pinned?"true":"false");
+    // v2.06: definitive ownership flag — the JS no longer guesses by matching
+    // the display fullname against the stored username (they never matched).
+    o+=",\"mine\":"; o+=((m.from==g_session.user.username)?"true":"false");
     o+="}";
     return o;
 }
@@ -1200,10 +1203,47 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         std::wstring who=forU.empty()?g_session.user.username:u82w(forU);
         if(who.empty()) who=L"*";
         auto msgs=loadMessages(who);       // oldest-first (file order)
+        // v2.06 («پیام خودم در کارتابل نمایش داده نمی‌شد»): also include the
+        // messages this user SENT so the inbox reflects both sides. Sent rows
+        // get idx=-1 — pin/seen/delete keep addressing received rows only.
+        {
+            /* v2.06: local split helper (splitPipe is a static in employees.cpp
+               and not visible in this TU). */
+            auto crmSplitPipe=[](const std::wstring& s){
+                std::vector<std::wstring> out; size_t pos=0;
+                while(true){ size_t e=s.find(L'|',pos);
+                    if(e==std::wstring::npos){ out.push_back(s.substr(pos)); break; }
+                    out.push_back(s.substr(pos,e-pos)); pos=e+1; }
+                return out; };
+            std::wstring all=readFileUtf8(dataDir()+L"\\messages.dat");
+            size_t pos=0;
+            while(pos<all.size()){
+                size_t e=all.find(L'\n',pos); if(e==std::wstring::npos) e=all.size();
+                std::wstring line=all.substr(pos,e-pos); pos=e+1;
+                if(trim(line).empty()) continue;
+                auto f=crmSplitPipe(line);
+                if(f.size()<5) continue;
+                KMsg k; k.from=f[0]; k.to=f[1]; k.time=f[2]; k.seen=(f[3]==L"1");
+                if(f.size()>=6){ k.type=_wtoi(f[4].c_str()); k.text=f[5]; }
+                else          { k.type=KMSG_NORMAL;        k.text=f[4]; }
+                k.pinned=(f.size()>=7 && f[6]==L"1");
+                /* v2.06: skip the auto-generated audit rows — bookkeeping, not mail */
+                if(k.from==L"مدیریت" && k.text.rfind(L"کاربر «",0)==0) continue;
+                if(k.from==who && k.to!=L"*") msgs.push_back(k);   /* sent rows */
+            }
+        }
         // newest-first so idx == indexNewestFirst used by pin/seen/delete.
+        // Received rows keep consecutive idx; sent rows are re-stamped -1.
         std::reverse(msgs.begin(),msgs.end());
         std::string o="{\"rows\":[";
-        for(size_t i=0;i<msgs.size();++i){ if(i)o+=","; o+=crmMsgJson(msgs[i],(int)i); }
+        int recvIdx=0;
+        /* first pass: count received rows to build their newest-first idx */
+        for(size_t i=0;i<msgs.size();++i) if(msgs[i].to==L"*"||msgs[i].to==who) recvIdx++;
+        for(size_t i=0;i<msgs.size();++i){
+            if(i)o+=",";
+            bool sent=(msgs[i].from==who && msgs[i].to!=L"*");
+            o+=crmMsgJson(msgs[i], sent?-1:(--recvIdx));
+        }
         o+="],\"unseen\":"+jnum((long long)unseenMessageCount(who))+"}";
         return o;
     }
