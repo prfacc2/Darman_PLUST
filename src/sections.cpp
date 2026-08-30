@@ -7,6 +7,7 @@
 #include "app.h"
 #include "sections.h"
 #include "ui_kit.h"
+#include "clinic_ops.h"   // v2.07: Ops_IsReception for Sections_AccountRoleLabel
 #include <algorithm>
 
 static std::wstring sec_path(){ return dataDir()+L"\\sections.dat"; }
@@ -63,6 +64,9 @@ static std::vector<Section> sec_readAll(){
         // v1.97: optional 11th field = has_pos (دستگاه پوز). Older files load
         // unchanged (has_pos stays 0/OFF).
         if(f.size() >= 11) s.has_pos = _wtoi(f[10].c_str());
+        // v2.07 §7.1: optional 12th field = زیربخش پذیرش. Older files load
+        // unchanged (recept_sub stays 0/OFF).
+        if(f.size() >= 12) s.recept_sub = _wtoi(f[11].c_str());
         v.push_back(s);
     }
     int maxId=0;
@@ -103,7 +107,8 @@ static bool sec_writeAll(const std::vector<Section>& v){
         out += sec_esc(s.net_meta); out += L'|';
         out += pid; out += L'|';                          // v1.74 subsection
         out += std::to_wstring(s.cashier_tab); out += L'|';       // v1.93 cashier tab
-        out += std::to_wstring(s.has_pos); out += L"\r\n";        // v1.97 POS flag
+        out += std::to_wstring(s.has_pos); out += L'|';            // v1.97 POS flag
+        out += std::to_wstring(s.recept_sub); out += L"\r\n";      // v2.07 زیربخش پذیرش
 
     }
     return writeFileUtf8(sec_path(), out, false);
@@ -277,6 +282,36 @@ bool Sections_HasPos(int id){
     std::vector<Section> all = sec_readAll();
     for(const auto& s : all) if(s.id==id) return s.has_pos!=0;
     return false;
+}
+
+// v2.07 §7.1 — «زیربخش پذیرش» on THIS id only; NO parent inheritance
+// (mirrors Sections_HasPos exactly). Missing/unknown → false.
+bool Sections_IsReceptionSub(int id){
+    if(id<=0) return false;
+    std::vector<Section> all = sec_readAll();
+    for(const auto& s : all) if(s.id==id) return s.recept_sub!=0;
+    return false;
+}
+
+// v2.07 §7.2 — deterministic account-role label for the header's second line.
+//   زیربخش پذیرش  → «پذیرش » + the PARENT section's name_fa (e.g. «پذیرش آزمایشگاه»)
+//   top-level reception section → «پذیرش»
+//   anything else → empty (caller falls through to the next precedence step).
+// The parent_id is resolved at call time; never derived from `code` and never
+// from a display name that could be renamed without going through here.
+std::wstring Sections_AccountRoleLabel(int sectionId){
+    if(sectionId<=0) return L"";
+    std::vector<Section> all = sec_readAll();
+    const Section* me=nullptr;
+    for(const auto& s : all) if(s.id==sectionId){ me=&s; break; }
+    if(!me) return L"";
+    if(me->recept_sub!=0 && me->parent_id>0){
+        for(const auto& s : all)
+            if(s.id==me->parent_id) return L"پذیرش "+s.name_fa;
+        return L"پذیرش";
+    }
+    if(Ops_IsReception(*me)) return L"پذیرش";
+    return L"";
 }
 
 std::wstring Sections_CodePrefix(const Section& s){

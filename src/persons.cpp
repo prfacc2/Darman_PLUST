@@ -172,18 +172,38 @@ std::wstring resolveSessionTitle(const User& u){
     std::wstring pos;
     PersonDef p;
     bool haveP=personByUsername(u.username,p);
-    if(haveP)
-        pos = p.position.empty() ? personRoleLabel(p) : p.position;
+    // v2.07 §6.1 — deterministic precedence for the SECOND identity line:
+    //   1) the مقام/سمت on the personnel record, if set
+    //   2) the employee-profile role, if set
+    //   3) the section-derived label (Sections_AccountRoleLabel — e.g. «پذیرش آزمایشگاه»)
+    //   4) the access-level fallback (پذیرش / مدیریت / کارآموز)
+    if(haveP && !p.position.empty())
+        pos = p.position;
     if(pos.empty()){
         EmpProfile e=loadEmpProfile(u.username);
         pos=e.position;
+    }
+    if(pos.empty() && haveP){
+        // §6.1(3): section-derived label — a زیربخش پذیرش operator shows
+        // «پذیرش <parent section>», a top-level reception operator «پذیرش».
+        std::vector<Section> all; Sections_All(all);
+        int did=_wtoi(p.deptId.c_str());
+        int sid=_wtoi(p.subId.c_str());
+        for(const auto& s:all){
+            if(s.id!=did && s.id!=sid) continue;
+            std::wstring lbl=Sections_AccountRoleLabel(s.id);
+            if(!lbl.empty()){ pos=lbl; break; }
+        }
     }
     if(pos.empty()){
         if(u.role==2) pos=L"مدیر سامانه";
         else if(u.role==1) pos=L"مدیریت";
         else {
+            // §6.1(4): access-level fallback. کارآموز when the personnel
+            // record says trainee; پذیرش for reception-scope users; else پرسنل.
             bool rec=false;
             if(haveP){
+                if(p.roleKind==3){ pos=L"کارآموز"; return pos; }
                 std::vector<Section> all; Sections_All(all);
                 int did=_wtoi(p.deptId.c_str());
                 int sid=_wtoi(p.subId.c_str());
@@ -192,10 +212,14 @@ std::wstring resolveSessionTitle(const User& u){
                     if(Ops_IsReception(s)){ rec=true; break; }
                 }
             }
-            if(!rec && u.dept.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) rec=true;
-            pos = rec ? L"\u067e\u0630\u06cc\u0631\u0634" : L"پرسنل";
+            if(!rec && u.dept.find(L"پذیرش")!=std::wstring::npos) rec=true;
+            pos = rec ? L"پذیرش" : L"پرسنل";
         }
     }
+    // §6.4: the header shows the FULL NAME — never the login username. When we
+    // only have a username to show, log the data gap so it is visible.
+    if(u.fullname.empty() && !u.username.empty())
+        logError(L"resolveSessionTitle: user '"+u.username+L"' has no fullname on record");
     return pos;
 }
 

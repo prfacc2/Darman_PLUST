@@ -35,7 +35,13 @@ struct Section {
     // 0/OFF. Stored as an optional 11th column so older files load unchanged.
     // Sections_HasPos does NOT inherit from the parent row.
     int          has_pos;
-    Section():id(0),is_active(1),parent_id(0),cashier_tab(0),has_pos(0){}
+    // v2.07 §7.1: «زیربخش پذیرش». recept_sub=1 means this زیربخش acts as a
+    // reception point (its operator admits patients but cannot complete
+    // payment — the ticket routes to the main reception صندوق unless has_pos
+    // is also set). Default 0/OFF. Stored as an optional 12th column so older
+    // data files load unchanged.
+    int          recept_sub;
+    Section():id(0),is_active(1),parent_id(0),cashier_tab(0),has_pos(0),recept_sub(0){}
 };
 
 // Stable durable CATEGORY codes (§7). Section display names may change; these
@@ -71,3 +77,13 @@ const wchar_t* Sections_KindLabel(const std::wstring& kind);
 
 // v1.97: POS flag on THIS id only — no parent inheritance. Missing/unknown → false.
 bool Sections_HasPos(int id);
+// v2.07 §7.1: «زیربخش پذیرش» flag on THIS id only — no parent inheritance.
+// Missing/unknown → false.
+bool Sections_IsReceptionSub(int id);
+// v2.07 §7.2: deterministic account-role label for the header's second line.
+//   زیربخش پذیرش  → «پذیرش » + the PARENT section's name_fa (e.g. «پذیرش آزمایشگاه»)
+//   top-level reception section → «پذیرش»
+//   anything else → empty (caller falls through to the next precedence step).
+// Never built from `code`, and never from a display name other than the
+// parent resolved at call time.
+std::wstring Sections_AccountRoleLabel(int sectionId);

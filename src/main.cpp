@@ -1133,15 +1133,23 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
             SelectObject(dc,g_fUIB);
             SetTextColor(dc,g_theme.text);
             RECT nr={S(160),S(5),idRight,S(5)+S(24)};
-            DrawTextW(dc,g_session.user.fullname.c_str(),-1,&nr,
-                DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+            /* §6.4: the name is ALWAYS the full name; the login username is
+               shown ONLY as a last resort (and that data gap is logged by
+               resolveSessionTitle so it stays visible). */
+            { const wchar_t* nm=g_session.user.fullname.empty()
+                                  ? g_session.user.username.c_str()
+                                  : g_session.user.fullname.c_str();
+              DrawTextW(dc,nm,-1,&nr,
+                  DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
             SelectObject(dc,g_fSmall);
             SetTextColor(dc,g_theme.textDim);
-            // v1.79.0: the second line shows the person's مقام/سمت (دکتر /
-            // پرستار / کارآموز / …) instead of the technical «سطح دسترسی»
-            // label. It is resolved ONCE at login (resolveSessionTitle) and
-            // cached in g_session.title — this paint path never touches disk
-            // (the clock timer repaints this band up to twice a second).
+            // v2.07 §6.2/§6.3: the second line shows the ACCOUNT TYPE
+            // (پذیرش / مدیریت / کارآموز / پذیرش آزمایشگاه / …), resolved ONCE
+            // at login (resolveSessionTitle) and cached in g_session.title —
+            // this paint path never touches persons.dat / emp_*.dat (the clock
+            // timer repaints this band up to twice a second). §6.4: the name is
+            // ALWAYS the full name; the username is shown only as a last resort
+            // (and that gap is logged by resolveSessionTitle).
             RECT sr={S(160),S(5)+S(26),idRight,mainBarH()-S(4)};
             DrawTextW(dc,g_session.title.c_str(),-1,&sr,
                 DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
