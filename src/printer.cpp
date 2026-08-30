@@ -1519,6 +1519,11 @@ void PrinterLink_Open(HWND owner){
     s_plink=CreateWindowExW(WS_EX_TOPMOST,PL_CLASS,L"",
         WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN,
         org.x,org.y,rc.right,rc.bottom,owner,NULL,g_hInst,NULL);
+    if(!s_plink){
+        // window creation failed — release the state so the next open starts clean
+        delete s_pls; s_pls=NULL;
+        return;
+    }
     // themed search EDIT child (same pattern as the settings server-url box)
     { RECT er=plSearchEditRect(plCard(s_plink));
       s_pls->eSearch=CreateWindowExW(0,L"EDIT",s_pls->عبارت_جستجو.c_str(),
@@ -1777,10 +1782,11 @@ static inline COLORREF pdCR(unsigned int rgb){
 // Authored colours are tuned for the on-screen designer, where light greys
 // read fine; on paper they produce the washed-out look the operator reported.
 // On the PRINTER DC (never on the preview) we therefore saturate:
-//   • TEXT whose relative luminance is above 0.62 is darkened to a minimum
-//     ink contrast (no text grey lighter than #555555).
-//   • Hairlines thinner than 0.30 mm are bumped up, and no line lighter than
-//     #333333 is emitted.
+//   • TEXT whose relative luminance is above 0.62 is darkened by scaling all
+//     channels toward ink (a #DDDDDD grey becomes ~#898989). Text authored
+//     WHITE on a coloured band keeps its colour (see pdTextInkOn).
+//   • Hairlines thinner than 0.30 mm are bumped up, and lines lighter than
+//     the ~#333333-equivalent luminance are darkened to it.
 //   • opacity < 1.0 and shadows are ignored on paper (preview-only effects).
 static inline double pdLuminance(unsigned int rgb){
     double r=((rgb>>16)&0xFF)/255.0, g=((rgb>>8)&0xFF)/255.0, b=(rgb&0xFF)/255.0;
@@ -1797,15 +1803,20 @@ static inline unsigned int pdSaturateInk(unsigned int rgb,double ceiling){
     if(r>0xFF)r=0xFF; if(g>0xFF)g=0xFF; if(b>0xFF)b=0xFF;
     return (r<<16)|(g<<8)|b;
 }
-// v2.07 §3.8: the canonical saturated print palette.
-static const unsigned int PD_INK    = 0x000000;   // INK
-static const unsigned int PD_ACCENT = 0x0B3D91;   // ACCENT
-static const unsigned int PD_DANGER = 0xA31212;   // DANGER
-static const unsigned int PD_MUTED  = 0x333333;   // MUTED
 // Text ink: saturate, then never lighter than #555555-equivalent luminance.
+// v2.07 (review fix): text that sits ON a dark/authored fill (e.g. the accent
+// header band where white text is intentional) must keep its authored colour —
+// desaturating it would turn white into mid-grey on dark blue and break
+// WYSIWYG with the designer preview. The caller passes the underlying fill
+// (0xFFFFFFFF = paper/white) so only genuinely light-on-white text is darkened.
 static inline COLORREF pdTextInk(unsigned int rgb){
     unsigned int sat=pdSaturateInk(rgb,0.62);
     return pdCR(sat);
+}
+static inline COLORREF pdTextInkOn(unsigned int rgb, unsigned int fillRgb){
+    if(fillRgb!=0xFFFFFFFF && fillRgb!=0xFFFFFF)
+        return pdCR(rgb);          // authored contrast on a coloured band — keep
+    return pdTextInk(rgb);
 }
 // Hairline ink: never lighter than #333333.
 static inline COLORREF pdLineInk(unsigned int rgb){
@@ -2032,10 +2043,21 @@ static long long pdReceiptSeed(const ReceptionRecord& r){
 }
 
 // v2.07 §3.3 — resolve the record's specialty/codes against the LIVE doctors
-// store (the «مدیریت تخصص» records live on DoctorDef). Memoised per call so a
-// receipt with many doctor tokens loads the store once.
+// store (the «مدیریت تخصص» records live on DoctorDef). Memoised for the
+// duration of one print run so a receipt with many doctor tokens loads the
+// store once; printPrintDesign resets it at entry.
+static std::vector<DoctorDef> s_pdDoctorsCache;
+static bool s_pdDoctorsCached=false;
 static std::vector<DoctorDef> pdLoadDoctorsForRecord(){
-    return loadDoctors();
+    if(!s_pdDoctorsCached){
+        s_pdDoctorsCache=loadDoctors();
+        s_pdDoctorsCached=true;
+    }
+    return s_pdDoctorsCache;
+}
+static void pdResetDoctorsCache(){
+    s_pdDoctorsCache.clear();
+    s_pdDoctorsCached=false;
 }
 
 static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& tokIn){
@@ -2700,7 +2722,7 @@ static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
                 DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,
                 it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
             HGDIOBJ ofm=SelectObject(dc,fm);
-            double maxDesc=0, maxName=0;
+            double maxDesc=0;
             for(size_t i=0;i<live->services.size();++i){
                 const ServiceLine& sv=live->services[i];
                 RECT mr={0,0,0,0};
@@ -2708,12 +2730,6 @@ static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
                     DrawTextW(dc,sv.desc.c_str(),-1,&mr,
                         DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
                     if(mr.right-mr.left>maxDesc) maxDesc=mr.right-mr.left;
-                }
-                RECT nr={0,0,0,0};
-                if(!sv.name.empty()){
-                    DrawTextW(dc,sv.name.c_str(),-1,&nr,
-                        DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
-                    if(nr.right-nr.left>maxName) maxName=nr.right-nr.left;
                 }
             }
             SelectObject(dc,ofm); DeleteObject(fm);
@@ -3299,6 +3315,7 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     // design.
     { static bool s_printSeeded=false;
       if(!s_printSeeded){ Sections_Init(); Designs_Init(); s_printSeeded=true; } }
+    pdResetDoctorsCache();   // v2.07: fresh doctors store per print run
     PrintDesign d;
     // v1.99: design is bound to THIS machine's printer, not a clinic section.
     (void)sectionId;
@@ -3443,8 +3460,11 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                     // 4.0 on sheet papers, 2.5 on R80/R58 thermal rolls.
                     double gapMm = (d.paperW<=90.0)?2.5:4.0;
                     double shift=(double)delta/sy/pscale + gapMm;
-                    // clamp: the block must never leave the PRINTABLE area (the
-                    // hardware unprintable bottom margin, not just the paper edge)
+                    // clamp: the TRAILING BLOCK (بلوک_پایانی), not just the
+                    // services box, must stay inside the printable area. The
+                    // block's own bottom edge is the lowest item authored below
+                    // the services table — otherwise a large table growth would
+                    // silently push the payment summary off the page.
                     double printableBottomMm = d.paperH;
                     {
                         int ph=GetDeviceCaps(dc,PHYSICALHEIGHT);
@@ -3453,9 +3473,17 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                     }
                     double limitMm = printableBottomMm - 2.0;
                     if(limitMm > d.paperH-2.0) limitMm = d.paperH-2.0;
-                    double svcBottomMm = serviceItem->y + serviceItem->h + shift;
-                    if(svcBottomMm > limitMm)
-                        shift = limitMm - (serviceItem->y+serviceItem->h);
+                    double svcBottomMm = serviceItem->y + serviceItem->h;
+                    // lowest bottom edge among the trailing items
+                    for(const PrintItem* pit:ord){
+                        if(pit==serviceItem) continue;
+                        if(pit->y >= serviceItem->y + serviceItem->h - 0.001){
+                            double b=pit->y+pit->h;
+                            if(b>svcBottomMm) svcBottomMm=b;
+                        }
+                    }
+                    if(svcBottomMm + shift > limitMm)
+                        shift = limitMm - svcBottomMm;
                     if(shift<0) shift=0;
                     svcShiftMm=shift;
                     // grow the services box so the table renders its natural height
@@ -3650,9 +3678,11 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                     it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
                 HGDIOBJ ofF=SelectObject(dc,fF);
                 SetTextColor(dc,pdTextInk(it.textColor));
+                /* review fix: DT_VCENTER already centres inside the box — do
+                   NOT also offset the rect manually (that double-centred the
+                   name ~off/2 below centre). valign 2 (bottom) still offsets. */
                 RECT drN=rr;
-                if(it.valign==1){ int off=(boxH-(int)(ptN*dpiY/72.0))/2; if(off>0) drN.top+=off; }
-                else if(it.valign==2){ int off=boxH-(int)(ptN*dpiY/72.0); if(off>0) drN.top+=off; }
+                if(it.valign==2){ int off=boxH-(int)(ptN*dpiY/72.0); if(off>0) drN.top+=off; }
                 DrawTextW(dc,s.c_str(),-1,&drN,
                     al|DT_SINGLELINE|DT_VCENTER|dirf|DT_NOPREFIX|DT_NOCLIP|DT_END_ELLIPSIS);
                 SelectObject(dc,ofF); DeleteObject(fF);
@@ -3677,7 +3707,24 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                 SelectObject(dc,of); DeleteObject(f); f=NULL;
                 pt = pt*0.92; if(pt<floorPt) pt=floorPt;
             }
-            SetTextColor(dc,pdTextInk(it.textColor));   // v2.07 §3.8 saturated ink
+            // v2.07 §3.8 saturated ink. Text authored WHITE on a coloured band
+            // (the accent header) keeps its colour — desaturating it would
+            // produce mid-grey on dark blue and break WYSIWYG.
+            {
+                bool onBand=false;
+                if(it.textColor==0xFFFFFF || it.textColor==0xFFFFFFFF){
+                    for(const PrintItem* q:ord){
+                        if(q->type!=PIT_RECT && q->type!=PIT_FRAME) continue;
+                        if(q->fillTransparent) continue;
+                        if(it.y+it.h*0.5 >= q->y && it.y+it.h*0.5 <= q->y+q->h &&
+                           it.x+it.w*0.5 >= q->x && it.x+it.w*0.5 <= q->x+q->w){
+                            onBand=true; break;
+                        }
+                    }
+                }
+                SetTextColor(dc, onBand? pdCR(it.textColor)
+                                       : pdTextInk(it.textColor));
+            }
             // v1.23.0: vertical alignment (0=top 1=middle 2=bottom).
             RECT dr=rr;
             int bh=boxH;

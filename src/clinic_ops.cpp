@@ -978,13 +978,18 @@ bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out){
     out.receptionist=cashUserFullName(t->user);
     out.cashierName=cashUserFullName(t->paidUser.empty()?t->user:t->paidUser);
     /* §7.4: ش.ص = the MAIN reception cash sheet/shift number (the register the
-       money lands in), not the sub-section's. Resolved from the OPEN shift of
-       the main reception section; falls back to the session shift index. */
+       money lands in), not the sub-section's. We emit the 1-based SEQUENCE of
+       the open shift for that section (short, fits the footer cell), never the
+       raw shift id; falls back to the session shift index. */
     if(t->sectionId>0){
         std::vector<CashShift> shifts=shiftLoad();
+        int seq=0;
         for(const auto& sh:shifts){
-            if(sh.sectionId==t->sectionId && sh.status==L"open"){
-                out.scNum=sh.id;   // the shift/sheet document number
+            if(sh.sectionId!=t->sectionId) continue;
+            ++seq;
+            if(sh.status==L"open"){
+                wchar_t b[16]; swprintf(b,16,L"%d",seq);
+                out.scNum=b;
                 break;
             }
         }

@@ -557,7 +557,19 @@ static ReceptionRecord adBuildRecord(const std::string& body){
     r.mobile=p.mobile; r.landline=p.phone; r.address=p.addr;
     std::string s;
     if(jsonGetString(body,"ptype",s)) r.patientType=u82w(s);
-    if(jsonGetString(body,"insType",s)) r.insuranceType=u82w(s);
+    // v2.07: #insType is now the «بیمه تکمیلی» picker and carries a SuppDef
+    // idx (or "-1" for «ندارد»). Store the resolved NAME so the stored
+    // insuranceType keeps its human-readable semantics.
+    if(jsonGetString(body,"insType",s)){
+        std::wstring it=u82w(s);
+        int si=_wtoi(it.c_str());
+        if(si>=0){
+            const SuppDef* sd=suppDefByIndex(si);
+            r.insuranceType = sd? sd->name : L"";
+        } else {
+            r.insuranceType=L"ندارد";
+        }
+    }
     // Date and shift are assigned from the trusted native session, not HTML.
     r.apptDate=adTodayJalali();
     r.shift=shiftName(g_session.shift);
@@ -1343,11 +1355,11 @@ static std::string admissionApi(const std::string& verb, const std::string& body
                 bool done=false;
                 if(recSubNoPos){
                     // §7.5: زیربخش پذیرش prints ONLY the barcode label (TB1),
-                    // regardless of the machine/section design binding.
+                    // regardless of the machine/section design binding. No
+                    // cash-drawer kick — this scope never takes money.
                     PrintDesign tb1=Design_BuiltinTemplate(31);
                     done=printPrintDesignWith(r,tb1,owner);
                     if(done) printMode=L"barcode-label TB1";
-                    kickCashDrawer();
                     return;
                 }
                 // v1.65.0: ALWAYS try the services-capable print-design first —

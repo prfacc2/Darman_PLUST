@@ -308,20 +308,45 @@
     if (isNaN(v) || v < 0) v = -1;
     state.suppIdxSel = v;
     /* keep the legacy hidden #insSupp in sync so bill.compute/insSupp stays
-       coherent with the visible «بیمه تکمیلی» choice */
+       coherent with the visible «بیمه تکمیلی» choice. Sync by NAME —
+       fillSelect writes the array POSITION as the option value, which can
+       gap against SuppDef.idx, so a value match can silently select (and
+       bill) a different plan. */
     var hs = $('insSupp');
     if (hs) {
-      var matched = false, i;
-      for (i = 0; i < hs.options.length; i++) {
-        if (parseInt(hs.options[i].value, 10) === v) { hs.selectedIndex = i; matched = true; break; }
+      var wantName = '';
+      if (v >= 0 && state.suppDefs) {
+        for (var sd = 0; sd < state.suppDefs.length; sd++) {
+          if (parseInt(state.suppDefs[sd].idx, 10) === v) { wantName = state.suppDefs[sd].name || ''; break; }
+        }
       }
-      if (!matched) hs.selectedIndex = 0;
+      var matched = false, i;
+      if (wantName) {
+        for (i = 0; i < hs.options.length; i++) {
+          if (hs.options[i].text === wantName) { hs.selectedIndex = i; matched = true; break; }
+        }
+      }
+      if (!matched) {
+        /* «ندارد» (or no match) → select the first option that means none;
+           fall back to index 0 only when nothing else exists. */
+        var noneIdx = 0;
+        for (i = 0; i < hs.options.length; i++) {
+          if (/\u0646\u062f\u0627\u0631\u062f/.test(hs.options[i].text)) { noneIdx = i; break; }
+        }
+        hs.selectedIndex = noneIdx;
+      }
     }
     Bridge.call('بیمه_تکمیلی_انتخاب', { idx: v }).then(function (r) {
+      var box = $('insSuppPct');
       if (r && r.ok && r.pct != null) {
         state.suppPctLive = r.pct;
-        var box = $('insSuppPct');
         if (box && r.pct > 0) box.value = toFa(String(r.pct));
+      }
+      /* review fix: «ندارد» must clear any stale explicit percentage, else
+         suppInsPct() keeps billing the previously-selected plan's percent. */
+      if (v < 0) {
+        state.suppPctLive = 0;
+        if (box) box.value = '0';
       }
       scheduleRender();
     }, function () { scheduleRender(); });
@@ -5088,12 +5113,16 @@
       state.payBlocked = !!r.payBlocked;
       state.receptSub  = !!r.receptSub;
       if (state.payBlocked) {
+        /* §7.3: the payment controls (نقد، POS، تخفیف، پرداختی) are disabled —
+           never removed (RULE 6). The admission cannot be marked paid. */
         var blockIds = ['noPay', 'insSuppPct'];
         var bi;
         for (bi = 0; bi < blockIds.length; bi++) {
           var el = $(blockIds[bi]);
           if (el) { el.disabled = true; }
         }
+        /* the cashier mini payment buttons (data-paym) are inert in this scope */
+        state.canCashEdit = false;
         showPayBlockedNotice();
       }
       if (!state.canCashView) {

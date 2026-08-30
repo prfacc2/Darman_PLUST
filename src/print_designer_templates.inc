@@ -231,54 +231,94 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
     }
     v.push_back(mkHLine(x,y,w,bw)); y+=1.6;
 
-    // ---------------- BLOCK 6: appt date · time · queue --------------------
-    {
-        double colW=(w-2*0.6)/3.0;
-        putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_APPTDATE, L"apptdate", pt, true,false, 0.52);
-        putLF(v, x+(colW+0.6),     y, colW, 4.4, FA_APPTTIME, L"appttime", pt, false,false, 0.52);
-        putLF(v, x,                y, colW, 4.4, FA_QUEUE,    L"queue",    pt, false,true,  0.40);
-        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
-    }
-
-    // ---------------- BLOCK 7: nid · base ins · supp ins -------------------
-    {
-        double colW=(w-2*0.6)/3.0;
-        putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_NID,     L"nid",      pt, true,false, 0.46);
-        putLF(v, x+(colW+0.6),   y, colW, 4.4, FA_BASEINS, L"ins_full", pt, false,false, 0.48);
-        putLF(v, x,              y, colW, 4.4, FA_SUPPINS, L"supp_full",pt, false,false, 0.48);
-        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
-    }
-
-    // ---------------- BLOCK 8: patient name (single line) · age · certno ---
-    {
-        double nameW = w*0.46, ageW=w*0.22, certW=w-nameW-ageW-1.2;
-        putLF(v, x+ageW+certW+1.2, y, nameW, 4.6, FA_FULL, L"P-Name", pt+0.5, true, true, 0.34);
-        // §3.5 name item contract: dir 0 (RTL), align 0 (right), valign 1
-        v.back().dir=0; v.back().align=0; v.back().valign=1;
-        putLF(v, x+certW+0.6, y, ageW, 4.4, FA_AGE,    L"age",    pt, false,false, 0.40);
-        putLF(v, x,            y, certW, 4.4, FA_CERTNO, L"certno", pt, false,false, 0.52);
-        y+=5.0; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
-    }
-
-    // ---------------- BLOCK 9: انجام‌دهنده + کد -----------------------------
-    {
-        double codeW=w*0.28;
-        putLF(v, x+codeW+0.6, y, w-codeW-0.6, 4.4, FA_PERF, L"performer", pt, true,false, 0.34);
-        putLF(v, x,            y, codeW,      4.4, FA_PERFCODE, L"performercode", pt, false,false, 0.56);
-        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
-    }
-
-    // ---------------- BLOCK 10: پزشک معالج + تخصص + کد نظام پزشکی ----------
-    {
-        double codeW=w*0.24, specW=w*0.34, docW=w-codeW-specW-1.2;
-        putLF(v, x+codeW+specW+1.2, y, docW,  4.4, FA_DOCTOR,   L"doctor",     pt, true,false, 0.36);
-        putLF(v, x+codeW+0.6,       y, specW, 4.4, FA_SPECIALTY, L"specialty",  pt, false,false, 0.40);
-        putLF(v, x,                 y, codeW, 4.4, FA_DOCCODE,   L"doctorcode", pt, false,false, 0.56);
-        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
+    // ---------------- BLOCKS 6-10: identity / visit / doctor ----------------
+    // چیدمان 1 (two-column): blocks 6..10 pack into two columns, side by side.
+    // چیدمان 2 (banded):     each block gets a caption bar above it.
+    // چیدمان 0/3/4:          single-column rows (the classic receipt flow).
+    const bool twoCol = (p.چیدمان==1);
+    const bool banded = (p.چیدمان==2);
+    auto captionBar=[&](const wchar_t* txt){
+        v.push_back(mkLabel(x, y, w, 3.6, txt, pt-1.0, true, 1));
+        v.back().textColor=R_ACCENT;
+        y+=3.8;
+    };
+    if(twoCol){
+        // Two columns: visit+insurance on the RIGHT column, patient+doctors LEFT.
+        double gap=2.0, colW=(w-gap)/2.0;
+        double xR=x+colW+gap, xL=x;                 // RTL: right column first
+        double yTop=y;
+        // right column: blocks 6 + 7
+        putLF(v, xR, y, colW, 4.4, FA_APPTDATE, L"apptdate", pt, true,false, 0.52); y+=4.6;
+        putLF(v, xR, y, colW, 4.4, FA_APPTTIME, L"appttime", pt, false,false, 0.52); y+=4.6;
+        putLF(v, xR, y, colW, 4.4, FA_QUEUE,    L"queue",    pt, false,true,  0.40); y+=4.6;
+        putLF(v, xR, y, colW, 4.4, FA_NID,      L"nid",      pt, true,false, 0.46); y+=4.6;
+        putLF(v, xR, y, colW, 4.4, FA_BASEINS,  L"ins_full", pt, false,false, 0.48); y+=4.6;
+        putLF(v, xR, y, colW, 4.4, FA_SUPPINS,  L"supp_full",pt, false,false, 0.48); y+=4.6;
+        double yR=y;
+        // left column: blocks 8 + 9 + 10
+        y=yTop;
+        putLF(v, xL, y, colW, 4.6, FA_FULL, L"P-Name", pt+0.5, true, true, 0.34);
+        v.back().dir=0; v.back().align=0; v.back().valign=1;   // §3.5 contract
+        y+=5.0;
+        putLF(v, xL, y, colW, 4.4, FA_AGE,     L"age",    pt, false,false, 0.40); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_CERTNO,  L"certno", pt, false,false, 0.52); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_PERF,    L"performer", pt, true,false, 0.34); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_PERFCODE, L"performercode", pt, false,false, 0.56); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_DOCTOR,  L"doctor",     pt, true,false, 0.36); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_SPECIALTY, L"specialty", pt, false,false, 0.40); y+=4.6;
+        putLF(v, xL, y, colW, 4.4, FA_DOCCODE,   L"doctorcode", pt, false,false, 0.56); y+=4.6;
+        if(yR>y) y=yR;
+        v.push_back(mkVLine(x+colW+gap/2.0, yTop, y-yTop, bw));
+        v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
+    } else {
+        if(banded) captionBar(L"مشخصات نوبت و بیمه");
+        // ---------------- BLOCK 6: appt date · time · queue ----------------
+        {
+            double colW=(w-2*0.6)/3.0;
+            putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_APPTDATE, L"apptdate", pt, true,false, 0.52);
+            putLF(v, x+(colW+0.6),     y, colW, 4.4, FA_APPTTIME, L"appttime", pt, false,false, 0.52);
+            putLF(v, x,                y, colW, 4.4, FA_QUEUE,    L"queue",    pt, false,true,  0.40);
+            y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+        }
+        // ---------------- BLOCK 7: nid · base ins · supp ins ---------------
+        {
+            double colW=(w-2*0.6)/3.0;
+            putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_NID,     L"nid",      pt, true,false, 0.46);
+            putLF(v, x+(colW+0.6),   y, colW, 4.4, FA_BASEINS, L"ins_full", pt, false,false, 0.48);
+            putLF(v, x,              y, colW, 4.4, FA_SUPPINS, L"supp_full",pt, false,false, 0.48);
+            y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+        }
+        if(banded) captionBar(L"مشخصات بیمار و پزشک");
+        // ---------------- BLOCK 8: patient name (single line) · age · certno
+        {
+            double nameW = w*0.46, ageW=w*0.22, certW=w-nameW-ageW-1.2;
+            putLF(v, x+ageW+certW+1.2, y, nameW, 4.6, FA_FULL, L"P-Name", pt+0.5, true, true, 0.34);
+            // §3.5 name item contract: dir 0 (RTL), align 0 (right), valign 1
+            v.back().dir=0; v.back().align=0; v.back().valign=1;
+            putLF(v, x+certW+0.6, y, ageW, 4.4, FA_AGE,    L"age",    pt, false,false, 0.40);
+            putLF(v, x,            y, certW, 4.4, FA_CERTNO, L"certno", pt, false,false, 0.52);
+            y+=5.0; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+        }
+        // ---------------- BLOCK 9: انجام‌دهنده + کد -------------------------
+        {
+            double codeW=w*0.28;
+            putLF(v, x+codeW+0.6, y, w-codeW-0.6, 4.4, FA_PERF, L"performer", pt, true,false, 0.34);
+            putLF(v, x,            y, codeW,      4.4, FA_PERFCODE, L"performercode", pt, false,false, 0.56);
+            y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+        }
+        // ---------------- BLOCK 10: پزشک معالج + تخصص + کد نظام پزشکی ------
+        {
+            double codeW=w*0.24, specW=w*0.34, docW=w-codeW-specW-1.2;
+            putLF(v, x+codeW+specW+1.2, y, docW,  4.4, FA_DOCTOR,   L"doctor",     pt, true,false, 0.36);
+            putLF(v, x+codeW+0.6,       y, specW, 4.4, FA_SPECIALTY, L"specialty",  pt, false,false, 0.40);
+            putLF(v, x,                 y, codeW, 4.4, FA_DOCCODE,   L"doctorcode", pt, false,false, 0.56);
+            y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
+        }
     }
 
     // ---------------- BLOCK 11: جدول خدمات (3 columns) ---------------------
     // The elastic item of the layout: everything below forms بلوک_پایانی.
+    if(banded) captionBar(L"جدول خدمات");
     double footH = roll? 26.0 : 34.0;
     double moneyH = roll? 16.0 : 22.0;
     double svcY=y;

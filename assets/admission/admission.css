@@ -8374,3 +8374,11 @@ body.surface-adm .svc-card > .card-head{
 body.surface-adm .svc-card > .card-head .card-title{
   cursor:text;
 }
+
+/* v2.07 review fix §5.2: the expanded doctor listbox (size=2..8 driven by
+   filterDoctorSelect) must keep its auto height — the fixed 34px rule above
+   only applies to the collapsed single-row mode. */
+body.surface-adm select.inp#doc2name[size]{
+  height:auto;
+  line-height:normal;
+}

@@ -360,7 +360,7 @@ T15 طرح بارکدمحور              T30 طرح خلاصهٔ مدیریت�
 |---|---|
 | Label text change | `نوع بیمه` → `بیمه تکمیلی` (element id `insType` unchanged) |
 | New bridge verb 1 | `بیمه_تکمیلی_فهرست` — returns per active `SuppDef`: `idx`, `name`, `franchiseOrgPct`, `tariffType`, `franchise`, `ceiling`, `color` |
-| New bridge verb 2 | `بیمه_تکمیلی_انتخاب` — body `{idx}`; C++ sets `ReceptionRecord::suppIdx` + `suppPercent` via `Supp_Percent(idx)` |
+| New bridge verb 2 | `بیمه_تکمیلی_انتخاب` — body `{idx}`; returns the resolved `pct` (via `Supp_Percent(idx)`) + name so the form can display the authoritative percentage live. The persisted `suppIdx`/`suppPercent` flow through the save payload (`insSupp`/`insSuppPct`) exactly as before — this verb is the live-echo half of the one path. |
 | CSS scoping | only `body.surface-adm`-prefixed rules; Trident-safe literals |
 | Services search width | `+28px` from the right edge at base density (appended `body.surface-adm` rule) |
 | Header click-to-focus | listener on the خدمات پذیرش `.card-head` root only; `cursor: text` on background/title |
