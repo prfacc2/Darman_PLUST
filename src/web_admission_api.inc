@@ -566,6 +566,35 @@ static ReceptionRecord adBuildRecord(const std::string& body){
     if(jsonGetString(body,"doc2code",s)) r.doctorCode=normDigits(u82w(s));
     if(jsonGetString(body,"perfcode",s)) r.performerCode=normDigits(u82w(s));
     if(jsonGetString(body,"perfname",s)) r.performer=u82w(s);
+    if(jsonGetString(body,"certNo",s)) r.certNo=normDigits(u82w(s));
+    // v2.07 §3.3 — resolve شرح تخصص from the doctors store (the «مدیریت تخصص»
+    // records) so {specialty} prints for web-admission records too. The chain
+    // mirrors pdFieldValue: r.specialty → doctor by code → doctor by exact name.
+    // Nothing is fabricated — no match leaves the fields empty.
+    r.specialty.clear(); r.specialtyCode.clear();
+    if(!r.treatingDoctor.empty() || !r.doctorCode.empty()){
+        std::vector<DoctorDef> docs=loadDoctors();
+        const DoctorDef* hit=nullptr;
+        if(!r.doctorCode.empty()){
+            for(const auto& d:docs)
+                if(d.medicalId==r.doctorCode||d.docCode==r.doctorCode){ hit=&d; break; }
+        }
+        if(!hit && !r.treatingDoctor.empty()){
+            for(const auto& d:docs)
+                if(d.name==r.treatingDoctor){ hit=&d; break; }
+        }
+        if(hit){
+            r.specialty=hit->specialty;
+            if(!r.doctorCode.empty()) r.specialtyCode=r.doctorCode;
+            else if(!hit->medicalId.empty()) r.specialtyCode=hit->medicalId;
+            // capture کد نظام پزشکی ONCE at save time so reprints never
+            // depend on the doctors store staying unchanged
+            if(r.doctorCode.empty() && !hit->medicalId.empty())
+                r.doctorCode=hit->medicalId;
+        }
+    }
+    if(r.performer.empty())     r.performer=r.treatingDoctor;
+    if(r.performerCode.empty()) r.performerCode=r.doctorCode;
     if(jsonGetString(body,"insBooklet",s)) r.insNo=normDigits(u82w(s));
     if(jsonGetString(body,"insValid",s)) r.insExp=normDigits(u82w(s));
     r.apptTime=adNowTime();

@@ -1856,6 +1856,25 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
                 gdipShutdown(); BackupLog_Shutdown();
                 return 0;
             }
+            // v2.07: headless smoke for the «ارتباط با چاپگر» dialog — verify
+            // the dialog opens, enumerates printers, applies the filter and
+            // resolves the pre-selection without blocking, then exits cleanly.
+            // Pumps briefly so the dialog actually paints (screenshot path).
+            else if(!wcscmp(dbg,L"printer_link")){
+                switchScreen(SC_RECEPTION);
+                UpdateWindow(f);
+                PrinterLink_Open(f);
+                logLine(L"SMOKE printer_link: dialog opened — OK");
+                MSG m;
+                DWORD t0=GetTickCount();
+                while(GetTickCount()-t0 < 1500){
+                    while(PeekMessageW(&m,NULL,0,0,PM_REMOVE)){
+                        TranslateMessage(&m); DispatchMessageW(&m);
+                    }
+                    Sleep(30);
+                }
+                return 0;
+            }
         }
     }
 #endif

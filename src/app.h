@@ -526,6 +526,11 @@ struct ReceptionRecord {
               finalTotal, discount, paid;
     int queueNo, insIdx, suppIdx;
     std::vector<ServiceLine> services;   // §1.51.0: billed services list
+    // v2.07.0 — additional receipt fields. All additive, appended at the END
+    // of the member list (existing serialization order is untouched).
+    std::wstring certNo;        // شماره شناسنامه — as entered; empty when not captured
+    std::wstring receiptTitle;  // لیبل معرف رسید (e.g. «رسید بیمه تکمیلی»)
+    std::wstring clinicName, clinicAddr, clinicPhone; // resolved from settings at print time
     ReceptionRecord():insPercent(-1),suppPercent(-1),cash(0),pos(0),receiptNo(0),
         total(0),mainShare(0),patientShare(0),baseDiff(0),
         orgShare(0),finalTotal(0),discount(0),paid(0),queueNo(0),

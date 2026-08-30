@@ -32,3 +32,18 @@ inline bool pdContinuationRepeatAllowed(PdContinuationItemKind itemKind,
         if(normalizedField==safe[i]) return true;
     return false;
 }
+
+// v2.07 §3.4 — LAYOUT-LEVEL BARCODE DE-DUPLICATION GUARD.
+// The barcode value must appear EXACTLY ONCE per receipt: as the HRI text
+// under the barcode graphic (PIT_BARCODE with hri == true). When a design
+// contains such a barcode, any ADDITIONAL text item bound to the same value
+// ({receiptbarcode}, or {receiptcode} when it repeats the same payload) is
+// skipped at render time. This holds even for user designs saved earlier —
+// without deleting the user's item type (RULE 6).
+//   hriRendered     — true once a PIT_BARCODE with hri==true has been emitted
+//   normalizedField — the item's field, already run through pdNormalizeField()
+inline bool pdBarcodeValueAlreadyRendered(bool hriRendered,
+                                          const std::wstring& normalizedField){
+    if(!hriRendered) return false;
+    return normalizedField==L"{receiptbarcode}" || normalizedField==L"{barcode}";
+}

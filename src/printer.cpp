@@ -17,6 +17,7 @@
 #include "print_services_policy.h"
 #include "sections.h"         // v1.65.0: lazy seeding in the print path
 #include "ui_kit.h"           // v2.07: uikit::NormalizeFa for printer search
+#include <cmath>              // v2.07: std::abs for reflow comparison
 #include <stdio.h>
 
 // ----------------------------------------------------------------------------
@@ -1067,10 +1068,9 @@ static void plApplyFilter(){
            uikit::NormalizeFa(s_pls->همه_چاپگرها[i]).find(q)!=std::wstring::npos)
             s_pls->نتایج_جستجو.push_back((int)i);
     }
-    bool found=false;
-    for(size_t i=0;i<s_pls->نتایج_جستجو.size();++i)
-        if(s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[i]]==s_pls->چاپگر_انتخابی){ found=true; break; }
-    if(!found) s_pls->چاپگر_انتخابی.clear();
+    // v2.07: چاپگر_انتخابی is a STABLE candidate that survives filtering —
+    // typing one character and deleting it must not lose the Windows-default
+    // pre-selection (§2.3 contract). It is re-derived only on open/reload.
     int maxScroll=(int)s_pls->نتایج_جستجو.size()-plListRows();
     if(maxScroll<0) maxScroll=0;
     if(s_pls->اسکرول>maxScroll) s_pls->اسکرول=maxScroll;
@@ -1123,6 +1123,14 @@ static void plClose(){
 static RECT plSearchEditRect(const RECT& c){
     RECT r={c.left+S(20),c.top+S(64),c.right-S(20),c.top+S(64)+S(36)};
     return r;
+}
+// v2.07: re-place the search EDIT child after a resize so it always sits on
+// its drawn frame (same pattern as settings.cpp layoutServerEdit).
+static void plLayoutEdit(HWND h){
+    if(!s_pls || !s_pls->eSearch || !IsWindow(s_pls->eSearch)) return;
+    RECT er=plSearchEditRect(plCard(h));
+    MoveWindow(s_pls->eSearch,
+        er.left+S(6),er.top+S(3),(er.right-er.left)-S(12),(er.bottom-er.top)-S(6),TRUE);
 }
 static int plListTop(const RECT& c){ return c.top+S(112); }
 static RECT plListRect(const RECT& c){
@@ -1453,6 +1461,10 @@ static LRESULT CALLBACK plProc(HWND h, UINT m, WPARAM w, LPARAM l){
             return 0;
         }
         break;
+    case WM_SIZE:
+        plLayoutEdit(h);
+        InvalidateRect(h,NULL,FALSE);
+        return 0;
     case WM_CTLCOLOREDIT: {
         HDC dc=(HDC)w;
         SetTextColor(dc,g_theme.inputText); SetBkColor(dc,g_theme.inputBg);
@@ -1510,7 +1522,7 @@ void PrinterLink_Open(HWND owner){
     // themed search EDIT child (same pattern as the settings server-url box)
     { RECT er=plSearchEditRect(plCard(s_plink));
       s_pls->eSearch=CreateWindowExW(0,L"EDIT",s_pls->عبارت_جستجو.c_str(),
-          WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+          WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_AUTOHSCROLL,
           er.left+S(6),er.top+S(3),(er.right-er.left)-S(12),(er.bottom-er.top)-S(6),
           s_plink,(HMENU)IDC_PL_SEARCH,g_hInst,NULL);
       SendMessageW(s_pls->eSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
@@ -1562,8 +1574,19 @@ static std::wstring fieldValue(const ReceptionRecord& r, const std::wstring& tok
     if(tok==L"{discount}") return toFaDigits(formatMoney(r.discount))+L" ریال";
     if(tok==L"{paid}")     return toFaDigits(formatMoney(r.paid))+L" ریال";
     // v1.96.0 — full medical-receipt field set for the expanded default slip.
-    if(tok==L"{clinicaddr}")   return getSetting(L"clinic_address",L"");
-    if(tok==L"{clinicphone}")  return toFaDigits(getSetting(L"clinic_phone",L""));
+    // v2.07: same resolution chain as pdFieldValue.
+    if(tok==L"{clinicaddr}"){
+        if(!r.clinicAddr.empty()) return r.clinicAddr;
+        std::wstring a=getSetting(L"clinic_addr",L"");
+        if(!a.empty()) return a;
+        return getSetting(L"clinic_address",L"");
+    }
+    if(tok==L"{clinicphone}"){
+        if(!r.clinicPhone.empty()) return toFaDigits(r.clinicPhone);
+        std::wstring p=getSetting(L"clinic_phone_num",L"");
+        if(!p.empty()) return toFaDigits(p);
+        return toFaDigits(getSetting(L"clinic_phone",L""));
+    }
     if(tok==L"{apptdate}")     return toFaDigits(r.apptDate);
     if(tok==L"{age}"){
         // v1.97.0: thermal receipts print age as 10Y / 24Y (Latin digits + Y).
@@ -1748,6 +1771,47 @@ static std::wstring pdU8toW(const std::string& s){
 static inline COLORREF pdCR(unsigned int rgb){
     return RGB((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
 }
+
+// ---------------------------------------------------------------------------
+// v2.07 §3.8 — PRINT INK POLICY (high-contrast, saturated output).
+// Authored colours are tuned for the on-screen designer, where light greys
+// read fine; on paper they produce the washed-out look the operator reported.
+// On the PRINTER DC (never on the preview) we therefore saturate:
+//   • TEXT whose relative luminance is above 0.62 is darkened to a minimum
+//     ink contrast (no text grey lighter than #555555).
+//   • Hairlines thinner than 0.30 mm are bumped up, and no line lighter than
+//     #333333 is emitted.
+//   • opacity < 1.0 and shadows are ignored on paper (preview-only effects).
+static inline double pdLuminance(unsigned int rgb){
+    double r=((rgb>>16)&0xFF)/255.0, g=((rgb>>8)&0xFF)/255.0, b=(rgb&0xFF)/255.0;
+    return 0.2126*r + 0.7152*g + 0.0722*b;
+}
+// Darken toward pure ink until the luminance is at or below the ceiling.
+static inline unsigned int pdSaturateInk(unsigned int rgb,double ceiling){
+    if(pdLuminance(rgb)<=ceiling) return rgb;
+    double k=ceiling/pdLuminance(rgb);          // scale all channels equally
+    if(k>1.0) k=1.0;
+    unsigned int r=(unsigned int)(((rgb>>16)&0xFF)*k+0.5);
+    unsigned int g=(unsigned int)(((rgb>>8)&0xFF)*k+0.5);
+    unsigned int b=(unsigned int)((rgb&0xFF)*k+0.5);
+    if(r>0xFF)r=0xFF; if(g>0xFF)g=0xFF; if(b>0xFF)b=0xFF;
+    return (r<<16)|(g<<8)|b;
+}
+// v2.07 §3.8: the canonical saturated print palette.
+static const unsigned int PD_INK    = 0x000000;   // INK
+static const unsigned int PD_ACCENT = 0x0B3D91;   // ACCENT
+static const unsigned int PD_DANGER = 0xA31212;   // DANGER
+static const unsigned int PD_MUTED  = 0x333333;   // MUTED
+// Text ink: saturate, then never lighter than #555555-equivalent luminance.
+static inline COLORREF pdTextInk(unsigned int rgb){
+    unsigned int sat=pdSaturateInk(rgb,0.62);
+    return pdCR(sat);
+}
+// Hairline ink: never lighter than #333333.
+static inline COLORREF pdLineInk(unsigned int rgb){
+    unsigned int sat=pdSaturateInk(rgb,0.25);
+    return pdCR(sat);
+}
 static bool pdParseTable(const std::wstring& jsonW, PdTable& t){
     // convert to utf8 for byte parsing, but keep strings as wstring
     int n=WideCharToMultiByte(CP_UTF8,0,jsonW.c_str(),(int)jsonW.size(),NULL,0,NULL,NULL);
@@ -1912,6 +1976,11 @@ static std::wstring pdNormalizeField(const std::wstring& f){
     if(eq("referralno")||eq("referral_no")||eq("ref_no")||eq("refno")) return L"{referralno}";
     if(eq("basepay")||eq("base_pay")||eq("baseshare"))  return L"{basepay}";
     if(eq("supppay")||eq("supp_pay")||eq("suppshare"))  return L"{supppay}";
+    // ---- v2.07.0: clinic/receipt identity aliases ------------------------
+    if(eq("certno")||eq("cert_no")||eq("certificateNo")||eq("certificateno")
+       ||eq("shenasname")||eq("shenasnameNo")||eq("shenasnameno")) return L"{certno}";
+    if(eq("receipttitle")||eq("receipt_title")||eq("receiptlabel")) return L"{receipttitle}";
+    if(eq("clinicname")||eq("clinic_name")) return L"{clinicname}";
     // unknown bare name → wrap as {name} so the token pass can still decide
     return L"{"+f+L"}";
 }
@@ -1962,6 +2031,13 @@ static long long pdReceiptSeed(const ReceptionRecord& r){
     return 0;
 }
 
+// v2.07 §3.3 — resolve the record's specialty/codes against the LIVE doctors
+// store (the «مدیریت تخصص» records live on DoctorDef). Memoised per call so a
+// receipt with many doctor tokens loads the store once.
+static std::vector<DoctorDef> pdLoadDoctorsForRecord(){
+    return loadDoctors();
+}
+
 static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& tokIn){
     // §1.52.0 — accept BOTH the canonical {token} form and the bare field name
     // (e.g. "firstName") that ready-made templates / the designer store. We
@@ -2007,8 +2083,20 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
     if(tok==L"{issued}")   return L"چاپ توسط پذیرش: "+
         (r.userName.empty()?g_session.user.fullname:r.userName);
     // v1.22.0 — extra fields modelled on real Iranian clinic forms.
-    if(tok==L"{clinicaddr}")  return getSetting(L"clinic_address",L"");
-    if(tok==L"{clinicphone}") return toFaDigits(getSetting(L"clinic_phone",L""));
+    // v2.07: prefer the record-resolved value, then management settings
+    // (clinic_addr then the legacy clinic_address key), else blank.
+    if(tok==L"{clinicaddr}"){
+        if(!r.clinicAddr.empty()) return r.clinicAddr;
+        std::wstring a=getSetting(L"clinic_addr",L"");
+        if(!a.empty()) return a;
+        return getSetting(L"clinic_address",L"");
+    }
+    if(tok==L"{clinicphone}"){
+        if(!r.clinicPhone.empty()) return toFaDigits(r.clinicPhone);
+        std::wstring p=getSetting(L"clinic_phone_num",L"");
+        if(!p.empty()) return toFaDigits(p);
+        return toFaDigits(getSetting(L"clinic_phone",L""));
+    }
     if(tok==L"{clinicmgr}")   return getSetting(L"clinic_manager",L"");
     if(tok==L"{cliniclic}")   return toFaDigits(getSetting(L"clinic_license",L""));
     if(tok==L"{age}"){
@@ -2127,11 +2215,51 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
         return r.suppInsurance+L" ("+toFaDigits(b)+L"٪)";
     }
     // --- doctor / performer / specialty -----------------------------------
-    if(tok==L"{doctorcode}")     return toFaDigits(r.doctorCode);
+    if(tok==L"{doctorcode}"){
+        // v2.07 §3.3: prefer the captured code; fall back to the doctors-store
+        // نظام پزشکی code (medicalId) of the matched doctor — never fabricated.
+        if(!r.doctorCode.empty()) return toFaDigits(r.doctorCode);
+        std::vector<DoctorDef> docs=pdLoadDoctorsForRecord();
+        for(const auto& d:docs){
+            if(!r.treatingDoctor.empty() && d.name==r.treatingDoctor &&
+               !d.medicalId.empty()) return toFaDigits(d.medicalId);
+        }
+        return L"";
+    }
     if(tok==L"{performer}")      return r.performer.empty()? r.treatingDoctor : r.performer;
-    if(tok==L"{performercode}")  return toFaDigits(r.performerCode.empty()? r.doctorCode : r.performerCode);
-    if(tok==L"{specialty}")      return r.specialty;
-    if(tok==L"{specialtycode}")  return toFaDigits(r.specialtyCode);
+    if(tok==L"{performercode}"){
+        if(!r.performerCode.empty()) return toFaDigits(r.performerCode);
+        if(!r.doctorCode.empty())    return toFaDigits(r.doctorCode);
+        std::vector<DoctorDef> docs=pdLoadDoctorsForRecord();
+        for(const auto& d:docs){
+            if(!r.performer.empty() && d.name==r.performer &&
+               !d.medicalId.empty()) return toFaDigits(d.medicalId);
+        }
+        return L"";
+    }
+    if(tok==L"{specialty}"){
+        // v2.07 §3.3 — fallback chain, no fabricated specialty:
+        //   1) r.specialty (captured at admission from the doctors store)
+        //   2) doctors-store lookup by r.doctorCode (medicalId/docCode)
+        //   3) doctors-store lookup by exact r.treatingDoctor name
+        //   4) empty
+        if(!r.specialty.empty()) return r.specialty;
+        std::vector<DoctorDef> docs=pdLoadDoctorsForRecord();
+        if(!r.doctorCode.empty()){
+            for(const auto& d:docs)
+                if((d.medicalId==r.doctorCode||d.docCode==r.doctorCode) &&
+                   !d.specialty.empty()) return d.specialty;
+        }
+        if(!r.treatingDoctor.empty()){
+            for(const auto& d:docs)
+                if(d.name==r.treatingDoctor && !d.specialty.empty()) return d.specialty;
+        }
+        return L"";
+    }
+    if(tok==L"{specialtycode}"){
+        if(!r.specialtyCode.empty()) return toFaDigits(r.specialtyCode);
+        return toFaDigits(r.doctorCode);
+    }
     // --- service description / type --------------------------------------
     if(tok==L"{servicetype}"){
         // نوع خدمت (e.g. «عمومی») — taken from the catalogue category of the
@@ -2171,6 +2299,25 @@ static std::wstring pdFieldValue(const ReceptionRecord& r, const std::wstring& t
     if(tok==L"{scnum}"){
         if(!r.scNum.empty()) return toFaDigits(r.scNum);
         wchar_t b[16]; swprintf(b,16,L"%d",g_session.shift+1); return toFaDigits(b);
+    }
+    // ---- v2.07.0: clinic / receipt identity tokens ------------------------
+    if(tok==L"{certno}"){
+        if(!r.certNo.empty()) return toFaDigits(r.certNo);
+        return L"";                       // never synthesised
+    }
+    if(tok==L"{receipttitle}"){
+        if(!r.receiptTitle.empty()) return r.receiptTitle;
+        // fall back to the section's receipt kind label
+        if(!r.dept.empty()) return r.dept;
+        return L"";
+    }
+    if(tok==L"{clinicname}"){
+        if(!r.clinicName.empty()) return r.clinicName;
+        std::wstring n=getSetting(L"clinic.name",L"");
+        if(!n.empty()) return n;
+        n=getSetting(L"clinic_name",L"");
+        if(!n.empty()) return n;
+        return APP_NAME_W;
     }
     return L"";
 }
@@ -2232,7 +2379,7 @@ static void pdDrawTable(HDC dc, const PrintItem& it, const RECT& box,
     HFONT fHead=CreateFontW(lf,0,0,0,FW_BOLD,0,0,0,DEFAULT_CHARSET,0,0,
         CLEARTYPE_QUALITY,0,it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
     int pad=(int)(1.2*pxPerMmX); if(pad<2)pad=2;
-    SetTextColor(dc,pdCR(it.textColor));
+    SetTextColor(dc,pdTextInk(it.textColor));   // v2.07 §3.8 saturated ink
     for(int rr=0;rr<t.rows;++rr){
         bool isHead=(t.header && rr==0);
         HGDIOBJ of=SelectObject(dc, isHead?fHead:fNorm);
@@ -2407,6 +2554,56 @@ static bool pdParseServicesModel(const std::wstring& jsonW, PdServicesModel& m){
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// v2.07 §3.7 — THE CANONICAL 3-COLUMN SERVICES MODEL.
+// نام خدمت | تعداد | شرح خدمت — exactly three columns, in this RTL order,
+// for the default design and every builtin template. Any parsed model that a
+// builtin/default carries is clamped here so no builtin can drift to four
+// columns. User designs are NEVER clamped (their authored model is theirs).
+static void pdClampBuiltinServicesModel(PdServicesModel& m){
+    m.cols=3;
+    m.header=true;
+    m.labels.assign(3,std::wstring());
+    m.labels[0]=L"نام خدمت";
+    m.labels[1]=L"تعداد";
+    m.labels[2]=L"شرح خدمت";
+    m.widths.assign(3,0.0);
+    m.widths[0]=0.46;   // نام خدمت
+    m.widths[1]=0.12;   // تعداد (fixed)
+    m.widths[2]=0.42;   // شرح خدمت (base)
+}
+
+// v2.07 §3.7 — CONTENT-ADAPTIVE «شرح خدمت» WIDTH.
+// Fractions of the ITEM width (survive paper changes), computed once, before
+// pagination, from the measured text of all rows:
+//   every desc empty            → desc collapses to 0.18, name takes the freed width
+//   long descriptions           → desc may grow up to 0.52 (name only shrinks)
+//   تعداد stays fixed at 0.12, always.
+// The caller passes the measured widths (device px) of the widest desc/name.
+static void pdAdaptServicesWidths(std::vector<double>& widths,
+                                  double descPx, double itemPx){
+    if(widths.size()!=3 || itemPx<=0){ return; }
+    const double WNAME=0.46, WQTY=0.12, WDESC=0.42;
+    double desc=WDESC, name=WNAME;
+    double descRatio = descPx/itemPx;
+    if(descPx<=0.5){
+        desc=0.18;                        // every desc empty → collapse
+        name=WNAME+(WDESC-0.18);          // name takes the freed width
+    } else if(descRatio>WDESC){
+        // grow desc (cap 0.52), taking width from name only
+        desc=descRatio>0.52?0.52:descRatio;
+        name=WNAME+(WDESC-desc);
+        if(name<0.30) name=0.30;          // keep the name readable
+        desc=WQTY+name+desc>1.0 ? 1.0-WQTY-name : desc;
+    }
+    double sum=name+WQTY+desc;
+    if(sum>0){
+        widths[0]=name/sum;
+        widths[1]=WQTY/sum;
+        widths[2]=desc/sum;
+    }
+}
+
 // v1.55.0 — resolve one services-table cell from the live ServiceLine according
 // to the column's LABEL (never by blind index). All values are real data taken
 // straight from the record; nothing is generated or randomised. A service that
@@ -2489,8 +2686,40 @@ static void pdDrawCellNoEllipsis(HDC dc,const std::wstring& cell,const RECT& cr,
 static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
                                   double pxPerMmX, double pxPerMmY,
                                   double fontPxPerPt, const ReceptionRecord* live,
-                                  PdServicesLayout& out){
+                                  PdServicesLayout& out, bool builtinDesign=false){
     pdParseServicesModel(it.text, out.model);
+    // v2.07 §3.7: builtin/default designs are clamped to the canonical
+    // 3-column model so no builtin can drift. User designs keep their model.
+    if(builtinDesign){
+        pdClampBuiltinServicesModel(out.model);
+        // v2.07: content-adaptive «شرح خدمت» width, measured from the live rows
+        if(live && !live->services.empty()){
+            // measure desc/name extents once with the table's own font
+            double fontPt0=it.fontPt>0?it.fontPt:8.5;
+            HFONT fm=CreateFontW(-(int)(fontPt0*fontPxPerPt+0.5),0,0,0,FW_NORMAL,0,0,0,
+                DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,
+                it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
+            HGDIOBJ ofm=SelectObject(dc,fm);
+            double maxDesc=0, maxName=0;
+            for(size_t i=0;i<live->services.size();++i){
+                const ServiceLine& sv=live->services[i];
+                RECT mr={0,0,0,0};
+                if(!sv.desc.empty()){
+                    DrawTextW(dc,sv.desc.c_str(),-1,&mr,
+                        DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                    if(mr.right-mr.left>maxDesc) maxDesc=mr.right-mr.left;
+                }
+                RECT nr={0,0,0,0};
+                if(!sv.name.empty()){
+                    DrawTextW(dc,sv.name.c_str(),-1,&nr,
+                        DT_RIGHT|DT_SINGLELINE|DT_RTLREADING|DT_NOPREFIX|DT_CALCRECT);
+                    if(nr.right-nr.left>maxName) maxName=nr.right-nr.left;
+                }
+            }
+            SelectObject(dc,ofm); DeleteObject(fm);
+            pdAdaptServicesWidths(out.model.widths,maxDesc,(double)(box.right-box.left));
+        }
+    }
     int X0=box.left, X1=box.right;
     int W=X1-X0, H=box.bottom-box.top; if(W<=0||H<=0) return false;
 
@@ -2551,9 +2780,9 @@ static bool pdBuildServicesLayout(HDC dc, const PrintItem& it, const RECT& box,
 }
 static std::vector<PdServicesPageSlice> pdPlanServicePages(
         HDC dc,const PrintItem& it,const RECT& box,double pxPerMmX,double pxPerMmY,
-        double fontPxPerPt,const ReceptionRecord* live){
+        double fontPxPerPt,const ReceptionRecord* live,bool builtinDesign=false){
     PdServicesLayout layout;
-    if(!pdBuildServicesLayout(dc,it,box,pxPerMmX,pxPerMmY,fontPxPerPt,live,layout))
+    if(!pdBuildServicesLayout(dc,it,box,pxPerMmX,pxPerMmY,fontPxPerPt,live,layout,builtinDesign))
         return std::vector<PdServicesPageSlice>(1);
     int available=(box.bottom-box.top)-layout.headH;
     int firstInset=layout.pad/2; if(firstInset<0) firstInset=0;
@@ -2586,7 +2815,7 @@ static void pdPaintServiceLogicalRow(HDC dc,const PrintItem& it,
 
     HGDIOBJ oldFont=SelectObject(dc,fNorm);
     SetBkMode(dc,TRANSPARENT); SetTextAlign(dc,TA_RTLREADING|TA_TOP|TA_LEFT);
-    SetTextColor(dc,pdCR(it.textColor));
+    SetTextColor(dc,pdTextInk(it.textColor));   // v2.07 §3.8 saturated ink
     for(int c=0;c<m.cols;++c){
         PdSvcCol kind=layout.kinds[c];
         std::wstring cell=pdSvcCellValue(kind,svc,rowIdx);
@@ -2740,7 +2969,7 @@ static void pdDrawServices(HDC dc, const PrintItem& it, const RECT& box,
 
     int dataStart=m.header?1:0;
     if(emptyRow){
-        HGDIOBJ oldFont=SelectObject(dc,fNorm); SetTextColor(dc,pdCR(it.textColor));
+        HGDIOBJ oldFont=SelectObject(dc,fNorm); SetTextColor(dc,pdTextInk(it.textColor));   // v2.07 §3.8 saturated ink
         if(live){
             for(int c=0;c<m.cols;++c) if(layout.kinds[c]==PSC_NAME){
                 RECT cr={cx[c+1]+layout.pad,ry[dataStart]+layout.pad/2,
@@ -2983,7 +3212,9 @@ static void pdDrawBarcode(HDC dc, const PrintItem& it, const RECT& box,
         HFONT f=CreateFontW(lf,0,0,0,it.bold?FW_BOLD:FW_NORMAL,0,0,0,DEFAULT_CHARSET,0,0,
             CLEARTYPE_QUALITY,0,it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
         HGDIOBJ of=SelectObject(dc,f);
-        SetTextColor(dc,pdCR(it.textColor));
+        // v2.07 §3.8: the HRI line IS the barcode value — the single most
+        // important text on the receipt. Saturated ink, never washed out.
+        SetTextColor(dc,pdTextInk(it.textColor));
         RECT tr={X0, Y0+barsH, X1, Y1};
         DrawTextW(dc,hriW.c_str(),-1,&tr,
             DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
@@ -3067,6 +3298,17 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
         double pw,ph; if(Paper_Dims(d.paper,pw,ph)){ d.paperW=pw; d.paperH=ph;
             if(d.orientation==1) std::swap(d.paperW,d.paperH); }
         else { d.paperW=148; d.paperH=210; }
+    }
+    // v2.07 §3.9 — RESPONSIVE REFLOW. If the current paper differs from the
+    // paper the layout was authored for (baseW/baseH), reflow a COPY of the
+    // design (never the stored one) before rendering. Legacy designs with
+    // baseW == 0 adopt the current paper as base WITHOUT scaling (existing
+    // contract — kept).
+    if(d.baseW>0 && d.baseH>0 &&
+       (std::abs(d.paperW-d.baseW)>0.01 || std::abs(d.paperH-d.baseH)>0.01)){
+        reflowDesign(d);
+    } else if(d.baseW<=0 || d.baseH<=0){
+        d.baseW=d.paperW; d.baseH=d.paperH;   // adopt without scaling
     }
 
     // Resolve a printer DC whose paper size matches the DESIGN (so an A5 design
@@ -3157,6 +3399,13 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     for(const PrintItem* pit:ord) if(pit->type==PIT_SERVICES){ serviceItem=pit; break; }
     RECT serviceBox={0,0,0,0};
     std::vector<PdServicesPageSlice> servicePages(1);
+    // v2.07 §3.9 — ELASTIC STRETCH BAND (بلوک_پایانی). Everything authored
+    // BELOW the services item's bottom edge (payment summary, signatures,
+    // footer) is translated down by (naturalHeight − authoredHeight), clamped
+    // to the printable area, so the footer sits directly under the table and
+    // the table can never reach the footer. Internal block spacing is kept
+    // exactly as authored.
+    double svcShiftMm=0.0;
     if(serviceItem){
         serviceBox.left=mmX(serviceItem->x);
         serviceBox.top=mmY(serviceItem->y);
@@ -3166,8 +3415,42 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
         PdServicesFrame safe=pdEnsureServicesFrame(serviceBox.top,serviceBox.bottom,
             mmY(0),mmY(d.paperH),minimumFrame);
         serviceBox.top=safe.top; serviceBox.bottom=safe.bottom;
+        // ---- v2.07 §3.9: natural height of the table from the actual rows ----
+        {
+            PdServicesLayout probe;
+            if(pdBuildServicesLayout(dc,*serviceItem,serviceBox,sx*pscale,sy*pscale,
+                                     (dpiY/72.0)*pscale,&r,probe,d.kind==L"builtin")){
+                int natural=probe.headH;
+                for(size_t i=0;i<probe.rowHeights.size();++i) natural+=probe.rowHeights[i];
+                int authored=serviceBox.bottom-serviceBox.top;
+                int delta=natural-authored;
+                if(delta>0){
+                    // breathing room between the last row and the block (mm):
+                    // 4.0 on sheet papers, 2.5 on R80/R58 thermal rolls.
+                    double gapMm = (d.paperW<=90.0)?2.5:4.0;
+                    double shift=(double)delta/sy/pscale + gapMm;
+                    // clamp: the block must never leave the PRINTABLE area (the
+                    // hardware unprintable bottom margin, not just the paper edge)
+                    double printableBottomMm = d.paperH;
+                    {
+                        int ph=GetDeviceCaps(dc,PHYSICALHEIGHT);
+                        if(ph>0 && sy>0 && pscale>0)
+                            printableBottomMm = ((double)(ph-offY)/sy)/pscale;
+                    }
+                    double limitMm = printableBottomMm - 2.0;
+                    if(limitMm > d.paperH-2.0) limitMm = d.paperH-2.0;
+                    double svcBottomMm = serviceItem->y + serviceItem->h + shift;
+                    if(svcBottomMm > limitMm)
+                        shift = limitMm - (serviceItem->y+serviceItem->h);
+                    if(shift<0) shift=0;
+                    svcShiftMm=shift;
+                    // grow the services box so the table renders its natural height
+                    serviceBox.bottom=mmY(serviceItem->y+serviceItem->h+shift);
+                }
+            }
+        }
         servicePages=pdPlanServicePages(dc,*serviceItem,serviceBox,sx*pscale,sy*pscale,
-                                        (dpiY/72.0)*pscale,&r);
+                                        (dpiY/72.0)*pscale,&r,d.kind==L"builtin");
         if(servicePages.empty()) servicePages.push_back(PdServicesPageSlice());
     }
 
@@ -3176,6 +3459,9 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
         bool finalPage=pageNo+1==servicePages.size();
         if(StartPage(dc)<=0){ AbortDoc(dc); DeleteDC(dc); return false; }
         SetBkMode(dc,TRANSPARENT);
+        // v2.07 §3.4 — set once a PIT_BARCODE with hri==true is emitted on this
+        // page; any additional {receiptbarcode}-bound text item is then skipped.
+        bool hriBarcodeRendered=false;
 
         for(const PrintItem* pit : ord){
         const PrintItem& it=*pit;
@@ -3193,6 +3479,24 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
         }
         int x0=mmX(it.x), y0=mmY(it.y), x1=mmX(it.x+it.w), y1=mmY(it.y+it.h);
         if(pit==serviceItem){ y0=serviceBox.top; y1=serviceBox.bottom; }
+        else if(serviceItem && svcShiftMm>0.0){
+            // v2.07 §3.9 — translate the trailing block (بلوک_پایانی): every
+            // item whose TOP starts at or below the services item's authored
+            // bottom edge moves down by the same shift, keeping its internal
+            // spacing untouched. Items above the table never move.
+            double svcBottomMm = serviceItem->y + serviceItem->h;
+            if(it.y >= svcBottomMm - 0.001){
+                y0=mmY(it.y+svcShiftMm);
+                y1=mmY(it.y+it.h+svcShiftMm);
+            }
+        }
+        // v2.07 §3.4 — barcode value de-duplication: once a PIT_BARCODE with
+        // hri==true has been rendered, skip any later text item bound to the
+        // same value (holds for old user designs too; nothing is deleted).
+        if(it.type==PIT_FIELD && hriBarcodeRendered){
+            std::wstring nf=pdNormalizeField(it.field);
+            if(pdBarcodeValueAlreadyRendered(true,nf)) continue;
+        }
         if(it.type==PIT_TABLE){
             RECT rr={x0,y0,x1,y1};
             // §1.52.0: scale the internal font/cell px-per-mm so an A4-authored
@@ -3214,13 +3518,21 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
             if(pl.empty() && !it.prefix.empty()) pl = it.prefix;
             RECT rr={x0,y0,x1,y1};
             pdDrawBarcode(dc, it, rr, sx*pscale, sy*pscale, (dpiY/72.0)*pscale, pl);
+            // v2.07 §3.4: mark the HRI as rendered so any later {receiptbarcode}
+            // text item is skipped (single barcode value per receipt).
+            { PdBarcodeModel bm; pdParseBarcodeModel(it.text, bm);
+              if(bm.hri) hriBarcodeRendered=true; }
         } else if(it.type==PIT_HLINE){
-            int wpx=(int)(it.borderWidth*sx*pscale); if(wpx<1)wpx=1;
-            HPEN p=CreatePen(PS_SOLID,wpx,pdCR(it.borderColor)); HGDIOBJ o=SelectObject(dc,p);
+            // v2.07 §3.8: hairlines are at least 0.30 mm and never lighter
+            // than #333333 on paper.
+            double wmm=it.borderWidth; if(wmm<0.30) wmm=0.30;
+            int wpx=(int)(wmm*sx*pscale); if(wpx<1)wpx=1;
+            HPEN p=CreatePen(PS_SOLID,wpx,pdLineInk(it.borderColor)); HGDIOBJ o=SelectObject(dc,p);
             MoveToEx(dc,x0,y0,0); LineTo(dc,x1,y0); SelectObject(dc,o); DeleteObject(p);
         } else if(it.type==PIT_VLINE){
-            int wpx=(int)(it.borderWidth*sx*pscale); if(wpx<1)wpx=1;
-            HPEN p=CreatePen(PS_SOLID,wpx,pdCR(it.borderColor)); HGDIOBJ o=SelectObject(dc,p);
+            double wmm=it.borderWidth; if(wmm<0.30) wmm=0.30;
+            int wpx=(int)(wmm*sx*pscale); if(wpx<1)wpx=1;
+            HPEN p=CreatePen(PS_SOLID,wpx,pdLineInk(it.borderColor)); HGDIOBJ o=SelectObject(dc,p);
             MoveToEx(dc,x0,y0,0); LineTo(dc,x0,y1); SelectObject(dc,o); DeleteObject(p);
         } else if(it.type==PIT_RECT||it.type==PIT_FRAME||it.type==PIT_LOGO||
                   it.type==PIT_PHOTO||it.type==PIT_QR||it.type==PIT_IMAGE){
@@ -3254,7 +3566,9 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                     std::wstring ph=(it.type==PIT_LOGO)?L"لوگو":(it.type==PIT_QR?L"QR":(it.type==PIT_IMAGE?L"تصویر":L"عکس"));
                     HFONT f=CreateFontW(-(int)(9*dpiY/72.0),0,0,0,FW_NORMAL,0,0,0,
                         DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Vazirmatn");
-                    HGDIOBJ of=SelectObject(dc,f); SetTextColor(dc,RGB(150,150,150));
+                    // v2.07 §3.8: placeholder text obeys the ink floor (no grey
+                    // lighter than #555555-equivalent luminance on paper).
+                    HGDIOBJ of=SelectObject(dc,f); SetTextColor(dc,pdTextInk(0x555555));
                     DrawTextW(dc,ph.c_str(),-1,&rr,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
                     SelectObject(dc,of); DeleteObject(f);
                 }
@@ -3286,6 +3600,50 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
             // auto-fit from the responsively-scaled point size (A4→A5).
             double basePt = it.fontPt>0 ? it.fontPt : 10.0;
             basePt *= pscale;
+            // v2.07 §3.5 — PATIENT NAME NEVER WRAPS. The bound patient-name item
+            // ({full}/{P-Name}) is measured SINGLE-LINE first; if the string
+            // exceeds the item width the point size drops in 0.5 pt steps down
+            // to 70% of the authored size, and only then ellipsizes. It never
+            // breaks to a second line and never overlaps the neighbouring cell.
+            std::wstring nfName;
+            if(it.type==PIT_FIELD && !it.field.empty())
+                nfName=pdNormalizeField(it.field);
+            bool isPatientName = (nfName==L"{full}");
+            if(isPatientName){
+                UINT single=al|DT_SINGLELINE|DT_NOCLIP|dirf|DT_NOPREFIX;
+                double ptN=basePt; double floorN=basePt*0.70;
+                HFONT fN=NULL; HGDIOBJ ofN=NULL;
+                for(int tries=0;tries<24;++tries){
+                    int lf=-(int)(ptN*dpiY/72.0+0.5);
+                    fN=CreateFontW(lf,0,0,0,it.bold?FW_BOLD:FW_NORMAL,it.italic?1:0,0,0,
+                        DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,
+                        DEFAULT_PITCH|FF_DONTCARE,
+                        it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
+                    ofN=SelectObject(dc,fN);
+                    RECT mN=rr;
+                    DrawTextW(dc,s.c_str(),-1,&mN,single|DT_TOP|DT_CALCRECT);
+                    int wN=mN.right-mN.left;
+                    SelectObject(dc,ofN); DeleteObject(fN); fN=NULL;
+                    if(wN<=boxW+1) break;
+                    if(ptN<=floorN+0.001) break;
+                    ptN-=0.5; if(ptN<floorN) ptN=floorN;
+                }
+                // final single-line draw (ellipsis only as the last resort)
+                int lf=-(int)(ptN*dpiY/72.0+0.5);
+                HFONT fF=CreateFontW(lf,0,0,0,it.bold?FW_BOLD:FW_NORMAL,it.italic?1:0,0,0,
+                    DEFAULT_CHARSET,OUT_TT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,
+                    DEFAULT_PITCH|FF_DONTCARE,
+                    it.fontName.empty()?L"Vazirmatn":it.fontName.c_str());
+                HGDIOBJ ofF=SelectObject(dc,fF);
+                SetTextColor(dc,pdTextInk(it.textColor));
+                RECT drN=rr;
+                if(it.valign==1){ int off=(boxH-(int)(ptN*dpiY/72.0))/2; if(off>0) drN.top+=off; }
+                else if(it.valign==2){ int off=boxH-(int)(ptN*dpiY/72.0); if(off>0) drN.top+=off; }
+                DrawTextW(dc,s.c_str(),-1,&drN,
+                    al|DT_SINGLELINE|DT_VCENTER|dirf|DT_NOPREFIX|DT_NOCLIP|DT_END_ELLIPSIS);
+                SelectObject(dc,ofF); DeleteObject(fF);
+                continue;   // name item is fully handled — next item
+            }
             UINT base = al|DT_WORDBREAK|dirf|DT_NOPREFIX;
             HFONT f=NULL; HGDIOBJ of=NULL; RECT meas; int th=0;
             double pt=basePt; double floorPt = (basePt<7.0)? basePt*0.7 : 6.0;
@@ -3305,7 +3663,7 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
                 SelectObject(dc,of); DeleteObject(f); f=NULL;
                 pt = pt*0.92; if(pt<floorPt) pt=floorPt;
             }
-            SetTextColor(dc,pdCR(it.textColor));
+            SetTextColor(dc,pdTextInk(it.textColor));   // v2.07 §3.8 saturated ink
             // v1.23.0: vertical alignment (0=top 1=middle 2=bottom).
             RECT dr=rr;
             int bh=boxH;
