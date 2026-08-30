@@ -58,6 +58,7 @@ enum SettingsRow {
     ROW_BLACKLIST,     // v1.58: patient blacklist — now its OWN page (moved
                        //         out of the reception/appearance settings)
     ROW_DESIGNER,      // print designer hub
+    ROW_PRINTER_LINK,  // v2.07: «ارتباط با چاپگر» — dedicated printer picker
     ROW_BACKUP,        // backup & restore
     ROW_EMP_SECT,      // employees / sections (admin)
     ROW_SAVED_MSG,     // saved messages
@@ -87,6 +88,7 @@ static bool canAccess(int row, int mode){
     case ROW_RECEPTION: return false;
     case ROW_BLACKLIST: return false;
     case ROW_DESIGNER:  return true;
+    case ROW_PRINTER_LINK: return true;
     case ROW_BACKUP:    return mode==SM_ADMIN;   // admin-only — removed from «حساب پرسنل»
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
     case ROW_SAVED_MSG: return false;
@@ -196,6 +198,11 @@ static std::vector<RowDef> homeRows(int mode){
         { ROW_DESIGNER,  PAGE_DESIGNER,  ICO_PRINT,
           L"\u0637\u0631\u0627\u062d\u06cc \u0686\u0627\u067e",                                        // طراحی چاپ
           L"\u0637\u0631\u0627\u062d\u06cc \u0642\u0627\u0644\u0628 \u0686\u0627\u067e \u0628\u0631\u0627\u06cc \u0647\u0631 \u0628\u062e\u0634" },
+        // v2.07: «ارتباط با چاپگر» — dedicated printer picker (page 0 = opens
+        // the PrinterLink dialog directly, handled in activateRow).
+        { ROW_PRINTER_LINK, 0,           ICO_PRINT,
+          L"\u0627\u0631\u062a\u0628\u0627\u0637 \u0628\u0627 \u0686\u0627\u067e\u06af\u0631",                        // ارتباط با چاپگر
+          L"\u0627\u0646\u062a\u062e\u0627\u0628 \u0686\u0627\u067e\u06af\u0631 \u067e\u06cc\u0634\u200c\u0641\u0631\u0636 \u0628\u0631\u0646\u0627\u0645\u0647" },
         { ROW_BACKUP,    PAGE_BACKUP,    ICO_SHIELD,
           L"\u067e\u0634\u062a\u06cc\u0628\u0627\u0646\u200c\u06af\u06cc\u0631\u06cc \u0648 \u0628\u0627\u0632\u06cc\u0627\u0628\u06cc",   // پشتیبان‌گیری و بازیابی
           L"\u062a\u062d\u0644\u06cc\u0644\u060c \u0648\u0631\u0648\u062f\u060c \u062a\u0627\u0631\u06cc\u062e\u0686\u0647" },
@@ -918,6 +925,13 @@ static void activateRow(SettingsWin* sw, int idx){
         if(g_hFrame){ setUserOnline(g_session.user.username,false);
             g_session=Session(); switchScreen(SC_HOME); }
         (void)mw;
+        return;
+    }
+    if(rd.row==ROW_PRINTER_LINK){
+        // v2.07: open the dedicated «ارتباط با چاپگر» dialog (printer picker),
+        // keeping the settings window open exactly like the designer buttons
+        // (IDC_PANEL_BASE+60/+65 pattern) so the user can come straight back.
+        PrinterLink_Open(sw->hMain);
         return;
     }
     if(rd.page) pushPage(sw,rd.page);

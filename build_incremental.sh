@@ -23,13 +23,15 @@ CXXFLAGS="-std=c++17 -O2 -municode -mwindows \
 LIBS="-lcomctl32 -lcomdlg32 -lgdi32 -lgdiplus -lmsimg32 -ldwmapi -luxtheme \
     -luser32 -lshlwapi -lwininet -ladvapi32 -lshell32 -lwinspool \
     -lole32 -loleaut32 -luuid -lversion -lwinmm -ldbghelp \
-    -lwinhttp -lurlmon -lcrypt32 -lwintrust -lwtsapi32 -lpsapi"
+    -lwinhttp -lurlmon -lcrypt32 -lwintrust -lwtsapi32 -lpsapi -lws2_32"
 
 SRCS="main util handlers theme users billing calculator dialogs update \
-      admin reception gdiplus settings printer employees data_ext appointment \
+      admin reception gdiplus settings printer employees data_ext \
       backup ui_kit backup_analyzer backup_log sections print_designer \
       user_settings net_sync profile_requests backup_log_viewer backup_mtf \
-      saved_messages setup_splash web_designer services clinic_ops accounting"
+      saved_messages setup_splash web_designer services clinic_ops accounting \
+      blacklist web_admission web_pages web_thread_pool web_ping_api web_crm \
+      insurance_defs persons"
 
 echo "[1/3] Compiling resources..."
 $RES -O coff -i src/app.rc -o obj/app.res

@@ -16,6 +16,7 @@
 #include "print_services_pagination.h"
 #include "print_services_policy.h"
 #include "sections.h"         // v1.65.0: lazy seeding in the print path
+#include "ui_kit.h"           // v2.07: uikit::NormalizeFa for printer search
 #include <stdio.h>
 
 // ----------------------------------------------------------------------------
@@ -567,37 +568,12 @@ static RECT prnCard(HWND h){
     return c;
 }
 
+// v2.07: shared test-print core (defined further below, before the PrinterLink
+// dialog) — doTestPrint delegates so the printer-DC code exists exactly once.
+static bool prnTestPrintTo(HWND h, const std::wstring& printer);
+
 static void doTestPrint(HWND h){
-    if(!s_ps || s_ps->sel.empty()){
-        MessageBoxW(h,L"ابتدا یک چاپگر را انتخاب کنید.",L"تست چاپگر",
-            MB_OK|MB_ICONWARNING); return;
-    }
-    HDC dc=CreateDCW(L"WINSPOOL",s_ps->sel.c_str(),NULL,NULL);
-    if(!dc){
-        MessageBoxW(h,L"اتصال به چاپگر برقرار نشد.\nبررسی کنید چاپگر روشن و متصل باشد.",
-            L"تست چاپگر",MB_OK|MB_ICONERROR); return;
-    }
-    DOCINFOW di={sizeof(di)}; di.lpszDocName=L"درمان پلاس — تست چاپ";
-    if(StartDocW(dc,&di)>0){
-        StartPage(dc);
-        int dpiY=GetDeviceCaps(dc,LOGPIXELSY);
-        HFONT f=CreateFontW(-(dpiY*18/72),0,0,0,FW_BOLD,0,0,0,DEFAULT_CHARSET,
-            0,0,CLEARTYPE_QUALITY,0,L"Vazirmatn");
-        HGDIOBJ of=SelectObject(dc,f);
-        SetBkMode(dc,TRANSPARENT);
-        SetTextAlign(dc,TA_RIGHT|TA_RTLREADING);
-        RECT r={dpiY/2,dpiY/2,GetDeviceCaps(dc,HORZRES)-dpiY/2,dpiY*3};
-        DrawTextW(dc,L"تست چاپ موفق بود — درمان پلاس\nچاپگر به‌درستی کار می‌کند.",-1,&r,
-            DT_RIGHT|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX);
-        SelectObject(dc,of); DeleteObject(f);
-        EndPage(dc); EndDoc(dc);
-        MessageBoxW(h,L"صفحهٔ تست به چاپگر ارسال شد.",L"تست چاپگر",
-            MB_OK|MB_ICONINFORMATION);
-    } else {
-        MessageBoxW(h,L"ارسال سند به چاپگر ناموفق بود.",L"تست چاپگر",
-            MB_OK|MB_ICONERROR);
-    }
-    DeleteDC(dc);
+    prnTestPrintTo(h, s_ps ? s_ps->sel : std::wstring(L""));
 }
 
 static void doAdvanced(HWND h){
@@ -1025,6 +1001,522 @@ void openPrinterSettings(HWND owner){
         WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN,
         org.x,org.y,rc.right,rc.bottom,owner,NULL,g_hInst,NULL);
     BringWindowToTop(s_prn); SetFocus(s_prn);
+}
+
+// ===========================================================================
+//  v2.07.0 — «ارتباط با چاپگر» dialog (PrinterLink).
+//  A dedicated printer-picker opened from the C++ settings header: searchable
+//  list of every installed printer, Windows-default pre-selection, an explicit
+//  «پیرو پیش‌فرض ویندوز» switch, a live test-connection button and a reload
+//  button. Saving routes through printerRequestGate exactly like every other
+//  printer setting, so a reception user's change is queued for management.
+//  Styling is identical to the AzPrinterCfg card above (same card geometry,
+//  same theme primitives, same fonts) — no new colours, fonts or radii.
+// ===========================================================================
+#define PL_CLASS L"AzPrinterLink"
+
+enum {
+    PLB_بستن = 400, PLB_تأیید, PLB_انصراف, PLB_تست_اتصال,
+    PLB_بازخوانی, PLB_پیش‌فرض_ویندوز, PLB_ITEM_BASE = 500
+};
+
+struct PrinterLinkState {
+    HWND owner;
+    HWND eSearch;                            // real EDIT child (EN_CHANGE filter)
+    int  hot;
+    std::vector<std::wstring> همه_چاپگرها;   // every enumerated printer
+    std::vector<int>          نتایج_جستجو;   // indices into همه_چاپگرها
+    std::wstring عبارت_جستجو;                // current filter text
+    std::wstring چاپگر_انتخابی;              // in-dialog selection
+    std::wstring چاپگر_ویندوز;               // GetDefaultPrinterW() snapshot
+    bool         پیرو_ویندوز;                // printer_follow_windows_default
+    int          اسکرول;                     // list scroll offset (rows)
+    PrinterLinkState():owner(NULL),eSearch(NULL),hot(0),پیرو_ویندوز(true),اسکرول(0){}
+};
+static HWND s_plink=NULL;
+static PrinterLinkState* s_pls=NULL;
+#define IDC_PL_SEARCH 901     // search edit child id
+
+static int plCardW(){ return S(560); }
+static int plCardH(){ return S(640); }
+static RECT plCard(HWND h){
+    RECT rc; GetClientRect(h,&rc);
+    int w=plCardW(), hh=plCardH();
+    if(hh > rc.bottom-S(40)) hh = rc.bottom-S(40);
+    RECT c={(rc.right-w)/2,(rc.bottom-hh)/2,(rc.right+w)/2,(rc.bottom+hh)/2};
+    return c;
+}
+static int plListRows(){ return 7; }
+static int plRowH(){ return S(36); }
+
+// Apply the current filter (case-insensitive + Persian-normalized substring,
+// reusing uikit::NormalizeFa — the same normalizer Sections_Find uses) and
+// rebuild نتایج_جستجو. Keeping the current selection if it still matches.
+static void plApplyFilter(){
+    if(!s_pls) return;
+    // sync state from the EDIT child (single source of truth for the filter)
+    if(s_pls->eSearch && IsWindow(s_pls->eSearch)){
+        wchar_t buf[256]={0};
+        GetWindowTextW(s_pls->eSearch,buf,256);
+        s_pls->عبارت_جستجو=buf;
+    }
+    s_pls->نتایج_جستجو.clear();
+    std::wstring q=uikit::NormalizeFa(s_pls->عبارت_جستجو);
+    for(size_t i=0;i<s_pls->همه_چاپگرها.size();++i){
+        if(q.empty() ||
+           uikit::NormalizeFa(s_pls->همه_چاپگرها[i]).find(q)!=std::wstring::npos)
+            s_pls->نتایج_جستجو.push_back((int)i);
+    }
+    bool found=false;
+    for(size_t i=0;i<s_pls->نتایج_جستجو.size();++i)
+        if(s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[i]]==s_pls->چاپگر_انتخابی){ found=true; break; }
+    if(!found) s_pls->چاپگر_انتخابی.clear();
+    int maxScroll=(int)s_pls->نتایج_جستجو.size()-plListRows();
+    if(maxScroll<0) maxScroll=0;
+    if(s_pls->اسکرول>maxScroll) s_pls->اسکرول=maxScroll;
+    if(s_pls->اسکرول<0) s_pls->اسکرول=0;
+}
+
+// Shared test-print core (factored out of doTestPrint so both dialogs use ONE
+// printer-DC path — no duplicated driver code).
+static bool prnTestPrintTo(HWND h, const std::wstring& printer){
+    if(printer.empty()){
+        MessageBoxW(h,L"ابتدا یک چاپگر را انتخاب کنید.",L"تست چاپگر",
+            MB_OK|MB_ICONWARNING); return false;
+    }
+    HDC dc=CreateDCW(L"WINSPOOL",printer.c_str(),NULL,NULL);
+    if(!dc){
+        MessageBoxW(h,L"اتصال به چاپگر برقرار نشد.\nبررسی کنید چاپگر روشن و متصل باشد.",
+            L"تست چاپگر",MB_OK|MB_ICONERROR); return false;
+    }
+    DOCINFOW di={sizeof(di)}; di.lpszDocName=L"درمان پلاس — تست چاپ";
+    bool ok=false;
+    if(StartDocW(dc,&di)>0){
+        StartPage(dc);
+        int dpiY=GetDeviceCaps(dc,LOGPIXELSY);
+        HFONT f=CreateFontW(-(dpiY*18/72),0,0,0,FW_BOLD,0,0,0,DEFAULT_CHARSET,
+            0,0,CLEARTYPE_QUALITY,0,L"Vazirmatn");
+        HGDIOBJ of=SelectObject(dc,f);
+        SetBkMode(dc,TRANSPARENT);
+        SetTextAlign(dc,TA_RIGHT|TA_RTLREADING);
+        RECT r={dpiY/2,dpiY/2,GetDeviceCaps(dc,HORZRES)-dpiY/2,dpiY*3};
+        DrawTextW(dc,L"تست چاپ موفق بود — درمان پلاس\nچاپگر به‌درستی کار می‌کند.",-1,&r,
+            DT_RIGHT|DT_WORDBREAK|DT_RTLREADING|DT_NOPREFIX);
+        SelectObject(dc,of); DeleteObject(f);
+        EndPage(dc); EndDoc(dc);
+        MessageBoxW(h,L"صفحهٔ تست به چاپگر ارسال شد.",L"تست چاپگر",
+            MB_OK|MB_ICONINFORMATION);
+        ok=true;
+    } else {
+        MessageBoxW(h,L"ارسال سند به چاپگر ناموفق بود.",L"تست چاپگر",
+            MB_OK|MB_ICONERROR);
+    }
+    DeleteDC(dc);
+    return ok;
+}
+
+static void plClose(){
+    if(s_plink && IsWindow(s_plink)){ HWND v=s_plink; s_plink=NULL; DestroyWindow(v); }
+    if(s_pls){ delete s_pls; s_pls=NULL; }
+}
+
+static RECT plSearchEditRect(const RECT& c){
+    RECT r={c.left+S(20),c.top+S(64),c.right-S(20),c.top+S(64)+S(36)};
+    return r;
+}
+static int plListTop(const RECT& c){ return c.top+S(112); }
+static RECT plListRect(const RECT& c){
+    int top=plListTop(c);
+    RECT r={c.left+S(20),top,c.right-S(20),top+plRowH()*plListRows()};
+    return r;
+}
+static RECT plSwitchRect(const RECT& c){
+    int y=plListTop(c)+plRowH()*plListRows()+S(10);
+    RECT r={c.left+S(20),y,c.right-S(20),y+S(30)};
+    return r;
+}
+static RECT plBtnRowRect(const RECT& c){
+    int y=plSwitchRect(c).bottom+S(14);
+    RECT r={c.left+S(20),y,c.right-S(20),y+S(44)};
+    return r;
+}
+
+static void plPaint(HWND h, HDC dc0){
+    RECT rc; GetClientRect(h,&rc);
+    HDC dc=CreateCompatibleDC(dc0);
+    HBITMAP bmp=CreateCompatibleBitmap(dc0,rc.right,rc.bottom);
+    HGDIOBJ obm=SelectObject(dc,bmp);
+    { HBRUSH sb=CreateSolidBrush(g_dark?RGB(6,9,14):RGB(28,36,48));
+      FillRect(dc,&rc,sb); DeleteObject(sb); }
+    gpFillAlpha(dc,rc,0,g_dark?RGB(0,0,0):RGB(20,28,40),120);
+    RECT c=plCard(h);
+    gpShadow(dc,c,S(20),S(22),80);
+    { HBRUSH pb=CreateSolidBrush(g_theme.surface); FillRect(dc,&c,pb); DeleteObject(pb); }
+    gpGradRoundRect(dc,c,S(20),g_theme.surfaceTop,g_theme.surface,g_theme.border);
+    SetBkMode(dc,TRANSPARENT);
+
+    // title band
+    SelectObject(dc,g_fTitle); SetTextColor(dc,g_theme.text);
+    RECT tr={c.left+S(20),c.top+S(18),c.right-S(20),c.top+S(54)};
+    DrawTextW(dc,L"ارتباط با چاپگر",-1,&tr,
+        DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    // close (×)
+    { RECT cb={c.left+S(16),c.top+S(18),c.left+S(42),c.top+S(44)};
+      if(s_pls&&s_pls->hot==PLB_بستن) gpRoundRect(dc,cb,S(8),g_theme.hover,CLR_INVALID,255);
+      RECT ci={cb.left+S(5),cb.top+S(5),cb.right-S(5),cb.bottom-S(5)};
+      drawIcon(dc,ICO_X,ci,g_theme.text,S(2)); }
+
+    // ---- جستجوی چاپگر (real themed EDIT child — handles EN_CHANGE, paste, IME) --
+    SelectObject(dc,g_fSmall); SetTextColor(dc,g_theme.textDim);
+    { RECT lr={c.left+S(20),c.top+S(56),c.right-S(20),c.top+S(64)};
+      DrawTextW(dc,L"جستجوی چاپگر:",-1,&lr,
+          DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
+    // The EDIT child itself is positioned in plLayoutEdit(); here we only draw
+    // its themed frame so the control blends into the card like every other
+    // input in AzPrinterCfg.
+    { RECT er=plSearchEditRect(c);
+      gpRoundRect(dc,er,S(10),CLR_INVALID,g_theme.border,255); }
+
+    // ---- لیست چاپگرها ------------------------------------------------------
+    SelectObject(dc,g_fSmall); SetTextColor(dc,g_theme.textDim);
+    { RECT lr={c.left+S(20),plListTop(c)-S(20),c.right-S(20),plListTop(c)-S(2)};
+      DrawTextW(dc,L"لیست چاپگرها:",-1,&lr,
+          DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
+    { RECT lr=plListRect(c);
+      int shown=s_pls?(int)s_pls->نتایج_جستجو.size():0;
+      wchar_t n[64]; swprintf(n,64,L"%d چاپگر",shown);
+      RECT cr={lr.left,lr.top-S(20),lr.right,lr.top-S(2)};
+      SetTextColor(dc,g_theme.textDim);
+      DrawTextW(dc,toFaDigits(n).c_str(),-1,&cr,
+          DT_LEFT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX); }
+    { RECT lb=plListRect(c);
+      gpRoundRect(dc,lb,S(10),g_theme.surface2,g_theme.border,255);
+      if(s_pls){
+        int rows=plListRows();
+        for(int v=0;v<rows;++v){
+            int idx=s_pls->اسکرول+v;
+            if(idx>=(int)s_pls->نتایج_جستجو.size()) break;
+            int gi=s_pls->نتایج_جستجو[idx];
+            const std::wstring& name=s_pls->همه_چاپگرها[gi];
+            RECT r={lb.left+S(4),lb.top+S(4)+v*plRowH(),
+                    lb.right-S(4),lb.top+S(4)+v*plRowH()+plRowH()-S(4)};
+            bool selrow=(name==s_pls->چاپگر_انتخابی);
+            bool hov=(s_pls->hot==PLB_ITEM_BASE+v);
+            gpRoundRect(dc,r,S(9),
+                selrow?g_theme.accent:(hov?g_theme.hover:g_theme.surface),
+                selrow?g_theme.accent:g_theme.border,255);
+            SetTextColor(dc,selrow?g_theme.accentText:g_theme.text);
+            SelectObject(dc,g_fUI);
+            RECT ir={r.right-S(30),r.top+S(6),r.right-S(10),r.bottom-S(6)};
+            drawIcon(dc,ICO_PRINT,ir,selrow?g_theme.accentText:g_theme.accent,S(2));
+            // Windows-default trailing chip «پیش‌فرض ویندوز»
+            bool isDef=(!s_pls->چاپگر_ویندوز.empty() && name==s_pls->چاپگر_ویندوز);
+            int chipW=S(84);
+            if(isDef){
+                RECT chip={r.left+S(8),r.top+(r.bottom-r.top)/2-S(12),
+                           r.left+S(8)+chipW,r.top+(r.bottom-r.top)/2+S(12)};
+                gpRoundRect(dc,chip,S(9),g_theme.success,g_theme.success,255);
+                SetTextColor(dc,RGB(255,255,255)); SelectObject(dc,g_fSmall);
+                DrawTextW(dc,L"پیش‌فرض ویندوز",-1,&chip,
+                    DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+            }
+            RECT nr={r.left+S(8)+(isDef?chipW+S(6):0),r.top,
+                     r.right-S(36),r.bottom};
+            SetTextColor(dc,selrow?g_theme.accentText:g_theme.text);
+            SelectObject(dc,g_fUI);
+            DrawTextW(dc,name.c_str(),-1,&nr,
+                DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX|DT_END_ELLIPSIS);
+        }
+        if(s_pls->نتایج_جستجو.empty()){
+            SetTextColor(dc,g_theme.danger); SelectObject(dc,g_fUI);
+            RECT r={lb.left+S(10),lb.top,lb.right-S(10),lb.bottom};
+            DrawTextW(dc,s_pls->عبارت_جستجو.empty()
+                        ?L"هیچ چاپگری روی این سیستم پیدا نشد."
+                        :L"چاپگری با این نام پیدا نشد.",-1,&r,
+                DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+        }
+        // scroll affordance arrows (only when the list overflows)
+        int maxScroll=(int)s_pls->نتایج_جستجو.size()-plListRows();
+        if(maxScroll>0){
+            SelectObject(dc,g_fSmall); SetTextColor(dc,g_theme.textDim);
+            RECT up={lb.right-S(22),lb.top+S(2),lb.right-S(4),lb.top+S(16)};
+            RECT dn={lb.right-S(22),lb.bottom-S(16),lb.right-S(4),lb.bottom-S(2)};
+            UINT a=DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX;
+            SetTextColor(dc,s_pls->اسکرول>0?g_theme.text:g_theme.border);
+            DrawTextW(dc,L"▲",-1,&up,a);
+            SetTextColor(dc,s_pls->اسکرول<maxScroll?g_theme.text:g_theme.border);
+            DrawTextW(dc,L"▼",-1,&dn,a);
+        }
+      }
+    }
+
+    // ---- پیرو پیش‌فرض ویندوز switch (same pill geometry as AzPrinterCfg) ----
+    if(s_pls){
+        int id=PLB_پیش‌فرض_ویندوز;
+        bool on=s_pls->پیرو_ویندوز;
+        bool hov=(s_pls->hot==id);
+        RECT sr=plSwitchRect(c);
+        SetTextColor(dc,g_theme.text); SelectObject(dc,g_fUI);
+        RECT lr={c.left+S(96),sr.top,c.right-S(20),sr.bottom};
+        DrawTextW(dc,L"پیرو پیش‌فرض ویندوز (چاپگر برنامه مستقل نباشد)",-1,&lr,
+            DT_RIGHT|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+        RECT pill={c.left+S(20),sr.top+S(1),c.left+S(86),sr.bottom-S(1)};
+        gpRoundRect(dc,pill,(pill.bottom-pill.top)/2,
+            on?g_theme.success:(hov?g_theme.hover:g_theme.surface2),
+            on?g_theme.success:g_theme.border,255);
+        int kr=(pill.bottom-pill.top)/2-S(3);
+        int kcx= on? (pill.right-S(3)-kr) : (pill.left+S(3)+kr);
+        int kcy=(pill.top+pill.bottom)/2;
+        RECT kn={kcx-kr,kcy-kr,kcx+kr,kcy+kr};
+        gpRoundRect(dc,kn,kr,RGB(255,255,255),CLR_INVALID,255);
+        SetTextColor(dc,on?g_theme.accentText:g_theme.textDim);
+        SelectObject(dc,g_fSmall);
+        RECT tt={pill.left+(on?S(6):S(20)),pill.top,pill.right-(on?S(20):S(6)),pill.bottom};
+        DrawTextW(dc,on?L"روشن":L"خاموش",-1,&tt,
+            DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+    }
+
+    // ---- action buttons -----------------------------------------------------
+    { RECT br=plBtnRowRect(c);
+      int gap=S(10);
+      int bw=(br.right-br.left-gap*2)/3;
+      auto btn=[&](int id,const wchar_t* t,RECT r,bool primary){
+        bool hov=(s_pls&&s_pls->hot==id);
+        COLORREF bg = primary? (hov?g_theme.accentHover:g_theme.accent)
+                             : (hov?g_theme.hover:g_theme.surface2);
+        gpRoundRect(dc,r,S(10),bg,primary?bg:g_theme.border,255);
+        SetTextColor(dc,primary?g_theme.accentText:g_theme.text);
+        SelectObject(dc,g_fUIB);
+        DrawTextW(dc,t,-1,&r,
+            DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_RTLREADING|DT_NOPREFIX);
+      };
+      int cx=br.right;
+      RECT rOk={cx-bw,br.top,cx,br.bottom}; cx-=bw+gap;
+      RECT rNo={cx-bw,br.top,cx,br.bottom}; cx-=bw+gap;
+      RECT rTs={cx-bw,br.top,cx,br.bottom};
+      btn(PLB_تأیید,L"تأیید",rOk,true);
+      btn(PLB_انصراف,L"انصراف",rNo,false);
+      btn(PLB_تست_اتصال,L"تست اتصال",rTs,false);
+      // بازخوانی sits below, full width
+      RECT rb={c.left+S(20),br.bottom+S(10),c.right-S(20),br.bottom+S(10)+S(40)};
+      btn(PLB_بازخوانی,L"بازخوانی لیست چاپگرها",rb,false);
+    }
+
+    BitBlt(dc0,0,0,rc.right,rc.bottom,dc,0,0,SRCCOPY);
+    SelectObject(dc,obm); DeleteObject(bmp); DeleteDC(dc);
+}
+
+static int plHit(HWND h, POINT pt){
+    if(!s_pls) return 0;
+    RECT c=plCard(h);
+    if(!PtInRect(&c,pt)) return -1;   // scrim
+    RECT cb={c.left+S(16),c.top+S(18),c.left+S(42),c.top+S(44)};
+    if(PtInRect(&cb,pt)) return PLB_بستن;
+    { RECT er=plSearchEditRect(c);
+      if(PtInRect(&er,pt)) return -2; }               // search field
+    { RECT lb=plListRect(c);
+      if(PtInRect(&lb,pt)){
+          int v=(pt.y-(lb.top+S(4)))/plRowH();
+          if(v>=0 && v<plListRows()){
+              int idx=s_pls->اسکرول+v;
+              if(idx<(int)s_pls->نتایج_جستجو.size()) return PLB_ITEM_BASE+v;
+          }
+          return 0;
+      } }
+    { RECT sr=plSwitchRect(c);
+      RECT pill={c.left+S(20),sr.top+S(1),c.left+S(86),sr.bottom-S(1)};
+      if(PtInRect(&pill,pt)) return PLB_پیش‌فرض_ویندوز; }
+    { RECT br=plBtnRowRect(c);
+      int gap=S(10);
+      int bw=(br.right-br.left-gap*2)/3;
+      int cx=br.right;
+      RECT rOk={cx-bw,br.top,cx,br.bottom}; cx-=bw+gap;
+      RECT rNo={cx-bw,br.top,cx,br.bottom}; cx-=bw+gap;
+      RECT rTs={cx-bw,br.top,cx,br.bottom};
+      if(PtInRect(&rOk,pt))  return PLB_تأیید;
+      if(PtInRect(&rNo,pt))  return PLB_انصراف;
+      if(PtInRect(&rTs,pt))  return PLB_تست_اتصال;
+      RECT rb={c.left+S(20),br.bottom+S(10),c.right-S(20),br.bottom+S(10)+S(40)};
+      if(PtInRect(&rb,pt))   return PLB_بازخوانی; }
+    return 0;
+}
+
+static void plSave(HWND h){
+    if(!s_pls) return;
+    std::wstring name = s_pls->پیرو_ویندوز ? std::wstring(L"") : s_pls->چاپگر_انتخابی;
+    if(!s_pls->پیرو_ویندوز && name.empty()){
+        // manual mode with no pick → keep following Windows (nothing to save)
+        MessageBoxW(h,L"ابتدا یک چاپگر از لیست انتخاب کنید.",L"ارتباط با چاپگر",
+            MB_OK|MB_ICONWARNING);
+        return;
+    }
+    wchar_t f[2]={0,0}; f[0]=s_pls->پیرو_ویندوز?L'1':L'0';
+    std::wstring preview = s_pls->پیرو_ویندوز
+        ? L"چاپگر: پیش‌فرض ویندوز"
+        : L"چاپگر: "+name;
+    std::wstring payload = L"printer_name="+name+
+        L";printer_follow_windows_default="+std::wstring(f);
+    if(printerRequestGate(h,L"ارتباط با چاپگر",L"تغییر چاپگر برنامه",
+            payload,preview)){
+        setSetting(L"printer_name",name);
+        setSetting(L"printer_follow_windows_default",f);
+        plClose();
+    }
+}
+
+static LRESULT CALLBACK plProc(HWND h, UINT m, WPARAM w, LPARAM l){
+    switch(m){
+    case WM_ERASEBKGND: return 1;
+    case WM_PAINT: { PAINTSTRUCT ps; HDC dc=BeginPaint(h,&ps);
+        plPaint(h,dc); EndPaint(h,&ps); return 0; }
+    case WM_APP_THEME: InvalidateRect(h,NULL,FALSE); return 0;
+    case WM_MOUSEMOVE: {
+        POINT pt={GET_X_LPARAM(l),GET_Y_LPARAM(l)};
+        int hr=plHit(h,pt); if(hr==-1) hr=0;   // -2 (search field) stays for hover
+        if(s_pls && hr!=s_pls->hot){ s_pls->hot=hr; InvalidateRect(h,NULL,FALSE); }
+        TRACKMOUSEEVENT te={sizeof(te),TME_LEAVE,h,0}; TrackMouseEvent(&te);
+        return 0; }
+    case WM_MOUSELEAVE:
+        if(s_pls && s_pls->hot){ s_pls->hot=0; InvalidateRect(h,NULL,FALSE); }
+        return 0;
+    case WM_MOUSEWHEEL: {
+        if(!s_pls) break;
+        int z=GET_WHEEL_DELTA_WPARAM(w);
+        int maxScroll=(int)s_pls->نتایج_جستجو.size()-plListRows();
+        if(maxScroll<=0) return 0;
+        s_pls->اسکرول += (z>0)?-1:1;
+        if(s_pls->اسکرول>maxScroll) s_pls->اسکرول=maxScroll;
+        if(s_pls->اسکرول<0) s_pls->اسکرول=0;
+        InvalidateRect(h,NULL,FALSE);
+        return 0; }
+    case WM_LBUTTONDOWN: {
+        POINT pt={GET_X_LPARAM(l),GET_Y_LPARAM(l)};
+        int id=plHit(h,pt);
+        if(id==-1 || id==PLB_بستن){ plClose(); return 0; }
+        if(id==-2){ SetFocus(s_pls->eSearch?s_pls->eSearch:h); return 0; }
+        if(id>=PLB_ITEM_BASE){
+            int v=id-PLB_ITEM_BASE;
+            int gi=s_pls->اسکرول+v;
+            if(gi<(int)s_pls->نتایج_جستجو.size()){
+                s_pls->چاپگر_انتخابی=s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[gi]];
+                if(s_pls->پیرو_ویندوز){ s_pls->پیرو_ویندوز=false; }
+            }
+            InvalidateRect(h,NULL,FALSE);
+            return 0;
+        }
+        switch(id){
+        case PLB_پیش‌فرض_ویندوز:
+            s_pls->پیرو_ویندوز=!s_pls->پیرو_ویندوز;
+            if(s_pls->پیرو_ویندوز) s_pls->چاپگر_انتخابی=s_pls->چاپگر_ویندوز;
+            InvalidateRect(h,NULL,FALSE); break;
+        case PLB_تأیید:      plSave(h); break;
+        case PLB_انصراف:     plClose(); break;
+        case PLB_تست_اتصال:  prnTestPrintTo(h, s_pls->پیرو_ویندوز
+                                             ? s_pls->چاپگر_ویندوز
+                                             : s_pls->چاپگر_انتخابی); break;
+        case PLB_بازخوانی: {
+            s_pls->همه_چاپگرها=enumPrinters();
+            wchar_t def[256]={0}; DWORD sz=256;
+            s_pls->چاپگر_ویندوز = GetDefaultPrinterW(def,&sz)? std::wstring(def):std::wstring(L"");
+            plApplyFilter();
+            InvalidateRect(h,NULL,FALSE); break; }
+        }
+        return 0; }
+    case WM_KEYDOWN:
+        if(w==VK_ESCAPE){ plClose(); return 0; }
+        if(s_pls){
+            if(w==VK_UP||w==VK_DOWN){
+                int n=(int)s_pls->نتایج_جستجو.size();
+                if(n>0){
+                    int cur=-1;
+                    for(int i=0;i<n;++i)
+                        if(s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[i]]==s_pls->چاپگر_انتخابی){ cur=i; break; }
+                    cur += (w==VK_DOWN)?1:-1;
+                    if(cur<0) cur=0; if(cur>=n) cur=n-1;
+                    s_pls->چاپگر_انتخابی=s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[cur]];
+                    if(s_pls->پیرو_ویندوز) s_pls->پیرو_ویندوز=false;
+                    int vis=cur-s_pls->اسکرول;
+                    if(vis<0) s_pls->اسکرول=cur;
+                    if(vis>=plListRows()) s_pls->اسکرول=cur-plListRows()+1;
+                    InvalidateRect(h,NULL,FALSE);
+                }
+                return 0;
+            }
+            if(w==VK_RETURN){ plSave(h); return 0; }
+        }
+        break;
+    case WM_COMMAND:
+        // EN_CHANGE from the search EDIT → re-filter the list live.
+        if(LOWORD(w)==IDC_PL_SEARCH && HIWORD(w)==EN_CHANGE && s_pls){
+            plApplyFilter();
+            InvalidateRect(h,NULL,FALSE);
+            return 0;
+        }
+        break;
+    case WM_CTLCOLOREDIT: {
+        HDC dc=(HDC)w;
+        SetTextColor(dc,g_theme.inputText); SetBkColor(dc,g_theme.inputBg);
+        return (LRESULT)g_brInput; }
+    case WM_DESTROY:
+        // Mirror prnProc exactly: never call DestroyWindow from WM_DESTROY
+        // (plClose() would re-enter on a window already being destroyed).
+        if(s_pls){ delete s_pls; s_pls=NULL; }
+        s_plink=NULL;
+        if(g_hFrame) InvalidateRect(g_hFrame,NULL,TRUE);
+        return 0;
+    }
+    return DefWindowProcW(h,m,w,l);
+}
+
+void PrinterLink_Open(HWND owner){
+    if(s_plink && IsWindow(s_plink)){ plClose(); return; }
+    static bool reg=false;
+    if(!reg){ WNDCLASSW wc={0}; wc.lpfnWndProc=plProc; wc.hInstance=g_hInst;
+        wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.lpszClassName=PL_CLASS;
+        RegisterClassW(&wc); reg=true; }
+    RECT rc; GetClientRect(owner,&rc);
+    POINT org={0,0}; ClientToScreen(owner,&org);
+    s_pls=new PrinterLinkState();
+    s_pls->owner=owner; s_pls->hot=0; s_pls->اسکرول=0;
+    s_pls->همه_چاپگرها=enumPrinters();
+    wchar_t def[256]={0}; DWORD sz=256;
+    s_pls->چاپگر_ویندوز = GetDefaultPrinterW(def,&sz)? std::wstring(def) : std::wstring(L"");
+    s_pls->پیرو_ویندوز = getSetting(L"printer_follow_windows_default",L"1")!=L"0";
+    // Pre-selection order (exactly the currentPrinter() precedence):
+    //   1) saved printer_name, if non-empty AND still installed
+    //   2) Windows default
+    //   3) no selection
+    { std::wstring saved=getSetting(L"printer_name",L"");
+      bool have=false;
+      for(size_t i=0;i<s_pls->همه_چاپگرها.size();++i)
+          if(s_pls->همه_چاپگرها[i]==saved){ have=true; break; }
+      if(!saved.empty() && have) s_pls->چاپگر_انتخابی=saved;
+      else                       s_pls->چاپگر_انتخابی=s_pls->چاپگر_ویندوز;
+      if(!s_pls->پیرو_ویندوز && (s_pls->چاپگر_انتخابی.empty() ||
+          (s_pls->چاپگر_انتخابی==s_pls->چاپگر_ویندوز && saved.empty())))
+          s_pls->پیرو_ویندوز=true;
+      if(s_pls->پیرو_ویندوز) s_pls->چاپگر_انتخابی=s_pls->چاپگر_ویندوز;
+    }
+    plApplyFilter();
+    // bring the selection into view
+    for(int i=0;i<(int)s_pls->نتایج_جستجو.size();++i)
+        if(s_pls->همه_چاپگرها[s_pls->نتایج_جستجو[i]]==s_pls->چاپگر_انتخابی){
+            if(i>=plListRows()) s_pls->اسکرول=i-plListRows()+1;
+            break;
+        }
+    s_plink=CreateWindowExW(WS_EX_TOPMOST,PL_CLASS,L"",
+        WS_POPUP|WS_VISIBLE|WS_CLIPCHILDREN,
+        org.x,org.y,rc.right,rc.bottom,owner,NULL,g_hInst,NULL);
+    // themed search EDIT child (same pattern as the settings server-url box)
+    { RECT er=plSearchEditRect(plCard(s_plink));
+      s_pls->eSearch=CreateWindowExW(0,L"EDIT",s_pls->عبارت_جستجو.c_str(),
+          WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL,
+          er.left+S(6),er.top+S(3),(er.right-er.left)-S(12),(er.bottom-er.top)-S(6),
+          s_plink,(HMENU)IDC_PL_SEARCH,g_hInst,NULL);
+      SendMessageW(s_pls->eSearch,WM_SETFONT,(WPARAM)g_fUI,TRUE);
+      SendMessageW(s_pls->eSearch,EM_SETCUEBANNER,TRUE,(LPARAM)L"نام چاپگر را بنویسید…");
+    }
+    BringWindowToTop(s_plink); SetFocus(s_plink);
 }
 
 // ============================================================================

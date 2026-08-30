@@ -666,6 +666,10 @@ extern const wchar_t* PRINT_SECTIONS[];  extern const int N_PRINT_SECTIONS;
 //  Open the printer-settings dialog (default printer, test, paper size,
 //  fit/fill, advanced) — persisted in settings.
 void openPrinterSettings(HWND owner);
+//  v2.07.0: «ارتباط با چاپگر» — dedicated printer picker (searchable list,
+//  Windows-default pre-selection, «پیرو پیش‌فرض ویندوز» switch, test page,
+//  reload) opened from the C++ settings header.
+void PrinterLink_Open(HWND owner);
 //  Open the visual print designer for a given section index.
 void openPrintDesigner(HWND owner, int sectionIdx);
 //  Render the saved design for a section onto a printer DC for a real receipt.
