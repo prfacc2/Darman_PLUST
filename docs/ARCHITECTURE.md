@@ -125,7 +125,8 @@ RULE 8 — Version is set in THREE places. Update all three together.
 | `src/app.rc` | Win32 resource script (RCDATA blobs + version info) |
 | `update/version.txt` | Released version string + download URL |
 | `src/sections.h` / `src/sections.cpp` | Sections registry — v2.07 adds the optional 12th column `recept_sub` (زیربخش پذیرش), `Sections_IsReceptionSub()`, `Sections_AccountRoleLabel()` |
-| `src/print_designer_templates.inc` | v2.07: the 30 builtin templates (T01–T30) + TB1, all produced by the single composer `بساز_طرح(طرح_پارامتر)` |
+| `src/print_designer_templates.inc` | v2.07: the 30 builtin templates (T01–T30) + TB1, all produced by the single composer `بساز_طرح(طرح_پارامتر)`. v2.07.1: PURE black-and-white (ink #000000 only — the clinic's printers are monochrome) |
+| `assets/designer/templates.js` | v2.07.1: exact JS mirror of the C++ composer feeding the designer gallery thumbnails — must stay byte-equivalent with the .inc |
 
 > `src/printer.cpp` additionally owns the v2.07 «ارتباط با چاپگر» dialog:
 > window class `AzPrinterLink` (`PL_CLASS`), entry point `PrinterLink_Open(HWND)`
