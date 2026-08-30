@@ -179,6 +179,11 @@ std::wstring resolveSessionTitle(const User& u){
     //   4) the access-level fallback (پذیرش / مدیریت / کارآموز)
     if(haveP && !p.position.empty())
         pos = p.position;
+    if(pos.empty() && haveP){
+        // the role on the personnel record (پزشک/پرستار/کارآموز/سایر) is also
+        // a مقام/سمت the manager defined — keep it ahead of the section label.
+        pos = personRoleLabel(p);
+    }
     if(pos.empty()){
         EmpProfile e=loadEmpProfile(u.username);
         pos=e.position;
@@ -199,11 +204,11 @@ std::wstring resolveSessionTitle(const User& u){
         if(u.role==2) pos=L"مدیر سامانه";
         else if(u.role==1) pos=L"مدیریت";
         else {
-            // §6.1(4): access-level fallback. کارآموز when the personnel
-            // record says trainee; پذیرش for reception-scope users; else پرسنل.
+            // §6.1(4): access-level fallback — پذیرش for reception-scope
+            // users, else پرسنل. (کارآموز/پزشک/پرستار were already handled by
+            // the personnel-role step above.)
             bool rec=false;
             if(haveP){
-                if(p.roleKind==3){ pos=L"کارآموز"; return pos; }
                 std::vector<Section> all; Sections_All(all);
                 int did=_wtoi(p.deptId.c_str());
                 int sid=_wtoi(p.subId.c_str());

@@ -3275,6 +3275,18 @@ static HDC pdCreatePrinterDC(const std::wstring& prn, const PrintDesign& d){
     return dc;
 }
 
+// v2.07 §7.5 — print a SPECIFIC design (used by the زیربخش پذیرش barcode-only
+// route, which must select TB1 regardless of the machine/section binding).
+// A thread-local override makes the standard engine resolve `forced` instead
+// of the machine-bound design — no duplicated rendering path.
+static thread_local const PrintDesign* t_forcedDesign=nullptr;
+bool printPrintDesignWith(const ReceptionRecord& r, const PrintDesign& forced, HWND owner){
+    t_forcedDesign=&forced;
+    bool ok=printPrintDesign(r,0,owner);
+    t_forcedDesign=nullptr;
+    return ok;
+}
+
 bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     // v1.65.0 SERVICES-PRINT FIX. Root cause of «قبض فقط برچسب چاپ می‌کند»:
     // Designs_Init() was only ever called from the Settings window / the Print
@@ -3290,7 +3302,9 @@ bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner){
     PrintDesign d;
     // v1.99: design is bound to THIS machine's printer, not a clinic section.
     (void)sectionId;
-    if(!MachineDesign_Resolve(d)){
+    if(t_forcedDesign){                       // v2.07 §7.5 (TB1 route)
+        d=*t_forcedDesign;
+    } else if(!MachineDesign_Resolve(d)){
         d = Design_BuiltinTemplate(0);
     }
     if(d.items.empty()) return false;

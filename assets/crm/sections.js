@@ -264,6 +264,9 @@
       '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gActive" ' + (!sub || sub.active ? 'checked' : '') + ' />فعال</label></div>' +
       '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gCashier" ' + (sub && sub.cashierTab ? 'checked' : '') + ' />ثبت پذیرش در صندوق</label></div>' +
       '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gHasPos" ' + (sub && sub.hasPos ? 'checked' : '') + ' />زیر بخش دستگاه پوز دارد</label></div>' +
+      /* v2.07 §7.1: «زیربخش پذیرش» — visible only for sub-sections (this modal
+         is only reachable for parentId > 0), default OFF. */
+      '<div class="crm-field full"><label class="crm-check"><input type="checkbox" id="gReceptSub" ' + (sub && sub.receptSub ? 'checked' : '') + ' />زیربخش پذیرش</label></div>' +
       '</div>';
     var foot = Crm.el('div', 'crm-modal-foot');
     foot.innerHTML = '<button class="crm-btn ghost" id="mCancel">انصراف</button><button class="crm-btn primary" id="mSave">ذخیره</button>';
@@ -278,7 +281,8 @@
         kind: Crm.$('gKind').value,
         active: Crm.$('gActive').checked,
         cashierTab: !!(Crm.$('gCashier') && Crm.$('gCashier').checked),
-        hasPos: !!(Crm.$('gHasPos') && Crm.$('gHasPos').checked)
+        hasPos: !!(Crm.$('gHasPos') && Crm.$('gHasPos').checked),
+        receptSub: !!(Crm.$('gReceptSub') && Crm.$('gReceptSub').checked)
       };
       if (!payload.name) { Crm.toast('نام زیربخش الزامی است.', 'err'); return; }
       if (!payload.parentId) { Crm.toast('انتخاب بخش مربوطه الزامی است.', 'err'); return; }

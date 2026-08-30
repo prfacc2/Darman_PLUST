@@ -261,6 +261,25 @@
    * suppIdx + suppPercent through Supp_Percent(idx) — ONE path feeds the  *
    * form, the billing computation and {supp_percent}/{supppay} on print.  *
    * ------------------------------------------------------------------ */
+  /* v2.07 §7.3 — inline notice for a زیربخش پذیرش without POS. The payment
+     controls are disabled (not removed); the message tells the operator the
+     patient pays at the main reception. Inserted once, idempotent. */
+  function showPayBlockedNotice() {
+    var insCard = document.querySelector ? document.querySelector('.ins-card .card-body') : null;
+    if (!insCard) return;
+    var existing = $('payBlockedNote');
+    if (existing) return;
+    var note = document.createElement('div');
+    note.id = 'payBlockedNote';
+    note.className = 'fld pay-blocked-note';
+    /* Trident-safe inline styles — no var(), no calc() */
+    note.style.cssText = 'width:100%;padding:6px 10px;margin:4px 0 0 0;' +
+      'background:#FFF7E6;border:1px solid #E0A030;border-radius:8px;' +
+      'color:#7A4A00;font-size:12.5px;text-align:right;';
+    note.innerHTML = 'پرداخت در بخش پذیرش انجام می‌شود';
+    insCard.appendChild(note);
+  }
+
   function loadSuppInsType() {
     if (state.surface !== 'admission') return;
     Bridge.call('بیمه_تکمیلی_فهرست', {}).then(function (r) {
@@ -5062,6 +5081,21 @@
       }
       state.canCashView = !r.perms || r.perms.cashier_view !== false;
       state.canCashEdit = !r.perms || r.perms.cashier_edit !== false;
+      /* v2.07 §7.3: a زیربخش پذیرش WITHOUT POS cannot complete a payment —
+         the payment controls (نقد، POS، تخفیف، پرداختی) are DISABLED (never
+         removed — RULE 6) and an inline notice is shown. The admission cannot
+         be marked paid; ثبت قبض routes the patient to the main صندوق. */
+      state.payBlocked = !!r.payBlocked;
+      state.receptSub  = !!r.receptSub;
+      if (state.payBlocked) {
+        var blockIds = ['noPay', 'insSuppPct'];
+        var bi;
+        for (bi = 0; bi < blockIds.length; bi++) {
+          var el = $(blockIds[bi]);
+          if (el) { el.disabled = true; }
+        }
+        showPayBlockedNotice();
+      }
       if (!state.canCashView) {
         var tc = $('toolsCash'); if (tc) tc.style.display = 'none';
       }

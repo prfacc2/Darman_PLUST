@@ -727,6 +727,22 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         o+="\"performers\":"+performersJson()+",";
         o+="\"queue\":"+adQueueJson(true,24)+",";
         o+="\"user\":"+jstr(g_session.user.fullname.empty()?g_session.user.username:g_session.user.fullname);
+        // v2.07 §7.3/§7.5: the acting scope's زیربخش پذیرش state. A reception
+        // sub WITHOUT POS cannot complete a payment (controls disabled, inline
+        // notice) and prints only TB1. has_pos keeps the v1.97 self-payment
+        // behaviour intact and overrides the new flag.
+        {
+            CashScope sc=Cash_ResolveScope();
+            int subId=sc.homeSubId>0?sc.homeSubId:0;
+            int secId=sc.homeSectionId>0?sc.homeSectionId:0;
+            bool isRecSub = subId>0 && Sections_IsReceptionSub(subId);
+            bool posOwns  = (subId>0 && Sections_HasPos(subId)) ||
+                            (secId>0 && Sections_HasPos(secId));
+            bool payBlocked = isRecSub && !posOwns;
+            o+=",\"receptSub\":";  o+=(isRecSub?"true":"false");
+            o+=",\"payBlocked\":"; o+=(payBlocked?"true":"false");
+            o+=",\"canPay\":";     o+=((!payBlocked)?"true":"false");
+        }
         o+="}";
         return o;
     }
@@ -1113,7 +1129,24 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         if(!Receipt_BuildRecord(u82w(idU),rec))
             return "{\"ok\":false,\"err\":\"قبض پیدا نشد.\"}";
         HWND owner=g_hFrame;
+        // v2.07 §7.5: a زیربخش پذیرش without POS prints ONLY the barcode
+        // label (TB1), regardless of the machine/section design binding.
+        bool recSubNoPos=false;
+        {
+            CashScope sc=Cash_ResolveScope();
+            int subId=sc.homeSubId>0?sc.homeSubId:0;
+            int secId=sc.homeSectionId>0?sc.homeSectionId:0;
+            bool isRecSub = subId>0 && Sections_IsReceptionSub(subId);
+            bool posOwns  = (subId>0 && Sections_HasPos(subId)) ||
+                            (secId>0 && Sections_HasPos(secId));
+            recSubNoPos = isRecSub && !posOwns;
+        }
         RunOnUiThreadSync([&](){
+            if(recSubNoPos){
+                PrintDesign tb1=Design_BuiltinTemplate(31);
+                printPrintDesignWith(rec,tb1,owner);
+                return;
+            }
             int sid=adResolveSectionId(); bool done=false;
             done=printPrintDesign(rec,sid,owner);
             if(!done) done=printDesignedReceipt(rec,0,owner);
@@ -1289,12 +1322,34 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         // (the "everything freezes after adding a service + saving" bug). We now
         // marshal the entire print block onto the UI thread and wait for it.
         std::wstring printMode=L"none";
+        // v2.07 §7.5: a زیربخش پذیرش WITHOUT POS never prints the designed
+        // receipt — it may only view/print the barcode (TB1). Enforce the
+        // routing at the print entry point, not in the UI.
+        bool recSubNoPos=false;
+        {
+            CashScope sc=Cash_ResolveScope();
+            int subId=sc.homeSubId>0?sc.homeSubId:0;
+            int secId=sc.homeSectionId>0?sc.homeSectionId:0;
+            bool isRecSub = subId>0 && Sections_IsReceptionSub(subId);
+            bool posOwns  = (subId>0 && Sections_HasPos(subId)) ||
+                            (secId>0 && Sections_HasPos(secId));
+            recSubNoPos = isRecSub && !posOwns;
+        }
         // v1.97: non-POS tickets go to cashier — skip print, return needsCashier.
-        if(posHas){
+        if(posHas || recSubNoPos){
             HWND owner = g_hFrame;
             int  sid=adResolveSectionId();
             RunOnUiThreadSync([&](){
                 bool done=false;
+                if(recSubNoPos){
+                    // §7.5: زیربخش پذیرش prints ONLY the barcode label (TB1),
+                    // regardless of the machine/section design binding.
+                    PrintDesign tb1=Design_BuiltinTemplate(31);
+                    done=printPrintDesignWith(r,tb1,owner);
+                    if(done) printMode=L"barcode-label TB1";
+                    kickCashDrawer();
+                    return;
+                }
                 // v1.65.0: ALWAYS try the services-capable print-design first —
                 // even when sid==0 (SectionDesign_Resolve maps sid<=0 to the first
                 // builtin, and printPrintDesign now seeds the design store lazily).

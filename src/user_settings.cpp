@@ -28,6 +28,7 @@
 #include "app.h"
 #include "ui_kit.h"
 #include "sections.h"
+#include "clinic_ops.h"   // v2.07 §7.5: CashScope gating for زیربخش پذیرش
 #include "print_designer.h"
 #include "net_sync.h"
 #include "backup_log.h"
@@ -87,7 +88,7 @@ static bool canAccess(int row, int mode){
     case ROW_THEME:     return true;
     case ROW_RECEPTION: return false;
     case ROW_BLACKLIST: return false;
-    case ROW_DESIGNER:  return true;
+    case ROW_DESIGNER:  return true;   // §7.5 gating happens at open time below
     case ROW_PRINTER_LINK: return true;
     case ROW_BACKUP:    return mode==SM_ADMIN;   // admin-only — removed from «حساب پرسنل»
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
@@ -555,6 +556,34 @@ static void buildDesignerPage(SettingsWin* sw){
         L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a \u0686\u0627\u067e",   // تنظیمات چاپ
         ICO_GEAR,BS_OUTLINE,x,y+S(58)+S(48),w,S(40));
     sw->ctrls.push_back(b2);
+
+    /* v2.07 §7.5: a زیربخش پذیرش without POS gets NO designed receipt — it may
+       only view/print the barcode (TB1). The designer / print-settings entries
+       are INERT for that scope: disabled with an explanatory tooltip, not
+       removed (RULE 6). */
+    {
+        bool payBlocked=false;
+        {
+            CashScope sc=Cash_ResolveScope();
+            int subId=sc.homeSubId>0?sc.homeSubId:0;
+            int secId=sc.homeSectionId>0?sc.homeSectionId:0;
+            bool isRecSub = subId>0 && Sections_IsReceptionSub(subId);
+            bool posOwns  = (subId>0 && Sections_HasPos(subId)) ||
+                            (secId>0 && Sections_HasPos(secId));
+            payBlocked = isRecSub && !posOwns;
+        }
+        if(payBlocked){
+            EnableWindow(b1,FALSE);
+            EnableWindow(b2,FALSE);
+            HWND tip=CreateWindowExW(0,L"STATIC",
+                L"زیربخش پذیرش فقط برچسب بارکد چاپ می‌کند؛ "
+                L"طراحی چاپ مخصوص بخش پذیرش است.",
+                WS_CHILD|WS_VISIBLE|SS_RIGHT|WS_CLIPSIBLINGS,
+                x,y+S(58)+S(96),w,S(36),sw->hwnd,NULL,g_hInst,NULL);
+            SendMessageW(tip,WM_SETFONT,(WPARAM)g_fSmall,TRUE);
+            sw->ctrls.push_back(tip);
+        }
+    }
 }
 
 // §1.12.0: compute the unscrolled content height of the current page so we can

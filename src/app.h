@@ -687,6 +687,9 @@ bool printDesignedReceipt(const ReceptionRecord& r, int sectionIdx, HWND owner);
 //  printReceipt. First call (per session, no saved printer) shows the standard
 //  print dialog so the operator picks printer + paper (A4/A5).
 bool printPrintDesign(const ReceptionRecord& r, int sectionId, HWND owner);
+// v2.07 §7.5: print a SPECIFIC design (زیربخش پذیرش barcode-only TB1 route)
+// regardless of the machine/section binding.
+bool printPrintDesignWith(const ReceptionRecord& r, const struct PrintDesign& forced, HWND owner);
 //  Pulse the cash drawer connected to the configured printer (ESC/POS kick),
 //  but only when the «باز کردن کشوی پول» option is enabled in printer settings.
 void kickCashDrawer();

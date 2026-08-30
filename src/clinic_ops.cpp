@@ -254,12 +254,48 @@ static std::wstring cashBuildServicesJson(const ReceptionRecord& r){
     return o;
 }
 
+// v2.07 §7.4 — resolve the FULL NAME of a user (never the login username).
+// Users store first (User::fullname), then the personnel record. When only a
+// username exists we log the gap so it stays visible.
+static std::wstring cashUserFullName(const std::wstring& username){
+    if(username.empty()) return L"";
+    std::vector<User> users=loadUsers();
+    for(const auto& u:users)
+        if(u.username==username && !u.fullname.empty()) return u.fullname;
+    PersonDef p;
+    if(personByUsername(username,p)){
+        std::wstring fn=p.firstName;
+        if(!p.lastName.empty()){ if(!fn.empty()) fn+=L" "; fn+=p.lastName; }
+        if(!fn.empty()) return fn;
+    }
+    logError(L"cashUserFullName: no full name on record for user '"+username+L"'");
+    return username;
+}
+
 static void cashFillHome(CashTicket& t){
     CashScope sc=Cash_ResolveScope();
     t.sectionId=sc.homeSectionId;
     t.sectionName=sc.homeSectionName;
     t.subId=sc.homeSubId;
     t.subName=sc.homeSubName;
+    /* v2.07 §7.4 — REVENUE ATTRIBUTION. Revenue is posted to the MAIN
+       reception section's cash register (the top-level parent), never to the
+       زیربخش itself. The ticket keeps its originating sub attribution above
+       (پذیرش = the sub-section operator); the LEDGER target below is the
+       main reception scope. has_pos keeps the v1.97 self-payment behaviour
+       and is never overridden by the new flag. */
+    if(t.subId>0 && Sections_IsReceptionSub(t.subId)){
+        std::vector<Section> all; Sections_All(all);
+        for(const auto& sec:all){
+            if(sec.id==t.subId && sec.parent_id>0){
+                t.sectionId=sec.parent_id;          // main reception register
+                for(const auto& ps:all) if(ps.id==sec.parent_id){
+                    t.sectionName=ps.name_fa; break;
+                }
+                break;
+            }
+        }
+    }
 }
 
 static bool opsNeedCashEdit(std::wstring& err){
@@ -936,6 +972,27 @@ bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out){
     out.receiptCode=t->archiveNo;
     out.finalTotal=t->payable; out.paid=t->paid; out.patientShare=t->payable;
     out.userName=t->user;
+    // v2.07 §7.4: پذیرش = the (sub-section) operator who admitted the patient;
+    // صندوق‌دار = the main-reception cashier who took the money. Both FULL
+    // names resolved through the personnel/user store — never the username.
+    out.receptionist=cashUserFullName(t->user);
+    out.cashierName=cashUserFullName(t->paidUser.empty()?t->user:t->paidUser);
+    /* §7.4: ش.ص = the MAIN reception cash sheet/shift number (the register the
+       money lands in), not the sub-section's. Resolved from the OPEN shift of
+       the main reception section; falls back to the session shift index. */
+    if(t->sectionId>0){
+        std::vector<CashShift> shifts=shiftLoad();
+        for(const auto& sh:shifts){
+            if(sh.sectionId==t->sectionId && sh.status==L"open"){
+                out.scNum=sh.id;   // the shift/sheet document number
+                break;
+            }
+        }
+    }
+    if(out.scNum.empty()){
+        wchar_t b[16]; swprintf(b,16,L"%d",g_session.shift+1);
+        out.scNum=b;
+    }
     out.regStamp=t->jdate+L" "+t->time;
     std::wstring js=t->servicesJson;
     // parse a tiny [{"code":"..","name":"..","qty":1,"price":0,"patShare":0},...]

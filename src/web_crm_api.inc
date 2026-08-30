@@ -25,6 +25,7 @@ static std::string crmSectionJson(const Section& s){
     o+=(s.is_active?"true":"false");
     o+=",\"cashierTab\":"; o+=(s.cashier_tab?"true":"false");   // v1.93
     o+=",\"hasPos\":"; o+=(s.has_pos?"true":"false");           // v1.97
+    o+=",\"receptSub\":"; o+=(s.recept_sub?"true":"false");     // v2.07 §7.1
     o+=",\"createdAt\":"+jstr(s.created_at)+",";
     o+="\"updatedAt\":"+jstr(s.updated_at)+"";
     o+="}";
@@ -466,6 +467,8 @@ static std::string crmApi(const std::string& verb, const std::string& body){
         if(jsonHasKey(body,"active"))     s.is_active=jsonGetBool(body,"active",true)?1:0;
         if(jsonHasKey(body,"cashierTab")) s.cashier_tab=jsonGetBool(body,"cashierTab",false)?1:0;
         if(jsonHasKey(body,"hasPos"))     s.has_pos=jsonGetBool(body,"hasPos",false)?1:0;
+        // v2.07 §7.1: «زیربخش پذیرش» tick (sub-section modal only; default OFF).
+        if(jsonHasKey(body,"receptSub"))  s.recept_sub=jsonGetBool(body,"receptSub",false)?1:0;
         s.updated_at=crmTodayJalali();
         if(s.id<=0) s.created_at=s.updated_at;
         int rid=Sections_Upsert(s);
