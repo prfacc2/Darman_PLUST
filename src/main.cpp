@@ -7,6 +7,7 @@
 #include "backup_log.h"
 #include "web_admission.h"
 #include "web_crm.h"          // v1.70.0: embedded HTML CRM management surface
+#include "print_designer.h"   // v2.07: pdVerifyBuiltinTemplates (§4.6 smoke)
 #include "web_thread_pool.h"   // v1.40.0: WM_APP_UI_TASK marshalling (RunOnUiThread)
 #include <stdio.h>
 #ifdef AZ_DEBUG_BUILD
@@ -1852,6 +1853,14 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
                 // non-zero code. Reaching here means the open path is healthy.
                 void Sections_Init(); void Designs_Init();
                 Sections_Init(); Designs_Init(); InsDefs_SeedDefaults();
+                // v2.07 §4.6: assert every builtin carries the 13 mandatory
+                // blocks, exactly one barcode, one 3-column services table,
+                // zero شماره سابقه bindings and at most one {receiptbarcode}.
+                if(!pdVerifyBuiltinTemplates()){
+                    logLine(L"SMOKE print_designer: builtin template check FAILED");
+                    gdipShutdown(); BackupLog_Shutdown();
+                    return 2;
+                }
                 logLine(L"SMOKE print_designer: subsystems initialized — OK");
                 gdipShutdown(); BackupLog_Shutdown();
                 return 0;

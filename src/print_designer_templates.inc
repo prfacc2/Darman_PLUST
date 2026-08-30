@@ -1,15 +1,35 @@
 // ============================================================================
-//  print_designer_templates.inc — 31 built-in reception templates (v2.00)
+//  print_designer_templates.inc — 30 builtin templates + TB1 (v2.07.0)
 //
 //  Included into print_designer.cpp.
 //
-//  Index 0 is the never-deletable «پیش‌فرض»: an exact thermal R80 (80×200 mm)
-//  Samen-al-Aemeh receipt. Indices 1..30 are 30 additional designs, all
-//  different from the default and from each other, mixing R80 / R58 / A5 / A4.
+//  THE COMPOSER MODEL (§4.4): every builtin is produced by ONE deterministic
+//  composer, بساز_طرح(طرح_پارامتر), which always emits the 13 mandatory
+//  blocks of §4.3 in order. Templates differ ONLY in the knobs carried by
+//  طرح_پارامتر: paper, orientation, layout arrangement, colour emphasis and
+//  base font. No loops over random values, no generated names — the 30 rows
+//  of the parameter table are literal constants.
 //
-//  Same complete field set + exact Persian C2 labels on every design.
-//  One Code128 (field receiptbarcode, never nid). Basic insurance = {ins}
-//  name only (no percent). Supplementary = {supp} {supp_percent}.
+//  The 13 mandatory blocks (identical on every template, top to bottom):
+//   1. لیبل نام درمانگاه {clinicname}
+//   2. لیبل آدرس {clinicaddr}
+//   3. لیبل تلفن {clinicphone}
+//   4. لیبل معرف رسید {receipttitle} — right side
+//   5. بارکد PIT_BARCODE hri:true — left side (value ONLY under the graphic)
+//   6. تاریخ نوبت {apptdate} · ساعت نوبت {appttime} · نوبت {queue}
+//   7. کد ملی {nid} · بیمه پایه {ins_full} · بیمه مکمل {supp_full}
+//   8. نام بیمار {P-Name} single-line · سن {age} · شماره شناسنامه {certno}
+//   9. انجام‌دهنده {performer} + {performercode}
+//  10. پزشک معالج {doctor} + شرح تخصص {specialty} + کد نظام پزشکی {doctorcode}
+//  11. جدول خدمات PIT_SERVICES — exactly نام خدمت | تعداد | شرح خدمت
+//  12. خلاصهٔ پرداخت: پرداختی/قیمت کل/سهم پایه/سهم مکمل/تخفیف از/تخفیف/نقد/POS
+//  13. پذیرش {receptionist} · صندوق‌دار {cashier_name} · ش.ص {scnum} ·
+//      تاریخ و ساعت {datetime}
+//
+//  Removed from every layout per §3.4/§3.6: the duplicated بارکد text row,
+//  شماره پرونده (FA_FILENO) and شماره سابقه (FA_ARCHIVE). Their tokens and
+//  renderers remain available for user designs (RULE 6) — the composer simply
+//  never emits them.
 // ============================================================================
 
 namespace {
@@ -17,6 +37,9 @@ namespace {
 static int g_tplItemId = 1;
 static int nid(){ return g_tplItemId++; }
 
+// ---------------------------------------------------------------------------
+//  item builders (mm coordinates)
+// ---------------------------------------------------------------------------
 static PrintItem mkLabel(double x,double y,double w,double h,
                          const std::wstring& text,double pt,bool bold,int align){
     PrintItem it; it.id=nid(); it.type=PIT_LABEL; it.x=x; it.y=y; it.w=w; it.h=h;
@@ -51,108 +74,74 @@ static PrintItem mkFrame(double pw,double ph,double margin,unsigned col,double b
     it.borderColor=col; it.borderWidth=bw; it.fillTransparent=true; it.corner=0;
     return it;
 }
-static PrintItem mkFrameBox(double x,double y,double w,double h,double bw){
-    PrintItem it; it.id=nid(); it.type=PIT_FRAME; it.is_frame=true;
-    it.x=x; it.y=y; it.w=w; it.h=h;
-    it.borderColor=0x000000; it.borderWidth=bw; it.fillTransparent=true; it.corner=0;
-    return it;
-}
-static PrintItem mkLogo(double x,double y,double w,double h){
-    PrintItem it; it.id=nid(); it.type=PIT_LOGO; it.x=x; it.y=y; it.w=w; it.h=h;
-    it.borderWidth=0.3; return it;
-}
+// v2.07 §3.4: the barcode value appears ONLY as the HRI text under the graphic.
 static PrintItem mkBarcode(double x,double y,double w,double h){
     PrintItem it; it.id=nid(); it.type=PIT_BARCODE; it.x=x; it.y=y; it.w=w; it.h=h;
     it.field=L"receiptbarcode";
     it.text=L"{\"sym\":\"code128\",\"hri\":true,\"quiet\":2}";
     it.fontPt=8.0; it.align=1; it.textColor=0x000000; return it;
 }
-static PrintItem mkPhoto(double x,double y,double w,double h){
-    PrintItem it; it.id=nid(); it.type=PIT_PHOTO; it.x=x; it.y=y; it.w=w; it.h=h;
-    it.borderWidth=0.3; return it;
-}
 
-// ---------------------------------------------------------------------------o
-//  v2.06 — TABLE POLICY (user request): the services table carries EXACTLY
-//  three columns — نام خدمت / تعداد / شرح خدمت. Nothing else. All money and
-//  identity data (پرداختی، قیمت کل، سهم پایه، سهم مکمل، تخفیف، نقد، POS،
-//  کد رهگیری نسخه الکترونیک، شماره معرفی نامه، صندوق دار، ش.ص، تاریخ و ساعت)
-//  lives BELOW the table in the footer blocks (emitSamenFinance /
-//  emitSamenRef / emitSamenFooter). The former per-variant presets are kept
-//  as enum values so stored designs referencing them still parse, but every
-//  preset now renders the same canonical 3-column model (only the column
-//  widths differ slightly per paper width).
-// ---------------------------------------------------------------------------
-enum SvcPreset {
-    SVC3 = 0, SVC4_ROW, SVC4_CAT, SVC5, SVC5_CODE, SVC6_FIN, SVC6_INS, SVC7,
-    SVC_SAMEN,
-    SVC_PRESET_COUNT
-};
-
-static std::wstring svcModelJson(int preset){
-    /* v2.06: every preset → the canonical 3-column table. The variant only
-       tweaks the NAME/DESC width split so narrow rolls keep readable prose. */
-    (void)preset;
-    return L"{\"cols\":3,\"header\":true,\"widths\":[0.34,0.10,0.56],"
-           L"\"labels\":[\"نام خدمت\",\"تعداد\",\"شرح خدمت\"]}";
-}
-
+// v2.07 §3.7: the canonical 3-column model (the renderer clamps builtins to
+// this anyway; the composer stores the same canonical shape).
 static PrintItem mkServices(double x,double y,double w,double h,double pt,
-                            int preset,unsigned headFill,double bw,
-                            double rowH,double headerH){
+                            double bw,double rowH,double headerH){
     PrintItem it; it.id=nid(); it.type=PIT_SERVICES; it.x=x; it.y=y; it.w=w; it.h=h;
-    it.text=svcModelJson(preset);
+    it.text=L"{\"cols\":3,\"header\":true,\"widths\":[0.46,0.12,0.42],"
+            L"\"labels\":[\"نام خدمت\",\"تعداد\",\"شرح خدمت\"]}";
     it.fontPt=pt; it.bold=false; it.align=1;
     it.borderColor=0x000000; it.borderWidth=bw;
     it.textColor=0x000000;
     it.fillColor=0xFFFFFF; it.fillTransparent=true;
-    (void)headFill;
     it.padding=0.6;
     it.headerH=headerH; it.rowH=rowH;
     return it;
 }
 
-// --- exact C2 Persian captions --------------------------------------------
-#define FA_CLINIC    L"درمانگاه شبانه روزی ثامن الائمه"
-#define FA_ADDR      L"آدرس : "
-#define FA_PHONE     L"تلفن : "
-#define FA_DOC_REC   L"قبض پزشک"
-#define FA_INS_REC   L"رسید بیمه"
-#define FA_DOC_BOTH  L"قبض و رسید"
-#define FA_APPT      L"تاریخ نوبت : "
-#define FA_QUEUE     L"نوبت : "
-#define FA_NID       L"کد ملی : "
-#define FA_BARCODE   L"بارکد : "
-#define FA_BASEINS   L"بیمه پایه : "
-#define FA_SUPP      L"مکمل : "
-#define FA_FULL      L"نام بیمار : "
-#define FA_FILENO    L"شماره پرونده "
-#define FA_ARCHIVE   L"شماره سابقه "
-#define FA_DOCTOR    L"دکتر : "
-#define FA_SPECIALTY L"شرح تخصص : "
-#define FA_PAID      L"پرداختی : "
-#define FA_TOTAL     L"قیمت کل : "
-#define FA_INSSHARE  L"سهم پایه : "
-#define FA_SUPPPAY   L"سهم مکمل : "
-#define FA_DISCFROM  L"تخفیف از : "
-#define FA_DISCOUNT  L"تخفیف : "
-#define FA_CASH      L"نقد : "
-#define FA_CASHDISC  L"تخفیف نقد : "
-#define FA_POS       L"POS : "
-#define FA_EPRESC    L"کد رهگیری نسخه الکترونیک : "
-#define FA_REFERRAL  L"شماره معرفی نامه : "
-#define FA_RECEPTION L"پذیرش : "
-#define FA_CASHIER   L"صندوق دار : "
-#define FA_SC        L"ش.ص : "
-#define FA_CASH_SFX  L" / دار"
-#define FA_TEAR      L"— — — محل جدا کردن — — —"
-#define FA_STUB      L"نسخهٔ بیمار"
-#define FA_PAYLBL    L"پرداخت‌ها"
-#define FA_SHARELBL  L"سهم بیمه"
-#define FA_SVCLIST   L"شرح خدمات"
+// ---------------------------------------------------------------------------
+//  exact C2 Persian captions (§4.3 order)
+// ---------------------------------------------------------------------------
+#define FA_CLINICLBL  L"نام درمانگاه : "
+#define FA_ADDRLBL    L"آدرس : "
+#define FA_PHONELBL   L"تلفن : "
+#define FA_TITLELBL   L""                       // معرف رسید prefix (dynamic)
+#define FA_APPTDATE   L"تاریخ نوبت : "
+#define FA_APPTTIME   L"ساعت نوبت : "
+#define FA_QUEUE      L"نوبت : "
+#define FA_NID        L"کد ملی : "
+#define FA_BASEINS    L"بیمه پایه : "
+#define FA_SUPPINS    L"بیمه مکمل : "
+#define FA_FULL       L"نام بیمار : "
+#define FA_AGE        L"سن : "
+#define FA_CERTNO     L"شماره شناسنامه : "
+#define FA_PERF       L"انجام‌دهنده : "
+#define FA_PERFCODE   L"کد نظام پزشکی : "
+#define FA_DOCTOR     L"پزشک معالج : "
+#define FA_SPECIALTY  L"شرح تخصص : "
+#define FA_DOCCODE    L"کد نظام پزشکی : "
+#define FA_SVCTITLE   L"جدول خدمات"
+#define FA_PAID       L"پرداختی : "
+#define FA_TOTAL      L"قیمت کل : "
+#define FA_BASEPAY    L"سهم پایه : "
+#define FA_SUPPPAY    L"سهم مکمل : "
+#define FA_DISCFROM   L"تخفیف از : "
+#define FA_DISCOUNT   L"تخفیف : "
+#define FA_CASH       L"نقد : "
+#define FA_POS        L"POS : "
+#define FA_RECEPTION  L"پذیرش : "
+#define FA_CASHIER    L"صندوق‌دار : "
+#define FA_SC         L"ش.ص : "
+#define FA_DATETIME   L"تاریخ و ساعت : "
 
-static const unsigned R_INK = 0x000000;
+// v2.07 §3.8 — saturated print palette (INK/ACCENT/DANGER/MUTED).
+static const unsigned R_INK    = 0x000000;
+static const unsigned R_ACCENT = 0x0B3D91;
+static const unsigned R_DANGER = 0xA31212;
+static const unsigned R_MUTED  = 0x333333;
 
+// ---------------------------------------------------------------------------
+//  label+field row helper (RTL: label on the right, value to its left)
+// ---------------------------------------------------------------------------
 static inline void putLF(std::vector<PrintItem>& v,double x,double y,double w,double h,
                          const wchar_t* label,const wchar_t* field,double pt,
                          bool lblBold,bool valBold,double lwFrac=0.42){
@@ -162,485 +151,298 @@ static inline void putLF(std::vector<PrintItem>& v,double x,double y,double w,do
                                  : mkField (x, y, vw, h, field, L"", pt, 0));
 }
 
-static double emitHeader(std::vector<PrintItem>& v,double x,double y,double w,
-                         double pt,bool rules,bool photo){
-    double pw=14.0, ph=16.0, tw=w;
-    if(photo) tw=w-pw-2.0;
-    double namePt=pt+3.0;
-    v.push_back(mkLabel(x, y, tw, 6.2, FA_CLINIC, namePt, true, 1)); y+=6.4;
-    v.push_back(mkField(x, y, tw, 4.0, L"clinicaddr",  FA_ADDR,  pt-1.5, 1)); y+=4.2;
-    v.push_back(mkField(x, y, tw, 3.8, L"clinicphone", FA_PHONE, pt-1.5, 1)); y+=4.0;
-    if(photo) v.push_back(mkPhoto(x+w-pw, y-14.4, pw, ph));
-    if(rules){ v.push_back(mkHLine(x, y, w, 0.3)); y+=1.2; }
-    return y;
-}
-
-static double emitTitle(std::vector<PrintItem>& v,double x,double y,double w,
-                        double pt,const std::wstring& title){
-    v.push_back(mkLabel(x, y, w, 5.6, title, pt+1.5, true, 1));
-    y+=6.0;
-    v.push_back(mkHLine(x, y, w, 0.3));
-    return y+0.8;
-}
-
-static double emitBarcode(std::vector<PrintItem>& v,double x,double y,double w,
-                          double bcW,double bcH){
-    if(bcW>w-1.0) bcW=w-1.0;
-    v.push_back(mkBarcode(x+(w-bcW)/2.0, y+0.3, bcW, bcH));
-    return y+bcH+1.2;
-}
-
-// C2 info block — 6 rows, RTL label-right value-left, HLINE separators.
-static double emitSamenInfo(std::vector<PrintItem>& v,double x,double y,double w,
-                            double rH,double pt,double bw){
-    double half=w/2.0, fh=rH-0.7;
-    auto vline=[&](double cy){ v.push_back(mkVLine(x+half, cy, rH, bw)); };
-    auto rule =[&](double cy){ v.push_back(mkHLine(x, cy, w, bw)); };
-
-    // 1 تاریخ نوبت : {apptdate} {appttime} | نوبت : {queue}
-    vline(y);
-    { double rx=x+half+0.5, rw=half-1.0;
-      double lblW=rw*0.40, g=0.5, rem=rw-lblW-2*g; if(rem<8) rem=8;
-      double f1=rem*0.58, f2=rem*0.42;
-      v.push_back(mkField (rx,         y+0.3, f2, fh, L"appttime", L"", pt, 0));
-      v.push_back(mkFieldB(rx+f2+g,     y+0.3, f1, fh, L"apptdate", L"", pt, 0));
-      v.push_back(mkLabel (rx+rw-lblW,  y+0.3, lblW, fh, FA_APPT, pt, true, 0)); }
-    putLF(v, x+0.5, y+0.3, half-1.0, fh, FA_QUEUE, L"queue", pt, true, false, 0.38);
-    y+=rH; rule(y);
-
-    // 2 کد ملی : {nid} | بارکد : {receiptbarcode}
-    vline(y);
-    putLF(v, x+half+0.5, y+0.3, half-1.0, fh, FA_NID,     L"nid",             pt, true,  false, 0.40);
-    putLF(v, x+0.5,      y+0.3, half-1.0, fh, FA_BARCODE, L"receiptbarcode",  pt, false, false, 0.32);
-    y+=rH; rule(y);
-
-    // 3 بیمه پایه : {ins} | مکمل : {supp} {supp_percent}
-    vline(y);
-    putLF(v, x+half+0.5, y+0.3, half-1.0, fh, FA_BASEINS, L"ins", pt, false, false, 0.42);
-    { double lx=x+0.5, lw=half-1.0;
-      double lblW=lw*0.28, g=0.5, rem=lw-lblW-2*g;
-      double f1=rem*0.58, f2=rem*0.42;
-      v.push_back(mkField(lx,         y+0.3, f2, fh, L"supp_percent", L"", pt, 0));
-      v.push_back(mkField(lx+f2+g,     y+0.3, f1, fh, L"supp",         L"", pt, 0));
-      v.push_back(mkLabel(lx+lw-lblW,  y+0.3, lblW, fh, FA_SUPP, pt, false, 0)); }
-    y+=rH; rule(y);
-
-    // 4 نام بیمار : {full} | شماره پرونده {fileNo} LARGE BOLD | شماره سابقه {archiveNo} small
-    { double w1=w*0.42, w2=w*0.33, w3=w-w1-w2;
-      v.push_back(mkVLine(x+w1, y, rH, bw));
-      v.push_back(mkVLine(x+w1+w2, y, rH, bw));
-      putLF(v, x+w1+w2+0.4, y+0.3, w3-0.8, fh, FA_FULL, L"full", pt, true, false, 0.44);
-      { double ptB=pt+1.5, fhB=fh;
-        putLF(v, x+w3+0.4, y+0.25, w2-0.8, fhB, FA_FILENO, L"fileNo", ptB, true, true, 0.52);
-        v.back().bold=true; v.back().fontPt=ptB; }
-      putLF(v, x+0.4, y+0.4, w1-0.8, fh-0.2, FA_ARCHIVE, L"archiveNo", pt-1.5, false, false, 0.52); }
-    y+=rH; rule(y);
-
-    // 5 دکتر : {doctor}-{doctorcode} full width
-    { double lblW=(w<60)?11.0:13.0, hyW=2.4, codeW=w*0.20; if(codeW<10) codeW=10;
-      double docW=w-lblW-hyW-codeW-1.2; if(docW<12) docW=12;
-      double xl=x+0.5;
-      v.push_back(mkField (xl,               y+0.3, codeW, fh, L"doctorcode", L"", pt, 0));
-      v.push_back(mkLabel (xl+codeW,         y+0.3, hyW,   fh, L"-", pt, false, 1));
-      v.push_back(mkFieldB(xl+codeW+hyW,     y+0.3, docW,  fh, L"doctor",     L"", pt, 0));
-      v.push_back(mkLabel (x+w-lblW-0.4,     y+0.3, lblW,  fh, FA_DOCTOR, pt, true, 0)); }
-    y+=rH; rule(y);
-
-    // 6 شرح تخصص : {specialty} | empty reserved | {specialtycode} one char
-    { double codeW=(w<60)?6.0:7.5, emptyW=w*0.16; if(emptyW<8) emptyW=8;
-      double specW=w-codeW-emptyW-1.0;
-      v.push_back(mkVLine(x+codeW+0.4, y, rH, bw));
-      v.push_back(mkVLine(x+codeW+emptyW, y, rH, bw));
-      v.push_back(mkField(x+0.4, y+0.3, codeW, fh, L"specialtycode", L"", pt-1.0, 1));
-      putLF(v, x+codeW+emptyW+0.4, y+0.3, specW-0.6, fh, FA_SPECIALTY, L"specialty", pt, false, false, 0.36); }
-    y+=rH; rule(y);
-    return y;
-}
-
-// Two-column packing of the same C2 fields (patient | visit).
-static double emitSamenInfoSplit(std::vector<PrintItem>& v,double x,double y,double w,
-                                 double rH,double pt,double bw){
-    double gap=2.4, colW=(w-gap)/2.0, fh=rH-0.7;
-    double lx=x, rx=x+colW+gap;
-    const int n=6;
-    v.push_back(mkRect(lx, y, colW, n*rH, bw, 0));
-    v.push_back(mkRect(rx, y, colW, n*rH, bw, 0));
-    for(int i=1;i<n;i++){
-        v.push_back(mkHLine(lx, y+i*rH, colW, bw));
-        v.push_back(mkHLine(rx, y+i*rH, colW, bw));
-    }
-    auto cell=[&](double cx,int row,const wchar_t* lab,const wchar_t* fld,
-                  bool lb,bool vb,double frac,double ptv){
-        putLF(v, cx+0.6, y+row*rH+0.3, colW-1.2, fh, lab, fld, ptv, lb, vb, frac);
-    };
-    cell(rx,0,FA_FULL,    L"full",            true,  false, 0.44, pt);
-    cell(rx,1,FA_NID,     L"nid",             true,  false, 0.40, pt);
-    cell(rx,2,FA_FILENO,  L"fileNo",          true,  true,  0.52, pt+1.0);
-    cell(rx,3,FA_ARCHIVE, L"archiveNo",       false, false, 0.52, pt-1.0);
-    cell(rx,4,FA_BASEINS, L"ins",             false, false, 0.42, pt);
-    { double cw=colW-1.2, xx=rx+0.6, yy=y+5*rH+0.3;
-      double lblW=cw*0.28, g=0.5, rem=cw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
-      v.push_back(mkField(xx,         yy, f2, fh, L"supp_percent", L"", pt, 0));
-      v.push_back(mkField(xx+f2+g,     yy, f1, fh, L"supp",         L"", pt, 0));
-      v.push_back(mkLabel(xx+cw-lblW,  yy, lblW, fh, FA_SUPP, pt, false, 0)); }
-    { double cw=colW-1.2, xx=lx+0.6, yy=y+0.3;
-      double lblW=cw*0.40, g=0.5, rem=cw-lblW-2*g, f1=rem*0.58, f2=rem*0.42;
-      v.push_back(mkField (xx,         yy, f2, fh, L"appttime", L"", pt, 0));
-      v.push_back(mkFieldB(xx+f2+g,     yy, f1, fh, L"apptdate", L"", pt, 0));
-      v.push_back(mkLabel (xx+cw-lblW,  yy, lblW, fh, FA_APPT, pt, true, 0)); }
-    cell(lx,1,FA_QUEUE,     L"queue",           true,  false, 0.38, pt);
-    cell(lx,2,FA_BARCODE,   L"receiptbarcode",  false, false, 0.34, pt);
-    cell(lx,3,FA_DOCTOR,    L"doctor",          true,  false, 0.30, pt);
-    { PrintItem c=mkField(lx+0.6, y+4*rH+0.3, colW-1.2, fh, L"doctorcode", L"-", pt, 0);
-      v.push_back(c); }
-    cell(lx,5,FA_SPECIALTY, L"specialty",       false, false, 0.40, pt);
-    v.push_back(mkField(lx+colW-8.0, y+5*rH+0.3, 7.0, fh, L"specialtycode", L"", pt-1.0, 1));
-    return y+n*rH;
-}
-
-static double emitSamenFinance(std::vector<PrintItem>& v,double x,double y,double w,
-                               double rH,double pt,double bw){
-    double half=w/2.0, fh=rH-0.7;
-    auto row2=[&](const wchar_t* l1,const wchar_t* f1,bool b1,
-                  const wchar_t* l2,const wchar_t* f2){
-        v.push_back(mkVLine(x+half, y, rH, bw));
-        putLF(v, x+half+0.5, y+0.3, half-1.0, fh, l1, f1, pt, b1, false, 0.44);
-        putLF(v, x+0.5,      y+0.3, half-1.0, fh, l2, f2, pt, false, false, 0.44);
-        y+=rH; v.push_back(mkHLine(x, y, w, bw));
-    };
-    /* v2.06: the complete financial footer block requested by the user —
-       پرداختی، قیمت کل، سهم پایه، سهم مکمل، تخفیف از، تخفیف، تخفیف نقد،
-       POS — all BELOW the services table, never as table columns. */
-    row2(FA_PAID,     L"paid",          true,  FA_TOTAL,    L"total");
-    row2(FA_INSSHARE, L"insshare",      false, FA_SUPPPAY,  L"supppay");
-    row2(FA_DISCFROM, L"discount_from", false, FA_DISCOUNT, L"discount");
-    row2(FA_CASHDISC, L"cash",          false, FA_POS,      L"pos");
-    return y;
-}
-
-static double emitDualFinance(std::vector<PrintItem>& v,double x,double y,double w,
-                              double rH,double pt,double bw){
-    double gap=2.5, bw2=(w-gap)/2.0, capH=5.2, fh=rH-0.7;
-    double lx=x, rx=x+bw2+gap;
-    v.push_back(mkLabel(lx+0.5, y+0.3, bw2-1.0, capH-0.6, FA_PAYLBL,   pt-0.5, true, 1));
-    v.push_back(mkLabel(rx+0.5, y+0.3, bw2-1.0, capH-0.6, FA_SHARELBL, pt-0.5, true, 1));
-    v.push_back(mkHLine(lx, y+capH, bw2, bw));
-    v.push_back(mkHLine(rx, y+capH, bw2, bw));
-    double iy=y+capH;
-    /* v2.06: same complete footer field set as emitSamenFinance — the whole
-       money block lives below the table, never inside it. */
-    putLF(v, lx+0.5, iy+0.3,        bw2-1.0, fh, FA_PAID,     L"paid",          pt, true,  false, 0.44);
-    v.push_back(mkHLine(lx, iy+rH, bw2, bw));
-    putLF(v, lx+0.5, iy+rH+0.3,     bw2-1.0, fh, FA_TOTAL,    L"total",         pt, false, false, 0.44);
-    v.push_back(mkHLine(lx, iy+2*rH, bw2, bw));
-    putLF(v, lx+0.5, iy+2*rH+0.3,   bw2-1.0, fh, FA_DISCFROM, L"discount_from", pt, false, false, 0.44);
-    v.push_back(mkHLine(lx, iy+3*rH, bw2, bw));
-    putLF(v, lx+0.5, iy+3*rH+0.3,   bw2-1.0, fh, FA_DISCOUNT, L"discount",      pt, false, false, 0.44);
-    putLF(v, rx+0.5, iy+0.3,        bw2-1.0, fh, FA_INSSHARE, L"insshare",      pt, false, false, 0.44);
-    v.push_back(mkHLine(rx, iy+rH, bw2, bw));
-    putLF(v, rx+0.5, iy+rH+0.3,     bw2-1.0, fh, FA_SUPPPAY,  L"supppay",       pt, false, false, 0.44);
-    v.push_back(mkHLine(rx, iy+2*rH, bw2, bw));
-    putLF(v, rx+0.5, iy+2*rH+0.3,   bw2-1.0, fh, FA_CASHDISC, L"cash",          pt, true,  false, 0.36);
-    v.push_back(mkHLine(rx, iy+3*rH, bw2, bw));
-    putLF(v, rx+0.5, iy+3*rH+0.3,   bw2-1.0, fh, FA_POS,      L"pos",           pt, false, false, 0.30);
-    double bottom=y+capH+4*rH;
-    v.push_back(mkRect(lx, y, bw2, capH+4*rH, bw, 0));
-    v.push_back(mkRect(rx, y, bw2, capH+4*rH, bw, 0));
-    v.push_back(mkHLine(x, bottom, w, bw));
-    return bottom;
-}
-
-static double emitSamenRef(std::vector<PrintItem>& v,double x,double y,double w,
-                           double rH,double pt,double bw){
-    double fh=rH-0.7;
-    putLF(v, x+0.5, y+0.3, w-1.0, fh, FA_EPRESC,   L"eprescription", pt-0.5, false, false, 0.56);
-    y+=rH; v.push_back(mkHLine(x, y, w, bw));
-    putLF(v, x+0.5, y+0.3, w-1.0, fh, FA_REFERRAL, L"referralno",    pt-0.5, false, false, 0.42);
-    y+=rH;
-    return y;
-}
-
-static double emitSamenFooter(std::vector<PrintItem>& v,double x,double y,double w,
-                              double pt){
-    double fh=4.6, half=w/2.0;
-    v.push_back(mkHLine(x, y, w, 0.25));
-    v.push_back(mkVLine(x+half, y+0.3, fh, 0.25));
-    putLF(v, x+half+0.4, y+0.5, half-0.8, fh, FA_RECEPTION, L"receptionist", pt-1.0, false, false, 0.36);
-    putLF(v, x+0.4,      y+0.5, half-0.8, fh, FA_CASHIER,   L"cashier",      pt-1.0, false, false, 0.36);
-    if(!v.empty()) v.back().suffix=FA_CASH_SFX;
-    y+=fh+0.8;
-    putLF(v, x+half+0.4, y, half-0.8, fh, FA_SC, L"scnum", pt-1.0, false, false, 0.28);
-    v.push_back(mkField(x+0.4, y, half-0.8, fh, L"reg_ts", L"", pt-1.5, 0));
-    return y+fh+0.4;
-}
-
-static double emitStub(std::vector<PrintItem>& v,double x,double y,double w,double pt){
-    v.push_back(mkHLine(x, y, w, 0.3));
-    v.push_back(mkLabel(x, y+0.4, w, 3.6, FA_TEAR, pt-1.5, false, 1));
-    y+=4.6;
-    v.push_back(mkLabel(x, y, w, 4.8, FA_STUB, pt, true, 1));
-    y+=5.2;
-    double rH=4.8, fh=4.2, half=w/2.0;
-    v.push_back(mkRect(x, y, w, 2*rH, 0.3, 0));
-    v.push_back(mkVLine(x+half, y, 2*rH, 0.3));
-    putLF(v, x+half+0.5, y+0.3, half-1.0, fh, FA_FULL,  L"full",  pt-1.0, true, false, 0.40);
-    putLF(v, x+0.5,      y+0.3, half-1.0, fh, FA_QUEUE, L"queue", pt-1.0, false, false, 0.36);
-    v.push_back(mkHLine(x, y+rH, w, 0.3));
-    putLF(v, x+0.5, y+rH+0.3, w-1.0, fh, FA_PAID, L"paid", pt, true, true, 0.28);
-    return y+2*rH+1.0;
-}
-
-static double paperMargin(double pw){
-    if(pw<=80.0) return 3.0;
-    if(pw<=148.0) return 6.0;
-    return 8.0;
-}
-
 // ===========================================================================
-//  Index 0 — NEVER-deletable «پیش‌فرض» exact thermal R80 Samen receipt.
+//  §4.4 — THE COMPOSER PARAMETER STRUCT (per-template variation knobs ONLY)
 // ===========================================================================
-static void buildSamenDefault(PrintDesign& d){
-    const double PW=80.0, PH=200.0, M=3.0, bw=0.30, pt=8.0, rH=5.2;
-    d.paper=L"R80"; d.paperW=PW; d.paperH=PH; d.orientation=0;
-    std::vector<PrintItem>& v=d.items;
-    double x=M, w=PW-2*M, y=M;
-
-    // HEADER (no border, centered)
-    v.push_back(mkLabel(x, y, w, 6.4, FA_CLINIC, 11.0, true, 1)); y+=6.6;
-    v.push_back(mkField(x, y, w, 4.0, L"clinicaddr",  FA_ADDR,  7.0, 1)); y+=4.2;
-    v.push_back(mkField(x, y, w, 3.8, L"clinicphone", FA_PHONE, 7.0, 1)); y+=4.2;
-
-    // TITLE+BARCODE row: right title, left Code128 ~50×8 mm
-    { double bcW=50.0, bcH=8.0;
-      v.push_back(mkBarcode(x, y+0.2, bcW, bcH));
-      v.push_back(mkLabel(x+bcW+1.0, y+1.0, w-bcW-1.0, 6.4, FA_DOC_REC, 9.5, true, 0));
-      y+=bcH+1.0; }
-
-    double footH=10.5;
-    double boxTop=y, boxBot=PH-M-footH, boxH=boxBot-boxTop;
-    double ix=x+0.8, iw=w-1.6, iy=boxTop+0.8;
-    iy=emitSamenInfo(v, ix, iy, iw, rH, pt, bw);
-    double finRefH=6*rH;
-    double svcH=boxBot-0.8-iy-finRefH;
-    if(svcH<20.0) svcH=20.0;
-    v.push_back(mkServices(ix, iy, iw, svcH, 7.0, SVC_SAMEN, 0, bw, 4.6, 5.0));
-    iy+=svcH;
-    iy=emitSamenFinance(v, ix, iy, iw, rH, pt, bw);
-    iy=emitSamenRef(v, ix, iy, iw, rH, pt, bw);
-    (void)iy;
-    v.push_back(mkFrameBox(x, boxTop, w, boxH, bw));
-    emitSamenFooter(v, x, boxBot+0.4, w, pt);
-}
-
-// ===========================================================================
-//  Indices 1..30 — 10 layout families × 3 variants, mixed papers.
-// ===========================================================================
-struct ExtraSpec {
-    int layout;     // 0..9
-    int variant;    // 0..2
-    int svc;
-    const wchar_t* paper;
-    double bw;
-    double rowH;
-    bool pageFrame;
-    bool photo;
-    bool logo;
-    bool tear;
+struct طرح_پارامتر {
+    const wchar_t* کد;         // "T01"…"T30"
+    const wchar_t* نام;        // Persian display name from §4.2
+    const wchar_t* کاغذ;       // "A4"|"A5"|"A6"|"B5"|"Letter"|"R80"|"R58"
+    int   جهت;                 // 0 portrait 1 landscape
+    int   چیدمان;              // 0 one-column 1 two-column 2 banded 3 card 4 roll
+    int   تأکید;               // 0 mono 1 accent-header 2 full-color bands
+    double قلم_پایه;           // base pt
 };
 
-static const ExtraSpec EXTRA[30] = {
-  /* 01 */ {0,0, SVC3,      L"R80", 0.30, 5.2, false, false, false, false},
-  /* 02 */ {0,1, SVC4_ROW,  L"R80", 0.30, 5.0, true,  false, false, false},
-  /* 03 */ {0,2, SVC5,      L"A5",  0.30, 5.6, true,  false, false, false},
-  /* 04 */ {1,0, SVC3,      L"R80", 0.30, 5.0, false, false, false, false},
-  /* 05 */ {1,1, SVC4_CAT,  L"R58", 0.28, 4.8, false, false, false, false},
-  /* 06 */ {1,2, SVC5_CODE, L"A5",  0.30, 5.6, true,  false, false, false},
-  /* 07 */ {2,0, SVC6_FIN,  L"R80", 0.30, 5.0, false, false, false, false},
-  /* 08 */ {2,1, SVC6_INS,  L"A5",  0.30, 5.4, true,  false, false, false},
-  /* 09 */ {2,2, SVC7,      L"A4",  0.30, 5.8, true,  false, false, false},
-  /* 10 */ {3,0, SVC3,      L"A5",  0.30, 5.4, false, false, true,  false},
-  /* 11 */ {3,1, SVC4_ROW,  L"A4",  0.30, 5.8, true,  false, true,  false},
-  /* 12 */ {3,2, SVC5,      L"A4",  0.30, 6.0, false, true,  true,  false},
-  /* 13 */ {4,0, SVC3,      L"A5",  0.25, 5.4, false, false, false, false},
-  /* 14 */ {4,1, SVC4_ROW,  L"A4",  0.25, 5.8, true,  false, false, false},
-  /* 15 */ {4,2, SVC5,      L"A4",  0.25, 6.0, false, true,  false, false},
-  /* 16 */ {5,0, SVC3,      L"R80", 0.30, 5.0, false, false, false, false},
-  /* 17 */ {5,1, SVC4_CAT,  L"A5",  0.30, 5.4, false, false, false, false},
-  /* 18 */ {5,2, SVC6_INS,  L"A4",  0.30, 5.8, true,  false, false, false},
-  /* 19 */ {6,0, SVC3,      L"R58", 0.28, 4.8, false, false, false, false},
-  /* 20 */ {6,1, SVC5,      L"R80", 0.30, 5.2, false, false, false, false},
-  /* 21 */ {6,2, SVC5_CODE, L"A5",  0.30, 5.6, true,  false, false, false},
-  /* 22 */ {7,0, SVC3,      L"R58", 0.25, 4.6, false, false, false, false},
-  /* 23 */ {7,1, SVC4_ROW,  L"R58", 0.28, 4.8, true,  false, false, false},
-  /* 24 */ {7,2, SVC5,      L"R80", 0.30, 5.0, false, false, false, false},
-  /* 25 */ {8,0, SVC3,      L"A5",  0.30, 5.2, false, false, false, true },
-  /* 26 */ {8,1, SVC4_ROW,  L"A4",  0.30, 5.4, true,  false, false, true },
-  /* 27 */ {8,2, SVC5,      L"A4",  0.30, 5.6, false, false, false, true },
-  /* 28 */ {9,0, SVC3,      L"A5",  0.30, 5.4, false, false, false, false},
-  /* 29 */ {9,1, SVC6_FIN,  L"A4",  0.30, 5.8, true,  false, false, false},
-  /* 30 */ {9,2, SVC5_CODE, L"A4",  0.30, 6.0, true,  false, false, false},
+// ===========================================================================
+//  §4.4 — THE SINGLE COMPOSER. بساز_طرح is the ONLY producer of builtin
+//  templates. It always emits the 13 mandatory blocks of §4.3 in order.
+// ===========================================================================
+static PrintDesign بساز_طرح(const طرح_پارامتر& p){
+    g_tplItemId = 1;
+    PrintDesign d;
+    d.kind=L"builtin";
+    d.name=p.نام;
+    d.paper=p.کاغذ;
+    double PW=210.0,PH=297.0;
+    Paper_Dims(p.کاغذ,PW,PH);
+    d.orientation=p.جهت;
+    if(p.جهت==1) std::swap(PW,PH);
+    d.paperW=PW; d.paperH=PH;
+    d.baseW=PW; d.baseH=PH;      // §4.5: base = authored paper → reflow scales
+
+    std::vector<PrintItem>& v=d.items;
+    const double M = (PW<=60.0)?3.0 : (PW<=90.0)?4.0 : (PW<=150.0)?7.0 : 9.0;
+    const double bw = 0.30;                       // §3.8 hairline minimum
+    const double pt = p.قلم_پایه;
+    const bool roll = (PW<=90.0);
+    const bool card = (p.چیدمان==3);
+    double x=M, w=PW-2*M, y=M;
+
+    // Emphasis palette: mono = all ink; accent-header = ACCENT on block 1;
+    // full-color = ACCENT band + DANGER money + MUTED footer.
+    unsigned cTitle = (p.تأکید==0)?R_INK:R_ACCENT;
+    unsigned cHead  = (p.تأکید==0)?R_INK:R_ACCENT;
+    unsigned cMoney = (p.تأکید==2)?R_DANGER:R_INK;
+    unsigned cFoot  = (p.تأکید==0)?R_INK:R_MUTED;
+
+    // ---------------- BLOCK 1-3: clinic name / address / phone --------------
+    double namePt = pt + (roll?2.5:3.0);
+    if(p.تأکید>=1 && !roll){
+        // accent header band behind the clinic block
+        v.push_back(mkRect(x, y-1.0, w, 16.0, 0.0, 0));
+        v.back().fillColor=R_ACCENT; v.back().fillTransparent=false;
+        v.back().textColor=R_ACCENT;
+        v.push_back(mkField(x, y, w, 5.6, L"clinicname", L"", namePt, 1));
+        v.back().bold=true; v.back().textColor=0xFFFFFF;
+    } else {
+        v.push_back(mkField(x, y, w, 5.6, L"clinicname", L"", namePt, 1));
+        v.back().bold=true; v.back().textColor=cHead;
+    }
+    y+=5.8;
+    v.push_back(mkField(x, y, w, 4.0, L"clinicaddr", FA_ADDRLBL, pt-1.5, 1));
+    v.back().textColor=cFoot; y+=4.2;
+    v.push_back(mkField(x, y, w, 3.8, L"clinicphone", FA_PHONELBL, pt-1.5, 1));
+    v.back().textColor=cFoot; y+=4.4;
+    v.push_back(mkHLine(x,y,w,bw)); y+=1.6;
+
+    // ---------------- BLOCK 4+5: receipt title (right) + barcode (left) -----
+    {
+        double bcW = roll? (w*0.62) : (w*0.42);
+        double bcH = roll?7.5:9.0;
+        if(bcW>w-30.0) bcW=w-30.0;
+        double tW = w-bcW-2.0;
+        // right: معرف رسید
+        v.push_back(mkField(x+bcW+2.0, y+1.0, tW, 5.0, L"receipttitle", L"", pt+1.5, 0));
+        v.back().bold=true; v.back().textColor=cTitle;
+        // left: barcode (value ONLY as the HRI under the graphic)
+        v.push_back(mkBarcode(x, y+0.2, bcW, bcH));
+        y += bcH+1.6;
+    }
+    v.push_back(mkHLine(x,y,w,bw)); y+=1.6;
+
+    // ---------------- BLOCK 6: appt date · time · queue --------------------
+    {
+        double colW=(w-2*0.6)/3.0;
+        putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_APPTDATE, L"apptdate", pt, true,false, 0.52);
+        putLF(v, x+(colW+0.6),     y, colW, 4.4, FA_APPTTIME, L"appttime", pt, false,false, 0.52);
+        putLF(v, x,                y, colW, 4.4, FA_QUEUE,    L"queue",    pt, false,true,  0.40);
+        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+    }
+
+    // ---------------- BLOCK 7: nid · base ins · supp ins -------------------
+    {
+        double colW=(w-2*0.6)/3.0;
+        putLF(v, x+2*(colW+0.6), y, colW, 4.4, FA_NID,     L"nid",      pt, true,false, 0.46);
+        putLF(v, x+(colW+0.6),   y, colW, 4.4, FA_BASEINS, L"ins_full", pt, false,false, 0.48);
+        putLF(v, x,              y, colW, 4.4, FA_SUPPINS, L"supp_full",pt, false,false, 0.48);
+        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+    }
+
+    // ---------------- BLOCK 8: patient name (single line) · age · certno ---
+    {
+        double nameW = w*0.46, ageW=w*0.22, certW=w-nameW-ageW-1.2;
+        putLF(v, x+ageW+certW+1.2, y, nameW, 4.6, FA_FULL, L"P-Name", pt+0.5, true, true, 0.34);
+        // §3.5 name item contract: dir 0 (RTL), align 0 (right), valign 1
+        v.back().dir=0; v.back().align=0; v.back().valign=1;
+        putLF(v, x+certW+0.6, y, ageW, 4.4, FA_AGE,    L"age",    pt, false,false, 0.40);
+        putLF(v, x,            y, certW, 4.4, FA_CERTNO, L"certno", pt, false,false, 0.52);
+        y+=5.0; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+    }
+
+    // ---------------- BLOCK 9: انجام‌دهنده + کد -----------------------------
+    {
+        double codeW=w*0.28;
+        putLF(v, x+codeW+0.6, y, w-codeW-0.6, 4.4, FA_PERF, L"performer", pt, true,false, 0.34);
+        putLF(v, x,            y, codeW,      4.4, FA_PERFCODE, L"performercode", pt, false,false, 0.56);
+        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+    }
+
+    // ---------------- BLOCK 10: پزشک معالج + تخصص + کد نظام پزشکی ----------
+    {
+        double codeW=w*0.24, specW=w*0.34, docW=w-codeW-specW-1.2;
+        putLF(v, x+codeW+specW+1.2, y, docW,  4.4, FA_DOCTOR,   L"doctor",     pt, true,false, 0.36);
+        putLF(v, x+codeW+0.6,       y, specW, 4.4, FA_SPECIALTY, L"specialty",  pt, false,false, 0.40);
+        putLF(v, x,                 y, codeW, 4.4, FA_DOCCODE,   L"doctorcode", pt, false,false, 0.56);
+        y+=4.8; v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
+    }
+
+    // ---------------- BLOCK 11: جدول خدمات (3 columns) ---------------------
+    // The elastic item of the layout: everything below forms بلوک_پایانی.
+    double footH = roll? 26.0 : 34.0;
+    double moneyH = roll? 16.0 : 22.0;
+    double svcY=y;
+    double svcH = (PH - M - footH - moneyH) - y;
+    if(svcH < 18.0) svcH = 18.0;
+    if(!roll && svcH > (PH-2*M)*0.42) svcH=(PH-2*M)*0.42;
+    v.push_back(mkServices(x, svcY, w, svcH, pt-0.8, bw,
+                           roll?4.6:5.2, roll?4.8:5.4));
+    y = svcY + svcH + 1.2;
+
+    // ---------------- BLOCK 12: خلاصهٔ پرداخت --------------------------------
+    {
+        double colW=(w-0.6)/2.0;
+        double rH = roll?3.8:4.6;
+        auto money2=[&](const wchar_t* l1,const wchar_t* f1,
+                        const wchar_t* l2,const wchar_t* f2,double yy,bool boldL){
+            putLF(v, x+colW+0.6, yy, colW, rH, l1, f1, pt, boldL, false, 0.44);
+            v.back().textColor=cMoney;
+            putLF(v, x,           yy, colW, rH, l2, f2, pt, boldL, false, 0.44);
+            v.back().textColor=cMoney;
+        };
+        money2(FA_PAID,     L"paid",          FA_TOTAL,    L"total",         y, true);
+        y+=rH;
+        money2(FA_BASEPAY,  L"basepay",       FA_SUPPPAY,  L"supppay",       y, false);
+        y+=rH;
+        money2(FA_DISCFROM, L"discount_from", FA_DISCOUNT, L"discount",      y, false);
+        y+=rH;
+        money2(FA_CASH,     L"cash",          FA_POS,      L"pos",           y, false);
+        y+=rH+0.8;
+        v.push_back(mkHLine(x,y,w,bw)); y+=1.2;
+    }
+
+    // ---------------- BLOCK 13: پذیرش · صندوق‌دار · ش.ص · تاریخ و ساعت ------
+    {
+        double colW=(w-0.6)/2.0;
+        double rH = roll?3.6:4.2;
+        putLF(v, x+colW+0.6, y, colW, rH, FA_RECEPTION, L"receptionist", pt-0.5, false,false, 0.34);
+        v.back().textColor=cFoot;
+        putLF(v, x,           y, colW, rH, FA_CASHIER,   L"cashier_name", pt-0.5, false,false, 0.36);
+        v.back().textColor=cFoot;
+        y+=rH;
+        putLF(v, x+colW+0.6, y, colW, rH, FA_SC,        L"scnum",    pt-0.5, false,false, 0.30);
+        v.back().textColor=cFoot;
+        putLF(v, x,           y, colW, rH, FA_DATETIME, L"datetime", pt-0.5, false,false, 0.44);
+        v.back().textColor=cFoot;
+    }
+
+    // Framing per layout family (never straddles the services bottom edge —
+    // §3.9 invariant: frames stop ABOVE the table or wrap the whole page).
+    if(p.چیدمان==0 && p.تأکید==2 && !roll){
+        v.push_back(mkFrame(PW,PH,M-1.0,R_ACCENT,0.30));
+    } else if(card){
+        v.push_back(mkFrame(PW,PH,M-1.0,R_MUTED,0.30));
+    }
+    return d;
+}
+
+// ===========================================================================
+//  §7.5 — TB1: «برچسب بارکد زیربخش» — barcode-only label (NOT one of the 30).
+//  Reduced block set: {clinicname}, {receipttitle}, PIT_BARCODE hri:true,
+//  {P-Name}, {nid}, {queue}, {datetime}.
+// ===========================================================================
+static PrintDesign بساز_برچسب_بارکد(){
+    g_tplItemId = 1;
+    PrintDesign d;
+    d.kind=L"builtin";
+    d.name=L"برچسب بارکد زیربخش";
+    d.paper=L"R80"; d.paperW=80.0; d.paperH=120.0;
+    d.orientation=0; d.baseW=80.0; d.baseH=120.0;
+    std::vector<PrintItem>& v=d.items;
+    const double M=3.0, bw=0.30, pt=8.0;
+    double x=M, w=80.0-2*M, y=M;
+    v.push_back(mkField(x, y, w, 5.0, L"clinicname", L"", pt+2.0, 1));
+    v.back().bold=true; y+=5.4;
+    v.push_back(mkField(x, y, w, 4.2, L"receipttitle", L"", pt, 1));
+    v.back().textColor=R_MUTED; y+=4.6;
+    v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
+    v.push_back(mkBarcode(x, y, w, 12.0)); y+=13.4;
+    putLF(v, x, y, w, 4.6, L"نام بیمار : ", L"P-Name", pt, true, true, 0.36); y+=5.0;
+    putLF(v, x, y, w, 4.2, L"کد ملی : ",   L"nid",    pt, false,false, 0.34); y+=4.6;
+    putLF(v, x, y, w, 4.2, L"نوبت : ",     L"queue",  pt, false,false, 0.30); y+=4.6;
+    putLF(v, x, y, w, 4.2, L"تاریخ و ساعت : ", L"datetime", pt-0.5, false,false, 0.44);
+    return d;
+}
+
+// ===========================================================================
+//  §4.2 — THE FROZEN PARAMETER TABLE (30 rows, literal constants)
+// ===========================================================================
+static const طرح_پارامتر TPL_TABLE[30] = {
+    {L"T01", L"طرح پیش‌فرض حرفه‌ای",      L"A4",  0, 0, 1, 9.5},
+    {L"T02", L"طرح ساده و سریع",          L"A5",  0, 0, 0, 9.0},
+    {L"T03", L"طرح رسمی کادردار",         L"A4",  0, 0, 2, 9.5},
+    {L"T04", L"طرح فشردهٔ A5",            L"A5",  0, 0, 0, 8.5},
+    {L"T05", L"طرح سربرگ رنگی مدرن",      L"A4",  0, 0, 2, 9.5},
+    {L"T06", L"طرح شمارهٔ نوبت درشت",      L"A5",  0, 0, 1, 9.5},
+    {L"T07", L"طرح رسید پرداخت",          L"A5",  0, 0, 1, 9.0},
+    {L"T08", L"طرح دو ستونهٔ شیک",        L"A4",  0, 1, 1, 9.0},
+    {L"T09", L"طرح مینیمال خط‌دار",        L"A5",  0, 0, 0, 9.0},
+    {L"T10", L"طرح کارت بیمار",           L"A6",  0, 3, 1, 8.5},
+    {L"T11", L"طرح نواری ۸۰ میلی‌متر",     L"R80", 0, 4, 0, 7.5},
+    {L"T12", L"طرح نواری ۵۸ میلی‌متر",     L"R58", 0, 4, 0, 7.0},
+    {L"T13", L"طرح افقی A5",             L"A5",  1, 0, 1, 9.0},
+    {L"T14", L"طرح افقی A4",             L"A4",  1, 0, 1, 9.5},
+    {L"T15", L"طرح بارکدمحور",           L"A6",  0, 3, 0, 8.5},
+    {L"T16", L"طرح جدول‌محور",            L"A4",  0, 0, 1, 9.0},
+    {L"T17", L"طرح دو ستونهٔ فشرده",      L"A5",  0, 1, 0, 8.5},
+    {L"T18", L"طرح سربرگ‌دار بلند",        L"A4",  0, 0, 2, 9.5},
+    {L"T19", L"طرح رسید نقدی",           L"A5",  0, 0, 1, 9.0},
+    {L"T20", L"طرح رسید کارتخوان",        L"A5",  0, 0, 1, 9.0},
+    {L"T21", L"طرح بیمهٔ پایه",           L"A5",  0, 0, 1, 9.0},
+    {L"T22", L"طرح بیمهٔ تکمیلی",         L"A5",  0, 0, 1, 9.0},
+    {L"T23", L"طرح آزمایشگاه",           L"A5",  0, 0, 1, 9.0},
+    {L"T24", L"طرح رادیولوژی",           L"A5",  0, 0, 1, 9.0},
+    {L"T25", L"طرح تزریقات",             L"A5",  0, 0, 1, 9.0},
+    {L"T26", L"طرح داروخانه",            L"A5",  0, 0, 1, 9.0},
+    {L"T27", L"طرح فیزیوتراپی",           L"A5",  0, 0, 1, 9.0},
+    {L"T28", L"طرح نسخهٔ پزشک",           L"A5",  0, 0, 1, 9.0},
+    {L"T29", L"طرح صورتحساب تفصیلی",       L"A4",  0, 0, 2, 9.0},
+    {L"T30", L"طرح خلاصهٔ مدیریتی",        L"A4",  0, 0, 1, 9.0},
 };
 
 static const wchar_t* const TPL_NAMES[31]={
     L"پیش‌فرض",
-    L"۰۱) قبض پزشک — رول ۸۰ کلاسیک",
-    L"۰۲) رسید بیمه — رول ۸۰ قاب‌دار",
-    L"۰۳) قبض و رسید — A5 کلاسیک",
-    L"۰۴) قبض پزشک — رول ۸۰ خدمات‌بالا",
-    L"۰۵) رسید بیمه — رول ۵۸ خدمات‌بالا",
-    L"۰۶) قبض و رسید — A5 خدمات‌بالا",
-    L"۰۷) قبض پزشک — رول ۸۰ مالی‌اول",
-    L"۰۸) رسید بیمه — A5 مالی‌اول",
-    L"۰۹) قبض و رسید — A4 مالی‌اول",
-    L"۱۰) قبض پزشک — A5 ستون کناری",
-    L"۱۱) رسید بیمه — A4 ستون کناری",
-    L"۱۲) قبض و رسید — A4 ستون و عکس",
-    L"۱۳) قبض پزشک — A5 دو ستونه",
-    L"۱۴) رسید بیمه — A4 دو ستونه",
-    L"۱۵) قبض و رسید — A4 دو ستونه عکس",
-    L"۱۶) قبض پزشک — رول ۸۰ با عنوان بخش",
-    L"۱۷) رسید بیمه — A5 با عنوان بخش",
-    L"۱۸) قبض و رسید — A4 با عنوان بخش",
-    L"۱۹) قبض پزشک — رول ۵۸ بارکد پایین",
-    L"۲۰) رسید بیمه — رول ۸۰ بارکد پایین",
-    L"۲۱) قبض و رسید — A5 بارکد پایین",
-    L"۲۲) قبض پزشک — رول ۵۸ فشرده",
-    L"۲۳) رسید بیمه — رول ۵۸ فشرده قاب‌دار",
-    L"۲۴) قبض و رسید — رول ۸۰ فشرده",
-    L"۲۵) قبض پزشک — A5 ته‌برگ",
-    L"۲۶) رسید بیمه — A4 ته‌برگ",
-    L"۲۷) قبض و رسید — A4 ته‌برگ",
-    L"۲۸) قبض پزشک — A5 دو بلوک مالی",
-    L"۲۹) رسید بیمه — A4 دو بلوک مالی",
-    L"۳۰) قبض و رسید — A4 دو بلوک مالی قاب‌دار",
+    L"T01 طرح پیش‌فرض حرفه‌ای",
+    L"T02 طرح ساده و سریع",
+    L"T03 طرح رسمی کادردار",
+    L"T04 طرح فشردهٔ A5",
+    L"T05 طرح سربرگ رنگی مدرن",
+    L"T06 طرح شمارهٔ نوبت درشت",
+    L"T07 طرح رسید پرداخت",
+    L"T08 طرح دو ستونهٔ شیک",
+    L"T09 طرح مینیمال خط‌دار",
+    L"T10 طرح کارت بیمار",
+    L"T11 طرح نواری ۸۰ میلی‌متر",
+    L"T12 طرح نواری ۵۸ میلی‌متر",
+    L"T13 طرح افقی A5",
+    L"T14 طرح افقی A4",
+    L"T15 طرح بارکدمحور",
+    L"T16 طرح جدول‌محور",
+    L"T17 طرح دو ستونهٔ فشرده",
+    L"T18 طرح سربرگ‌دار بلند",
+    L"T19 طرح رسید نقدی",
+    L"T20 طرح رسید کارتخوان",
+    L"T21 طرح بیمهٔ پایه",
+    L"T22 طرح بیمهٔ تکمیلی",
+    L"T23 طرح آزمایشگاه",
+    L"T24 طرح رادیولوژی",
+    L"T25 طرح تزریقات",
+    L"T26 طرح داروخانه",
+    L"T27 طرح فیزیوتراپی",
+    L"T28 طرح نسخهٔ پزشک",
+    L"T29 طرح صورتحساب تفصیلی",
+    L"T30 طرح خلاصهٔ مدیریتی",
 };
 
-static void buildExtra(PrintDesign& d, int extraIdx){
-    if(extraIdx<0||extraIdx>=30) extraIdx=0;
-    const ExtraSpec& sp=EXTRA[extraIdx];
-    double PW=210.0, PH=297.0;
-    Paper_Dims(sp.paper, PW, PH);
-    d.paper=sp.paper; d.paperW=PW; d.paperH=PH; d.orientation=0;
-    std::vector<PrintItem>& v=d.items;
-    const int lay=sp.layout, var=sp.variant;
-    double M=paperMargin(PW);
-    double bw=sp.bw, rH=sp.rowH;
-    double pt=(PW<=58.0)?7.2:(PW<=80.0)?8.2:(PW<=148.0)?9.0:9.5;
-    double bcW=(PW<=58.0)?44.0:(PW<=80.0)?52.0:(PW<=148.0)?64.0:72.0;
-    double bcH=(PW<=80.0)?7.0:7.0;
-    double footH=(PW<=80.0)?11.0:13.5;
-    double stubH=sp.tear?16.0:0.0;
-    double x=M, w=PW-2*M, y=M;
-    double yMax=PH-M-footH-stubH;
-    const std::wstring title=(var==0)?FA_DOC_REC:(var==1)?FA_INS_REC:FA_DOC_BOTH;
-    if(sp.pageFrame) v.push_back(mkFrame(PW, PH, (M>3.0)?(M-1.5):2.0, R_INK, 0.3));
-
-    auto caption=[&](const wchar_t* txt){
-        v.push_back(mkHLine(x, y, w, 0.3));
-        v.push_back(mkLabel(x+0.6, y+0.2, w-1.2, 4.0, txt, pt-1.0, true, 1));
-        v.push_back(mkHLine(x, y+4.4, w, 0.3));
-        y+=4.8;
-    };
-    auto emitSvcAt=[&](double svcH){
-        v.push_back(mkServices(x, y, w, svcH, pt-0.8, sp.svc, 0, bw, rH-0.8, rH-0.5));
-        y+=svcH;
-    };
-    auto emitBc=[&](){ y=emitBarcode(v, x, y, w, bcW, bcH); };
-
-    if(lay==3 && sp.logo){
-        double sbW=(PW>=210.0)?40.0:30.0;
-        double sbX=x, mainX=x+sbW+3.0, mainW=w-sbW-3.0;
-        double sy=y;
-        v.push_back(mkLogo(sbX+(sbW-18.0)/2.0, sy, 18.0, 18.0)); sy+=20.0;
-        v.push_back(mkLabel(sbX+0.4, sy, sbW-0.8, 10.0, FA_CLINIC, pt, true, 1)); sy+=11.0;
-        v.push_back(mkField(sbX+0.4, sy, sbW-0.8, 10.0, L"clinicaddr", FA_ADDR, pt-2.0, 1)); sy+=11.0;
-        v.push_back(mkField(sbX+0.4, sy, sbW-0.8, 5.0, L"clinicphone", FA_PHONE, pt-2.0, 1)); sy+=6.0;
-        sy=emitBarcode(v, sbX+0.4, sy, sbW-0.8, (sbW-2.0<bcW)?(sbW-2.0):bcW, bcH);
-        v.push_back(mkRect(sbX, y, sbW, sy-y+1.0, bw, 0));
-        double mx=mainX, mw=mainW, my=y;
-        if(sp.photo){ v.push_back(mkPhoto(mx+mw-16.0, my, 15.0, 18.0)); }
-        v.push_back(mkLabel(mx, my, mw-(sp.photo?17.0:0), 6.0, title, pt+1.5, true, 1)); my+=7.0;
-        my=emitSamenInfo(v, mx, my, mw, rH, pt, bw);
-        double remain=yMax-my-6*rH; if(remain<22.0) remain=22.0;
-        if(var==1) remain+=2.0; else if(var==2) remain+=4.0;
-        v.push_back(mkServices(mx, my, mw, remain, pt-0.8, sp.svc, 0, bw, rH-0.8, rH-0.5));
-        my+=remain;
-        my=emitSamenFinance(v, mx, my, mw, rH, pt, bw);
-        my=emitSamenRef(v, mx, my, mw, rH, pt, bw);
-        v.push_back(mkRect(mx, y, mw, my-y, bw, 0));
-        emitSamenFooter(v, mx, (my+1.0<PH-M-stubH)?my+1.0:PH-M-stubH-footH, mw, pt);
-        return;
-    }
-
-    y=emitHeader(v, x, y, w, pt, true, sp.photo);
-    y=emitTitle(v, x, y, w, pt, title);
-
-    double svcH=(PW<=58.0)?22.0:(PW<=80.0)?28.0:(PW<=148.0)?36.0:42.0;
-    if(var==1) svcH+=2.0; else if(var==2) svcH+=4.0;
-
-    if(lay==1){
-        emitSvcAt(svcH); emitBc();
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    } else if(lay==2){
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        emitSvcAt(svcH); emitBc();
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    } else if(lay==4){
-        y=emitSamenInfoSplit(v, x, y, w, rH, pt, bw);
-        emitSvcAt(svcH); emitBc();
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    } else if(lay==5){
-        caption(L"مشخصات بیمار");
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        caption(FA_SVCLIST);
-        emitSvcAt(svcH); emitBc();
-        caption(L"مالی و پرداخت");
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    } else if(lay==6){
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        emitSvcAt(svcH);
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-        emitBc();
-    } else if(lay==7){
-        y=emitSamenInfo(v, x, y, w, rH, pt-0.4, bw);
-        emitSvcAt(svcH);
-        y=emitSamenFinance(v, x, y, w, rH, pt-0.4, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt-0.4, bw);
-        emitBc();
-    } else if(lay==9){
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        emitSvcAt(svcH); emitBc();
-        y=emitDualFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    } else {
-        // 0 classic / 8 tear-off: info, services, barcode, finance, ref
-        y=emitSamenInfo(v, x, y, w, rH, pt, bw);
-        emitSvcAt(svcH); emitBc();
-        y=emitSamenFinance(v, x, y, w, rH, pt, bw);
-        y=emitSamenRef(v, x, y, w, rH, pt, bw);
-    }
-
-    double footY=y+1.0;
-    double footLimit=PH-M-stubH-11.0;
-    if(footY>footLimit) footY=footLimit;
-    y=emitSamenFooter(v, x, footY, w, pt);
-    if(sp.tear) emitStub(v, x, y+0.6, w, pt);
-}
-
 static PrintDesign buildTemplate(int idx){
-    g_tplItemId = 1;
-    PrintDesign d; d.kind=L"builtin"; d.orientation=0;
-    if(idx<0||idx>=31) idx=0;
-    d.name = TPL_NAMES[idx];
-    if(idx==0) buildSamenDefault(d);
-    else buildExtra(d, idx-1);
-    return d;
+    if(idx==0){                     // never-deletable default = T01 shape on A4
+        طرح_پارامتر p=TPL_TABLE[0];
+        p.کد=L"T01"; p.نام=TPL_NAMES[0];
+        return بساز_طرح(p);
+    }
+    if(idx>=1 && idx<=30) return بساز_طرح(TPL_TABLE[idx-1]);
+    if(idx==31)           return بساز_برچسب_بارکد();     // TB1 (§7.5)
+    return buildTemplate(0);
 }
 
 } // namespace
@@ -650,13 +452,75 @@ static std::wstring buildTemplateName(int idx){
     return TPL_NAMES[idx];
 }
 
-// Seed 31 builtins (index 0 = undeletable Default) and migrate existing
-// installs. The v2.00 one-shot flag rebuilds every builtin from
-// buildTemplate(idx) while preserving stored ids / bindings.
+// ---------------------------------------------------------------------------
+//  §4.6 — COMPILE-TIME-STYLE SMOKE ASSERTION (runs in AZ_SMOKE debug builds).
+//  Declared at file scope (outside the anonymous namespace) so the AZ_DEBUG
+//  smoke dispatcher in main.cpp can call it. Each of the 30 designs must
+//  contain all 13 mandatory blocks, exactly ONE PIT_BARCODE, exactly ONE
+//  PIT_SERVICES with cols==3, ZERO items bound to شماره سابقه/شماره پرونده,
+//  and at most ONE item bound to {receiptbarcode}.
+// ---------------------------------------------------------------------------
+bool pdVerifyBuiltinTemplates(){
+    bool ok=true;
+    for(int i=0;i<=30;++i){
+        PrintDesign d=buildTemplate(i);
+        int nBarcode=0,nServices=0,nRcptBarcode=0;
+        bool hasClinic=false,hasAddr=false,hasPhone=false,hasTitle=false,
+             hasAppt=false,hasIns=false,hasPatient=false,hasPerf=false,
+             hasDoctor=false,hasMoney=false,hasFooter=false;
+        std::wstring svcModel;
+        for(const auto& it:d.items){
+            if(it.type==PIT_BARCODE) ++nBarcode;
+            if(it.type==PIT_SERVICES){ ++nServices; svcModel=it.text; }
+            if(it.type==PIT_FIELD || it.type==PIT_LABEL){
+                std::wstring f=it.field;
+                if(f==L"clinicname") hasClinic=true;
+                if(f==L"clinicaddr") hasAddr=true;
+                if(f==L"clinicphone") hasPhone=true;
+                if(f==L"receipttitle") hasTitle=true;
+                if(f==L"apptdate"||f==L"appttime"||f==L"queue") hasAppt=true;
+                if(f==L"nid"||f==L"ins_full"||f==L"supp_full") hasIns=true;
+                if(f==L"P-Name"||f==L"full"||f==L"age"||f==L"certno") hasPatient=true;
+                if(f==L"performer"||f==L"performercode") hasPerf=true;
+                if(f==L"doctor"||f==L"specialty"||f==L"doctorcode") hasDoctor=true;
+                if(f==L"paid"||f==L"total"||f==L"basepay"||f==L"supppay"||
+                   f==L"discount_from"||f==L"discount"||f==L"cash"||f==L"pos") hasMoney=true;
+                if(f==L"receptionist"||f==L"cashier_name"||f==L"scnum"||f==L"datetime") hasFooter=true;
+                if(f==L"receiptbarcode") ++nRcptBarcode;
+                // §3.6: شماره سابقه must be gone (and شماره پرونده is not §4.3)
+                if(f==L"archiveNo"||f==L"fileNo"){
+                    logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+
+                            L" still binds removed field "+f);
+                    ok=false;
+                }
+            }
+        }
+        if(nBarcode!=1){ logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+
+            L" has "+std::to_wstring(nBarcode)+L" barcodes (want 1)"); ok=false; }
+        if(nServices!=1){ logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+
+            L" has "+std::to_wstring(nServices)+L" services tables (want 1)"); ok=false; }
+        if(nRcptBarcode>1){ logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+
+            L" binds {receiptbarcode} "+std::to_wstring(nRcptBarcode)+L" times"); ok=false; }
+        if(svcModel.find(L"\"cols\":3")==std::wstring::npos){
+            logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+L" services cols != 3"); ok=false; }
+        if(!(hasClinic&&hasAddr&&hasPhone&&hasTitle&&hasAppt&&hasIns&&hasPatient
+             &&hasPerf&&hasDoctor&&hasMoney&&hasFooter)){
+            logLine(L"SMOKE FAIL: template "+std::to_wstring(i)+L" missing mandatory blocks");
+            ok=false;
+        }
+    }
+    return ok;
+}
+
+// ---------------------------------------------------------------------------
+//  §4.6 — idempotent seeding / repair. An existing user-modified copy is NEVER
+//  overwritten; a missing or malformed builtin is regenerated from بساز_طرح.
+// ---------------------------------------------------------------------------
 void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
-    const int N = 31;
+    const int N = 31;       // index 0 = default, 1..30 = T01..T30, 31st slot = TB1
     auto stamp=[](){
+        setSetting(L"tpl_migration_2_07", L"1");
         setSetting(L"tpl_migration_2_06", L"1");
         setSetting(L"tpl_migration_2_00", L"1");
         setSetting(L"tpl_migration_1_200", L"1");
@@ -679,48 +543,15 @@ void Designs_Init(){
         stamp();
         return;
     }
-    // v2.00 migration: rebuild all 31 builtins (Default + 30 extras).
-    if(getSetting(L"tpl_migration_2_00", L"0") != L"1"){
+    // v2.07 migration: rebuild all builtins (Default + T01..T30 + TB1),
+    // preserving stored ids / machine bindings.
+    if(getSetting(L"tpl_migration_2_07", L"0") != L"1"){
         for(int i=0;i<N;i++){
             PrintDesign fresh=buildTemplate(i);
             if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }
             else Designs_Insert(fresh);
         }
         for(size_t i=N;i<existing.size();++i) Designs_Delete(existing[i].id);
-        stamp();
-    }
-    // v2.06 migration — the services-table policy changed: the table now has
-    // EXACTLY three columns (نام خدمت / تعداد / شرح خدمت) and all money data
-    // moved to the footer blocks. Rebuild every builtin AND migrate any
-    // user-saved design whose services model still carries the old columns.
-    if(getSetting(L"tpl_migration_2_06", L"0") != L"1"){
-        for(int i=0;i<N;i++){
-            PrintDesign fresh=buildTemplate(i);
-            if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }
-            else Designs_Insert(fresh);
-        }
-        /* migrate user-saved designs (id >= 31) that still hold an old model */
-        for(size_t i=N;i<existing.size();++i){
-            PrintDesign d=existing[i];
-            bool changed=false;
-            for(auto& it:d.items){
-                if(it.type!=PIT_SERVICES) continue;
-                std::wstring t=it.text;
-                if(t.find(L"نام خدمت")!=std::wstring::npos &&
-                   (t.find(L"مبلغ کل")!=std::wstring::npos ||
-                    t.find(L"قیمت کل")!=std::wstring::npos ||
-                    t.find(L"سهم پایه")!=std::wstring::npos ||
-                    t.find(L"سهم بیمه")!=std::wstring::npos ||
-                    t.find(L"مبلغ واحد")!=std::wstring::npos ||
-                    t.find(L"کد خدمت")!=std::wstring::npos ||
-                    t.find(L"ردیف")!=std::wstring::npos ||
-                    t.find(L"نوع خدمت")!=std::wstring::npos)){
-                    it.text=svcModelJson(SVC3);
-                    changed=true;
-                }
-            }
-            if(changed) Designs_Update(d);
-        }
         stamp();
     }
 }

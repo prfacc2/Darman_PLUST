@@ -180,6 +180,10 @@ bool         Design_FromWebJson(const std::string& json, PrintDesign& out);
 
 // ----------------------------------------------------------- design store ----
 void Designs_Init();                       // seed the 30 built-ins on first run
+// v2.07 §4.6: smoke assertion — every builtin carries the 13 mandatory blocks,
+// exactly one barcode, one 3-column services table, zero شماره سابقه bindings
+// and at most one {receiptbarcode}. Returns false (and logs) on any violation.
+bool pdVerifyBuiltinTemplates();
 // v1.65.0: build built-in template #idx (0..29) ENTIRELY IN MEMORY (no file
 // I/O). Used by the print path as a services-capable last-resort fallback when
 // the design store cannot be read/seeded, so receipts never degrade to the
