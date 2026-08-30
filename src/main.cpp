@@ -8,6 +8,7 @@
 #include "web_admission.h"
 #include "web_crm.h"          // v1.70.0: embedded HTML CRM management surface
 #include "print_designer.h"   // v2.07: pdVerifyBuiltinTemplates (§4.6 smoke)
+#include "web_designer.h"    // v2.07.1: WebDesigner_Open (designer_gallery smoke)
 #include "web_thread_pool.h"   // v1.40.0: WM_APP_UI_TASK marshalling (RunOnUiThread)
 #include <stdio.h>
 #ifdef AZ_DEBUG_BUILD
@@ -1877,6 +1878,22 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int){
             // the dialog opens, enumerates printers, applies the filter and
             // resolves the pre-selection without blocking, then exits cleanly.
             // Pumps briefly so the dialog actually paints (screenshot path).
+            else if(!wcscmp(dbg,L"designer_gallery")){
+                // v2.07.1: headless check that the designer gallery renders
+                // real template thumbnails (not empty cards).
+                switchScreen(SC_MANAGE);
+                WebDesigner_Open(f, std::vector<int>());
+                logLine(L"SMOKE designer_gallery: host opened — OK");
+                MSG m;
+                DWORD t0=GetTickCount();
+                while(GetTickCount()-t0 < 4000){
+                    while(PeekMessageW(&m,NULL,0,0,PM_REMOVE)){
+                        TranslateMessage(&m); DispatchMessageW(&m);
+                    }
+                    Sleep(30);
+                }
+                return 0;
+            }
             else if(!wcscmp(dbg,L"printer_link")){
                 switchScreen(SC_RECEPTION);
                 UpdateWindow(f);
