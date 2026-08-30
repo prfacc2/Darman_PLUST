@@ -235,6 +235,24 @@ for f in MANDATORY_FIELDS:
     check('L"%s"' % f in inc,
           f"the composer never binds the mandatory field {f}")
 
+# --- v2.07.1: PURE BLACK-AND-WHITE — no colour anywhere in a builtin ----
+# The clinic's printers are monochrome; emphasis is weight/rules only.
+check("R_ACCENT" not in inc and "R_DANGER" not in inc and "R_MUTED" not in inc,
+      "the composer still carries a colour palette — builtins must be pure B/W")
+check("0x0B3D91" not in inc and "0xA31212" not in inc,
+      "the composer still carries ACCENT/DANGER hex values")
+check(re.search(r'fillColor=R_', inc) is None,
+      "the composer still fills a rect with a non-white colour")
+# every textColor the composer sets must be R_INK
+for m in re.finditer(r'textColor=(0x[0-9A-Fa-f]+|R_INK)', inc):
+    val = m.group(1)
+    check(val == "R_INK" or val.upper() == "0X000000" or val.upper() == "0XFFFFFF",
+          f"the composer sets a non-ink text colour: {val}")
+# templates.js mirror must be B/W too
+js_bw = JS.read_text(encoding="utf-8")
+check('var INK = "#000000"' in js_bw and '#0B3D91' not in js_bw and '#A31212' not in js_bw,
+      "templates.js is not pure black-and-white")
+
 # --- TB1 barcode-only label (§7.5) ---------------------------------------
 check("\u0628\u0633\u0627\u0632_\u0628\u0631\u0686\u0633\u0628_\u0628\u0627\u0631\u06a9\u062f" in inc,
       "the TB1 \u0628\u0631\u0686\u0633\u0628 \u0628\u0627\u0631\u06a9\u062f builder is missing")
@@ -271,8 +289,8 @@ check(inc_names and inc_names[0] == "\u067e\u06cc\u0634\u200c\u0641\u0631\u0636"
       "index 0 is not named \u300e\u067e\u06cc\u0634\u200c\u0641\u0631\u0636\u300f")
 
 # --- migration guard -------------------------------------------------------
-check('getSetting(L"tpl_migration_2_07"' in inc,
-      "the v2.07 migration guard is missing")
+check('getSetting(L"tpl_migration_2_07_1"' in inc,
+      "the v2.07.1 B/W rebuild migration guard is missing")
 init_fn = re.search(r"void Designs_Init\(\)\{(.*?)\n\}", inc, re.S)
 check(init_fn is not None, "Designs_Init() was not found")
 if init_fn:
@@ -303,9 +321,33 @@ for gone in ("buildSamenDefault", "buildExtra", "svcModelJson"):
     check(gone not in js,
           f"templates.js still embeds the legacy {gone} layout mirror — the "
           "authoritative layouts come from the seeded designs via the bridge")
-js_names = re.findall(r'"(T\d\d [^"]+)"', js)
-check(len(js_names) == 30,
-      f"templates.js should list the 30 frozen T-codes, got {len(js_names)}")
+# the JS mirror must publish 31 full designs (default + T01..T30) — verify
+# by executing it and counting, since the names are Persian literals.
+import subprocess as _sp, json as _json
+_probe = (
+    "global.window={};require(process.argv[1]);"
+    "var T=window.AZ_TEMPLATES;"
+    "if(!T||T.length!==31)process.exit(1);"
+    "var need=['clinicname','clinicaddr','clinicphone','receipttitle','apptdate',"
+    "'appttime','queue','nid','ins_full','supp_full','P-Name','age','certno',"
+    "'performer','performercode','doctor','specialty','doctorcode','paid','total',"
+    "'basepay','supppay','discount_from','discount','cash','pos','receptionist',"
+    "'cashier_name','scnum','datetime'];"
+    "var bad=0;"
+    "T.forEach(function(t){"
+    "  if(!t.items||t.items.length<30)bad++;"
+    "  var f={};var nb=0,ns=0;"
+    "  t.items.forEach(function(it){if(it.field)f[it.field]=1;"
+    "    if(it.type==='barcode')nb++;if(it.type==='services')ns++;});"
+    "  need.forEach(function(k){if(!f[k])bad++;});"
+    "  if(nb!==1||ns!==1)bad++;"
+    "});"
+    "process.exit(bad?1:0);"
+)
+_r = _sp.run(["node", "-e", _probe, str(JS)])
+check(_r.returncode == 0,
+      "templates.js must publish 31 full B/W designs with the 13 mandatory blocks, "
+      "exactly one barcode and one services table each")
 
 # ===========================================================================
 # report

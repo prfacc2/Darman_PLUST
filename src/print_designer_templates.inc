@@ -133,11 +133,11 @@ static PrintItem mkServices(double x,double y,double w,double h,double pt,
 #define FA_SC         L"ش.ص : "
 #define FA_DATETIME   L"تاریخ و ساعت : "
 
-// v2.07 §3.8 — saturated print palette (INK/ACCENT/DANGER/MUTED).
-static const unsigned R_INK    = 0x000000;
-static const unsigned R_ACCENT = 0x0B3D91;
-static const unsigned R_DANGER = 0xA31212;
-static const unsigned R_MUTED  = 0x333333;
+// v2.07.1 — PURE BLACK-AND-WHITE. The clinic's printers are monochrome, so no
+// builtin may carry any colour: every stroke, every glyph, every fill is
+// #000000 ink on white paper. Emphasis (تأکید) is expressed ONLY through
+// weight (bold), rule thickness and framing — never through hue.
+static const unsigned R_INK = 0x000000;
 
 // ---------------------------------------------------------------------------
 //  label+field row helper (RTL: label on the right, value to its left)
@@ -189,32 +189,22 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
     const bool card = (p.چیدمان==3);
     double x=M, w=PW-2*M, y=M;
 
-    // Emphasis palette: mono = all ink; accent-header = ACCENT on block 1;
-    // full-color = ACCENT band + DANGER money + MUTED footer.
-    unsigned cTitle = (p.تأکید==0)?R_INK:R_ACCENT;
-    unsigned cHead  = (p.تأکید==0)?R_INK:R_ACCENT;
-    unsigned cMoney = (p.تأکید==2)?R_DANGER:R_INK;
-    unsigned cFoot  = (p.تأکید==0)?R_INK:R_MUTED;
+    // B/W emphasis: 0 = plain, 1 = bold header + heavier rules,
+    // 2 = full-page frame + heaviest rules. No colour anywhere.
+    double ruleBw = (p.تأکید==2)? bw*2.0 : (p.تأکید==1)? bw*1.5 : bw;
+    if(ruleBw < 0.30) ruleBw = 0.30;   // §3.8 hairline floor
 
     // ---------------- BLOCK 1-3: clinic name / address / phone --------------
     double namePt = pt + (roll?2.5:3.0);
-    if(p.تأکید>=1 && !roll){
-        // accent header band behind the clinic block
-        v.push_back(mkRect(x, y-1.0, w, 16.0, 0.0, 0));
-        v.back().fillColor=R_ACCENT; v.back().fillTransparent=false;
-        v.back().textColor=R_ACCENT;
-        v.push_back(mkField(x, y, w, 5.6, L"clinicname", L"", namePt, 1));
-        v.back().bold=true; v.back().textColor=0xFFFFFF;
-    } else {
-        v.push_back(mkField(x, y, w, 5.6, L"clinicname", L"", namePt, 1));
-        v.back().bold=true; v.back().textColor=cHead;
-    }
+    v.push_back(mkField(x, y, w, 5.6, L"clinicname", L"", namePt, 1));
+    v.back().bold=true; v.back().textColor=R_INK;
     y+=5.8;
     v.push_back(mkField(x, y, w, 4.0, L"clinicaddr", FA_ADDRLBL, pt-1.5, 1));
-    v.back().textColor=cFoot; y+=4.2;
+    v.back().textColor=R_INK; y+=4.2;
     v.push_back(mkField(x, y, w, 3.8, L"clinicphone", FA_PHONELBL, pt-1.5, 1));
-    v.back().textColor=cFoot; y+=4.4;
-    v.push_back(mkHLine(x,y,w,bw)); y+=1.6;
+    v.back().textColor=R_INK; y+=4.4;
+    // heavier rule under the letterhead for تأکید>=1
+    v.push_back(mkHLine(x,y,w,ruleBw)); y+=1.6;
 
     // ---------------- BLOCK 4+5: receipt title (right) + barcode (left) -----
     {
@@ -224,7 +214,7 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
         double tW = w-bcW-2.0;
         // right: معرف رسید
         v.push_back(mkField(x+bcW+2.0, y+1.0, tW, 5.0, L"receipttitle", L"", pt+1.5, 0));
-        v.back().bold=true; v.back().textColor=cTitle;
+        v.back().bold=true; v.back().textColor=R_INK;
         // left: barcode (value ONLY as the HRI under the graphic)
         v.push_back(mkBarcode(x, y+0.2, bcW, bcH));
         y += bcH+1.6;
@@ -239,7 +229,7 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
     const bool banded = (p.چیدمان==2);
     auto captionBar=[&](const wchar_t* txt){
         v.push_back(mkLabel(x, y, w, 3.6, txt, pt-1.0, true, 1));
-        v.back().textColor=R_ACCENT;
+        v.back().textColor=R_INK;
         y+=3.8;
     };
     if(twoCol){
@@ -336,9 +326,9 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
         auto money2=[&](const wchar_t* l1,const wchar_t* f1,
                         const wchar_t* l2,const wchar_t* f2,double yy,bool boldL){
             putLF(v, x+colW+0.6, yy, colW, rH, l1, f1, pt, boldL, false, 0.44);
-            v.back().textColor=cMoney;
+            v.back().textColor=R_INK;
             putLF(v, x,           yy, colW, rH, l2, f2, pt, boldL, false, 0.44);
-            v.back().textColor=cMoney;
+            v.back().textColor=R_INK;
         };
         money2(FA_PAID,     L"paid",          FA_TOTAL,    L"total",         y, true);
         y+=rH;
@@ -356,22 +346,22 @@ static PrintDesign بساز_طرح(const طرح_پارامتر& p){
         double colW=(w-0.6)/2.0;
         double rH = roll?3.6:4.2;
         putLF(v, x+colW+0.6, y, colW, rH, FA_RECEPTION, L"receptionist", pt-0.5, false,false, 0.34);
-        v.back().textColor=cFoot;
+        v.back().textColor=R_INK;
         putLF(v, x,           y, colW, rH, FA_CASHIER,   L"cashier_name", pt-0.5, false,false, 0.36);
-        v.back().textColor=cFoot;
+        v.back().textColor=R_INK;
         y+=rH;
         putLF(v, x+colW+0.6, y, colW, rH, FA_SC,        L"scnum",    pt-0.5, false,false, 0.30);
-        v.back().textColor=cFoot;
+        v.back().textColor=R_INK;
         putLF(v, x,           y, colW, rH, FA_DATETIME, L"datetime", pt-0.5, false,false, 0.44);
-        v.back().textColor=cFoot;
+        v.back().textColor=R_INK;
     }
 
     // Framing per layout family (never straddles the services bottom edge —
     // §3.9 invariant: frames stop ABOVE the table or wrap the whole page).
     if(p.چیدمان==0 && p.تأکید==2 && !roll){
-        v.push_back(mkFrame(PW,PH,M-1.0,R_ACCENT,0.30));
+        v.push_back(mkFrame(PW,PH,M-1.0,R_INK,0.30));
     } else if(card){
-        v.push_back(mkFrame(PW,PH,M-1.0,R_MUTED,0.30));
+        v.push_back(mkFrame(PW,PH,M-1.0,R_INK,0.30));
     }
     return d;
 }
@@ -394,7 +384,7 @@ static PrintDesign بساز_برچسب_بارکد(){
     v.push_back(mkField(x, y, w, 5.0, L"clinicname", L"", pt+2.0, 1));
     v.back().bold=true; y+=5.4;
     v.push_back(mkField(x, y, w, 4.2, L"receipttitle", L"", pt, 1));
-    v.back().textColor=R_MUTED; y+=4.6;
+    v.back().textColor=R_INK; y+=4.6;
     v.push_back(mkHLine(x,y,w,bw)); y+=1.4;
     v.push_back(mkBarcode(x, y, w, 12.0)); y+=13.4;
     putLF(v, x, y, w, 4.6, L"نام بیمار : ", L"P-Name", pt, true, true, 0.36); y+=5.0;
@@ -560,6 +550,7 @@ void Designs_Init(){
     std::vector<PrintDesign> existing; Designs_Builtins(existing);
     const int N = 31;       // index 0 = default, 1..30 = T01..T30, 31st slot = TB1
     auto stamp=[](){
+        setSetting(L"tpl_migration_2_07_1", L"1");   // v2.07.1 B/W rebuild
         setSetting(L"tpl_migration_2_07", L"1");
         setSetting(L"tpl_migration_2_06", L"1");
         setSetting(L"tpl_migration_2_00", L"1");
@@ -583,9 +574,12 @@ void Designs_Init(){
         stamp();
         return;
     }
-    // v2.07 migration: rebuild all builtins (Default + T01..T30 + TB1),
-    // preserving stored ids / machine bindings.
-    if(getSetting(L"tpl_migration_2_07", L"0") != L"1"){
+    // v2.07.1 migration: rebuild all builtins in PURE BLACK-AND-WHITE (the
+    // clinic's printers are monochrome) and restore the full designer-gallery
+    // layouts. The 2_07_1 flag is a NEW guard so installs that already ran the
+    // 2.07 rebuild get this regeneration too. Stored ids / machine bindings
+    // are preserved; user-modified copies keep kind=="user" and are untouched.
+    if(getSetting(L"tpl_migration_2_07_1", L"0") != L"1"){
         for(int i=0;i<N;i++){
             PrintDesign fresh=buildTemplate(i);
             if(i<(int)existing.size()){ fresh.id=existing[i].id; Designs_Update(fresh); }
