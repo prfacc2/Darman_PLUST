@@ -28,11 +28,14 @@ POLICY = ROOT / "src" / "print_services_policy.h"
 
 failures = []
 notes = []
+_invariant_count = [0]   # every check() that passes increments this
 
 
 def check(condition, message):
     if not condition:
         failures.append(message)
+    else:
+        _invariant_count[0] += 1
     return bool(condition)
 
 
@@ -232,11 +235,29 @@ for f in MANDATORY_FIELDS:
     check('L"%s"' % f in inc,
           f"the composer never binds the mandatory field {f}")
 
-# --- TB1 barcode-only label ----------------------------------------------
+# --- TB1 barcode-only label (§7.5) ---------------------------------------
 check("\u0628\u0633\u0627\u0632_\u0628\u0631\u0686\u0633\u0628_\u0628\u0627\u0631\u06a9\u062f" in inc,
       "the TB1 \u0628\u0631\u0686\u0633\u0628 \u0628\u0627\u0631\u06a9\u062f builder is missing")
 check("Design_BuiltinTemplate(31)" in inc or "31" in inc,
       "TB1 is not reachable at store index 31")
+# §7.5: TB1 carries EXACTLY the reduced block set — a زیربخش پذیرش gets no
+# other print, so drift here is release-critical.
+_tb1_i = inc.find("static PrintDesign \u0628\u0633\u0627\u0632_\u0628\u0631\u0686\u0633\u0628_\u0628\u0627\u0631\u06a9\u062f")
+_tb1_end = inc.find("\n}\n", _tb1_i)
+tb1 = inc[_tb1_i:_tb1_end] if (_tb1_i > 0 and _tb1_end > _tb1_i) else ""
+if tb1:
+    for fld in ("clinicname", "receipttitle", "P-Name", "nid", "queue", "datetime"):
+        check('L"%s"' % fld in tb1,
+              f"TB1 is missing its §7.5 field {{{fld}}}")
+    check("mkBarcode" in tb1, "TB1 has no PIT_BARCODE")
+    check("mkServices" not in tb1,
+          "TB1 must NOT carry a services table (barcode-only label)")
+    for money in ("paid", "total", "basepay", "supppay", "cash", "pos",
+                  "receptionist", "cashier_name"):
+        check('L"%s"' % money not in tb1,
+              f"TB1 must NOT carry the payment/footer field {{{money}}}")
+else:
+    check(False, "the TB1 builder body could not be extracted for verification")
 
 # --- names table -----------------------------------------------------------
 name_match = re.search(r"static const wchar_t\* const TPL_NAMES\[31\]=\{(.*?)\n\};", inc, re.S)
@@ -295,4 +316,4 @@ if failures:
     for f in failures:
         print("  FAIL: %s" % f)
     sys.exit(1)
-print("\nOK — %d builtin-template invariants hold" % (30 + 12))
+print("\nOK — %d builtin-template invariants hold" % _invariant_count[0])
