@@ -8337,3 +8337,40 @@ body.theme-dark .svr-pc-prev-wrap{background:#0A0F1A;border-color:#263447;}
   -webkit-box-shadow:0 8px 30px rgba(10,25,55,.30);box-shadow:0 8px 30px rgba(10,25,55,.30);
   border-radius:4px;
 }
+
+/* ==========================================================================
+   v2.07 — «پذیرش» surface adjustments (scoped to body.surface-adm only).
+   Trident-safe: literal hex/px, no var(), no calc().
+   ========================================================================== */
+
+/* §5.2 — پزشک معالج combo height: the SAME computed values as the انجام‌دهنده
+   search input (#perfcode inherits .inp: height 34px, padding 0 12px, line-height
+   34px, box-sizing border-box). Applied only to the collapsed single-row mode
+   of #doc2name; the expanded [size] listbox keeps its auto height. */
+body.surface-adm select.inp#doc2name{
+  height:34px;
+  line-height:34px;
+  padding:0 12px;
+  -ms-box-sizing:border-box;
+  box-sizing:border-box;
+  font-size:13px;
+}
+
+/* §5.3 — خدمات پذیرش search box: widen from the RIGHT edge by exactly +28px
+   at base density (the base .svc-search-wrap is 205px → 233px). The RTL flow
+   keeps the left edge fixed; .head-tools has free space (flex), so no sibling
+   is displaced. */
+body.surface-adm .svc-card .head-tools .svc-search-wrap{
+  width:233px;
+  -ms-flex:0 0 auto;
+  flex:0 0 auto;
+}
+
+/* §5.4 — click-to-focus affordance on the خدمات پذیرش header background and
+   title only (the icon keeps the default pointer). */
+body.surface-adm .svc-card > .card-head{
+  cursor:text;
+}
+body.surface-adm .svc-card > .card-head .card-title{
+  cursor:text;
+}

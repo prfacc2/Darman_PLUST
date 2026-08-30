@@ -253,6 +253,62 @@
     var idx = sel ? sel.selectedIndex : -1;
     return clampPct((state.insurances[idx] && state.insurances[idx].pct) || 0);
   }
+  /* ------------------------------------------------------------------ *
+   * v2.07 §5.1 — «بیمه تکمیلی» wiring.                                   *
+   * #insType (label «بیمه تکمیلی») lists the ACTIVE supplementary         *
+   * definitions from «مدیریت ▸ تعریف بیمه» via the verb                  *
+   * بیمه_تکمیلی_فهرست. Selecting one sends بیمه_تکمیلی_انتخاب so C++ sets  *
+   * suppIdx + suppPercent through Supp_Percent(idx) — ONE path feeds the  *
+   * form, the billing computation and {supp_percent}/{supppay} on print.  *
+   * ------------------------------------------------------------------ */
+  function loadSuppInsType() {
+    if (state.surface !== 'admission') return;
+    Bridge.call('بیمه_تکمیلی_فهرست', {}).then(function (r) {
+      if (!r || !r.rows) return;
+      state.suppDefs = r.rows;
+      var sel = $('insType');
+      if (!sel) return;
+      var cur = sel.value || '';
+      var h = '<option value="-1">ندارد</option>', i;
+      for (i = 0; i < r.rows.length; i++) {
+        h += '<option value="' + String(r.rows[i].idx) + '">' + esc(r.rows[i].name || '') + '</option>';
+      }
+      sel.innerHTML = h;
+      /* restore previous selection when it still exists */
+      if (cur !== '' && cur !== '-1') {
+        for (i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === cur) { sel.selectedIndex = i; break; }
+        }
+      }
+    });
+  }
+  function onSuppInsTypeChange() {
+    var sel = $('insType');
+    if (!sel) return;
+    var v = parseInt(toEn(sel.value), 10);
+    if (isNaN(v) || v < 0) v = -1;
+    state.suppIdxSel = v;
+    /* keep the legacy hidden #insSupp in sync so bill.compute/insSupp stays
+       coherent with the visible «بیمه تکمیلی» choice */
+    var hs = $('insSupp');
+    if (hs) {
+      var matched = false, i;
+      for (i = 0; i < hs.options.length; i++) {
+        if (parseInt(hs.options[i].value, 10) === v) { hs.selectedIndex = i; matched = true; break; }
+      }
+      if (!matched) hs.selectedIndex = 0;
+    }
+    Bridge.call('بیمه_تکمیلی_انتخاب', { idx: v }).then(function (r) {
+      if (r && r.ok && r.pct != null) {
+        state.suppPctLive = r.pct;
+        var box = $('insSuppPct');
+        if (box && r.pct > 0) box.value = toFa(String(r.pct));
+      }
+      scheduleRender();
+    }, function () { scheduleRender(); });
+    scheduleRender();
+  }
+
   function suppInsPct() {
     /* explicit percentage box wins; else the selected supplementary plan pct */
     var box = $('insSuppPct');
@@ -1721,10 +1777,69 @@
     on($('insSuppPct'), 'input', function () { scheduleRender(); });
     on($('insSuppPct'), 'keyup', function () { scheduleRender(); });
     on($('hasIns'), 'change', function () { scheduleRender(); });
+    /* v2.07 §5.1: «بیمه تکمیلی» select → recompute سهم مکمل through C++ */
+    on($('insType'), 'change', onSuppInsTypeChange);
     on($('noPay'), 'change', function () { recompute(); });
 
     /* collapse / expand lists */
     on($('svcToggle'), 'click', function () { toggleWrap('svcTblWrap', this); });
+
+    /* v2.07 §5.4 — click-to-focus on the خدمات پذیرش HEADER ONLY.
+       Clicking the header background / title / icon focuses the services
+       search box and puts the caret at the end. Guarded strictly: the handler
+       bails out when the walk-up from event.target crosses the list body or
+       hits an interactive control (button/select/input) first, so clicking
+       rows, the scrollbar or header buttons never steals focus. */
+    (function () {
+      var head = null, card = null;
+      var cards = document.querySelectorAll ? document.querySelectorAll('.svc-card') : [];
+      for (var ci = 0; ci < cards.length; ci++) {
+        if (cards[ci].querySelector && cards[ci].querySelector('.card-head')) { card = cards[ci]; break; }
+      }
+      if (!card) return;
+      head = card.querySelector('.card-head');
+      if (!head) return;
+      var focusSearch = function () {
+        var box = $('svcSearch');
+        if (!box) return;
+        try { box.focus(); } catch (e) {}
+        /* caret at the end (IE9+ / Trident-safe) */
+        var len = box.value ? box.value.length : 0;
+        if (typeof box.setSelectionRange === 'function') {
+          try { box.setSelectionRange(len, len); } catch (e2) {}
+        } else if (box.createTextRange) {
+          try {
+            var rng = box.createTextRange();
+            rng.collapse(false);
+            rng.select();
+          } catch (e3) {}
+        }
+      };
+      on(head, 'click', function (ev) {
+        ev = ev || window.event;
+        var t = ev.target || ev.srcElement;
+        if (!t) return;
+        /* walk up from the target to the header root; bail on the list body
+           (outside the header) or on any interactive control. */
+        var INTERACTIVE = { BUTTON: 1, SELECT: 1, INPUT: 1, TEXTAREA: 1, A: 1, OPTION: 1 };
+        var node = t;
+        while (node && node !== head) {
+          if (node.nodeType === 1) {
+            var tag = String(node.tagName || '').toUpperCase();
+            if (INTERACTIVE[tag]) return;          /* header button/select/input */
+            if (node.id === 'svcTblWrap' || node.id === 'svcSuggest' ||
+                node.id === 'svcBody') return;     /* list body / suggestions  */
+            if (node.className && /\brow\b/.test(String(node.className))) return;
+          }
+          node = node.parentNode;
+        }
+        if (node !== head) return;                 /* crossed out of the header */
+        if (ev.preventDefault) ev.preventDefault();
+        /* IE8- legacy cancel */
+        ev.returnValue = false;
+        defer(focusSearch);
+      });
+    })();
     on($('queueToggle'), 'click', function () { toggleWrap('queueWrap', this); });
     on($('invoiceToggle'), 'click', function () {
       var c = $('invoiceCard'); if (!c) return;
@@ -3323,6 +3438,7 @@
       ptype: val('ptype'), insType: val('insType'),
       doc2code: trimEn('doc2code'), doc2name: trimFa('doc2name'),
       perfcode: trimEn('perfcode'), perfname: trimFa('perfname'),
+      certNo: trimEn('certNo'),   /* v2.07: شماره شناسنامه for {certno} */
       apptDate: trimEn('apptDate'), apptShift: val('apptShift'),
       rxDate: trimEn('rxDate'),
       noPay: $('noPay') ? $('noPay').checked : false,
@@ -3336,7 +3452,7 @@
     opts = opts || {};
     /* v1.72.0: #docSearch / #docCode are retired (the #doc2code field is now the
        single doctor search field), so they are no longer cleared here. */
-    var ids = ['nid', 'first', 'last', 'father', 'birth', 'mobile', 'phone', 'addr',
+    var ids = ['nid', 'certNo', 'first', 'last', 'father', 'birth', 'mobile', 'phone', 'addr',
       'doc2code', 'perfcode', 'perfname', 'insBooklet', 'insValid', 'rxDate', 'apptDate',
       'svcSearch', 'qsNid', 'qsFile'];
     var i;
@@ -4883,6 +4999,9 @@
       if (!light) {
         if (r.insurances) { state.insurances = r.insurances; fillSelect($('insMain'), r.insurances); }
         if (r.supp) { state.supp = r.supp; fillSelect($('insSupp'), r.supp); }
+        /* v2.07 §5.1: «بیمه تکمیلی» — populate #insType from the supplementary
+           registry (verb بیمه_تکمیلی_فهرست). No hardcoded list here. */
+        loadSuppInsType();
       }
       if (r.date) setText($('tbDate'), toFa(r.date));
       if (r.time) setText($('tbClock'), toFa(r.time));

@@ -1790,5 +1790,46 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return raw;
     }
 
+    // --------------------------------------------------------------- v2.07 --
+    // §5.1 — «بیمه تکمیلی» wiring. The «نوع بیمه» select (#insType, label now
+    // «بیمه تکمیلی») is populated from the SUPPLEMENTARY insurance registry
+    // (whatever «مدیریت ▸ تعریف بیمه» defined). No hardcoded list in JS.
+    if(verb=="بیمه_تکمیلی_فهرست"){
+        auto defs=loadSuppDefs();
+        std::string o="{\"ok\":true,\"rows\":[";
+        bool first=true;
+        for(const auto& d:defs){
+            if(!d.active) continue;                    // active definitions only
+            if(d.name.empty()) continue;
+            if(!first) o+=",";
+            first=false;
+            o+="{\"idx\":"+jnum(d.idx);
+            o+=",\"name\":"+jstr(d.name);
+            o+=",\"franchiseOrgPct\":"+jnum(d.franchiseOrgPct);
+            o+=",\"tariffType\":"+jstr(d.tariffType);
+            o+=",\"franchise\":"+jstr(d.franchise);
+            o+=",\"ceiling\":"+jnum(d.ceiling);
+            o+=",\"color\":"+jstr(d.color);
+            o+=",\"pct\":"+jnum(Supp_Percent(d.idx));
+            o+="}";
+        }
+        o+="]}";
+        return o;
+    }
+    // §5.1 — selection change: set suppIdx + suppPercent via Supp_Percent(idx)
+    // so the form percentage, the billing computation and {supp_percent}/
+    // {supppay} on the receipt all come from this ONE path.
+    if(verb=="بیمه_تکمیلی_انتخاب"){
+        double idxD=-1; jsonGetNumber(body,"idx",idxD);
+        int idx=(int)idxD;
+        if(idx<0) return "{\"ok\":false,\"err\":\"شناسه بیمه تکمیلی نامعتبر است.\"}";
+        int pct=Supp_Percent(idx);
+        std::string o="{\"ok\":true,\"idx\":"+jnum(idx)+",\"pct\":"+jnum(pct);
+        const SuppDef* d=suppDefByIndex(idx);
+        if(d) o+=",\"name\":"+jstr(d->name);
+        o+="}";
+        return o;
+    }
+
     return "{\"ok\":false,\"err\":\"verb ناشناخته\"}";
 }
