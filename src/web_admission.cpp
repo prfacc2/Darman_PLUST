@@ -20,6 +20,7 @@
 #include "web_thread_pool.h"    // RunOnUiThreadSync (UI-thread marshalling)
 #include "sections.h"
 #include "clinic_ops.h"
+#include "print_designer.h"   // v2.07 §7.5: Design_BuiltinTemplate (TB1 route)
 #include <shlobj.h>
 #include <string>
 #include <vector>

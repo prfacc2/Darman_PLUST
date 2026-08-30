@@ -62,6 +62,9 @@ RULE 4 — Bridge verbs are shared and stable. APPEND only.
    (pattern: if(verb=="…")). Existing JS handlers depend on verb NAMES staying
    stable. When ADDING a verb, APPEND a new if-branch — NEVER remove, rename,
    or reorder existing verbs.
+   v2.07.0 appended two verbs at the END of the chain (both still active):
+   «بیمه_تکمیلی_فهرست» and «بیمه_تکمیلی_انتخاب» (supplementary-insurance
+   wiring for the admission surface).
 
 RULE 5 — RCDATA resource IDs are FIXED. Never renumber.
        400–405 = admission bundle
@@ -72,6 +75,8 @@ RULE 5 — RCDATA resource IDs are FIXED. Never renumber.
    Already allocated beyond 600: 700 = WebView2Loader (reserved),
    800–802 = CRM bundle. When adding a NEW resource, pick an unused ID block
    ≥ 700 and avoid collisions with the allocations above.
+   v2.07.0: block 900–909 is RESERVED for future use. No resource in this
+   release was added; existing allocations are unchanged.
 
 RULE 6 — Never delete a feature, control, or handler.
    "Improve" / "بهبود" means RESTYLE or ENHANCE — never remove. Do not delete a
@@ -119,7 +124,18 @@ RULE 8 — Version is set in THREE places. Update all three together.
 | `src/app.h` | Central header: `struct Theme`, `enum BtnStyle`, `enum IconId`, `S()`, `blendColor()` |
 | `src/app.rc` | Win32 resource script (RCDATA blobs + version info) |
 | `update/version.txt` | Released version string + download URL |
+| `src/sections.h` / `src/sections.cpp` | Sections registry — v2.07 adds the optional 12th column `recept_sub` (زیربخش پذیرش), `Sections_IsReceptionSub()`, `Sections_AccountRoleLabel()` |
+| `src/print_designer_templates.inc` | v2.07: the 30 builtin templates (T01–T30) + TB1, all produced by the single composer `بساز_طرح(طرح_پارامتر)` |
 
+> `src/printer.cpp` additionally owns the v2.07 «ارتباط با چاپگر» dialog:
+> window class `AzPrinterLink` (`PL_CLASS`), entry point `PrinterLink_Open(HWND)`
+> (declared in app.h next to openPrinterSettings), command enum `PLB_*`
+> (PLB_بستن=400, PLB_تأیید, PLB_انصراف, PLB_تست_اتصال, PLB_بازخوانی,
+> PLB_پیش‌فرض_ویندوز, PLB_ITEM_BASE=500), and the shared test-print core
+> `prnTestPrintTo`. It also hosts the print engine
+> (`printPrintDesign` / `printPrintDesignWith`) with the 3-column services
+> clamp, the elastic «بلوک_پایانی» band and the ink-saturation policy.
+>
 > Other `src/*.cpp` (billing, persons, employees, printer, backup, settings,
 > admin, …) are feature modules. Apply RULE 3 to all of them.
 
