@@ -59,6 +59,7 @@ enum SettingsRow {
     ROW_BLACKLIST,     // v1.58: patient blacklist — now its OWN page (moved
                        //         out of the reception/appearance settings)
     ROW_DESIGNER,      // print designer hub
+    ROW_FONT_ZOOM,     // v2.08: «تنظیمات فونت و بزرگنمایی» — font & zoom picker
     ROW_PRINTER_LINK,  // v2.07: «ارتباط با چاپگر» — dedicated printer picker
     ROW_BACKUP,        // backup & restore
     ROW_EMP_SECT,      // employees / sections (admin)
@@ -89,6 +90,7 @@ static bool canAccess(int row, int mode){
     case ROW_RECEPTION: return false;
     case ROW_BLACKLIST: return false;
     case ROW_DESIGNER:  return true;   // §7.5 gating happens at open time below
+    case ROW_FONT_ZOOM: return true;   // v2.08: font & zoom — available to all
     case ROW_PRINTER_LINK: return true;
     case ROW_BACKUP:    return mode==SM_ADMIN;   // admin-only — removed from «حساب پرسنل»
     case ROW_EMP_SECT:  return mode==SM_ADMIN;   // admin-only
@@ -199,6 +201,10 @@ static std::vector<RowDef> homeRows(int mode){
         { ROW_DESIGNER,  PAGE_DESIGNER,  ICO_PRINT,
           L"\u0637\u0631\u0627\u062d\u06cc \u0686\u0627\u067e",                                        // طراحی چاپ
           L"\u0637\u0631\u0627\u062d\u06cc \u0642\u0627\u0644\u0628 \u0686\u0627\u067e \u0628\u0631\u0627\u06cc \u0647\u0631 \u0628\u062e\u0634" },
+        // v2.08: «تنظیمات فونت و بزرگنمایی» — font family / size / weight / zoom.
+        { ROW_FONT_ZOOM, 0,             ICO_PALETTE,
+          L"\u062a\u0646\u0638\u06cc\u0645\u0627\u062a \u0641\u0648\u0646\u062a \u0648 \u0628\u0632\u0631\u06af\u0646\u0645\u0627\u06cc\u06cc",  // تنظیمات فونت و بزرگنمایی
+          L"\u0641\u0648\u0646\u062a\u060c \u0633\u0627\u06cc\u0632 \u0648 \u0628\u0632\u0631\u06af\u0646\u0645\u0627\u06cc\u06cc \u0635\u0641\u062d\u0647 \u067e\u0630\u06cc\u0631\u0634" }, // فونت، سایز و بزرگنمایی صفحه پذیرش
         // v2.07: «ارتباط با چاپگر» — dedicated printer picker (page 0 = opens
         // the PrinterLink dialog directly, handled in activateRow).
         { ROW_PRINTER_LINK, 0,           ICO_PRINT,
@@ -961,6 +967,11 @@ static void activateRow(SettingsWin* sw, int idx){
         // keeping the settings window open exactly like the designer buttons
         // (IDC_PANEL_BASE+60/+65 pattern) so the user can come straight back.
         PrinterLink_Open(sw->hMain);
+        return;
+    }
+    if(rd.row==ROW_FONT_ZOOM){
+        // v2.08: open the «تنظیمات فونت و بزرگنمایی» dialog (font & zoom picker).
+        FontZoom_Open(sw->hMain);
         return;
     }
     if(rd.page) pushPage(sw,rd.page);

@@ -90,6 +90,12 @@ bool Ops_IsReception(const Section& s){
     if(s.kind.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos) return true;
     return s.name_fa.find(L"\u067e\u0630\u06cc\u0631\u0634")!=std::wstring::npos;
 }
+// v2.08: lab kind — section.kind=="lab" OR name_fa contains «آزمایشگاه».
+bool Ops_IsLab(const Section& s){
+    if(s.kind==L"lab") return true;
+    if(s.kind.find(L"\u0622\u0632\u0645\u0627\u06cc\u0634\u06af\u0627\u0647")!=std::wstring::npos) return true;
+    return s.name_fa.find(L"\u0622\u0632\u0645\u0627\u06cc\u0634\u06af\u0627\u0647")!=std::wstring::npos;
+}
 
 static const Section* opsFind(const std::vector<Section>& all, int id){
     if(id<=0) return nullptr;
@@ -241,14 +247,19 @@ static std::wstring cashBuildServicesJson(const ReceptionRecord& r){
     for(size_t i=0;i<r.services.size();++i){
         const auto& s=r.services[i];
         if(i) o+=L",";
-        wchar_t pr[32],qty[16],pat[32];
+        wchar_t pr[32],qty[16],pat[32],ins[32];
         swprintf(pr,32,L"%lld",s.price);
         swprintf(qty,16,L"%d",s.qty>0?s.qty:1);
         swprintf(pat,32,L"%lld",s.patShare);
+        swprintf(ins,32,L"%lld",s.insShare);
         std::wstring nm=opsEscPipe(s.name);
         for(auto& c:nm) if(c==L'"') c=L'\'';
+        // v2.08: also persist insShare (combined insurance) and natCode
+        // (کد ملی سلامت) so the receipt detail table can show them.
         o += L"{\"code\":\""+opsEscPipe(s.code)+L"\",\"name\":\""+nm+
-             L"\",\"qty\":"+qty+L",\"price\":"+pr+L",\"patShare\":"+pat+L"}";
+             L"\",\"qty\":"+qty+L",\"price\":"+pr+
+             L",\"insShare\":"+ins+L",\"patShare\":"+pat+
+             L",\"natCode\":\""+opsEscPipe(s.natCode)+L"\"}";
     }
     o+=L"]";
     return o;
@@ -1013,8 +1024,16 @@ bool Receipt_BuildRecord(const std::wstring& id, ReceptionRecord& out){
         if(qpos!=std::wstring::npos) sl.qty=_wtoi(js.c_str()+qpos+6);
         size_t pr=js.find(L"\"price\":",ne);
         if(pr!=std::wstring::npos) sl.price=_wtoi64(js.c_str()+pr+8);
+        size_t is=js.find(L"\"insShare\":",ne);
+        if(is!=std::wstring::npos) sl.insShare=_wtoi64(js.c_str()+is+11);
         size_t ps=js.find(L"\"patShare\":",ne);
         if(ps!=std::wstring::npos) sl.patShare=_wtoi64(js.c_str()+ps+11);
+        // v2.08: parse natCode (کد ملی سلامت) — optional, absent on old tickets
+        size_t nc=js.find(L"\"natCode\":\"",ne);
+        if(nc!=std::wstring::npos){
+            nc+=11; size_t nce=js.find(L'"',nc);   /* \"natCode\":\" = 11 chars */
+            if(nce!=std::wstring::npos) sl.natCode=js.substr(nc,nce-nc);
+        }
         if(sl.qty<1) sl.qty=1;
         out.services.push_back(sl);
         p=ne+1;

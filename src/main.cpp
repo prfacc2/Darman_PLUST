@@ -884,8 +884,10 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         // lighter chrome, crisper text, clearly the secondary action.
         s_bNewPat   = createFlatButton(h, ID_FR_NEWPAT, L"پذیرش بیمار", ICO_USER_ADD, BS_PRIMARY,0,0,10,10,
                           L"ثبت پذیرش بیمار جدید");
-        s_bNewTab   = createFlatButton(h, ID_FR_NEWTAB, L"تب جدید",    ICO_PLUS,  BS_OUTLINE,0,0,10,10,
-                          L"باز کردن یک تب خالی");
+        // v2.08: «تب جدید» replaced by «جوابدهی بیمار» (lab answer). The old
+        // empty-tab action is removed; this button now opens the lab answer tab.
+        s_bNewTab   = createFlatButton(h, ID_FR_NEWTAB, L"جوابدهی بیمار",    ICO_PLUS,  BS_OUTLINE,0,0,10,10,
+                          L"جوابدهی آزمایشگاه بیمار");
         // v1.62.0: no native print buttons here any more — the admission page
         // owns «چاپ آخرین قبض / چاپ نسخه / رسید بیمه» in its bottom-right card.
         ShowWindow(s_bNewPat,SW_HIDE);
@@ -976,7 +978,7 @@ static LRESULT CALLBACK frameProc(HWND h, UINT m, WPARAM w, LPARAM l){
         else if(id==ID_FR_CALC) openCalculator(h);
         // v1.7.0: header reception-action buttons → route to reception screen
         else if(id==ID_FR_NEWPAT) receptionAction(RA_NEWPAT);
-        else if(id==ID_FR_NEWTAB) receptionAction(RA_NEWTAB);
+        else if(id==ID_FR_NEWTAB) Reception_OpenLabAnswer(); /* v2.08: was RA_NEWTAB */
         return 0; }
     case WM_KEYDOWN: {
         // hidden admin: Ctrl + P + N held together (home screen only)

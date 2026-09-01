@@ -1917,6 +1917,58 @@
     on($('toolsSvReport'), 'click', function () {
       Bridge.call('ui.openTab', { kind: 'svreport' });
     });
+    on($('toolsLabAnswer'), 'click', function () {
+      showLabQuestionBox(this);
+    });
+    /* v2.08: LAB question box + single-patient answer box wiring. */
+    on($('labQClose'), 'click', closeLabQuestionBox);
+    on($('labQuestionBackdrop'), 'click', closeLabQuestionBox);
+    on($('labSingleClose'), 'click', closeLabSingleBox);
+    on($('labSingleBackdrop'), 'click', closeLabSingleBox);
+    on($('labCancelBtn'), 'click', closeLabSingleBox);
+    (function () {
+      var opts = $('labQuestionBox');
+      if (!opts) return;
+      var btns = opts.getElementsByTagName('button'), i;
+      for (i = 0; i < btns.length; i++) {
+        (function (b) {
+          on(b, 'click', function () {
+            if (b.className.indexOf('lab-q-disabled') >= 0) return;
+            var opt = b.getAttribute('data-opt');
+            if (opt === 'single') {
+              closeLabQuestionBox();
+              showLabSingleBox();
+            }
+          });
+        })(btns[i]);
+      }
+    })();
+    on($('labConfirmBtn'), 'click', function () {
+      var rcpt = ($('labReceiptInput') || {}).value || '';
+      var barc = ($('labBarcodeInput') || {}).value || '';
+      if (!rcpt && !barc) { toast('شماره قبض یا بارکد را وارد کنید', 'err'); return; }
+      Bridge.call('lab.lookup', { receipt: rcpt, barcode: barc }).then(function (d) {
+        if (d && d.ok && d.ticket) {
+          closeLabSingleBox();
+          Bridge.call('ui.openTab', { kind: 'labanswer', ticketId: d.ticket.id });
+        } else {
+          toast((d && d.err) || 'قبض پیدا نشد', 'err');
+        }
+      }, function () { toast('جستجو ناموفق بود', 'err'); });
+    });
+    on($('labSearchBtn'), 'click', function () {
+      var rcpt = ($('labReceiptInput') || {}).value || '';
+      var barc = ($('labBarcodeInput') || {}).value || '';
+      if (!rcpt && !barc) { toast('شماره قبض یا بارکد را وارد کنید', 'err'); return; }
+      Bridge.call('lab.search', { receipt: rcpt, barcode: barc }).then(function (d) {
+        if (d && d.ok && d.rows && d.rows.length) {
+          toast(toFa(d.rows.length) + ' قبض پیدا شد', 'ok');
+        } else {
+          toast('قبضی پیدا نشد', 'err');
+        }
+      }, function () { toast('جستجو ناموفق بود', 'err'); });
+    });
+
     /* v1.87: tools hamburger drawer (categorised, searchable) + grid filter. */
     (function () {
       var drawer = $('toolsDrawer'), bk = $('toolsDrawerBk');
@@ -2004,6 +2056,7 @@
     on($('rcSearchBtn'), 'click', searchReceipts);
     on($('rcExcel'), 'click', exportReceiptExcel);
     on($('rcPrint'), 'click', printSelectedReceipt);
+    on($('rcPrintSide'), 'click', printSelectedReceipt); /* v2.08: side print button */
     on($('rcDelete'), 'click', deleteSelectedReceipts);
     on($('rcPrev'), 'click', function () { if (state.rcPageNo > 1) { state.rcPageNo -= 1; renderReceipts(); } });
     on($('rcNext'), 'click', function () {
@@ -2048,6 +2101,9 @@
         if (id && state.rcChecked[id]) cls += ' rc-sel';
         r.className = cls;
       }
+      /* v2.08: single-click also loads the receipt's services into the
+         bottom detail table (no new page). */
+      loadReceiptDetail(rid);
     });
     on($('rcBody'), 'dblclick', function (e) {
       e = e || window.event;
@@ -2217,6 +2273,7 @@
       var z = state.zoom || 80;
       z += (delta > 0) ? 5 : -5;
       if (z < 50) z = 50; if (z > 200) z = 200;
+      state.userZoom = z;           /* v2.08: mark manual zoom so resize won't auto-fit */
       if (applyZoom(z)) showZoomIndicator(z);
     });
     on(document, 'keydown', function (e) {
@@ -2224,9 +2281,21 @@
       if (e.ctrlKey && (e.keyCode === 48 || e.keyCode === 96)) {
         if (state.surface !== 'admission') return;
         if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
-        applyZoom(80, true);
-        showZoomIndicator(80);
+        /* v2.08: Ctrl+0 now auto-fits to the viewport instead of a fixed 80%. */
+        autoFitZoom();
+        showZoomIndicator(state.zoom || 100);
       }
+    });
+    /* v2.08: re-auto-fit on window resize (debounced) so the form always
+       fills the monitor without clipping.  Only when the user has NOT set a
+       manual zoom via Ctrl+scroll or the settings dialog. */
+    var resizeTimer = null;
+    on(window, 'resize', function () {
+      if (state.surface !== 'admission') return;
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        if (!state.userZoom) autoFitZoom();
+      }, 200);
     });
   }
 
@@ -2323,12 +2392,12 @@
     }
     if (z < 80) {
       var fsBump = z < 60 ? 3 : (z < 70 ? 2 : 1);
-      host.style.fontSize = (14 + fsBump) + 'px';
+      host.style.fontSize = ((state.baseFontSize || 14) + fsBump) + 'px';
       if ((' ' + host.className + ' ').indexOf(' az-unzoom ') < 0) {
         host.className = String(host.className || '') + ' az-unzoom';
       }
     } else {
-      host.style.fontSize = '';
+      host.style.fontSize = ((state.baseFontSize || 14)) + 'px';
       host.className = String(host.className || '').replace(/\s*az-unzoom\b/g, '');
     }
     /* v2.01: wrap-guard only for the admission surface (three-column layout).
@@ -2340,8 +2409,65 @@
     return true;
   }
   function applySavedZoom(saved) {
-    /* v2.04: fitted default is 80% like v2.00. Session-scoped — not persisted. */
-    applyZoom(80, true);
+    /* v2.08: honor a persisted zoom from C++ font/zoom settings; otherwise
+       auto-fit the workspace to the viewport so every item is visible on
+       every monitor without manual Ctrl+scroll. */
+    var z = Number(saved);
+    if (!isNaN(z) && z > 0) {
+      applyZoom(z, true);
+    } else {
+      autoFitZoom();
+    }
+  }
+  /* v2.08: measure the natural content height at 100% zoom and compute the
+     largest zoom that still fits the viewport.  Clamped to 50–100 so text
+     stays readable.  Called on initial load (when no saved zoom) and on
+     window resize. */
+  function autoFitZoom() {
+    var host = $('appBody');
+    var shell = $('app');
+    if (!host || !shell) { applyZoom(80, true); return; }
+    host.style.zoom = '100%';
+    host.style.webkitTransform = '';
+    host.style.msTransform = '';
+    host.style.transform = '';
+    host.style.fontSize = '';
+    void host.offsetHeight;            /* force reflow at 100% */
+    var naturalH = host.scrollHeight;
+    var availH = shell.clientHeight;
+    if (naturalH > 0 && availH > 0 && naturalH > availH) {
+      var z = Math.floor((availH / naturalH) * 100);
+      if (z < 50) z = 50;
+      if (z > 100) z = 100;
+      applyZoom(z, true);
+    } else {
+      applyZoom(100, true);
+    }
+  }
+  /* v2.08: apply font family / size / weight from C++ font/zoom settings to
+     the admission workspace.  Inline styles (Trident-safe — no CSS vars). */
+  function applyFontSettings(opts) {
+    if (!opts) return;
+    var hasFont = !!(opts.fontFamily || opts.fontSize || opts.fontWeight);
+    if (!hasFont) return;            /* v2.08: no-op when C++ sends nothing */
+    state.fontSettings = opts;
+    var host = $('appBody');
+    if (!host) return;
+    if (opts.fontFamily) {
+      host.style.fontFamily = "'" + opts.fontFamily + "','Vazirmatn','Segoe UI',Tahoma,sans-serif";
+    }
+    if (opts.fontSize) {
+      var fs = Number(opts.fontSize);
+      if (!isNaN(fs) && fs > 0) {
+        state.baseFontSize = fs;
+        host.style.fontSize = fs + 'px';   /* v2.08: apply immediately at all zoom levels */
+      }
+    }
+    if (opts.fontWeight) {
+      host.style.fontWeight = opts.fontWeight;
+    }
+    /* re-apply zoom so the font-size bump uses the new base */
+    if (state.zoom) applyZoom(state.zoom, true);
   }
   function applyMode(mode) {
     state.mode = mode === 'full' ? 'full' : 'simple';
@@ -2464,6 +2590,47 @@
   function newPatient() {
     clearForm();
     toast('فرم بیمار پاک شد', 'ok');
+  }
+
+  /* v2.08: LAB — «جوابدهی بیمار» question box + single-patient answer box.
+     These are glassmorphism overlays on the dashboard surface. The question
+     box appears next to the clicked icon with a connector line; only option
+     1 (جوابدهی تک بیمار) is active. */
+  function showLabQuestionBox(btn) {
+    var ov = $('labQuestionOverlay');
+    if (!ov) return;
+    ov.style.display = '-ms-flexbox';
+    ov.style.display = 'flex';
+    ov.setAttribute('aria-hidden', 'false');
+    /* default the receipt month prefix to the current Jalali month */
+    var inp = $('labReceiptInput');
+    if (inp && !inp.value) {
+      var jm = state.todayJalali || '';
+      var parts = jm.split('/');
+      if (parts.length >= 2) {
+        var mm = parseInt(parts[1], 10) || 1;
+        inp.value = (mm < 10 ? '0' : '') + toFa(String(mm)) + '-';
+      }
+    }
+  }
+  function closeLabQuestionBox() {
+    var ov = $('labQuestionOverlay');
+    if (!ov) return;
+    ov.style.display = 'none';
+    ov.setAttribute('aria-hidden', 'true');
+  }
+  function showLabSingleBox() {
+    var ov = $('labSingleOverlay');
+    if (!ov) return;
+    ov.style.display = '-ms-flexbox';
+    ov.style.display = 'flex';
+    ov.setAttribute('aria-hidden', 'false');
+  }
+  function closeLabSingleBox() {
+    var ov = $('labSingleOverlay');
+    if (!ov) return;
+    ov.style.display = 'none';
+    ov.setAttribute('aria-hidden', 'true');
   }
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -2725,6 +2892,122 @@
       if (r && r.ok) toast('چاپ قبض با تاریخ اصلی', 'ok');
       else toast((r && r.err) || 'چاپ ناموفق بود', 'err');
     }, function () { toast('چاپ ناموفق بود', 'err'); });
+  }
+  /* v2.08: load the selected receipt's services into the bottom detail table.
+     Calls receipt.get (returns ticket.services + ticket.insBase/insSupp) and
+     computes per-line base/supplementary insurance using the same formula as
+     the C++ billing engine — no random data. */
+  function loadReceiptDetail(id) {
+    var panel = $('rcDetail');
+    if (!panel) return;
+    if (!id) { panel.style.display = 'none'; return; }
+    Bridge.call('receipt.get', { id: id }).then(function (d) {
+      if (!d || !d.ok || !d.ticket) { panel.style.display = 'none'; return; }
+      renderReceiptDetail(d.ticket);
+    }, function () { panel.style.display = 'none'; });
+  }
+  function renderReceiptDetail(t) {
+    var panel = $('rcDetail');
+    var sub = $('rcDetailSub');
+    var body = $('rcDetailBody');
+    if (!panel || !body) return;
+    panel.style.display = '';
+    if (sub) {
+      var nm = t.name || ((t.first || '') + ' ' + (t.last || ''));
+      sub.innerHTML = esc(nm) + ' · ' + toFa(t.date || '') + ' · شماره قبض: ' +
+                      toFa(t.receiptNo || t.barcode || '');
+    }
+    var svcs = t.services || [];
+    if (!svcs.length) {
+      body.innerHTML = '<tr><td colspan="9" class="empty">خدماتی ثبت نشده</td></tr>';
+      return;
+    }
+    /* v2.08: use the persisted insShare (combined base+supp insurance, stored
+       authoritatively in servicesJson by cashBuildServicesJson) and patShare.
+       We cannot split base vs supp because the ticket stores only the combined
+       insurance share + the fund names (not percentages). So بیمه پایه shows
+       the combined insurance share and بیمه مکمل shows '—' unless the line has
+       a separate breakdown. This avoids the incorrect 0-everywhere result that
+       would occur from parsing a fund name as a percentage. */
+    var i, s, net, insShare, paid, html = '';
+    var tNet = 0, tIns = 0, tPaid = 0;
+    for (i = 0; i < svcs.length; i++) {
+      s = svcs[i];
+      net = (Number(s.price) || 0) * (Number(s.qty) > 0 ? Number(s.qty) : 1);
+      insShare = Number(s.insShare) || 0;
+      paid = (s.patShare != null) ? Number(s.patShare) : (net - insShare);
+      tNet += net; tIns += insShare; tPaid += paid;
+      html += '<tr>' +
+        '<td>' + esc(s.code || '—') + '</td>' +
+        '<td>' + esc(s.natCode || '—') + '</td>' +
+        '<td class="rc-d-name">' + esc(s.name || '—') + '</td>' +
+        '<td>' + toFa(String(Number(s.qty) > 0 ? Number(s.qty) : 1)) + '</td>' +
+        '<td class="rc-d-num">' + money(net) + '</td>' +
+        '<td class="rc-d-num">' + money(insShare) + '</td>' +
+        '<td class="rc-d-num">—</td>' +
+        '<td class="rc-d-num rc-d-paid">' + money(paid) + '</td>' +
+        '<td class="rc-d-num">' + money(net) + '</td>' +
+        '</tr>';
+    }
+    /* total row */
+    html += '<tr class="rc-d-totalrow">' +
+      '<td colspan="3">جمع کل</td>' +
+      '<td>' + toFa(String(svcs.length)) + '</td>' +
+      '<td class="rc-d-num">' + money(tNet) + '</td>' +
+      '<td class="rc-d-num">' + money(tIns) + '</td>' +
+      '<td class="rc-d-num">—</td>' +
+      '<td class="rc-d-num rc-d-paid">' + money(tPaid) + '</td>' +
+      '<td class="rc-d-num">' + money(tNet) + '</td>' +
+      '</tr>';
+    body.innerHTML = html;
+    setupDetailResize();
+  }
+  /* v2.08: user-resizable columns on the detail table. Drag the handle
+     between header cells to resize. Persists widths in state for the
+     session. Trident-safe (mousedown/mousemove/mouseup). */
+  function setupDetailResize() {
+    var tbl = $('rcDetailTbl');
+    if (!tbl) return;
+    var ths = tbl.getElementsByTagName('th');
+    var i, th, handle;
+    /* remove old handles */
+    for (i = 0; i < ths.length; i++) {
+      var old = ths[i].getElementsByTagName('span');
+      var j; for (j = 0; j < old.length; j++) if (old[j].className === 'rc-resize') old[j].parentNode.removeChild(old[j]);
+    }
+    if (!state.rcDetailColW) state.rcDetailColW = {};
+    for (i = 0; i < ths.length; i++) {
+      th = ths[i];
+      var col = th.getAttribute('data-col');
+      if (!col) continue;
+      var w = state.rcDetailColW[col];
+      if (!w) w = parseInt(th.getAttribute('data-w'), 10) || 100;
+      th.style.width = w + 'px';
+      handle = document.createElement('span');
+      handle.className = 'rc-resize';
+      (function (thx, colx) {
+        on(handle, 'mousedown', function (e) {
+          e = e || window.event;
+          if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+          var startX = e.clientX;
+          var startW = thx.offsetWidth;
+          var move = function (ev) {
+            ev = ev || window.event;
+            var nw = startW + (ev.clientX - startX);
+            if (nw < 40) nw = 40;
+            thx.style.width = nw + 'px';
+            state.rcDetailColW[colx] = nw;
+          };
+          var up = function () {
+            if (document.removeEventListener) { document.removeEventListener('mousemove', move, false); document.removeEventListener('mouseup', up, false); }
+            else { document.detachEvent('onmousemove', move); document.detachEvent('onmouseup', up); }
+          };
+          if (document.addEventListener) { document.addEventListener('mousemove', move, false); document.addEventListener('mouseup', up, false); }
+          else { document.attachEvent('onmousemove', move); document.attachEvent('onmouseup', up); }
+        });
+      })(th, col);
+      th.appendChild(handle);
+    }
   }
   function deleteSelectedReceipts() {
     if (state.role < 1) { toast('فقط مدیر می‌تواند قبض را حذف کند', 'err'); return; }
@@ -3596,8 +3879,15 @@
         applyMode(d.mode);
         toast('تنظیمات نمایش پذیرش اعمال شد', 'ok');
       }
-      if (state.surface === 'admission' && d && d.zoom != null && d.zoom !== '')
-        applySavedZoom(d.zoom);
+      if (state.surface === 'admission' && d) {
+        if (d.fontFamily || d.fontSize || d.fontWeight) {
+          applyFontSettings({ fontFamily: d.fontFamily, fontSize: d.fontSize, fontWeight: d.fontWeight });
+        }
+        if (d.zoom != null && d.zoom !== '') {
+          state.userZoom = Number(d.zoom);
+          applySavedZoom(d.zoom);
+        }
+      }
     });
     Bridge.on('native.print', function (d) {
       var kind=d && d.kind;
@@ -4239,6 +4529,149 @@
   function svrDebouncedBuild() {
     if (svr.debounceT) { try { clearTimeout(svr.debounceT); } catch (e1) {} }
     svr.debounceT = setTimeout(function () { svr.debounceT = 0; svrBuild(); }, 600);
+  }
+
+  /* v2.08: LAB ANSWER — «جوابدهی تک بیمار» surface init + render.
+     The ticket JSON arrives via window.__azTicket (injected by the inliner
+     when the tab opens from lab.lookup). The sidebar lists recent lab
+     receipts so the user can switch patients without going back. */
+  var labState = { ticket: null, rows: [], selIdx: -1 };
+  function labAnswerInit() {
+    if (state.surface !== 'labanswer') return;
+    /* load the ticket that was passed from the lookup box */
+    var tk = window.__azTicket;
+    if (tk && tk.ok === false) tk = null;
+    if (tk && tk.ticket) tk = tk.ticket;
+    if (tk && tk.id) {
+      labState.ticket = tk;
+      renderLabAnswer(tk);
+    } else {
+      labClearFields();
+    }
+    /* wire buttons */
+    on($('labRefreshBtn'), 'click', labLoadList);
+    on($('labPrintAllBtn'), 'click', function () {
+      if (!labState.ticket) { toast('بیماری انتخاب نشده', 'err'); return; }
+      Bridge.call('receipt.print', { id: labState.ticket.id }).then(function (d) {
+        if (d && d.ok) toast('چاپ جوابدهی', 'ok'); else toast('چاپ ناموفق بود', 'err');
+      }, function () { toast('چاپ ناموفق بود', 'err'); });
+    });
+    on($('labPrevPat'), 'click', function () { labNavPatient(-1); });
+    on($('labNextPat'), 'click', function () { labNavPatient(1); });
+    labLoadList();
+  }
+  function labLoadList() {
+    Bridge.call('lab.search', { receipt: '', barcode: '' }).then(function (d) {
+      labState.rows = (d && d.rows) || [];
+      renderLabSidebar();
+    }, function () { labState.rows = []; renderLabSidebar(); });
+  }
+  function renderLabSidebar() {
+    var box = $('labSbList');
+    if (!box) return;
+    var rows = labState.rows || [], i, html = '';
+    if (!rows.length) { box.innerHTML = '<div class="lab-empty">قبضی نیست</div>'; return; }
+    for (i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var nm = r.name || ((r.first || '') + ' ' + (r.last || ''));
+      var sel = (labState.ticket && r.id === labState.ticket.id) ? ' lab-sb-sel' : '';
+      html += '<div class="lab-sb-item' + sel + '" data-rid="' + esc(r.id) + '">' +
+              esc(nm) + ' · ' + toFa(r.date || '') + ' · ' + toFa(r.receiptNo || r.barcode || '') +
+              '</div>';
+    }
+    box.innerHTML = html;
+    var items = box.getElementsByTagName('div'), j;
+    for (j = 0; j < items.length; j++) {
+      (function (it) {
+        on(it, 'click', function () {
+          var rid = it.getAttribute('data-rid');
+          if (!rid) return;
+          Bridge.call('receipt.get', { id: rid }).then(function (d) {
+            if (d && d.ok && d.ticket) {
+              labState.ticket = d.ticket;
+              renderLabAnswer(d.ticket);
+              renderLabSidebar();
+            }
+          }, function () { toast('بارگذاری ناموفق بود', 'err'); });
+        });
+      })(items[j]);
+    }
+  }
+  function labNavPatient(dir) {
+    var rows = labState.rows || [];
+    if (!rows.length) return;
+    var idx = -1;
+    if (labState.ticket) {
+      for (var i = 0; i < rows.length; i++) if (rows[i].id === labState.ticket.id) { idx = i; break; }
+    }
+    idx += dir;
+    if (idx < 0) idx = 0;
+    if (idx >= rows.length) idx = rows.length - 1;
+    var rid = rows[idx].id;
+    Bridge.call('receipt.get', { id: rid }).then(function (d) {
+      if (d && d.ok && d.ticket) { labState.ticket = d.ticket; renderLabAnswer(d.ticket); renderLabSidebar(); }
+    });
+  }
+  function labClearFields() {
+    var ids = ['labTurn','labBarcode','labDoctor','labName','labAge','labGender',
+               'labRegDate','labReadyDate','labDoneDate','labPrintCount','labPrintDate',
+               'labPayStatus','labPhone','labEmail','labEditBy','labEditDate','labSigBy','labSigAt'];
+    var i; for (i = 0; i < ids.length; i++) { var el = $(ids[i]); if (el) el.textContent = '—'; }
+    var body = $('labTblBody'); if (body) body.innerHTML = '<tr><td colspan="9" class="lab-empty">بیماری انتخاب نشده</td></tr>';
+  }
+  function renderLabAnswer(t) {
+    var set = function (id, val) { var el = $(id); if (el) el.textContent = val || '—'; };
+    set('labTurn', toFa(t.turn || t.receiptNo || ''));
+    set('labBarcode', toFa(t.barcode || ''));
+    set('labDoctor', t.doctor || '—');
+    var nm = t.name || ((t.first || '') + ' ' + (t.last || ''));
+    set('labName', nm);
+    /* age: not stored on the ticket — show '—' (no fake data) */
+    set('labAge', '—');
+    set('labGender', t.gender || '—');
+    set('labRegDate', toFa(t.date || ''));
+    /* ready date: show the next day (no fake data — computed from the admission date) */
+    set('labReadyDate', '—');
+    set('labDoneDate', toFa(t.date || ''));
+    set('labPrintCount', toFa(String(t.printCount || '0')));
+    set('labPrintDate', toFa(t.date || ''));
+    /* payment status: green for paid, red for unpaid */
+    var psEl = $('labPayStatus');
+    if (psEl) {
+      var remain = Number(t.remain) || 0;
+      if (remain <= 0 && Number(t.paid) > 0) {
+        psEl.textContent = 'پرداخت شده';
+        psEl.className = 'lab-pi-val lab-pay-paid';
+      } else {
+        psEl.textContent = 'پرداخت نشده';
+        psEl.className = 'lab-pi-val lab-pay-unpaid';
+      }
+    }
+    set('labPhone', toFa(t.mobile || ''));
+    set('labEmail', '—');
+    /* info panel */
+    set('labEditBy', t.user || t.paidUser || '—');
+    set('labEditDate', toFa(t.paidAt || t.date || ''));
+    /* signature — not yet signed (feature placeholder) */
+    set('labSigBy', '—');
+    set('labSigAt', '—');
+    /* test results table: each service = one row */
+    var body = $('labTblBody');
+    if (!body) return;
+    var svcs = t.services || [];
+    if (!svcs.length) {
+      body.innerHTML = '<tr><td colspan="9" class="lab-empty">آزمایشی ثبت نشده</td></tr>';
+      return;
+    }
+    var i, s, html = '';
+    for (i = 0; i < svcs.length; i++) {
+      s = svcs[i];
+      html += '<tr>' +
+        '<td>' + esc(s.name || '—') + '</td>' +
+        '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
+        '</tr>';
+    }
+    body.innerHTML = html;
   }
 
   function svrFillSections() {
@@ -4899,11 +5332,11 @@
     var surf = window.__azSurface || 'admission';
     /* v1.88: 'receipts' is its own native C++ tab now (opened from the tools
        grid); the same HTML file renders it full-page via body.surface-rc. */
-    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal' && surf !== 'blacklist' && surf !== 'svreport') surf = 'admission';
+    if (surf !== 'tools' && surf !== 'cashier' && surf !== 'queue' && surf !== 'receipts' && surf !== 'dash' && surf !== 'portal' && surf !== 'blacklist' && surf !== 'svreport' && surf !== 'labanswer') surf = 'admission';
     state.surface = surf;
     var b = document.body;
     if (!b) return;
-    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal|bl|svr)\b/g, '').replace(/\s+/g, ' ');
+    var cls = String(b.className || '').replace(/\bsurface-(adm|tools|cash|queue|rc|dash|portal|bl|svr|lab)\b/g, '').replace(/\s+/g, ' ');
     if (surf === 'tools') cls += ' surface-tools';
     else if (surf === 'cashier') cls += ' surface-cash';
     else if (surf === 'queue') cls += ' surface-queue';
@@ -4912,6 +5345,7 @@
     else if (surf === 'portal') cls += ' surface-portal';
     else if (surf === 'blacklist') cls += ' surface-bl';
     else if (surf === 'svreport') cls += ' surface-svr';
+    else if (surf === 'labanswer') cls += ' surface-lab';
     else cls += ' surface-adm';
     b.className = cls;
   }
@@ -4947,7 +5381,7 @@
       function openApp(kind) { Bridge.call('ui.openTab', { kind: kind }); }
       on($('dashNewPat'), 'click', function () { openApp('admission'); });
       on($('dashTools'), 'click', function () { openApp('tools'); });
-      on($('dashNewTab'), 'click', function () { openApp('empty'); });
+      on($('dashLabAnswer'), 'click', function () { showLabQuestionBox(this); });
       on($('dashPortal'), 'click', function () { openApp('portal'); });
       on($('dashMail'), 'click', function () { openApp('portal'); });
       /* v1.94: dashboard blacklist launcher */
@@ -5057,7 +5491,14 @@
         }
         if (r.ps) updatePS(r.ps);
         applyMode(r.mode || 'simple');
-        if (state.surface === 'admission') applySavedZoom(r.zoom || 80);
+        if (state.surface === 'admission') {
+          state.userZoom = 0;   /* v2.08: clear stale manual zoom so auto-fit runs on fresh init */
+          applyFontSettings({ fontFamily: r.fontFamily, fontSize: r.fontSize, fontWeight: r.fontWeight });
+          var initZoom = r.zoom || 0;
+          /* v2.08: defer the fit one tick so Trident completes a layout pass
+             before we measure scrollHeight — otherwise the fit is inaccurate. */
+          setTimeout(function () { applySavedZoom(initZoom); }, 50);
+        }
       }
       document.body.className = String(document.body.className || '')
         .replace(/\btheme-(dark|calm|warm|neon)\b/g, '').replace(/\s+/g, ' ');
@@ -5162,6 +5603,11 @@
       if (state.surface === 'svreport') {
         /* v2.02: «تفکیک خدمات» — per-service breakdown report */
         svReportInit();
+        return;
+      }
+      if (state.surface === 'labanswer') {
+        /* v2.08: «جوابدهی تک بیمار» — lab answer surface */
+        labAnswerInit();
         return;
       }
       if (state.surface === 'dash') {

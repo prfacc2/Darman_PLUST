@@ -54,6 +54,8 @@ struct CashScope {
 // Reception kind: section.kind=="reception" OR name_fa contains «پذیرش».
 // Never hard-codes a clinic department name.
 bool Ops_IsReception(const Section& s);
+// v2.08: lab kind — section.kind=="lab" OR name_fa contains «آزمایشگاه».
+bool Ops_IsLab(const Section& s);
 
 CashScope Cash_ResolveScope();
 

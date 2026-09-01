@@ -1,2 +1,2 @@
-2.07.1
-https://github.com/prfacc2/Darman_PLUST/releases/download/v2.07.1/DarmanPlus.exe
+2.08.0
+https://github.com/prfacc2/Darman_PLUST/releases/download/v2.08.0/DarmanPlus.exe

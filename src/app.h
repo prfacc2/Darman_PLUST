@@ -20,7 +20,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------- version --
-#define APP_VERSION_W   L"2.07.1"
+#define APP_VERSION_W   L"2.08.0"
 
 // ----------------------------------------------------------- logging policy -
 //  RELEASE 1.2.0 (Section A): all general user-behavior logging is gated behind
@@ -482,6 +482,10 @@ struct ServiceLine {
     long long    discount; // per-line discount (Toman)
     long long    insShare; // insurance share for this line (Toman)
     long long    patShare; // patient share for this line (Toman)
+    // v2.08: کد ملی سلامت (national health code) from the service catalog,
+    // carried on the line so the receipt detail table can show it without a
+    // separate catalog lookup. Empty when the catalog has no national code.
+    std::wstring natCode;
     ServiceLine():price(0),qty(1),discount(0),insShare(0),patShare(0){}
 };
 struct ReceptionRecord {
@@ -610,6 +614,9 @@ void Reception_OpenReceipts();
 void Reception_OpenPortal();
 void Reception_OpenBlacklist();
 void Reception_OpenSvReport();   // v2.02: «تفکیک خدمات» report
+void Reception_OpenLabAnswer();  // v2.08: «جوابدهی تک بیمار» lab answer
+void Reception_CloseLabAnswer();
+void Reception_OpenLabAnswerTicket(const std::string& ticketJson);
 void Reception_CloseSvReport();
 void Reception_OpenNewTab();
 void Reception_OpenAdmissionNew();
@@ -675,6 +682,11 @@ void openPrinterSettings(HWND owner);
 //  Windows-default pre-selection, «پیرو پیش‌فرض ویندوز» switch, test page,
 //  reload) opened from the C++ settings header.
 void PrinterLink_Open(HWND owner);
+//  v2.08.0: «تنظیمات فونت و بزرگنمایی» — font family / size / weight / zoom
+//  picker opened from the C++ settings header. Persists to settings.ini and
+//  live-applies to the admission WebView.
+void FontZoom_Open(HWND owner);
+std::vector<std::wstring> EnumSystemFonts();
 //  Open the visual print designer for a given section index.
 void openPrintDesigner(HWND owner, int sectionIdx);
 //  Render the saved design for a section onto a printer DC for a real receipt.

@@ -405,6 +405,13 @@
             </span>
             <span class="tools-tile-name">تفکیک خدمات</span>
           </button>
+          <!-- v2.08: «جوابدهی بیمار» — lab answer launcher (also on dashboard) -->
+          <button type="button" class="tools-tile" id="toolsLabAnswer">
+            <span class="tools-appico tools-appico-lab" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9zm2 2h2v5l3 6H8l3-6V4z"/></svg>
+            </span>
+            <span class="tools-tile-name">جوابدهی بیمار</span>
+          </button>
         </div>
         <div class="tools-empty" id="toolsEmpty" style="display:none">ابزاری با این نام پیدا نشد</div>
       </div>
@@ -533,6 +540,10 @@
               <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M10 3a7 7 0 015.6 11.2l4.1 4.1-1.4 1.4-4.1-4.1A7 7 0 1110 3zm0 2a5 5 0 100 10 5 5 0 000-10z"/></svg>
               جستجو
             </button>
+            <button type="button" class="btn btn-primary btn-ico rc-search-btn rc-print-side-btn" id="rcPrintSide" title="چاپ قبض انتخاب‌شده">
+              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M6 3h12v4H6V3zm0 6h12a3 3 0 013 3v5h-3v4H6v-4H3v-5a3 3 0 013-3zm1 8v3h10v-3H7z"/></svg>
+              چاپ قبض
+            </button>
           </aside>
           <div class="rc-main">
             <div class="tbl-wrap rc-tbl-wrap" id="rcWrap">
@@ -560,6 +571,37 @@
               <button type="button" class="btn btn-outline btn-sm" id="rcPrev">قبلی</button>
               <span class="rc-page-lbl" id="rcPageLbl">صفحه ۱ از ۱</span>
               <button type="button" class="btn btn-outline btn-sm" id="rcNext">بعدی</button>
+            </div>
+            <!-- v2.08: bottom detail table — shows the selected receipt's service
+                 lines on single-click (no new page). Columns: کد خدمت، کد ملی
+                 خدمت، نام خدمت، تعداد، قیمت کل، بیمه پایه، بیمه مکمل، پرداختی،
+                 قیمت کل. Column widths are user-resizable via drag handles. -->
+            <div class="rc-detail" id="rcDetail" style="display:none">
+              <div class="rc-detail-head">
+                <h3 class="rc-detail-title">
+                  <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M3 5h18v14H3V5zm2 2v10h14V7H5zm2 2h10v2H7V9zm0 4h7v2H7v-2z"/></svg>
+                  خدمات قبض
+                </h3>
+                <span class="rc-detail-sub" id="rcDetailSub"></span>
+              </div>
+              <div class="rc-detail-wrap">
+                <table class="tbl rc-detail-tbl" id="rcDetailTbl">
+                  <thead><tr>
+                    <th data-col="code" data-w="90">کد خدمت</th>
+                    <th data-col="natCode" data-w="110">کد ملی خدمت</th>
+                    <th data-col="name" data-w="200">نام خدمت</th>
+                    <th data-col="qty" data-w="60">تعداد</th>
+                    <th data-col="total" data-w="110">قیمت کل</th>
+                    <th data-col="insBase" data-w="110">بیمه پایه</th>
+                    <th data-col="insSupp" data-w="110">بیمه مکمل</th>
+                    <th data-col="paid" data-w="110">پرداختی</th>
+                    <th data-col="total2" data-w="110">قیمت کل</th>
+                  </tr></thead>
+                  <tbody id="rcDetailBody">
+                    <tr><td colspan="9" class="empty">قبضی انتخاب نشده است</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -608,11 +650,14 @@
           </span>
           <span class="dash-appname">ابزارها</span>
         </button>
-        <button type="button" class="dash-app" id="dashNewTab" data-name="تب جدید تب خالی">
-          <span class="dash-appico dash-appico-tab" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M12 5a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H6a1 1 0 110-2h5V6a1 1 0 011-1z"/></svg>
+        <!-- v2.08: «جوابدهی بیمار» (lab answer) — replaces the unused «تب جدید».
+             Click shows a question box (not a page). Only option 1 (جوابدهی تک
+             بیمار) is active; the rest are placeholders. -->
+        <button type="button" class="dash-app" id="dashLabAnswer" data-name="جوابدهی بیمار آزمایشگاه جواب تک بیمار">
+          <span class="dash-appico dash-appico-lab" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="34" height="34"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9zm2 2h2v5l3 6H8l3-6V4z"/><path fill="currentColor" d="M8 16h8l1.5 3a1.5 1.5 0 01-1.5 2H8a1.5 1.5 0 01-1.5-2L8 16z" opacity=".35"/></svg>
           </span>
-          <span class="dash-appname">تب جدید</span>
+          <span class="dash-appname">جوابدهی بیمار</span>
         </button>
         <!-- v1.94.0: BLACKLIST — patient blocklist launcher (لیست سیاه بیماران) -->
         <button type="button" class="dash-app" id="dashBlacklist" data-name="لیست سیاه بیماران مسدودسازی پذیرش">
@@ -649,9 +694,9 @@
           <span class="dash-drico dash-appico-tools" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19.14 12.94a7.1 7.1 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.2 7.2 0 00-1.63-.94L14.5 2.5a.5.5 0 00-.5-.4h-4a.5.5 0 00-.5.4l-.35 2.42c-.58.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 00-.6.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58a7.1 7.1 0 000 1.88L2.83 14.52a.5.5 0 00-.12.64l1.92 3.32a.5.5 0 00.6.22l2.39-.96c.5.4 1.05.71 1.63.94l.35 2.42a.5.5 0 00.5.4h4a.5.5 0 00.5-.4l.35-2.42c.58-.23 1.13-.54 1.63-.94l2.39.96a.5.5 0 00.6-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg></span>
           <span class="dash-dri-tx"><b>ابزارها</b><small>صندوق، شیفت و گزارش</small></span>
         </button>
-        <button type="button" class="dash-drawer-item" data-app="dashNewTab">
-          <span class="dash-drico dash-appico-tab" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 5a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H6a1 1 0 110-2h5V6a1 1 0 011-1z"/></svg></span>
-          <span class="dash-dri-tx"><b>تب جدید</b><small>یک تب خالی تازه</small></span>
+        <button type="button" class="dash-drawer-item" data-app="dashLabAnswer">
+          <span class="dash-drico dash-appico-lab" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9zm2 2h2v5l3 6H8l3-6V4z"/></svg></span>
+          <span class="dash-dri-tx"><b>جوابدهی بیمار</b><small>آزمایشگاه و جواب تک بیمار</small></span>
         </button>
         <div class="dash-cat"><span class="dash-cat-dot" style="background:#4263E8"></span>پیام‌رسانی</div>
         <button type="button" class="dash-drawer-item" data-app="dashPortal">
@@ -661,6 +706,79 @@
       </nav>
     </aside>
   </div><!-- /#dashPanel -->
+
+  <!-- v2.08: LAB — «جوابدهی بیمار» question box + single-patient answer box.
+       Both are full-screen glassmorphism overlays on the dashboard surface. -->
+  <div class="lab-overlay" id="labQuestionOverlay" style="display:none">
+    <div class="lab-backdrop" id="labQuestionBackdrop"></div>
+    <div class="lab-qbox" id="labQuestionBox" role="dialog" aria-label="جوابدهی بیمار">
+      <div class="lab-qbox-header">
+        <div class="lab-qbox-title">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9zm2 2h2v5l3 6H8l3-6V4z"/></svg>
+          جوابدهی بیمار
+        </div>
+        <button type="button" class="lab-qbox-close" id="labQClose" title="بستن">×</button>
+      </div>
+      <div class="lab-qbox-body">
+        <button type="button" class="lab-q-option" data-opt="single">
+          <span class="lab-q-ico">🧪</span>
+          <span class="lab-q-text">جوابدهی تک بیمار</span>
+          <span class="lab-q-active">فعال</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="worklist" disabled>
+          <span class="lab-q-text">جوابدهی بر اساس لیست کار</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="manual" disabled>
+          <span class="lab-q-text">جوابدهی بیماران دستی</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="pathology" disabled>
+          <span class="lab-q-text">جوابدهی آسیب‌شناسی</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="sign" disabled>
+          <span class="lab-q-text">تأیید و امضای دیجیتال جواب</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="report" disabled>
+          <span class="lab-q-text">ارسال جواب به سامانه گزارش‌دهی درمان پلاس</span>
+        </button>
+        <button type="button" class="lab-q-option lab-q-disabled" data-opt="sepas" disabled>
+          <span class="lab-q-text">داشبورد ارسال سپاس</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v2.08: single-patient answer box (glassmorphism, lab-themed) -->
+  <div class="lab-overlay" id="labSingleOverlay" style="display:none">
+    <div class="lab-backdrop" id="labSingleBackdrop"></div>
+    <div class="lab-single-box" id="labSingleBox" role="dialog" aria-label="جوابدهی تک بیمار">
+      <div class="lab-single-header">
+        <div class="lab-single-title">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9zm2 2h2v5l3 6H8l3-6V4z"/></svg>
+          جوابدهی تک بیمار
+        </div>
+        <button type="button" class="lab-qbox-close" id="labSingleClose" title="بستن">×</button>
+      </div>
+      <div class="lab-single-body">
+        <div class="lab-field-group">
+          <div class="lab-field-label">بر اساس شماره قبض</div>
+          <label class="lab-input-row">
+            <span class="lab-input-cap">شماره قبض :</span>
+            <input type="text" id="labReceiptInput" class="lab-input" placeholder="مثلا ۰۵-۶۶۳" maxlength="12" />
+          </label>
+          <label class="lab-input-row">
+            <span class="lab-input-cap">شماره بارکد :</span>
+            <input type="text" id="labBarcodeInput" class="lab-input" placeholder="بارکد قبض" maxlength="20" />
+          </label>
+          <div class="lab-hint">در صورت خالی بودن شماره قبض، نمای قبض‌های همان ماه نمایش داده می‌شود.</div>
+        </div>
+        <div class="lab-single-btns">
+          <button type="button" class="lab-btn lab-btn-primary" id="labConfirmBtn">تأیید</button>
+          <button type="button" class="lab-btn lab-btn-outline" id="labSearchBtn">جستجو</button>
+          <button type="button" class="lab-btn lab-btn-ghost" id="labCancelBtn">انصراف</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- PORTAL: Message Workdesk (کارتابل پیام) — v1.93 HTML surface -->
   <section class="portal-panel" id="portalPanel" aria-hidden="true">
@@ -1056,6 +1174,109 @@
       </div>
       <div class="svr-pages" id="svrPages"></div>
     </div>
+  </section>
+
+  <!-- v2.08: LAB ANSWER — «جوابدهی تک بیمار» surface (surface-lab).
+       Shows patient info + the test results table with the specified columns.
+       The ticket JSON is injected via window.__azTicket by the inliner. -->
+  <section class="lab-panel" id="labPanel" aria-hidden="true">
+    <header class="lab-topbar">
+      <div class="lab-topbar-side">
+        <button type="button" class="lab-btn lab-btn-outline lab-btn-sm" id="labPrevPat">بیمار قبلی</button>
+        <button type="button" class="lab-btn lab-btn-outline lab-btn-sm" id="labNextPat">بیمار بعدی</button>
+      </div>
+      <div class="lab-topbar-titles">
+        <div class="lab-topbar-title">جوابدهی تک بیمار</div>
+      </div>
+      <div class="lab-topbar-acts">
+        <label class="lab-paper-sel">
+          <span>سایز کاغذ چاپ:</span>
+          <select id="labPaperSize" class="lab-select">
+            <option value="A4">A4</option>
+            <option value="A5">A5</option>
+            <option value="letter">Letter</option>
+          </select>
+        </label>
+        <button type="button" class="lab-btn lab-btn-outline lab-btn-sm" id="labPreviewBtn">پیش‌نمایش</button>
+        <button type="button" class="lab-btn lab-btn-primary lab-btn-sm" id="labPrintAllBtn">چاپ کامل</button>
+      </div>
+    </header>
+    <!-- v2.08: bottom row wraps content + sidebar so the sidebar doesn't occlude the info panel -->
+    <div class="lab-bottom-row">
+    <div class="lab-content">
+      <!-- left: patient info -->
+      <div class="lab-patinfo" id="labPatInfo">
+        <div class="lab-pi-grid">
+          <div class="lab-pi-row"><span class="lab-pi-lbl">شماره:</span><span class="lab-pi-val" id="labTurn">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">بارکد:</span><span class="lab-pi-val" id="labBarcode">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">پزشک:</span><span class="lab-pi-val" id="labDoctor">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">نام و نام خانوادگی:</span><span class="lab-pi-val" id="labName">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">سن:</span><span class="lab-pi-val" id="labAge">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">جنسیت:</span><span class="lab-pi-val" id="labGender">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">پذیرش:</span><span class="lab-pi-val" id="labRegDate">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">زمان آماده شدن جواب:</span><span class="lab-pi-val" id="labReadyDate">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">تاریخ تکمیل:</span><span class="lab-pi-val" id="labDoneDate">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">تعداد چاپ:</span><span class="lab-pi-val" id="labPrintCount">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">تاریخ چاپ:</span><span class="lab-pi-val" id="labPrintDate">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">وضعیت پرداخت:</span><span class="lab-pi-val" id="labPayStatus">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">شماره:</span><span class="lab-pi-val" id="labPhone">—</span></div>
+          <div class="lab-pi-row"><span class="lab-pi-lbl">پست الکترونیک:</span><span class="lab-pi-val" id="labEmail">—</span></div>
+        </div>
+      </div>
+      <!-- center: test results table -->
+      <div class="lab-table-wrap">
+        <table class="lab-tbl" id="labTbl">
+          <thead><tr>
+            <th>نام آزمایش</th>
+            <th>جواب آزمایش</th>
+            <th>R*</th>
+            <th>Sta</th>
+            <th>Method</th>
+            <th>F</th>
+            <th>N</th>
+            <th>Comment</th>
+            <th>Test</th>
+          </tr></thead>
+          <tbody id="labTblBody">
+            <tr><td colspan="9" class="lab-empty">در حال بارگذاری…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- right: info / signature panel -->
+      <div class="lab-info-panel" id="labInfoPanel">
+        <div class="lab-info-title">info</div>
+        <div class="lab-info-body">
+          <div class="lab-info-row"><span class="lab-info-lbl">Edite By :</span><span class="lab-info-val" id="labEditBy">—</span></div>
+          <div class="lab-info-row"><span class="lab-info-lbl">Date Time :</span><span class="lab-info-val" id="labEditDate">—</span></div>
+        </div>
+        <div class="lab-info-changes">
+          <button type="button" class="lab-btn lab-btn-ghost lab-btn-xs" id="labChangeRange">Change Range</button>
+          <button type="button" class="lab-btn lab-btn-ghost lab-btn-xs" id="labCommentBtn">Commite</button>
+          <button type="button" class="lab-btn lab-btn-ghost lab-btn-xs" id="labCommitAll">Commite All</button>
+        </div>
+        <div class="lab-sig-box">
+          <div class="lab-sig-ico">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M9 2v6L4 18a3 3 0 003 4h10a3 3 0 003-4L15 8V2H9z"/></svg>
+          </div>
+          <div class="lab-sig-info">
+            <div class="lab-sig-row"><span>Signatured By :</span><span id="labSigBy">—</span></div>
+            <div class="lab-sig-row"><span>Signatured At :</span><span id="labSigAt">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- v2.08: sidebar is a sibling of .lab-content inside .lab-bottom-row -->
+    <aside class="lab-sidebar" id="labSidebar">
+      <div class="lab-sb-actions">
+        <button type="button" class="lab-btn lab-btn-outline lab-btn-sm" id="labRefreshBtn">به‌روزرسانی</button>
+        <button type="button" class="lab-btn lab-btn-outline lab-btn-sm" id="labGroupPrintBtn">چاپ گروهی</button>
+      </div>
+      <div class="lab-sb-filter">
+        <input type="text" id="labFilter" class="lab-sb-inp" placeholder="فیلتر روی همه…" />
+      </div>
+      <div class="lab-sb-list" id="labSbList"></div>
+    </aside>
+    </div><!-- /.lab-bottom-row -->
   </section>
 
   <div id="toast" class="toast"></div>

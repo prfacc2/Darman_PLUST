@@ -458,6 +458,7 @@ static std::vector<ServiceLine> adCanonicalServices(const std::string& body,
             ln.name=trim(def->name);
             ln.category=trim(def->category);
             ln.desc=trim(def->desc);
+            ln.natCode=trim(def->healthNationalId);  // v2.08: کد ملی سلامت
             if(ln.desc.empty()) ln.desc=ln.category;
         } else if(!freeRate) {
             // Unknown/deactivated normal-rate rows may remain visible, but their
@@ -709,14 +710,24 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         std::wstring mode=getSetting(L"reception.mode"+suffix,
                            getSetting(L"reception.mode",L"simple"));
         if(mode!=L"full") mode=L"simple";
-        // v2.04: admission fitted default is 80% (v2.00 layout). Session-scoped.
-        int zoom=80;
+        // v2.08: zoom/font are now persisted in settings.ini by the font/zoom
+        // dialog.  zoom=0 means "auto-fit" (the JS autoFitZoom() measures the
+        // viewport).  Font defaults: Vazirmatn family, 14px, weight 600.
+        int zoom=_wtoi(getSetting(L"admission.zoom",L"0").c_str());
+        if(zoom<50||zoom>200) zoom=0;
+        std::wstring fontFamily=getSetting(L"admission.font_family",L"Vazirmatn");
+        std::wstring fontWeight=getSetting(L"admission.font_weight",L"600");
+        int fontSize=_wtoi(getSetting(L"admission.font_size",L"14").c_str());
+        if(fontSize<8||fontSize>32) fontSize=14;
         o+="\"date\":"+jstr(adTodayJalali())+",";
         o+="\"time\":"+jstr(adNowTime())+",";
         o+="\"shift\":"+jstr(shiftName(g_session.shift))+",";
         o+="\"shiftOpen\":"; o+=(Shift_IsOpen()?"true":"false"); o+=",";
         o+="\"mode\":"+jstr(mode)+",";
         o+="\"zoom\":"+jnum(zoom)+",";
+        o+="\"fontFamily\":"+jstr(fontFamily)+",";
+        o+="\"fontSize\":"+jnum(fontSize)+",";
+        o+="\"fontWeight\":"+jstr(fontWeight)+",";
         o+="\"theme\":"+jstr(getSetting(L"theme",L"light"))+",";
         // v1.77: calm/warm palettes retired — the admission surface is always the
         // standard light (blue) palette or dark, so no "palette" field is sent.
@@ -907,13 +918,14 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         return adDoctorStatsJson(u82w(nameU));
     }
 
-    // ---- reception.zoom.save: validate only (session-scoped, NOT persisted) --
-    // v2.01 (Part H): zoom is no longer persisted across sessions. This verb
-    // remains for API compatibility but does not write to settings.ini.
+    // ---- reception.zoom.save: persist zoom to settings.ini (v2.08) ----------
+    // v2.08: zoom is now persisted by the font/zoom settings dialog. This verb
+    // also writes so Ctrl+scroll changes can be optionally saved.
     if(verb=="reception.zoom.save"){
         double zN=0; int z=0;
         if(jsonGetNumber(body,"zoom",zN)) z=(int)llround(zN);
         if(z<50) z=50; if(z>200) z=200;
+        setSetting(L"admission.zoom",std::to_wstring((long long)z));
         return "{\"ok\":true}";
     }
 
@@ -1165,6 +1177,93 @@ static std::string admissionApi(const std::string& verb, const std::string& body
             if(!done) printReceipt(rec,2,owner);
         });
         return "{\"ok\":true}";
+    }
+
+    // ---- lab.lookup (v2.08) — find a ticket by receipt number or barcode ----
+    //   Used by the «جوابدهی تک بیمار» box. Returns the full ticket + services
+    //   (same shape as receipt.get).  No random data — all from cashier_tickets.
+    if(verb=="lab.lookup"){
+        std::string rU, bU;
+        jsonGetString(body,"receipt",rU);
+        jsonGetString(body,"barcode",bU);
+        std::wstring rcpt = u82w(rU);
+        std::wstring barc = u82w(bU);
+        // strip the "MM-" prefix from the receipt input if present (the user
+        // types "05-663" → search by the numeric part "663")
+        std::wstring q = rcpt;
+        size_t dash = q.find(L'-');
+        if(dash!=std::wstring::npos) q = q.substr(dash+1);
+        // trim
+        while(!q.empty() && (q.back()==L' '||q.back()==L'\t')) q.pop_back();
+        while(!q.empty() && (q.front()==L' '||q.front()==L'\t')) q.erase(0,1);
+        // search by receipt number or barcode
+        std::wstring id = Cash_LookupId(L"", barc.empty()?q:barc, false);
+        if(id.empty() && !barc.empty()) id = Cash_LookupId(L"", q, false);
+        if(id.empty() && !q.empty()){
+            // try matching by nid as well
+            id = Cash_LookupId(q, L"", false);
+        }
+        if(id.empty()) return "{\"ok\":false,\"err\":\"قبضی با این شماره/بارکد پیدا نشد.\"}";
+        return Cash_GetJson(id);
+    }
+    // ---- lab.search (v2.08) — search receipts for the lab answer box --------
+    //   Filters to lab sections only (Ops_IsLab) when no specific query is
+    //   given (the sidebar list). Falls back to all receipts when a specific
+    //   receipt/barcode query is provided (the lookup may cross sections).
+    if(verb=="lab.search"){
+        std::string rU, bU;
+        jsonGetString(body,"receipt",rU);
+        jsonGetString(body,"barcode",bU);
+        ReceiptQuery rq;
+        rq.q = u82w(rU.empty()?bU:rU);
+        // strip "MM-" prefix
+        size_t dash = rq.q.find(L'-');
+        if(dash!=std::wstring::npos) rq.q = rq.q.substr(dash+1);
+        std::string raw = Receipt_SearchJson(rq);
+        /* when the query is empty (sidebar list), filter to lab sections only */
+        if(rq.q.empty()){
+            std::vector<Section> secs; Sections_All(secs);
+            std::vector<int> labIds;
+            for(const auto& s : secs) if(Ops_IsLab(s)) labIds.push_back(s.id);
+            if(!labIds.empty()){
+                /* re-parse and filter — simple substring approach: keep only
+                   rows whose sectionId matches a lab section. We re-search
+                   without the cap by calling per-section. For simplicity, just
+                   filter the JSON rows in-place by checking sectionId. */
+                std::string filtered="{\"ok\":true,\"rows\":[";
+                size_t pos=raw.find("\"rows\":[");
+                if(pos!=std::string::npos){
+                    pos+=8;
+                    bool firstF=true;
+                    while(pos<raw.size()){
+                        size_t objStart=raw.find('{',pos);
+                        if(objStart==std::string::npos) break;
+                        size_t objEnd=raw.find('}',objStart);
+                        if(objEnd==std::string::npos) break;
+                        /* extract sectionId value */
+                        size_t sidK=raw.find("\"sectionId\":",objStart);
+                        if(sidK!=std::string::npos && sidK<objEnd){
+                            size_t vStart=sidK+12;
+                            size_t vEnd=raw.find_first_of(",}",vStart);
+                            if(vEnd!=std::string::npos){
+                                int sid=atoi(raw.substr(vStart,vEnd-vStart).c_str());
+                                bool isLab=false;
+                                for(int lid : labIds) if(lid==sid){ isLab=true; break; }
+                                if(isLab){
+                                    if(!firstF) filtered+=",";
+                                    filtered+=raw.substr(objStart,objEnd-objStart+1);
+                                    firstF=false;
+                                }
+                            }
+                        }
+                        pos=objEnd+1;
+                    }
+                }
+                filtered+="]}";
+                return filtered;
+            }
+        }
+        return raw;
     }
 
     // ---- blacklist.list (v1.94 درمان پلاس) — «لیست سیاه» همه موارد ---------
@@ -1453,6 +1552,22 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="portal")     RunOnUiThread([](){ Reception_OpenPortal(); });
         else if(kind=="blacklist")  RunOnUiThread([](){ Reception_OpenBlacklist(); });
         else if(kind=="svreport")   RunOnUiThread([](){ Reception_OpenSvReport(); });
+        else if(kind=="labanswer"){
+            // v2.08: if a ticketId is provided, fetch the full ticket JSON and
+            // pass it to the lab answer tab (same pattern as ui.openAdmission).
+            std::string tidU; jsonGetString(body,"ticketId",tidU);
+            if(!tidU.empty()){
+                std::string raw=Cash_GetJson(u82w(tidU));
+                std::string ticket;
+                if(!jsonGetRaw(raw,"ticket",ticket) || ticket.empty()){
+                    RunOnUiThread([](){ Reception_OpenLabAnswer(); });
+                } else {
+                    RunOnUiThread([ticket](){ Reception_OpenLabAnswerTicket(ticket); });
+                }
+            } else {
+                RunOnUiThread([](){ Reception_OpenLabAnswer(); });
+            }
+        }
         else if(kind=="empty")      RunOnUiThread([](){ Reception_OpenNewTab(); });
         else if(kind=="admission")  RunOnUiThread([](){ Reception_OpenAdmissionNew(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
@@ -1519,6 +1634,7 @@ static std::string admissionApi(const std::string& verb, const std::string& body
         else if(kind=="receipts") RunOnUiThread([](){ Reception_CloseReceipts(); });
         else if(kind=="portal")   RunOnUiThread([](){ Reception_ClosePortal(); });
         else if(kind=="svreport") RunOnUiThread([](){ Reception_CloseSvReport(); });
+        else if(kind=="labanswer") RunOnUiThread([](){ Reception_CloseLabAnswer(); });
         else return "{\"ok\":false,\"err\":\"kind\"}";
         return "{\"ok\":true}";
     }

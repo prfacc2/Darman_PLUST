@@ -126,7 +126,8 @@ enum TabKind {
     TK_RECEIPTS    = 6,   // v1.88: native «جستجوی قبض» web surface (was in-page)
     TK_DASH        = 7,   // v1.89: native «داشبورد» — the permanent landing tab
     TK_BLACKLIST   = 8,   // v1.94: لیست سیاه بیماران — HTML surface
-    TK_SVREPORT    = 9    // v2.02: «تفکیک خدمات» — per-service breakdown report
+    TK_SVREPORT    = 9,   // v2.02: «تفکیک خدمات» — per-service breakdown report
+    TK_LABANSWER   = 10   // v2.08: «جوابدهی تک بیمار» — lab answer surface
 };
 // v2.02: single map of tab kind → HTML surface name. Adding a new HTML tab
 // means one extra case here (plus title / ui.openTab kind). Kinds that return
@@ -142,6 +143,7 @@ static const char* tabKindSurface(int kind){
     case TK_PORTAL:    return "portal";
     case TK_BLACKLIST: return "blacklist";
     case TK_SVREPORT:  return "svreport";
+    case TK_LABANSWER: return "labanswer";
     default:           return nullptr;
     }
 }
@@ -583,6 +585,7 @@ static int tabIconFor(int kind){
     if(kind==TK_DASH)    return ICO_HOME;     // داشبورد — home glyph
     if(kind==TK_BLACKLIST) return ICO_ID;     // لیست سیاه — national-id card glyph
     if(kind==TK_SVREPORT) return ICO_RECEIPT; // تفکیک خدمات — report glyph
+    if(kind==TK_LABANSWER) return ICO_RECEIPT; // v2.08: جوابدهی تک بیمار
     // v1.87.0: the admission tab carries the new person-plus glyph, echoing
     // the «پذیرش بیمار» header action so both read as one feature.
     return ICO_USER_ADD;                     // پذیرش بیمار — patient admission
@@ -4825,6 +4828,7 @@ static void addTabKind(HWND h, int kind, const std::string& extra=""){
     else if(kind==TK_DASH)      t->title=L"داشبورد";
     else if(kind==TK_BLACKLIST) t->title=L"لیست سیاه بیماران";
     else if(kind==TK_SVREPORT) t->title=L"تفکیک خدمات";
+    else if(kind==TK_LABANSWER) t->title=L"جوابدهی تک بیمار";
     else                        t->title=L"پذیرش بیمار";
     RECT rc; GetClientRect(h,&rc);
     // Only the reception form scrolls (it has the long right-side form); the
@@ -5654,6 +5658,21 @@ void Reception_OpenSvReport(){
     activateKind(h, TK_SVREPORT);
 }
 void Reception_CloseSvReport(){ closeActiveKind(TK_SVREPORT); }
+// v2.08: «جوابدهی تک بیمار» — lab answer surface (own HTML tab).
+void Reception_OpenLabAnswer(){
+    HWND h=recWnd();
+    if(!h) h=createReceptionScreen(g_hFrame);
+    if(!h) return;
+    activateKind(h, TK_LABANSWER);
+}
+void Reception_CloseLabAnswer(){ closeActiveKind(TK_LABANSWER); }
+// v2.08: open the lab answer tab WITH a ticket (passed from lab.lookup).
+void Reception_OpenLabAnswerTicket(const std::string& ticketJson){
+    HWND h=recWnd();
+    if(!h) h=createReceptionScreen(g_hFrame);
+    if(!h) return;
+    addTabKind(h, TK_LABANSWER, ticketJson);
+}
 void Reception_CycleTab(){
     HWND h=recWnd(); if(!h || !s_rd || s_rd->tabs.empty()) return;
     int n=(int)s_rd->tabs.size();
@@ -5696,9 +5715,19 @@ void Reception_CloseQueue(){ closeActiveKind(TK_QUEUE); }
 void Reception_CloseReceipts(){ closeActiveKind(TK_RECEIPTS); }
 void Reception_ClosePortal(){ closeActiveKind(TK_PORTAL); }
 void Reception_ResetZoom(){
-    // v2.02: zoom is session-scoped and defaults to 100% so the page fills
-    // the C++ host. Each tab is its own browser instance — reset is per-tab.
-    WebAdmission_PushEvent("reception.settings", "{\"zoom\":80}");
+    // v2.08: push the persisted font/zoom settings. zoom=0 means auto-fit.
+    auto w2u=[](const std::wstring& ws)->std::string{
+        if(ws.empty()) return "";
+        int n=WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),NULL,0,NULL,NULL);
+        std::string s; if(n>0){ s.resize(n); WideCharToMultiByte(CP_UTF8,0,ws.c_str(),(int)ws.size(),&s[0],n,NULL,NULL); }
+        return s;
+    };
+    int z=_wtoi(getSetting(L"admission.zoom",L"0").c_str()); if(z<50||z>200) z=0;
+    std::string j="{\"zoom\":"+w2u(std::to_wstring((long long)z));
+    j+=",\"fontFamily\":\""+w2u(getSetting(L"admission.font_family",L"Vazirmatn"))+"\"";
+    j+=",\"fontSize\":"+w2u(getSetting(L"admission.font_size",L"14"));
+    j+=",\"fontWeight\":\""+w2u(getSetting(L"admission.font_weight",L"600"))+"\"}";
+    WebAdmission_PushEvent("reception.settings", j);
 }
 
 HWND createReceptionScreen(HWND frame){
