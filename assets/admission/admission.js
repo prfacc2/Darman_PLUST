@@ -114,7 +114,8 @@
     rcPage: 'home',
     rcPageNo: 1,
     shiftOpen: false,
-    surface: 'admission'
+    surface: 'admission',
+    labQFocus: 0
   };
 
   /* ---- Persian digit helpers ---- */
@@ -1931,7 +1932,7 @@
       if (!opts) return;
       var btns = opts.getElementsByTagName('button'), i;
       for (i = 0; i < btns.length; i++) {
-        (function (b) {
+        (function (b, idx) {
           on(b, 'click', function () {
             if (b.className.indexOf('lab-q-disabled') >= 0) return;
             var opt = b.getAttribute('data-opt');
@@ -1940,9 +1941,38 @@
               showLabSingleBox();
             }
           });
-        })(btns[i]);
+          on(b, 'mouseenter', function () {
+            state.labQFocus = idx;
+            labQUpdateFocus();
+          });
+        })(btns[i], i);
       }
     })();
+    /* v2.08.1: keyboard navigation for the question box */
+    on($('labQuestionOverlay'), 'keydown', function (e) {
+      e = e || window.event;
+      var ov = $('labQuestionOverlay');
+      if (!ov || ov.style.display === 'none') return;   /* v2.08.1: ignore when hidden */
+      var box = $('labQuestionBox');
+      if (!box) return;
+      var btns = box.getElementsByTagName('button');
+      var n = btns.length;
+      if (e.keyCode === 38) {
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        do { state.labQFocus = (state.labQFocus - 1 + n) % n; } while (btns[state.labQFocus].className.indexOf('lab-q-disabled') >= 0);
+        labQUpdateFocus();
+      } else if (e.keyCode === 40) {
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        do { state.labQFocus = (state.labQFocus + 1) % n; } while (btns[state.labQFocus].className.indexOf('lab-q-disabled') >= 0);
+        labQUpdateFocus();
+      } else if (e.keyCode === 13) {
+        if (e.preventDefault) e.preventDefault(); else e.returnValue = false;
+        var b = btns[state.labQFocus];
+        if (b && b.className.indexOf('lab-q-disabled') < 0) b.click();
+      } else if (e.keyCode === 27) {
+        closeLabQuestionBox();
+      }
+    });
     on($('labConfirmBtn'), 'click', function () {
       var rcpt = ($('labReceiptInput') || {}).value || '';
       var barc = ($('labBarcodeInput') || {}).value || '';
@@ -2012,7 +2042,10 @@
         if (grid) {
           tiles = grid.getElementsByClassName('tools-tile');
           for (i = 0; i < tiles.length; i++) {
-            txt = norm(tiles[i].textContent || tiles[i].innerText);
+            /* v2.08.1: search only the visible label (tools-tile-name), not the
+               full textContent which can include keywords from other contexts. */
+            var nm = tiles[i].getElementsByClassName('tools-tile-name');
+            txt = norm(nm.length ? (nm[0].textContent || nm[0].innerText) : (tiles[i].textContent || tiles[i].innerText));
             var hide = q && txt.indexOf(q) < 0;
             tiles[i].style.display = hide ? 'none' : '';
             if (!hide) any = true;
@@ -2602,15 +2635,22 @@
     ov.style.display = '-ms-flexbox';
     ov.style.display = 'flex';
     ov.setAttribute('aria-hidden', 'false');
-    /* default the receipt month prefix to the current Jalali month */
-    var inp = $('labReceiptInput');
-    if (inp && !inp.value) {
-      var jm = state.todayJalali || '';
-      var parts = jm.split('/');
-      if (parts.length >= 2) {
-        var mm = parseInt(parts[1], 10) || 1;
-        inp.value = (mm < 10 ? '0' : '') + toFa(String(mm)) + '-';
-      }
+    /* v2.08.1: keyboard nav state */
+    state.labQFocus = 0;
+    labQUpdateFocus();
+    /* v2.08.1: focus the overlay so keyboard nav works immediately */
+    ov.setAttribute('tabindex', '-1');
+    setTimeout(function () { try { ov.focus(); } catch (e) {} }, 50);
+  }
+  /* v2.08.1: highlight the focused option in the question box */
+  function labQUpdateFocus() {
+    var box = $('labQuestionBox');
+    if (!box) return;
+    var opts = box.getElementsByTagName('button'), i;
+    for (i = 0; i < opts.length; i++) {
+      var cls = String(opts[i].className || '').replace(/\s*lab-q-focused\b/g, '');
+      if (i === state.labQFocus) cls += ' lab-q-focused';
+      opts[i].className = cls;
     }
   }
   function closeLabQuestionBox() {
@@ -2625,6 +2665,24 @@
     ov.style.display = '-ms-flexbox';
     ov.style.display = 'flex';
     ov.setAttribute('aria-hidden', 'false');
+    /* v2.08.1: default the receipt month prefix to the current Jalali month
+       in ENGLISH digits (numbers read LTR). Then place the cursor after the
+       '-' so the user can immediately type the receipt sequence. */
+    var inp = $('labReceiptInput');
+    if (inp) {
+      var jm = state.todayJalali || '';
+      var parts = jm.split('/');
+      var mm = 1;
+      if (parts.length >= 2) mm = parseInt(toEn(parts[1]), 10) || 1;
+      inp.value = (mm < 10 ? '0' : '') + mm + '-';
+      /* focus and place cursor at end (after the dash) */
+      setTimeout(function () {
+        try { inp.focus(); var len = inp.value.length;
+          if (inp.setSelectionRange) inp.setSelectionRange(len, len);
+          else if (inp.createTextRange) { var r = inp.createTextRange(); r.moveStart('character', len); r.select(); }
+        } catch (e) {}
+      }, 60);
+    }
   }
   function closeLabSingleBox() {
     var ov = $('labSingleOverlay');
@@ -5427,7 +5485,10 @@
         if (grid) {
           var apps = grid.getElementsByClassName('dash-app');
           for (i = 0; i < apps.length; i++) {
-            txt = norm(apps[i].getAttribute('data-name') + ' ' + (apps[i].textContent || apps[i].innerText));
+            /* v2.08.1: search only the visible label (dash-appname), not the
+               hidden data-name which contains keywords from other items. */
+            var nm = apps[i].getElementsByClassName('dash-appname');
+            txt = norm(nm.length ? (nm[0].textContent || nm[0].innerText) : (apps[i].textContent || apps[i].innerText));
             var hide = !!(q && txt.indexOf(q) < 0);
             apps[i].style.display = hide ? 'none' : '';
             if (!hide) any = true;

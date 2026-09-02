@@ -235,13 +235,16 @@ static int fzHit(HWND h, POINT pt){
 static void fzPaint(HWND h, HDC dc0){
     if(!s_fzs) return;
     RECT card=fzCard(h);
+    /* Paint the scrim (full window area) directly onto dc0, then paint the
+       card content onto an off-screen bitmap and BitBlt it back.  The card
+       bitmap must be created from dc0 (not dc) so its colour depth matches. */
+    RECT full; GetClientRect(h,&full);
     HDC dc=CreateCompatibleDC(dc0);
-    int w=card.right-card.left, hh=card.bottom-card.top;
+    int w=full.right-full.left, hh=full.bottom-full.top;
     HBITMAP bmp=CreateCompatibleBitmap(dc0,w,hh);
     HBITMAP old=(HBITMAP)SelectObject(dc,bmp);
 
-    // scrim background (dim the owner behind the dialog)
-    RECT full; GetClientRect(h,&full);
+    // scrim background (dim the owner behind the dialog) — full window area
     gpFillAlpha(dc, full, 0, RGB(0,0,0), 130);
 
     // card shadow + gradient
@@ -409,6 +412,8 @@ static void fzPaint(HWND h, HDC dc0){
     DrawTextW(dc,L"\u0627\u0646\u0635\u0631\u0627\u0641",-1,&cancR,DT_RTLREADING|DT_SINGLELINE|DT_VCENTER|DT_CENTER);
 
     SelectObject(dc,oldF);
+    /* Blit the completed off-screen bitmap onto the real screen DC */
+    BitBlt(dc0, 0, 0, w, hh, dc, 0, 0, SRCCOPY);
     SelectObject(dc,old);
     DeleteObject(bmp);
     DeleteDC(dc);

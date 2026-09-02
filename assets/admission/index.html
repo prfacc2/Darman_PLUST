@@ -709,7 +709,7 @@
 
   <!-- v2.08: LAB — «جوابدهی بیمار» question box + single-patient answer box.
        Both are full-screen glassmorphism overlays on the dashboard surface. -->
-  <div class="lab-overlay" id="labQuestionOverlay" style="display:none">
+  <div class="lab-overlay" id="labQuestionOverlay" style="display:none" tabindex="0">
     <div class="lab-backdrop" id="labQuestionBackdrop"></div>
     <div class="lab-qbox" id="labQuestionBox" role="dialog" aria-label="جوابدهی بیمار">
       <div class="lab-qbox-header">
@@ -748,7 +748,7 @@
   </div>
 
   <!-- v2.08: single-patient answer box (glassmorphism, lab-themed) -->
-  <div class="lab-overlay" id="labSingleOverlay" style="display:none">
+  <div class="lab-overlay" id="labSingleOverlay" style="display:none" tabindex="0">
     <div class="lab-backdrop" id="labSingleBackdrop"></div>
     <div class="lab-single-box" id="labSingleBox" role="dialog" aria-label="جوابدهی تک بیمار">
       <div class="lab-single-header">
@@ -763,11 +763,11 @@
           <div class="lab-field-label">بر اساس شماره قبض</div>
           <label class="lab-input-row">
             <span class="lab-input-cap">شماره قبض :</span>
-            <input type="text" id="labReceiptInput" class="lab-input" placeholder="مثلا ۰۵-۶۶۳" maxlength="12" />
+            <input type="text" id="labReceiptInput" class="lab-input lab-input-ltr" placeholder="مثلا 05-663" maxlength="12" dir="ltr" autocomplete="off" />
           </label>
           <label class="lab-input-row">
             <span class="lab-input-cap">شماره بارکد :</span>
-            <input type="text" id="labBarcodeInput" class="lab-input" placeholder="بارکد قبض" maxlength="20" />
+            <input type="text" id="labBarcodeInput" class="lab-input lab-input-ltr" placeholder="barcode" maxlength="20" dir="ltr" autocomplete="off" />
           </label>
           <div class="lab-hint">در صورت خالی بودن شماره قبض، نمای قبض‌های همان ماه نمایش داده می‌شود.</div>
         </div>
